@@ -6,6 +6,7 @@ import (
 	"github.com/AmadeusDE/Misa/internal/builtins"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -17,6 +18,36 @@ func optionsGNU(t *testing.T) string {
 		t.Skip("/usr/bin/diff is not GNU diffutils")
 	}
 	return gnu
+}
+
+// gnuAtLeast skips a comparison whose GNU behaviour changed in version min:
+// Misa follows diffutils 3.12, and older releases treat -N with a missing
+// operand differently.
+func gnuAtLeast(t *testing.T, min string) {
+	t.Helper()
+	out, _ := exec.Command(optionsGNU(t), "--version").Output()
+	first, _, _ := strings.Cut(string(out), "\n")
+	version := first[strings.LastIndexByte(first, ' ')+1:]
+	if versionLess(version, min) {
+		t.Skipf("GNU diff %s is older than %s", version, min)
+	}
+}
+
+func versionLess(a, b string) bool {
+	as, bs := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < max(len(as), len(bs)); i++ {
+		var x, y int
+		if i < len(as) {
+			x, _ = strconv.Atoi(as[i])
+		}
+		if i < len(bs) {
+			y, _ = strconv.Atoi(bs[i])
+		}
+		if x != y {
+			return x < y
+		}
+	}
+	return false
 }
 
 func compareOptionsGNU(t *testing.T, dir string, args ...string) {
@@ -127,7 +158,7 @@ func TestDiffOptionsGNU(t *testing.T) {
 }
 
 func TestDiffNewFilesGNU(t *testing.T) {
-	optionsGNU(t)
+	gnuAtLeast(t, "3.12")
 	for _, option := range []string{"-N", "--new-file", "--unidirectional-new-file"} {
 		for _, style := range []string{"", "-u", "-c", "-n"} {
 			for _, missing := range []string{"a", "b"} {
@@ -194,7 +225,7 @@ func TestDiffContextLocaleGNU(t *testing.T) {
 }
 
 func TestDiffMissingDirectoriesGNU(t *testing.T) {
-	optionsGNU(t)
+	gnuAtLeast(t, "3.12")
 	for _, option := range []string{"-N", "--unidirectional-new-file"} {
 		for _, recursive := range []bool{false, true} {
 			for _, missing := range []string{"a", "b"} {

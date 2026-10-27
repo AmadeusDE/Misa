@@ -35,16 +35,13 @@ and `docs/ughbot/WEB.md`.
   flagged calls come back to the bot as mail. `request_repo` adds directories or clones through approval.
 - Web UI: device enrollment (TOTP plus a device ed25519 key), challenge login, the ughbot TUI streamed as
   terminal cells, device management inside the TUI (`internal/webdevtui`).
+- Tests never read the user's keyring (`testing.Testing()` in `auth`), and the bot test rigs run without model
+  classifiers (`fakellm.NoModelClassifiers`): the flaky coding-task test was a real classifier judging through
+  borrowed keys.
 
 ## Next
 
-1. **Fix the flaky coding-task test.** `TestCodeTaskWorksInTheSandboxAndAsksTheBot`
-   (`internal/ughbot/bot/code_test.go`) sometimes fails with "denied by permission policy (no human attached)":
-   the bot's reply to the task's question is sometimes judged by the untrusted-output check, which has no human
-   to ask. The test is skipped unless `UGHBOT_FLAKY_TESTS=1`. Find which check fires (log the triage tier and
-   verdict), make the test's fake classifier deterministic, and decide whether a bot's own `reply` to its task
-   should be judged at all.
-2. **Notes and memory** (`internal/ughbot/memory`):
+1. **Notes and memory** (`internal/ughbot/memory`):
    - Per-bot markdown notes with `note_read`/`note_write`.
    - Memory rows: text, provenance (`user_stated`, `tool_derived`, `bot_inferred`), source reference,
      `superseded_by`, embedding. Retrieval is cosine plus FTS5, fused with reciprocal rank fusion. Tools
@@ -53,12 +50,12 @@ and `docs/ughbot/WEB.md`.
    - Every note or memory write is classified with a memory-write question set (injected, off-task, "persists an
      instruction or permission"). `tool_derived` writes get stricter thresholds. A flagged write becomes an
      approval and is held until approved.
-3. **Library** (granted bots): ideas, work items and backlog with status, tags, pinned and a check-in date.
+2. **Library** (granted bots): ideas, work items and backlog with status, tags, pinned and a check-in date.
    Tools `library_add/update/search/list`. Tasks link to items so `ughbot cost --by item` can show the cost per
    completed item.
-4. **Routines that run tool calls.** Instead of a separate job system, let a routine fire a tool call a bot
+3. **Routines that run tool calls.** Instead of a separate job system, let a routine fire a tool call a bot
    scheduled, judged when it was scheduled.
-5. **Scripts and pipeline rules:**
+4. **Scripts and pipeline rules:**
    - `run_scripts` is a per-script capability granted through approvals. Writing scripts is a separate
      capability for one or a few bots. Scripts live in a configured git repository, so changes are reviewed in
      git.
@@ -67,7 +64,7 @@ and `docs/ughbot/WEB.md`.
    - Pipeline rules in code, not prompts: `locks = ["build"]` (named mutexes) and
      `requires_stopped = ["service"]` (stop, run, restart, release, even on failure).
    - Scripts run sandboxed (bubblewrap inside a VM reached over SSH).
-6. **Shared libraries and remote machines:**
+5. **Shared libraries and remote machines:**
    - `internal/search`: the pure-Go walker and matcher from `internal/ugh/tools/search.go` (rg stays an optional
      fast path), with new `grep` and `find` built-ins over it, developed against the toybox and uutils suites.
    - Built-ins safe for concurrent in-process use: `currentUmask` still flips the process umask off Linux (no
@@ -79,7 +76,7 @@ and `docs/ughbot/WEB.md`.
      SFTP.
    - `internal/remote`: a `Conn` interface over SSH. Bots name host aliases from config, granted per bot; keys
      stay in sshclient and ssh-agent. Tools `remote_exec`, `remote_put`, `remote_get`, `remote_pty`.
-7. **Importer** for the bot setup this replaces: role prompts to prompt files, routines to schedules, notes to
+6. **Importer** for the bot setup this replaces: role prompts to prompt files, routines to schedules, notes to
    library items and memory (`imported` provenance). Run both side by side before switching over.
 
 ## Open questions

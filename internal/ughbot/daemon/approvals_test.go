@@ -46,6 +46,9 @@ capabilities = { create_bots = true }
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := fakellm.NoModelClassifiers(cfg.ConfigDir); err != nil {
+		t.Fatal(err)
+	}
 	d, err := New(Options{Config: cfg, Provider: h.p})
 	if err != nil {
 		t.Fatal(err)

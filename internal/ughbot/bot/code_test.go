@@ -80,11 +80,6 @@ func gitRepo(t *testing.T, dir string) {
 }
 
 func TestCodeTaskWorksInTheSandboxAndAsksTheBot(t *testing.T) {
-	if os.Getenv("UGHBOT_FLAKY_TESTS") == "" {
-		// Intermittent: the bot's reply to the task's question is sometimes denied by the
-		// untrusted-output check. Tracked in docs/plans/ughbot.md.
-		t.Skip("flaky; set UGHBOT_FLAKY_TESTS=1 to run")
-	}
 	home := t.TempDir()
 	repo := filepath.Join(home, "repo")
 	if err := os.MkdirAll(repo, 0o755); err != nil {

@@ -3,6 +3,7 @@ package native
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -48,7 +49,9 @@ func TestWhoami_ReturnsUser(t *testing.T) {
 func TestNproc_ReturnsNumber(t *testing.T) {
 	r := run(t, "nproc")
 	wantSuccess(t, r)
-	wantOutContains(t, r, "1")
+	if n, err := strconv.Atoi(strings.TrimSpace(r.stdout)); err != nil || n < 1 {
+		t.Errorf("nproc printed %q, want a positive number", r.stdout)
+	}
 }
 
 func TestUname_Default(t *testing.T) {

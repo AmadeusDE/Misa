@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/AmadeusDE/Misa/internal/ugh/roots"
 
 	"github.com/zalando/go-keyring"
@@ -55,11 +59,36 @@ func (keyringBackend) Save(c *Credentials) error {
 	return nil
 }
 
-// probeKeyring reports whether the Secret Service is reachable. It is a
-// variable so tests can force the file fallback without touching a keyring.
-var probeKeyring = func() error {
+// probeKeyring reports whether the Secret Service is reachable, asking once
+// per process: D-Bus can activate a Secret Service that never answers (a
+// headless server, CI), and that must not hang every credential lookup.
+// Test binaries never use the user's keyring; tests that need one replace
+// this variable.
+var probeKeyring = onceWithin(func() error {
+	if testing.Testing() {
+		return errors.New("auth: the keyring is not used in tests")
+	}
 	_, err := keyringBackend{}.Load()
 	return err
+}, 3*time.Second)
+
+// onceWithin runs probe on first use and remembers its answer, or an error
+// if it took longer than limit.
+func onceWithin(probe func() error, limit time.Duration) func() error {
+	var once sync.Once
+	var result error
+	return func() error {
+		once.Do(func() {
+			done := make(chan error, 1)
+			go func() { done <- probe() }()
+			select {
+			case result = <-done:
+			case <-time.After(limit):
+				result = errors.New("auth: keyring did not answer")
+			}
+		})
+		return result
+	}
 }
 
 // Open picks the backend named by mode:

@@ -44,6 +44,9 @@ spend = { daily = ` + strconv.FormatFloat(daily, 'f', -1, 64) + ` }
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := fakellm.NoModelClassifiers(cfg.ConfigDir); err != nil {
+		t.Fatal(err)
+	}
 	st, err := store.Open(cfg.DBPath())
 	if err != nil {
 		t.Fatal(err)
@@ -164,11 +167,14 @@ func TestStartTaskReturnsItsResultAsMail(t *testing.T) {
 	if _, err := b.Send("please dig"); err != nil {
 		t.Fatal(err)
 	}
-	waitFor(t, events, "mail")
-	end := waitFor(t, events, "turn_end")
-	_ = end
-	if !strings.Contains(p.History(), "dug") {
-		t.Fatalf("main thread never saw the task result:\n%s", p.History())
+	// The result can land during the turn that started the task or after
+	// it, so wait for turn ends until the main thread has seen it.
+	deadline := time.Now().Add(10 * time.Second)
+	for !strings.Contains(p.History(), "dug") {
+		if time.Now().After(deadline) {
+			t.Fatalf("main thread never saw the task result:\n%s", p.History())
+		}
+		waitFor(t, events, "turn_end")
 	}
 }
 
