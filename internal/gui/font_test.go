@@ -9,6 +9,7 @@ func embeddedFonts(t testing.TB) *fontSet {
 	t.Helper()
 	lib := newFontLibrary()
 	lib.fcMatch = false
+	lib.dirsSet = true
 	fs, err := newFontSet(lib, "", 12, 1)
 	if err != nil {
 		t.Fatal(err)

@@ -1,6 +1,6 @@
 # Plan: Android port (native APK + Termux CLI)
 
-Status: A0 measured 2026-10-27; later phases not started. Written 2026-10-26 against `master` at `a5982a8`
+Status: A0 measured 2026-10-27; A1 and A2 landed; later phases not started. Written 2026-10-26 against `master` at `a5982a8`
 ("Build binaries and AppImages in Actions (#1)"). This file is `docs/plans/android.md`.
 
 Part 1 is the shared groundwork and the Termux CLI (phases A0–A2). Part 2 is the native APK (A3–A6).
@@ -617,7 +617,7 @@ plus nightly `schedule` and `workflow_dispatch`, since emulators are slow):
 |---|---|---|---|
 | A0 Measure | done | [#2](https://github.com/AmadeusDE/Misa/pull/2) | NDK r30 matrix, API floor, emulator, throwaway APK. Leftovers for A1 are listed in the measurement section. Decisions flagged, not rewritten |
 | A1 Termux CLI | done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | sysinfo/fetch, procmon degrade, clipboard, file secrets on Android, pkg, session walk. Termux-on-device still unmeasured; the emulator job covers amd64 |
-| A2 gui core/backend split | not started | | shared with Windows W2 |
+| A2 gui core/backend split | done | | shared with Windows W2. Core in `internal/gui` (`app.go`, `backend.go`, renderer, fonts). Wayland is `wl_*.go` with `unix && !android` (Android matches both `linux` and `unix`). `misa --gui` on Android errors cleanly. Pixel format is `FormatBGRA8888` or `FormatRGBA8888`; the core draws in the backend's order |
 | A3 Android backend + c-shared | not started | | |
 | A4 APK shell | not started | | |
 | A5 Platform services | not started | | |

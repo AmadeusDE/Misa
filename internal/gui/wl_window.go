@@ -1,3 +1,5 @@
+//go:build unix && !android
+
 package gui
 
 import (
@@ -79,6 +81,7 @@ type window struct {
 	onScale         func()
 	onFrame         func()
 	onBufferRelease func()
+	onClose         func()
 }
 
 // newWindow maps a toplevel; translucent windows get buffers with alpha.
@@ -151,6 +154,9 @@ func (w *window) toplevelEvent(ev *wayland.Event) {
 		w.pendingW, w.pendingH = int(ev.Int()), int(ev.Int())
 	case toplevelEventClose:
 		w.closeRequested = true
+		if w.onClose != nil {
+			w.onClose()
+		}
 	}
 }
 

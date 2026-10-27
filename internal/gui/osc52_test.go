@@ -8,7 +8,10 @@ import (
 
 func TestClipboardWriteOffIgnoresOSC52(t *testing.T) {
 	off := false
-	a := &app{cfg: config.GUIConfig{ClipboardWrite: &off}}
-	a.clip.manager, a.clip.device = 1, 1 // a copy would reach the (nil) connection
+	fb := newFakeBackend()
+	a := &app{cfg: config.GUIConfig{ClipboardWrite: &off}, be: fb}
 	a.handleOSC("52;c;aGVsbG8=")
+	if fb.clip.writes != 0 {
+		t.Fatalf("clipboard writes = %d", fb.clip.writes)
+	}
 }
