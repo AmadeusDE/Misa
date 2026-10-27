@@ -18,12 +18,30 @@ go build -tags noweb -o misa .   # without `--web` (browser terminal, see docs/M
 go build -o ughbot ./cmd/ughbot # the ughbot daemon and CLI (experimental, see docs/ughbot/DEPLOY.md)
 gofmt -l .                       # must print nothing
 GOOS=openbsd go vet ./... && GOOS=freebsd go vet ./... && GOOS=darwin go vet ./...
+
+# Android CLI (cgo). GOOS=android also matches the linux build tag, so a file
+# tagged linux is built for Android too. Where Android must differ, tag the
+# Linux file `linux && !android` and add an android sibling. import "C" is
+# allowed only in files tagged `android && cgo` (cgo_constraint_test.go).
+# Every other target stays CGO_ENABLED=0. NDK pin: android/ndk.version.
+# CC is the NDK's *-linux-android24-clang (API 24).
+ANDROID_NDK_HOME=... just android-cli          # dist/misa-android-arm64/ (misa, ugh; no ughbot)
+ANDROID_NDK_HOME=... just android-cli amd64    # dist/misa-android-amd64/
+# Vet matches CI: CGO_ENABLED=1 for both arches (and tags nough, nogui, noweb).
+# CGO_ENABLED=0 go vet ./... is arm64 only. android/amd64 cannot load test
+# binaries without the external linker, so that arch typechecks libraries
+# with go build. The arm64 vet covers the pure-Go android files.
 ```
 
-Single binary, no external build tools needed. Go 1.27.1 (OpenBSD: `GOTOOLCHAIN=go1.27.1`). CI (`.github/workflows/ci.yml`)
-runs gofmt, the builds, vet for every tag and the other unixes, and the tests. `build.yml` builds the binaries
-for every platform and the AppImages (`packaging/appimage/build.sh`, appimagetool pinned by checksum); a pushed
-`v*` tag publishes them as a release.
+Single binary, no external build tools needed except the Android NDK for `GOOS=android`.
+Go 1.27.1 (OpenBSD: `GOTOOLCHAIN=go1.27.1`). CI (`.github/workflows/ci.yml`)
+runs gofmt, the builds, vet for every tag and the other unixes, the tests, and an `android`
+job (NDK r30 from `android/ndk.version`, both ABIs, the tag set, cgo and cgo-less vet).
+`android-device` (path-filtered, plus nightly and `workflow_dispatch`) runs the portable
+test binaries on an emulator. `build.yml` builds the binaries
+for every platform, including `android-arm64` and `android-amd64` CLI trees, and the AppImages
+(`packaging/appimage/build.sh`, appimagetool pinned by checksum); a pushed
+`v*` tag publishes them as a release. The Android tarball is `misa` and `ugh` only.
 ugh lives in this repo: `internal/ugh/*` (agent, tools, llm, perm, session, …; `internal/ugh/ughtui` is the embeddable TUI)
 and `cmd/ugh`. Three binaries: `go build -o misa .`, `go build -o ugh ./cmd/ugh`, `go build -o ughbot ./cmd/ughbot`.
 ugh's user documentation is `docs/UGH.md`; ughbot's is `docs/ughbot/`.
@@ -126,7 +144,10 @@ internal/
                                  letters toggle, move list panel; the computer thinks in a tea.Cmd (thoughtMsg,
                                  gen drops abandoned searches); standalone runner
   vi/                            Built-in vi editor implementation
-  ascii/                         ASCII art loading (embedded + external dirs)
+  ascii/                         ASCII art loading (embedded + external dirs). Android and Termux art
+                                 live under distro/pfetch; ids come from sysinfo (termux / android)
+  clipboard/                     Host clipboard: atotto on Linux/BSD/macOS, termux-clipboard-* when on
+                                 PATH, ErrUnavailable so the UI emits OSC 52. APK JNI replaces it later
   color/                         Color palette loading, hex-to-ANSI, color translation
   config/                        YAML config — config.yaml (menu, ascii, colors, ui, statusbar), mux.yaml, fetch.yaml, gui.yaml
   companion/                     Encouraging messages after command (cargo-mommy derived)
@@ -140,8 +161,14 @@ internal/
     data/kemonos/                your/ (puppy) and companion/ (catgirl, …)
     data/catalog.yaml            pronouns, call terms, prefixes, items, parts, emotes
   thefuck/                       Command correction rules — pattern-based fix suggestions
-  pkgmanager/                    Data-driven package manager definitions (built-in + external YAML)
-  sysinfo/                       System info fetching (basic + extended)
+  pkgmanager/                    Data-driven package manager definitions (built-in + external YAML).
+                                 Termux adds `pkg` when TERMUX_VERSION or a com.termux PREFIX is set.
+                                 MISA_ANDROID_APP=1 hides managers with Distro set (pacman, flatpak, pkg)
+  sysinfo/                       System info fetching (basic + extended). Android/Termux detection:
+                                 TERMUX_VERSION, PREFIX, MISA_ANDROID_APP, and getprop
+                                 (ro.build.version.release, ro.product.model, ro.product.manufacturer)
+                                 via __system_property_get (android && cgo) or /system/bin/getprop.
+                                 EACCES on proc files used for memory/uptime/kernel shows "—"
   gitinfo/                       Git branch/dirty/ahead/behind detection
   help/                          TLDR downloading, man page parsing, markdown rendering
   launcher/                      Bubble Tea ExecProcess helper (unused: external programs run in-pane PTYs via Model.launch)
@@ -156,7 +183,11 @@ internal/
                                  screens/scrollback — keep Cell pointer-free, a test enforces it). Scrolled-off rows
                                  move into scrollback and evicted/discarded rows are recycled (blankRow), so steady
                                  output doesn't allocate; putASCII writes plain ASCII runs in one pass.
-                                 `go test -bench ProcessOutput ./internal/term/` measures parser throughput
+                                 `go test -bench ProcessOutput ./internal/term/` measures parser throughput.
+                                 session_linux.go walks /proc for the PTY session on Android too
+                                 (GOOS=android matches linux). Unreadable pids are skipped; if /proc
+                                 cannot be listed, kill falls back to the leader's process group.
+                                 pidfd is preferred; a refused pidfd (Android before 12) signals by pid
   gui/                           Optional Wayland window (`misa --gui [cmd…]`), pure Go, software rendered:
                                  runs Misa (or cmd) on a term.Terminal PTY and draws its cells into wl_shm buffers
     gui.go                       Run, event loop, sizing, frame pacing (frame callbacks), OSC title/52 handling,
@@ -191,7 +222,8 @@ internal/
 - **Screen-based navigation**: `screen` enum selects which update/view runs. Each screen is a self-contained update+view pair.
 - **Menu stack**: `pushMenu()`/`popMenu()` for nested menus. `pushFilterableMenu()` enables bubbles list filtering.
 - **Mux architecture**: Outer non-nested Model uses `updateMuxRoot`/`muxView()`. Nested Misa panes use `nestedMode=true`. `forceFrame()` renders lines at `w-1` characters to prevent terminal auto-wrap.
-- **Data-driven package managers**: `pkgmanager.Manager` defines detection, actions (run/shell_prefill/list). Built-in pacman and flatpak; external YAML in `~/.config/misa/managers/` or next to binary.
+- **Data-driven package managers**: `pkgmanager.Manager` defines detection, actions (run/shell_prefill/list). Built-in pacman and flatpak; Termux `pkg` when `TERMUX_VERSION` or a `com.termux` `PREFIX` is set; external YAML in `~/.config/misa/managers/` or next to binary. `MISA_ANDROID_APP=1` drops managers with `Distro: true`.
+- **Android build tags**: `GOOS=android` satisfies `linux`. Android-only files are tagged `android`. `import "C"` only with `android && cgo`. `CGO_ENABLED=0` everywhere else. NDK version is `android/ndk.version`; API level for the CLI is 24.
 - **External asset loading**: Distro art from `~/.config/misa/ascii/distro/`, anime only from `~/.config/misa/ascii/anime/` or `ascii/anime/` next to the binary (none is bundled; no art means an empty right column), themes from `presets.json`, all also searched next to binary.
 - **Picker screen**: Reusable searchable toggle-list with preview. Used by settings, onboarding. `finishPicker()` checks `m.picker == nil` before overwriting screen to handle chained pickers.
 - **Config search order**: next to executable → `~/.config/misa/`. Same for companion, mux, fetch and gui configs. Never the working directory: a cloned repo must not be able to supply `autorun:` or aliases.

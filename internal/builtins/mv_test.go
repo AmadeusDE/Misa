@@ -133,6 +133,7 @@ func TestMvVerboseUsesGivenDestinationName(t *testing.T) {
 // dereferenced target when another hard link to that target still exists:
 // this must be refused as "same file", not silently corrupt the link.
 func TestMvSameFileThroughSymlink(t *testing.T) {
+	skipWithoutHardlinks(t)
 	dir := t.TempDir()
 	f := writeFile(t, dir, "f", "x")
 	if err := os.Link(f, filepath.Join(dir, "h")); err != nil {

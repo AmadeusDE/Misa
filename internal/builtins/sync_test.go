@@ -31,7 +31,7 @@ func TestSyncFileAndFIFO(t *testing.T) {
 		assertExitCode(t, runBuiltinIn(t, dir, "sync", flag, "file", "."), 0)
 	}
 	if err := syscall.Mkfifo(filepath.Join(dir, "pipe"), 0600); err != nil {
-		t.Fatal(err)
+		t.Skipf("fifos are not permitted: %v", err)
 	}
 	start := time.Now()
 	r := runBuiltinIn(t, dir, "sync", "--data", "pipe")

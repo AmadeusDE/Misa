@@ -88,6 +88,9 @@ func getTitle() string {
 }
 
 func getOS() string {
+	if name := detectPlatform().osName(); name != "" {
+		return name
+	}
 	f, err := os.Open("/etc/os-release")
 	if err != nil {
 		return "Linux"
@@ -113,6 +116,9 @@ func getOS() string {
 }
 
 func getHost() string {
+	if host := detectPlatform().hostName(); host != "" {
+		return host
+	}
 	productName := ""
 	data, err := os.ReadFile("/sys/devices/virtual/dmi/id/product_name")
 	if err == nil {

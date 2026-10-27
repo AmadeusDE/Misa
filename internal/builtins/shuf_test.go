@@ -261,9 +261,11 @@ func TestShufZeroCount(t *testing.T) {
 }
 
 func TestShufWriteFull(t *testing.T) {
-	if _, err := os.Stat("/dev/full"); err != nil {
-		t.Skipf("env/host: /dev/full unavailable: %v", err)
+	full, err := os.OpenFile("/dev/full", os.O_WRONLY, 0)
+	if err != nil {
+		t.Skipf("env/host: /dev/full not writable: %v", err)
 	}
+	full.Close()
 	code, out, stderr, _ := shufTestRun(t, []string{"-i1-10", "-o/dev/full"}, "", nil)
 	if code != 1 || out != "" || stderr != "shuf: write failed: No space left on device\n" {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, out, stderr)

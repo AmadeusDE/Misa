@@ -325,6 +325,7 @@ func TestCpUpdateNoneAlwaysSkips(t *testing.T) {
 // destination that's already hard-linked to the source: real GNU treats
 // this as a no-op success rather than a same-file error.
 func TestCpHardlinkOntoExistingHardlinkIsNoop(t *testing.T) {
+	skipWithoutHardlinks(t)
 	dir := t.TempDir()
 	foo := writeFile(t, dir, "foo", "x")
 	hardlink := filepath.Join(dir, "hardlink")
@@ -339,6 +340,7 @@ func TestCpHardlinkOntoExistingHardlinkIsNoop(t *testing.T) {
 // --preserve=links -H: two operands that resolve to the same file after
 // dereferencing a symlink argument must end up hard-linked at dst too.
 func TestCpPreservesHardlinksAcrossDereferencedSymlinkArgs(t *testing.T) {
+	skipWithoutHardlinks(t)
 	dir := t.TempDir()
 	writeFile(t, dir, "a", "x")
 	if err := os.Symlink("a", filepath.Join(dir, "b")); err != nil {

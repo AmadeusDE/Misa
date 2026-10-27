@@ -28,6 +28,7 @@ type Manager struct {
 	Name    string   `yaml:"name"`
 	Desc    string   `yaml:"desc"`
 	Detect  string   `yaml:"detect"`
+	Distro  bool     `yaml:"distro,omitempty"`
 	Actions []Action `yaml:"actions"`
 }
 
@@ -72,8 +73,14 @@ func (la *ListAction) ItemCmd(item string) []string {
 }
 
 func All() []Manager {
-	managers := builtins()
-	managers = append(managers, loadExternal()...)
+	hideDistro := os.Getenv("MISA_ANDROID_APP") == "1"
+	var managers []Manager
+	for _, m := range append(builtins(), loadExternal()...) {
+		if hideDistro && m.Distro {
+			continue
+		}
+		managers = append(managers, m)
+	}
 	return managers
 }
 
@@ -112,8 +119,19 @@ func searchDirs(subdir string) []string {
 	return dirs
 }
 
+func onTermux() bool {
+	if os.Getenv("MISA_ANDROID_APP") == "1" {
+		return false
+	}
+	return os.Getenv("TERMUX_VERSION") != "" || strings.Contains(os.Getenv("PREFIX"), "/com.termux/")
+}
+
 func builtins() []Manager {
-	return []Manager{pacmanDef(), flatpakDef(), gitDef(), powerDef()}
+	managers := []Manager{pacmanDef(), flatpakDef(), gitDef(), powerDef()}
+	if onTermux() {
+		managers = append(managers, pkgDef())
+	}
+	return managers
 }
 
 func pacmanDef() Manager {
@@ -121,6 +139,7 @@ func pacmanDef() Manager {
 		Name:   "Pacman",
 		Desc:   "Package management",
 		Detect: "pacman",
+		Distro: true,
 		Actions: []Action{
 			{Title: "System upgrade", Desc: "pacman -Syu", Run: []string{"sudo", "pacman", "-Syu"}},
 			{Title: "Search", Desc: "Search repos for a package", ShellPrefill: "pacman -Ss "},
@@ -138,6 +157,7 @@ func flatpakDef() Manager {
 		Name:   "Flatpak",
 		Desc:   "Flatpak management",
 		Detect: "flatpak",
+		Distro: true,
 		Actions: []Action{
 			{Title: "Update all", Desc: "flatpak update", Run: []string{"flatpak", "update"}},
 			{Title: "Search", Desc: "Search Flathub for an app", ShellPrefill: "flatpak search "},
@@ -163,6 +183,21 @@ func flatpakDef() Manager {
 				},
 			},
 			{Title: "Clean unused", Desc: "flatpak uninstall --unused", Run: []string{"flatpak", "uninstall", "--unused"}},
+		},
+	}
+}
+
+func pkgDef() Manager {
+	return Manager{
+		Name:   "pkg",
+		Desc:   "Termux packages",
+		Detect: "pkg",
+		Distro: true,
+		Actions: []Action{
+			{Title: "Upgrade", Desc: "pkg upgrade", Run: []string{"pkg", "upgrade"}},
+			{Title: "Search", Desc: "Search packages", ShellPrefill: "pkg search "},
+			{Title: "Install", Desc: "Install a package", ShellPrefill: "pkg install "},
+			{Title: "Remove", Desc: "Remove a package", ShellPrefill: "pkg uninstall "},
 		},
 	}
 }

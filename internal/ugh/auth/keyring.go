@@ -91,11 +91,16 @@ func onceWithin(probe func() error, limit time.Duration) func() error {
 	}
 }
 
+// filePreferred selects the 0600 file backend without probing D-Bus.
+// Android has no Secret Service; prefer_android.go sets this.
+var filePreferred bool
+
 // Open picks the backend named by mode:
 //
 //	"keyring" — Secret Service only, error if unreachable
-//	"file"    — $XDG_CONFIG_HOME/ugh/credentials.json
-//	"auto"    — keyring when reachable, otherwise file (the default)
+//	"file"    — $XDG_CONFIG_HOME/ugh/credentials.json (0600, atomic replace)
+//	"auto"    — keyring when reachable, otherwise file (the default).
+//	            Android always uses the file: there is no Secret Service.
 //
 // With explicit roots the keyring is a single machine-wide "ugh" entry that
 // instances would share, so "auto" resolves to the roots' own file. A headless
@@ -141,6 +146,9 @@ func open(mode, filePath string) (*Store, error) {
 	case "file":
 		return NewStore(fileBackend{path: filePath}), nil
 	case "auto":
+		if filePreferred {
+			return NewStore(fileBackend{path: filePath}), nil
+		}
 		if err := probeKeyring(); err == nil {
 			return NewStore(keyringBackend{}), nil
 		}

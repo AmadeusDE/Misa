@@ -7,7 +7,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/AmadeusDE/Misa/internal/term"
@@ -130,15 +129,16 @@ func (m *Model) updateFullShell(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case mouseMsg:
 			if m.terminal.InAltScreen() {
 				if !forwardMouse(m.terminal, msg, msg.X, msg.Y) && !scrollAltScreen(m.terminal, msg) {
-					m.selMouse(msg, m.terminal)
+					_, cmd := m.selMouse(msg, m.terminal)
+					return m, cmd
 				}
 				return m, nil
 			}
 			if forwardMouse(m.terminal, msg, msg.X, msg.Y-m.fullShellTermTop()) {
 				return m, nil
 			}
-			if m.handleVPSelMouse(msg, m.fullShellVP.YOffset(), m.fullShellPlainLines(), 0) {
-				return m, nil
+			if handled, cmd := m.handleVPSelMouse(msg, m.fullShellVP.YOffset(), m.fullShellPlainLines(), 0); handled {
+				return m, cmd
 			}
 			if isWheelUp(msg) {
 				m.fullShellVP.ScrollUp(3)
@@ -155,8 +155,8 @@ func (m *Model) updateFullShell(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case mouseMsg:
-		if m.handleVPSelMouse(msg, m.fullShellVP.YOffset(), m.fullShellPlainLines(), 0) {
-			return m, nil
+		if handled, cmd := m.handleVPSelMouse(msg, m.fullShellVP.YOffset(), m.fullShellPlainLines(), 0); handled {
+			return m, cmd
 		}
 		if isWheelUp(msg) {
 			m.fullShellVP.ScrollUp(3)
@@ -201,7 +201,7 @@ func (m *Model) updateFullShell(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+v":
 			text := m.registerText()
 			if text == "" {
-				text, _ = clipboard.ReadAll()
+				text = readClipboard()
 			}
 			if text != "" {
 				insertAtCursor(&m.cmdInput, text)

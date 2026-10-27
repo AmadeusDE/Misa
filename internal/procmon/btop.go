@@ -398,11 +398,16 @@ func (b *BtopViewer) renderCPUBox(width, height int) []string {
 	if barW < 4 {
 		barW = 4
 	}
+	pct := fmt.Sprintf("%5.1f%%", totalUsage)
+	if !b.cur.CPUAvailable {
+		pct = unavailable
+		totalUsage = 0
+	}
 	var left []string
 	left = append(left, fmt.Sprintf("%s %s %s",
 		btopLabelStyle.Render("CPU"),
 		btopBarThreshold(barW, totalUsage),
-		btopThresholdColor(totalUsage).Render(fmt.Sprintf("%5.1f%%", totalUsage))))
+		btopThresholdColor(totalUsage).Render(pct)))
 
 	numCores := len(b.cur.CPUs)
 	twoCol := numCores > 4

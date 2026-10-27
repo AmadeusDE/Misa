@@ -68,8 +68,21 @@ func TestTimeoutSignals(t *testing.T) {
 func timeoutTestRun(t *testing.T, dir string, env []string, args ...string) (int, string, string) {
 	t.Helper()
 	var out, err bytes.Buffer
-	code := runTimeout(&Context{Dir: dir, Env: env, Args: args, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &err})
+	code := runTimeout(&Context{Dir: dir, Env: withTimeoutPath(env), Args: args, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &err})
 	return code, out.String(), err.String()
+}
+
+// withTimeoutPath supplies the directories timeout searches when PATH is
+// unset, so a child shell can find the same commands.
+func withTimeoutPath(env []string) []string {
+	for _, e := range env {
+		if strings.HasPrefix(e, "PATH=") {
+			return env
+		}
+	}
+	out := make([]string, len(env), len(env)+1)
+	copy(out, env)
+	return append(out, "PATH=/bin:/usr/bin:/system/bin")
 }
 
 func TestTimeoutCommand(t *testing.T) {
@@ -126,9 +139,9 @@ func TestTimeoutScripts(t *testing.T) {
 	}{
 		{"no shebang", "printf '%s' \"$1\"", 0700, []string{"1", "./script", "argument"}, 0, "argument"},
 		{"not executable", "echo nope", 0600, []string{"1", "./script"}, 126, ""},
-		{"trap", "#!/bin/sh\ntrap 'exit 3' TERM\nwhile :; do :; done", 0700, []string{".1", "./script"}, 124, ""},
-		{"trap preserve", "#!/bin/sh\ntrap 'exit 3' TERM\nwhile :; do :; done", 0700, []string{"-p", ".1", "./script"}, 3, ""},
-		{"ignore then kill", "#!/bin/sh\ntrap '' TERM\nwhile :; do :; done", 0700, []string{"-v", "-k.05", ".1", "./script"}, 137, ""},
+		{"trap", shBang() + "trap 'exit 3' TERM\nwhile :; do :; done", 0700, []string{".1", "./script"}, 124, ""},
+		{"trap preserve", shBang() + "trap 'exit 3' TERM\nwhile :; do :; done", 0700, []string{"-p", ".1", "./script"}, 3, ""},
+		{"ignore then kill", shBang() + "trap '' TERM\nwhile :; do :; done", 0700, []string{"-v", "-k.05", ".1", "./script"}, 137, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			file := filepath.Join(dir, "script")
@@ -149,7 +162,7 @@ func TestTimeoutScripts(t *testing.T) {
 func TestTimeoutContext(t *testing.T) {
 	dir := t.TempDir()
 	script := filepath.Join(dir, "child")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf '%s\\n' \"$VALUE\"\npwd\n/bin/cat"), 0700); err != nil {
+	if err := os.WriteFile(script, []byte(shBang()+"echo \"$VALUE\"\npwd\n"+hostCat()), 0700); err != nil {
 		t.Fatal(err)
 	}
 	var out, err bytes.Buffer
@@ -161,7 +174,7 @@ func TestTimeoutContext(t *testing.T) {
 
 func TestTimeoutMergedOutput(t *testing.T) {
 	var output bytes.Buffer
-	ctx := &Context{Dir: t.TempDir(), Env: []string{}, Args: []string{"-v", ".1", "sh", "-c", "while :; do echo output; echo error >&2; sleep .01; done"}, Stdin: strings.NewReader(""), Stdout: &output, Stderr: &output}
+	ctx := &Context{Dir: t.TempDir(), Env: withTimeoutPath(nil), Args: []string{"-v", ".1", "sh", "-c", "while :; do echo output; echo error >&2; sleep .01; done"}, Stdin: strings.NewReader(""), Stdout: &output, Stderr: &output}
 	if code := runTimeout(ctx); code != 124 || !strings.Contains(output.String(), "sending signal TERM") {
 		t.Fatalf("code=%d output=%q", code, output.String())
 	}
@@ -169,7 +182,7 @@ func TestTimeoutMergedOutput(t *testing.T) {
 
 func TestTimeoutProcessGroup(t *testing.T) {
 	dir := t.TempDir()
-	code, _, err := timeoutTestRun(t, dir, []string{}, ".15", "sh", "-c", "sleep 5 & echo $! > child.pid; wait")
+	code, _, err := timeoutTestRun(t, dir, nil, ".15", "sh", "-c", "sleep 5 & echo $! > child.pid; wait")
 	if code != 124 {
 		t.Fatalf("code=%d stderr=%q", code, err)
 	}
@@ -181,17 +194,43 @@ func TestTimeoutProcessGroup(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	// A killed grandchild can remain a zombie until the host's init reaps it.
-	data, e = os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
-	if e == nil && !strings.Contains(string(data), ") Z ") {
-		t.Fatalf("grandchild survived timeout: %s", data)
+	// timeout waits only for the shell. The grandchild is reparented to init and
+	// can stay runnable for a few milliseconds after SIGTERM, or as a zombie
+	// until init reaps it. Z and X are already dead.
+	stat := filepath.Join("/proc", strconv.Itoa(pid), "stat")
+	deadline := time.Now().Add(time.Second)
+	for {
+		data, e = os.ReadFile(stat)
+		if e != nil || strings.Contains(string(data), ") Z ") || strings.Contains(string(data), ") X ") {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("grandchild survived timeout: %s", data)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 
 func TestTimeoutWaitDelay(t *testing.T) {
 	start := time.Now()
-	code, _, err := timeoutTestRun(t, t.TempDir(), []string{}, "2", "sh", "-c", "sleep .5 & exit 0")
+	code, _, err := timeoutTestRun(t, t.TempDir(), nil, "2", "sh", "-c", "sleep .5 & exit 0")
 	if code != 0 || time.Since(start) > 400*time.Millisecond {
 		t.Fatalf("code=%d elapsed=%v stderr=%q", code, time.Since(start), err)
 	}
+}
+
+func shBang() string {
+	return "#!" + hostBin("sh") + "\n"
+}
+
+func hostCat() string { return hostBin("cat") }
+
+func hostBin(name string) string {
+	for _, dir := range []string{"/bin", "/usr/bin", "/system/bin"} {
+		p := filepath.Join(dir, name)
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			return p
+		}
+	}
+	return "/bin/" + name
 }

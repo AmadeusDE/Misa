@@ -159,10 +159,21 @@ func timeoutStart(ctx *Context, path string, args []string) (*exec.Cmd, error) {
 	}
 	cmd, err := start(path, args)
 	if errors.Is(err, syscall.ENOEXEC) {
-		argv := append([]string{"/bin/sh", path}, args[1:]...)
-		return start("/bin/sh", argv)
+		sh := timeoutShell()
+		argv := append([]string{sh, path}, args[1:]...)
+		return start(sh, argv)
 	}
 	return cmd, err
+}
+
+func timeoutShell() string {
+	for _, sh := range []string{"/bin/sh", "/usr/bin/sh", "/system/bin/sh"} {
+		info, err := os.Stat(sh)
+		if err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+			return sh
+		}
+	}
+	return "/bin/sh"
 }
 
 func timeoutLookPath(ctx *Context, name string) (string, error) {
@@ -174,7 +185,8 @@ func timeoutLookPath(ctx *Context, name string) (string, error) {
 	}
 	path, ok := lookupEnv(ctx, "PATH")
 	if !ok {
-		path = "/bin:/usr/bin"
+		// /system/bin is Android's toybox directory. Missing entries are skipped.
+		path = "/bin:/usr/bin:/system/bin"
 	}
 	var denied error
 	for _, dir := range strings.Split(path, string(os.PathListSeparator)) {

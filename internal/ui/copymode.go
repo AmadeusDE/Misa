@@ -7,7 +7,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/AmadeusDE/Misa/internal/term"
@@ -178,17 +177,14 @@ func (cs *copyState) selectedText() string {
 	return strings.Join(parts, "\n")
 }
 
-func (cs *copyState) copySelection() string {
+func (cs *copyState) copySelection() (string, tea.Cmd) {
 	text := cs.selectedText()
 	if text == "" {
 		if cs.curRow < len(cs.lines) {
 			text = strings.TrimRight(cs.lines[cs.curRow], " ")
 		}
 	}
-	if text != "" {
-		clipboard.WriteAll(text)
-	}
-	return text
+	return text, writeClipboard(text)
 }
 
 func (cs *copyState) render(ghost color.Color) string {
@@ -274,12 +270,12 @@ func (m *Model) updateCopyMode(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cs.selCol = 0
 		cs.curCol = cs.lineLen(cs.curRow)
 	case "y", "enter":
-		text := cs.copySelection()
+		text, cmd := cs.copySelection()
 		cs.active = false
 		if text != "" {
 			m.status = "copied to clipboard"
 		}
-		return m, nil
+		return m, cmd
 	}
 
 	return m, nil

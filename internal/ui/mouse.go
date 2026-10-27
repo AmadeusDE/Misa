@@ -178,7 +178,7 @@ func (m *Model) routePaneMouse(p *muxPane, msg mouseMsg) (tea.Model, tea.Cmd) {
 		return m, routeTo(p.misa, cmd)
 	case p.terminal != nil:
 		if !forwardMouse(p.terminal, msg, msg.X, msg.Y) && !scrollAltScreen(p.terminal, msg) {
-			m.handleMuxPaneSelMouse(p, msg)
+			return m, m.handleMuxPaneSelMouse(p, msg)
 		}
 	case p.kind == paneShell && isWheelUp(msg):
 		p.vp.ScrollUp(3)
@@ -192,7 +192,7 @@ func (m *Model) routePaneMouse(p *muxPane, msg mouseMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) handleMuxPaneSelMouse(p *muxPane, msg mouseMsg) {
+func (m *Model) handleMuxPaneSelMouse(p *muxPane, msg mouseMsg) tea.Cmd {
 	switch {
 	case msg.Button == tea.MouseLeft && msg.Action == mousePress:
 		m.sel.begin(msg.Y, msg.X)
@@ -202,9 +202,10 @@ func (m *Model) handleMuxPaneSelMouse(p *muxPane, msg mouseMsg) {
 		m.sel.extend(msg.Y, msg.X)
 		m.sel.active = false
 		if m.sel.hasRange && p.terminal != nil {
-			m.sel.copyToClipboard(p.terminal)
+			return m.sel.copyToClipboard(p.terminal)
 		}
 	}
+	return nil
 }
 
 // muxBarY is the bar's row below the frame's top margin, or -1 when hidden.

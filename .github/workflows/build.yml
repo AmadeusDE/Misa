@@ -110,9 +110,69 @@ jobs:
           path: dist/*.AppImage
           if-no-files-found: error
 
+  android:
+    name: android/${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            triple: aarch64-linux-android24-clang
+          - arch: amd64
+            triple: x86_64-linux-android24-clang
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+      - id: ndk
+        run: echo "version=$(tr -d '[:space:]' < android/ndk.version)" >> "$GITHUB_OUTPUT"
+      # The runner image owns /usr/local/lib/android/sdk as root. Cache
+      # restore otherwise fails utime and chmod on the NDK tree.
+      - name: Make the NDK directory writable
+        run: |
+          sudo mkdir -p /usr/local/lib/android/sdk/ndk
+          sudo chown -R "$USER" /usr/local/lib/android/sdk/ndk
+      - uses: actions/cache@v4
+        id: ndk-cache
+        with:
+          path: /usr/local/lib/android/sdk/ndk/${{ steps.ndk.outputs.version }}
+          key: ndk-${{ steps.ndk.outputs.version }}
+      - name: Install the pinned NDK
+        if: steps.ndk-cache.outputs.cache-hit != 'true'
+        env:
+          NDK_VERSION: ${{ steps.ndk.outputs.version }}
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          sdkmanager=$(find "$sdk/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          mkdir -p "$sdk/licenses"
+          printf '%s\n' 24333f8a63b6825ea9c5514f83c2829b004d1fee > "$sdk/licenses/android-sdk-license"
+          "$sdkmanager" --sdk_root="$sdk" "ndk;${NDK_VERSION}"
+      - name: Build the Termux CLI
+        env:
+          NDK_VERSION: ${{ steps.ndk.outputs.version }}
+          GOOS: android
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: '1'
+          CC: /usr/local/lib/android/sdk/ndk/${{ steps.ndk.outputs.version }}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.triple }}
+        run: |
+          set -euo pipefail
+          test -x "$CC"
+          mkdir -p dist
+          go build -trimpath -ldflags='-s -w' -o dist/misa .
+          go build -trimpath -ldflags='-s -w' -o dist/ugh ./cmd/ugh
+          cp LICENSE README.md THIRD_PARTY_NOTICES.md dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+
   # One artifact with every platform, a directory each.
   bundle:
-    needs: [binaries, appimage]
+    needs: [binaries, appimage, android]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/upload-artifact/merge@v4
@@ -144,7 +204,8 @@ jobs:
             case $platform in
             appimage-*) mv "$dir"/*.AppImage release/ ;;
             *)
-              chmod +x "$dir"/misa "$dir"/ugh "$dir"/ughbot
+              chmod +x "$dir"/misa "$dir"/ugh
+              [ -e "$dir/ughbot" ] && chmod +x "$dir/ughbot" || true
               mv "$dir" "misa-$TAG-$platform"
               tar -cf - "misa-$TAG-$platform" | xz -9e --lzma2=preset=9e,dict=128MiB > "release/misa-$TAG-$platform.tar.xz"
               ;;

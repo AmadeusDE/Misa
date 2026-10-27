@@ -56,6 +56,7 @@ func TestDuMissingTarget(t *testing.T) {
 // TestDuCountLinks verifies -l counts a hard-linked file's size at every link,
 // instead of deduplicating by inode as the default behavior does.
 func TestDuCountLinks(t *testing.T) {
+	skipWithoutHardlinks(t)
 	dir := t.TempDir()
 	file1 := writeFile(t, dir, "file1", strings.Repeat("x", 1024))
 	if err := os.Link(file1, filepath.Join(dir, "file1.1")); err != nil {

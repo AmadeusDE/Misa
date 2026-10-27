@@ -7,6 +7,7 @@ import (
 )
 
 func TestLnHardLink(t *testing.T) {
+	skipWithoutHardlinks(t)
 	dir := t.TempDir()
 	writeFile(t, dir, "src.txt", "data")
 	r := runBuiltinIn(t, dir, "ln", "src.txt", "dst.txt")
