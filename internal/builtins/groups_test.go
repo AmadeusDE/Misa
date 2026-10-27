@@ -13,6 +13,7 @@ func TestGroupsRegistered(t *testing.T) {
 }
 
 func TestGroupsOutput(t *testing.T) {
+	skipWithoutGroups(t)
 	r := runBuiltin(t, "groups")
 	assertExitCode(t, r, 0)
 	if strings.TrimSpace(r.stdout) == "" {
@@ -29,6 +30,7 @@ func TestGroupsUnknownUser(t *testing.T) {
 }
 
 func TestGroupsDoubleHyphen(t *testing.T) {
+	skipWithoutGroups(t)
 	r := runBuiltin(t, "groups", "--")
 	assertExitCode(t, r, 0)
 	if strings.TrimSpace(r.stdout) == "" {

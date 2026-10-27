@@ -11,6 +11,7 @@ import (
 )
 
 func TestMkfifoModes(t *testing.T) {
+	skipWithoutFifos(t)
 	for _, tc := range []struct {
 		mode string
 		want os.FileMode
@@ -48,6 +49,7 @@ func TestMkfifoErrors(t *testing.T) {
 			t.Errorf("stderr = %q", r.stderr)
 		}
 	}
+	skipWithoutFifos(t)
 	dir := t.TempDir()
 	p := writeFile(t, dir, "existing", "keep")
 	if err := os.Chmod(p, 0600); err != nil {
@@ -85,6 +87,7 @@ func TestMkfifoOmittedWho(t *testing.T) {
 			t.Errorf("mode(%q, %03o) = %03o, %v; want %03o", tc.mode, tc.mask, got, err, tc.want)
 		}
 	}
+	skipWithoutFifos(t)
 	mask, err := mkfifoUmask()
 	if err != nil {
 		t.Fatal(err)

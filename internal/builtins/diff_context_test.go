@@ -127,10 +127,7 @@ func diffPermutationCase(n int, variant string) (string, string) {
 
 func diffContextRoundTrip(t *testing.T, variant string) {
 	t.Helper()
-	patch, err := exec.LookPath("patch")
-	if err != nil {
-		t.Skip("patch unavailable")
-	}
+	patch := hostPatch(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "source")
 	for n := 0; n < 729; n++ {

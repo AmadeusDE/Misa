@@ -31,10 +31,7 @@ func TestDiffNormalRanges(t *testing.T) {
 
 func diffPatchPermutations(t *testing.T, style, variant string) {
 	t.Helper()
-	patch, err := exec.LookPath("patch")
-	if err != nil {
-		t.Skip("patch unavailable")
-	}
+	patch := hostPatch(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "source")
 	count := 729

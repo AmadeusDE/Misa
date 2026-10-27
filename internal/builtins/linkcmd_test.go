@@ -8,6 +8,7 @@ import (
 )
 
 func TestLinkCommand(t *testing.T) {
+	skipWithoutHardlinks(t)
 	dir := t.TempDir()
 	src := writeFile(t, dir, "old", "content")
 	assertExitCode(t, runBuiltinIn(t, dir, "link", "old", "new"), 0)

@@ -29,7 +29,7 @@ run() {
 	dir=$1
 	bin=$2
 	echo "=== $bin ==="
-	adb shell "cd /data/local/tmp/misa/$dir && TMPDIR=/data/local/tmp HOME=/data/local/tmp ./$bin -test.count=1 -test.timeout 15m"
+	adb shell "cd /data/local/tmp/misa/$dir && PATH=/system/bin:/system/xbin:\$PATH TMPDIR=/data/local/tmp HOME=/data/local/tmp ./$bin -test.count=1 -test.timeout 15m"
 }
 run internal/term term.test
 run internal/builtins builtins.test

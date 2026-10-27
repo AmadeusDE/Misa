@@ -68,8 +68,21 @@ func TestTimeoutSignals(t *testing.T) {
 func timeoutTestRun(t *testing.T, dir string, env []string, args ...string) (int, string, string) {
 	t.Helper()
 	var out, err bytes.Buffer
-	code := runTimeout(&Context{Dir: dir, Env: env, Args: args, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &err})
+	code := runTimeout(&Context{Dir: dir, Env: withTimeoutPath(env), Args: args, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &err})
 	return code, out.String(), err.String()
+}
+
+// withTimeoutPath supplies the directories timeout searches when PATH is
+// unset, so a child shell can find the same commands.
+func withTimeoutPath(env []string) []string {
+	for _, e := range env {
+		if strings.HasPrefix(e, "PATH=") {
+			return env
+		}
+	}
+	out := make([]string, len(env), len(env)+1)
+	copy(out, env)
+	return append(out, "PATH=/bin:/usr/bin:/system/bin")
 }
 
 func TestTimeoutCommand(t *testing.T) {
@@ -149,7 +162,7 @@ func TestTimeoutScripts(t *testing.T) {
 func TestTimeoutContext(t *testing.T) {
 	dir := t.TempDir()
 	script := filepath.Join(dir, "child")
-	if err := os.WriteFile(script, []byte(shBang()+"printf '%s\\n' \"$VALUE\"\npwd\n"+hostCat()), 0700); err != nil {
+	if err := os.WriteFile(script, []byte(shBang()+"echo \"$VALUE\"\npwd\n"+hostCat()), 0700); err != nil {
 		t.Fatal(err)
 	}
 	var out, err bytes.Buffer
@@ -161,7 +174,7 @@ func TestTimeoutContext(t *testing.T) {
 
 func TestTimeoutMergedOutput(t *testing.T) {
 	var output bytes.Buffer
-	ctx := &Context{Dir: t.TempDir(), Env: []string{}, Args: []string{"-v", ".1", "sh", "-c", "while :; do echo output; echo error >&2; sleep .01; done"}, Stdin: strings.NewReader(""), Stdout: &output, Stderr: &output}
+	ctx := &Context{Dir: t.TempDir(), Env: withTimeoutPath(nil), Args: []string{"-v", ".1", "sh", "-c", "while :; do echo output; echo error >&2; sleep .01; done"}, Stdin: strings.NewReader(""), Stdout: &output, Stderr: &output}
 	if code := runTimeout(ctx); code != 124 || !strings.Contains(output.String(), "sending signal TERM") {
 		t.Fatalf("code=%d output=%q", code, output.String())
 	}
@@ -169,7 +182,7 @@ func TestTimeoutMergedOutput(t *testing.T) {
 
 func TestTimeoutProcessGroup(t *testing.T) {
 	dir := t.TempDir()
-	code, _, err := timeoutTestRun(t, dir, []string{}, ".15", "sh", "-c", "sleep 5 & echo $! > child.pid; wait")
+	code, _, err := timeoutTestRun(t, dir, nil, ".15", "sh", "-c", "sleep 5 & echo $! > child.pid; wait")
 	if code != 124 {
 		t.Fatalf("code=%d stderr=%q", code, err)
 	}
@@ -191,7 +204,7 @@ func TestTimeoutProcessGroup(t *testing.T) {
 
 func TestTimeoutWaitDelay(t *testing.T) {
 	start := time.Now()
-	code, _, err := timeoutTestRun(t, t.TempDir(), []string{}, "2", "sh", "-c", "sleep .5 & exit 0")
+	code, _, err := timeoutTestRun(t, t.TempDir(), nil, "2", "sh", "-c", "sleep .5 & exit 0")
 	if code != 0 || time.Since(start) > 400*time.Millisecond {
 		t.Fatalf("code=%d elapsed=%v stderr=%q", code, time.Since(start), err)
 	}
