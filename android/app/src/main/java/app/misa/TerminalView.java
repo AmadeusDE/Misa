@@ -18,6 +18,7 @@ public final class TerminalView extends SurfaceView
 
     private final ScaleGestureDetector scale;
     private Geometry geometry;
+    private Modifiers modifiers;
     private int width;
     private int height;
     private boolean rawIme = true;
@@ -33,6 +34,10 @@ public final class TerminalView extends SurfaceView
 
     void setGeometry(Geometry geometry) {
         this.geometry = geometry;
+    }
+
+    void setModifiers(Modifiers modifiers) {
+        this.modifiers = modifiers;
     }
 
     int width() {
@@ -81,7 +86,7 @@ public final class TerminalView extends SurfaceView
         }
         outAttrs.imeOptions =
                 EditorInfo.IME_FLAG_NO_FULLSCREEN | EditorInfo.IME_FLAG_NO_EXTRACT_UI | EditorInfo.IME_ACTION_NONE;
-        return new MisaInputConnection(this);
+        return new MisaInputConnection(this, modifiers);
     }
 
     @Override

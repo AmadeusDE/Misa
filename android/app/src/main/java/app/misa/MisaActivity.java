@@ -145,6 +145,11 @@ public final class MisaActivity extends Activity implements ExtraKeys.Listener {
     }
 
     @Override
+    public void mux(String action) {
+        Native.muxAction(action);
+    }
+
+    @Override
     public void showSessions() {
         sessionsOpen = !sessionsOpen;
         sessionRow.setVisibility(sessionsOpen ? View.VISIBLE : View.GONE);
@@ -202,10 +207,11 @@ public final class MisaActivity extends Activity implements ExtraKeys.Listener {
                 new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         keys = new ExtraKeys(this, this);
         keys.setSessionLabel(sessionLabel());
+        terminal.setModifiers(keys);
         bottom.addView(
                 keys,
                 new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         FrameLayout.LayoutParams barLp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
         root.addView(bottom, barLp);

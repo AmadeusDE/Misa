@@ -129,7 +129,7 @@ func TestSessionsSurviveSurfaceLoss(t *testing.T) {
 		t.Fatalf("rotation %+v", ev)
 	}
 
-	m.OnText("hi")
+	m.OnText("hi", 0)
 	m.OnKey(keyA, MetaAltOn, true)
 	m.OnPinch(1.25)
 	m.OnPinch(0)

@@ -168,12 +168,26 @@ func (m *Manager) OnSurfaceDestroyed() {
 	}
 }
 
-// OnText delivers an IME commit to the active session.
-func (m *Manager) OnText(s string) {
-	if s == "" {
-		return
+// OnText delivers an IME commit to the active session. meta is the latched
+// Ctrl/Alt state from the extra-keys bar; zero sends the text unchanged.
+func (m *Manager) OnText(s string, meta int) {
+	for _, ev := range EventsForText(s, meta) {
+		m.emitActive(ev)
 	}
-	m.emitActive(gui.Event{Kind: gui.EventText, Text: s})
+}
+
+// MuxAction runs one extra-keys multiplexer button. Unknown names do nothing.
+func (m *Manager) MuxAction(name string) {
+	switch name {
+	case "zoom-in":
+		m.OnPinch(ZoomIn)
+	case "zoom-out":
+		m.OnPinch(ZoomOut)
+	default:
+		for _, c := range MuxChords(name) {
+			m.OnKey(c.Code, c.Meta, true)
+		}
+	}
 }
 
 // OnKey delivers one Android key. Releases and bare modifiers are ignored.

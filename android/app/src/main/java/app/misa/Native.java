@@ -21,7 +21,9 @@ public final class Native {
 
     public static native void onSurfaceDestroyed();
 
-    public static native void onText(String text);
+    public static native void onText(String text, int meta);
+
+    public static native void muxAction(String name);
 
     public static native void onKey(int code, int meta, boolean down);
 

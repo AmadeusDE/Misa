@@ -5,15 +5,15 @@ import android.graphics.Typeface;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
-import android.view.View;
 import android.widget.Button;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 
 // Esc, Ctrl, Alt, Tab, arrows and a few shell characters, above the IME.
-// Ctrl and Alt latch until the next key. The IME key shows the keyboard;
-// a long press switches raw and text input modes.
-final class ExtraKeys extends HorizontalScrollView {
+// Ctrl and Alt latch until the next key or IME commit. MUX opens a row of
+// one-tap multiplexer actions (ids are MuxChords in internal/gui/android).
+// The IME key shows the keyboard; a long press switches raw and text modes.
+final class ExtraKeys extends LinearLayout implements Modifiers {
     interface Listener {
         void key(int code, int meta);
 
@@ -22,26 +22,74 @@ final class ExtraKeys extends HorizontalScrollView {
         void toggleImeMode();
 
         void showSessions();
+
+        void mux(String action);
     }
+
+    // label, muxAction id. zoom-in/zoom-out are font scale, not key chords.
+    // Action ids match MuxChords / zoom-in / zoom-out in internal/gui/android.
+    // internal/gui/android/mux_test.go reads this table.
+    private static final String[][] MUX = {
+        {"split", "split"},
+        {"next", "next"},
+        {"◁", "left"},
+        {"▽", "down"},
+        {"△", "up"},
+        {"▷", "right"},
+        {"close", "close"},
+        {"layout", "layout"},
+        {"resize", "resize"},
+        {"agent", "agent"},
+        {"reattach", "reattach"},
+        {"copy", "copy"},
+        {"paste", "paste"},
+        {"^W", "prefix"},
+        {"A+", "zoom-in"},
+        {"A−", "zoom-out"},
+        {"t1", "tag1"},
+        {"t2", "tag2"},
+        {"t3", "tag3"},
+        {"t4", "tag4"},
+        {"t5", "tag5"},
+        {"t6", "tag6"},
+        {"t7", "tag7"},
+        {"t8", "tag8"},
+        {"t9", "tag9"},
+        {"t0", "tag0"},
+    };
 
     private final Listener listener;
     private final Button ctrl;
     private final Button alt;
     private final Button ime;
     private final Button sessions;
+    private final Button mux;
+    private final HorizontalScrollView muxScroll;
     private boolean ctrlOn;
     private boolean altOn;
+    private boolean muxOn = true;
 
     ExtraKeys(Context context, Listener listener) {
         super(context);
         this.listener = listener;
-        setHorizontalScrollBarEnabled(false);
-        setFillViewport(true);
-        LinearLayout row = new LinearLayout(context);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        addView(row, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
+        setOrientation(VERTICAL);
 
+        LinearLayout muxRow = new LinearLayout(context);
+        muxRow.setOrientation(HORIZONTAL);
+        muxRow.setGravity(Gravity.CENTER_VERTICAL);
+        for (String[] item : MUX) {
+            String action = item[1];
+            muxRow.addView(key(item[0], () -> sendMux(action)));
+        }
+        muxScroll = new HorizontalScrollView(context);
+        muxScroll.setHorizontalScrollBarEnabled(false);
+        muxScroll.setFillViewport(true);
+        muxScroll.addView(muxRow, new HorizontalScrollView.LayoutParams(LayoutParams.WRAP_CONTENT, dp(48)));
+        addView(muxScroll, new LayoutParams(LayoutParams.MATCH_PARENT, dp(48)));
+
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
         row.addView(key("ESC", () -> send(KeyEvent.KEYCODE_ESCAPE, 0)));
         row.addView(key("TAB", () -> send(KeyEvent.KEYCODE_TAB, 0)));
         ctrl = key("CTRL", this::toggleCtrl);
@@ -64,10 +112,19 @@ final class ExtraKeys extends HorizontalScrollView {
         row.addView(ime);
         sessions = key("≡", listener::showSessions);
         row.addView(sessions);
+        mux = key("MUX", this::toggleMux);
+        row.addView(mux);
+
+        HorizontalScrollView main = new HorizontalScrollView(context);
+        main.setHorizontalScrollBarEnabled(false);
+        main.setFillViewport(true);
+        main.addView(row, new HorizontalScrollView.LayoutParams(LayoutParams.WRAP_CONTENT, dp(48)));
+        addView(main, new LayoutParams(LayoutParams.MATCH_PARENT, dp(48)));
         paint();
     }
 
-    int latchedMeta() {
+    @Override
+    public int latchedMeta() {
         int meta = 0;
         if (ctrlOn) {
             meta |= KeyEvent.META_CTRL_ON;
@@ -78,7 +135,8 @@ final class ExtraKeys extends HorizontalScrollView {
         return meta;
     }
 
-    void clearLatch() {
+    @Override
+    public void clearLatch() {
         if (!ctrlOn && !altOn) {
             return;
         }
@@ -105,14 +163,26 @@ final class ExtraKeys extends HorizontalScrollView {
         paint();
     }
 
+    private void toggleMux() {
+        muxOn = !muxOn;
+        muxScroll.setVisibility(muxOn ? VISIBLE : GONE);
+        paint();
+    }
+
     private void send(int code, int meta) {
         listener.key(code, meta | latchedMeta());
         clearLatch();
     }
 
+    private void sendMux(String action) {
+        clearLatch();
+        listener.mux(action);
+    }
+
     private void paint() {
         style(ctrl, ctrlOn);
         style(alt, altOn);
+        style(mux, muxOn);
     }
 
     private void style(Button button, boolean on) {
@@ -134,8 +204,7 @@ final class ExtraKeys extends HorizontalScrollView {
         button.setFocusable(false);
         button.setOnClickListener(v -> action.run());
         style(button, false);
-        LinearLayout.LayoutParams lp =
-                new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
         lp.setMargins(dp(2), dp(4), dp(2), dp(4));
         button.setLayoutParams(lp);
         return button;

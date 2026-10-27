@@ -240,7 +240,9 @@ internal/
                                  clang, `-tags nough` (the agent runs in the child).
                                  `just android-lib`
   android/                       APK shell (`app.misa`), pure Java, no AndroidX. `MisaActivity`
-                                 (SurfaceView, InputConnection, extra-keys row, insets, pinch),
+                                 (SurfaceView, InputConnection, extra-keys row with a latched
+                                 Ctrl/Alt that applies to IME text, a MUX row of one-tap
+                                 multiplexer buttons, insets, pinch),
                                  `SessionService` (foreground `specialUse` notification, Stop),
                                  `Bootstrap` (D10 env, `filesDir/bin` symlinks to `libmisa.so`,
                                  first-run config). `Native` loads `libmisagui` from its static
