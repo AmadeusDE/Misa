@@ -8,7 +8,7 @@ import (
 )
 
 func TestHoldKeepsFailedProgramOnScreen(t *testing.T) {
-	a := &app{win: &window{configured: true}, term: term.New(3, 60)}
+	a := &app{mapped: true, term: term.New(3, 60)}
 	a.term.ProcessOutput([]byte("sshc: connection refused"))
 	if !a.hold(255) {
 		t.Fatal("hold refused on a mapped window")
@@ -23,7 +23,7 @@ func TestHoldKeepsFailedProgramOnScreen(t *testing.T) {
 }
 
 func TestHoldNeedsAMappedWindow(t *testing.T) {
-	a := &app{win: &window{}, term: term.New(3, 60)}
+	a := &app{term: term.New(3, 60)}
 	if a.hold(1) {
 		t.Fatal("held output in a window never shown")
 	}

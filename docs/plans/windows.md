@@ -1,6 +1,7 @@
 # Plan: Windows port, GUI first
 
-Status: draft, nothing implemented. Part 1 is Misa (phases W0–W6); part 2 is ugh (phases UW0–UW4), which
+Status: draft. The gui core/backend split (W2, shared with Android A2) has landed on Linux;
+the Win32 backend and the rest of this plan are not started. Part 1 is Misa (phases W0–W6); part 2 is ugh (phases UW0–UW4), which
 Misa needs before its Windows build can include the agent. The measurements below are from 2026-10-13; code
 added since then (`internal/webui`'s file lock, `internal/ughbot`, `internal/ugh/confine`) needs the same
 treatment. ughbot is out of scope: it stays Linux-only.
@@ -197,8 +198,20 @@ type backend interface {
 	setTitle(string); copy(string); paste(); scale() float64
 }
 ```
-The app keeps its single goroutine. Wayland maps `ready` to `conn.Events()` and `dispatch` to `conn.Dispatch`.
-Win32 feeds a channel from its window thread (W3).
+The app keeps its single goroutine. Wayland maps `Ready` to a queue fed from `conn.Events()` and
+`Dispatch` to `conn.Dispatch`, which calls the host before returning, so a configure still draws
+before the next protocol message. Win32 feeds `Events` from its window thread (W3).
+
+Android A2 landed this split. The contract the core uses is `internal/gui/backend.go` (exported, so
+an `internal/gui/android` subpackage can implement it): `Size() (w, h int, scale float64)`,
+`Present(pixels, stride, PixelFormat, damage)`, `SetTitle`, `Events`, and `Clipboard`, plus
+`Ready`/`Dispatch`/`CanPresent`/`Buffer` so Wayland keeps its single goroutine and its shm buffers.
+`PixelFormat` is `FormatBGRA8888` (Wayland ARGB8888, Win32 DIB) or `FormatRGBA8888` (Android
+`WINDOW_FORMAT_RGBA_8888`). The core draws in the backend's order, so the hot path does not swizzle;
+`Present` swizzles only a foreign buffer. Wayland files are `wl_*.go` with build tag `unix && !android`
+because `GOOS=android` matches both `linux` and `unix`. `font.go` still calls `fc-match` when it is on
+PATH; the non-fontconfig path searches `$PREFIX/share/fonts` and `/system/fonts`, then Go Mono.
+`fontfind_windows.go` stays with W3. Scale is `float64`. Wayland's buffer scale is still an integer.
 
 - **Scale becomes `float64`.** Windows DPI is fractional (125%, 150%). Fonts rasterize at `pt × scale`, padding
   scales the same way, and the core works in pixels with logical size = pixels / scale. Wayland still sets an

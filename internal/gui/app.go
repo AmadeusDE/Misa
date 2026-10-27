@@ -1,20 +1,19 @@
-// Package gui is an optional Wayland window for Misa: a software-rendered
-// terminal, in pure Go, that runs Misa (or another command) on a PTY for
-// when the host terminal lacks features or isn't wanted.
 package gui
 
 import (
 	"encoding/base64"
 	"fmt"
 	"image/color"
+	"math"
 	"os"
 	"strings"
 	"sync"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/AmadeusDE/Misa/internal/config"
 	"github.com/AmadeusDE/Misa/internal/term"
 	"github.com/AmadeusDE/Misa/internal/ui"
-	"github.com/AmadeusDE/Misa/internal/wayland"
 )
 
 const (
@@ -26,21 +25,23 @@ const (
 	maxOSCQueue     = 64
 )
 
+// app is the OS-neutral window session: the terminal, the renderer, damage
+// tracking and the event loop. Platform input and presentation go through be.
 type app struct {
-	conn     *wayland.Conn
-	win      *window
-	seat     seat
-	clip     clipboard
+	be       Backend
 	cfg      config.GUIConfig
 	lib      *fontLibrary
 	rend     renderer
 	fontSize float64
+	scale    float64
 
-	argv          []string
-	dir           string
+	argv []string
+	dir  string
+
 	term          *term.Terminal
 	snap          term.Snapshot
 	shown         frame
+	frames        map[uint64]*frame
 	shownW        int
 	shownH        int
 	logicalW      int
@@ -48,56 +49,30 @@ type app struct {
 	drawPending   bool
 	commitPending bool
 	osc           oscQueue
-	holding       bool // the program failed; its output stays until a key
+	holding       bool
 	exitCode      int
+	mapped        bool
+	focused       bool
+	closed        bool
+	lastCell      [2]int
 }
 
-// Run opens a window titled title and runs argv in it until the program
-// exits or the window closes, returning the program's exit status. A program
-// that fails leaves its last screen up until a key is pressed.
-func Run(dir string, argv []string, title string) int {
-	code, err := run(dir, argv, title)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "misa: gui:", err)
-		return 1
+func newApp(be Backend, cfg config.GUIConfig, dir string, argv []string) *app {
+	fontSize := cfg.FontSize
+	if fontSize <= 0 {
+		fontSize = defaultFontSize
 	}
-	return code
-}
-
-func run(dir string, argv []string, title string) (int, error) {
-	conn, err := wayland.Connect()
-	if err != nil {
-		return 1, err
-	}
-	defer conn.Close()
-	reg := conn.GetRegistry()
-	if err := conn.Roundtrip(); err != nil {
-		return 1, err
-	}
-	cfg := config.LoadGUI()
-	a := &app{conn: conn, cfg: cfg, argv: argv, dir: dir, lib: newFontLibrary(), fontSize: cfg.FontSize}
-	if a.fontSize <= 0 {
-		a.fontSize = defaultFontSize
+	a := &app{
+		be: be, cfg: cfg, argv: argv, dir: dir,
+		lib: newFontLibrary(), fontSize: fontSize, scale: 1,
 	}
 	a.osc.ready = make(chan struct{}, 1)
 	a.rend.pal = newPalette(cfg)
-	if a.win, err = newWindow(conn, reg, title, a.rend.pal.translucent()); err != nil {
-		return 1, err
-	}
-	a.win.onConfigure = a.configured
-	a.win.onScale = a.rescale
-	a.win.onFrame = a.redrawIfPending
-	a.win.onBufferRelease = a.redrawIfPending
-	a.bindSeat(reg)
-	a.bindClipboard(reg)
-	if err := a.loadFonts(); err != nil {
-		return 1, err
-	}
-	return a.loop()
+	return a
 }
 
 func (a *app) loadFonts() error {
-	fs, err := newFontSet(a.lib, a.cfg.Font, a.fontSize, a.win.scale)
+	fs, err := newFontSet(a.lib, a.cfg.Font, a.fontSize, a.scale)
 	if err != nil {
 		return err
 	}
@@ -106,45 +81,153 @@ func (a *app) loadFonts() error {
 	if a.cfg.Padding != nil {
 		pad = max(0, *a.cfg.Padding)
 	}
-	a.rend.pad = pad * a.win.scale
+	a.rend.pad = scaleLen(pad, a.scale)
 	a.shown.valid = false
 	return nil
 }
 
 func (a *app) loop() (int, error) {
 	for {
+		var pastes <-chan string
+		if c := a.be.Clipboard(); c != nil {
+			pastes = c.Pastes()
+		}
 		select {
-		case ev, ok := <-a.conn.Events():
+		case _, ok := <-a.be.Ready():
 			if !ok {
 				a.closeTerminal()
-				return 1, a.conn.Err()
+				return 1, a.be.Err()
 			}
-			a.conn.Dispatch(ev)
+			a.be.Dispatch(a)
+		case ev, ok := <-a.be.Events():
+			if !ok {
+				a.closeTerminal()
+				return 1, a.be.Err()
+			}
+			a.Handle(ev)
 		case <-a.termDirty():
 			a.requestDraw()
 		case <-a.termExited():
 			if code := a.term.WaitExit(); code == 0 || !a.hold(code) {
 				return code, nil
 			}
-		case <-a.seat.repeatC():
-			a.repeatKey()
-		case text := <-a.clip.pasted:
-			if a.term != nil {
-				a.term.SendBytes(ui.PasteBytes(text, a.term))
-			}
+		case <-a.be.Repeat():
+			a.be.DispatchRepeat(a)
+		case text := <-pastes:
+			a.pasteText(text)
 		case <-a.osc.ready:
 			for _, s := range a.osc.take() {
 				a.handleOSC(s)
 			}
 		}
-		if err := a.conn.Err(); err != nil {
+		if err := a.be.Err(); err != nil {
 			a.closeTerminal()
 			return 1, err
 		}
-		if a.win.closeRequested {
+		if a.closed {
 			a.closeTerminal()
 			return a.exitCode, nil
 		}
+	}
+}
+
+func (a *app) Handle(ev Event) {
+	switch ev.Kind {
+	case EventResize:
+		a.onResize(ev)
+	case EventScale:
+		a.onScale(ev.Scale)
+	case EventFrame:
+		a.redrawIfPending()
+	case EventClose:
+		a.closed = true
+	case EventFocus:
+		a.focused = ev.Focused
+		a.requestDraw()
+	case EventKey:
+		a.onKey(ev)
+	case EventText:
+		a.onText(ev.Text)
+	case EventPointer:
+		a.onPointer(ev)
+	case EventScroll:
+		a.onScroll(ev)
+	}
+}
+
+func (a *app) onResize(ev Event) {
+	if ev.Scale > 0 && ev.Scale != a.scale {
+		a.scale = ev.Scale
+		if err := a.loadFonts(); err != nil {
+			return
+		}
+	}
+	if ev.Width > 0 && ev.Height > 0 {
+		a.logicalW, a.logicalH = ev.Width, ev.Height
+	} else if a.logicalW == 0 {
+		a.logicalW, a.logicalH = a.defaultSize()
+	}
+	a.mapped = true
+	a.commitPending = true
+	a.resizeTerminal()
+	a.requestDraw()
+}
+
+func (a *app) onScale(scale float64) {
+	if scale <= 0 || scale == a.scale {
+		return
+	}
+	a.scale = scale
+	if err := a.loadFonts(); err != nil {
+		return
+	}
+	if a.logicalW > 0 {
+		a.resizeTerminal()
+	}
+	a.requestDraw()
+}
+
+func (a *app) onKey(ev Event) {
+	if !a.handleShortcut(ev.Key) && a.term != nil && (ev.Key.Code != 0 || ev.Key.Text != "") {
+		a.term.SendBytes(ui.KeyBytes(ev.Key, a.term.AppCursorKeys()))
+	}
+	if a.holding && ev.DismissHold {
+		a.closed = true
+	}
+}
+
+func (a *app) handleShortcut(k tea.Key) bool {
+	switch shortcutOf(k) {
+	case pasteShortcut:
+		if c := a.be.Clipboard(); c != nil {
+			if text, err := c.Read(); err == nil && text != "" {
+				a.pasteText(text)
+			}
+		}
+		return true
+	case zoomInShortcut:
+		a.zoom(1)
+		return true
+	case zoomOutShortcut:
+		a.zoom(-1)
+		return true
+	case zoomResetShortcut:
+		a.zoom(0)
+		return true
+	default:
+		return false
+	}
+}
+
+func (a *app) onText(text string) {
+	if a.term != nil && text != "" {
+		a.term.SendBytes([]byte(text))
+	}
+}
+
+func (a *app) pasteText(text string) {
+	if a.term != nil && text != "" {
+		a.term.SendBytes(ui.PasteBytes(text, a.term))
 	}
 }
 
@@ -165,7 +248,7 @@ func (a *app) termExited() <-chan struct{} {
 // hold keeps a failed program's screen up with a note, so errors (an ssh
 // connection refused) can be read. It reports false if nothing can be shown.
 func (a *app) hold(code int) bool {
-	if !a.win.configured {
+	if !a.mapped {
 		return false
 	}
 	a.holding, a.exitCode = true, code
@@ -180,17 +263,6 @@ func (a *app) closeTerminal() {
 	}
 }
 
-func (a *app) configured() {
-	if a.win.width > 0 && a.win.height > 0 {
-		a.logicalW, a.logicalH = a.win.width, a.win.height
-	} else if a.logicalW == 0 {
-		a.logicalW, a.logicalH = a.defaultSize()
-	}
-	a.commitPending = true
-	a.resizeTerminal()
-	a.requestDraw()
-}
-
 // defaultSize is the logical window size for the configured grid.
 func (a *app) defaultSize() (int, int) {
 	cols, rows := a.cfg.Columns, a.cfg.Rows
@@ -200,12 +272,35 @@ func (a *app) defaultSize() (int, int) {
 	if rows <= 0 {
 		rows = defaultRows
 	}
-	fs, s := a.rend.fonts, a.win.scale
-	return (cols*fs.cellW + 2*a.rend.pad + s - 1) / s, (rows*fs.cellH + 2*a.rend.pad + s - 1) / s
+	fs := a.rend.fonts
+	pw := cols*fs.cellW + 2*a.rend.pad
+	ph := rows*fs.cellH + 2*a.rend.pad
+	return ceilDiv(pw, a.scale), ceilDiv(ph, a.scale)
 }
 
 func (a *app) pixelSize() (int, int) {
-	return a.logicalW * a.win.scale, a.logicalH * a.win.scale
+	return scaleLen(a.logicalW, a.scale), scaleLen(a.logicalH, a.scale)
+}
+
+func scaleLen(logical int, scale float64) int {
+	if scale <= 0 {
+		scale = 1
+	}
+	if scale == float64(int(scale)) {
+		return logical * int(scale)
+	}
+	return int(math.Round(float64(logical) * scale))
+}
+
+func ceilDiv(px int, scale float64) int {
+	if scale <= 0 {
+		scale = 1
+	}
+	if scale == float64(int(scale)) {
+		s := int(scale)
+		return (px + s - 1) / s
+	}
+	return int(math.Ceil(float64(px) / scale))
 }
 
 func (a *app) gridSize() (rows, cols int) {
@@ -234,23 +329,11 @@ func (a *app) startTerminal(rows, cols int) {
 	os.Setenv("COLORTERM", "truecolor")
 	if err := t.StartArgv(a.dir, a.argv...); err != nil {
 		fmt.Fprintln(os.Stderr, "misa: gui:", err)
-		a.win.closeRequested = true
+		a.closed = true
 		return
 	}
 	t.StartReader()
 	a.term = t
-}
-
-// rescale follows a new buffer scale: glyphs re-rasterize at the new
-// density, keeping the logical size.
-func (a *app) rescale() {
-	if err := a.loadFonts(); err != nil {
-		return
-	}
-	if a.logicalW > 0 {
-		a.resizeTerminal()
-	}
-	a.requestDraw()
 }
 
 // zoom changes the font size by step points, or restores it for 0.
@@ -269,7 +352,7 @@ func (a *app) zoom(step int) {
 	if err := a.loadFonts(); err != nil {
 		return
 	}
-	a.win.dropBuffers()
+	a.be.DropBuffers()
 	a.resizeTerminal()
 	a.requestDraw()
 }
@@ -280,42 +363,60 @@ func (a *app) redrawIfPending() {
 	}
 }
 
-// requestDraw paints the terminal now, or once the compositor wants the next
-// frame or frees a buffer.
+// requestDraw paints the terminal now, or once the backend can take a frame.
 func (a *app) requestDraw() {
 	a.drawPending = true
-	if !a.win.configured || a.win.frameCB != 0 || a.term == nil || a.logicalW == 0 {
+	if a.be == nil || !a.be.CanPresent() || a.term == nil || a.logicalW == 0 {
 		return
 	}
 	pw, ph := a.pixelSize()
 	a.term.Snapshot(&a.snap)
-	cur := cursorState{row: a.snap.CursorRow, col: a.snap.CursorCol, visible: a.snap.CursorVisible, focused: a.seat.focused}
+	cur := cursorState{row: a.snap.CursorRow, col: a.snap.CursorCol, visible: a.snap.CursorVisible, focused: a.focused}
 	rows, full := changedRows(&a.snap, cur, &a.shown)
 	full = full || a.shownW != pw || a.shownH != ph
 	if !full && len(rows) == 0 {
 		a.drawPending = false
 		if a.commitPending {
-			a.win.commit()
+			a.be.Commit()
 			a.commitPending = false
 		}
 		return
 	}
-	b := a.win.bufferFor(pw, ph)
-	if b == nil {
+	t := a.be.Buffer(pw, ph)
+	if t == nil {
 		return
 	}
-	a.rend.draw(&b.c, &a.snap, cur, &b.content)
+	c := canvas{pix: t.Pix, w: pw, h: ph, stride: t.Stride, order: orderOf(a.be.Format())}
+	prev := t.content
+	if prev == nil {
+		prev = a.frameFor(t.ID)
+	}
+	a.rend.draw(&c, &a.snap, cur, prev)
 	a.shown.record(&a.snap, cur)
 	a.shownW, a.shownH = pw, ph
-	a.win.present(b, a.rend.damage(rows, full, b.c.bounds()))
+	a.be.Present(t.Pix, t.Stride, a.be.Format(), a.rend.damage(rows, full, c.bounds()))
 	a.drawPending, a.commitPending = false, false
+}
+
+func (a *app) frameFor(id uint64) *frame {
+	if a.frames == nil {
+		a.frames = map[uint64]*frame{}
+	}
+	f := a.frames[id]
+	if f == nil {
+		f = &frame{}
+		a.frames[id] = f
+	}
+	return f
 }
 
 func (a *app) handleOSC(s string) {
 	code, rest, _ := strings.Cut(s, ";")
 	switch code {
 	case "0", "2":
-		a.win.setTitle(rest)
+		if a.be != nil {
+			a.be.SetTitle(rest)
+		}
 	case "52":
 		if !config.BoolDefault(a.cfg.ClipboardWrite, true) {
 			return
@@ -324,9 +425,11 @@ func (a *app) handleOSC(s string) {
 		if !ok || data == "?" {
 			return
 		}
-		if text, err := base64.StdEncoding.DecodeString(data); err == nil {
-			a.clip.copy(a, string(text))
+		text, err := base64.StdEncoding.DecodeString(data)
+		if err != nil || a.be == nil || a.be.Clipboard() == nil {
+			return
 		}
+		a.be.Clipboard().Write(string(text))
 	}
 }
 
@@ -356,4 +459,11 @@ func (q *oscQueue) take() []string {
 	items := q.items
 	q.items = nil
 	return items
+}
+
+func orderOf(f PixelFormat) pixelOrder {
+	if f == FormatRGBA8888 {
+		return orderRGBA
+	}
+	return orderBGRA
 }

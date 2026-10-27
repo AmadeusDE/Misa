@@ -188,18 +188,25 @@ internal/
                                  (GOOS=android matches linux). Unreadable pids are skipped; if /proc
                                  cannot be listed, kill falls back to the leader's process group.
                                  pidfd is preferred; a refused pidfd (Android before 12) signals by pid
-  gui/                           Optional Wayland window (`misa --gui [cmd…]`), pure Go, software rendered:
-                                 runs Misa (or cmd) on a term.Terminal PTY and draws its cells into wl_shm buffers
-    gui.go                       Run, event loop, sizing, frame pacing (frame callbacks), OSC title/52 handling,
-                                 hold: a failed program's screen stays up until a key (ssh errors stay readable)
-    window.go                    wl_surface + xdg_toplevel, server-side decorations, buffer scale, shm buffer pool
-    input.go                     wl_seat: keyboard (xkb keymap, repeat), pointer (SGR reports, wheel/value120)
-    keys.go                      keysym → tea.Key (encoded by ui.KeyBytes); ctrl+shift+v paste, ctrl+shift+=/-/0 zoom
-    clipboard.go                 wl_data_device: paste the selection, own it for OSC 52 copies
-    render.go canvas.go          Cells → premultiplied ARGB pixels, row damage against what each buffer/the surface
-                                 last showed; only the default background takes `opacity` (default 0.55; ARGB8888
-                                 buffers unless it is 1)
-    font.go                      Fonts via fc-match (family + per-rune fallback), embedded Go Mono when absent
+  gui/                           Window frontend (`misa --gui [cmd…]`). OS-neutral core plus one backend
+                                 per platform. The core owns the terminal, the renderer, damage, the OSC
+                                 queue, fonts, and key/mouse/paste translation. Linux other than Android
+                                 presents through Wayland (`unix && !android`; Android matches `unix`).
+                                 Elsewhere `Run` errors cleanly until that platform's backend exists
+    app.go                       Loop, hold, OSC title/52, sizing, zoom, frame pacing
+    backend.go                   Backend, Event, Clipboard, PixelFormat (BGRA or RGBA)
+    pointer.go                   Pointer position → cell; buttons and wheel → ui.MouseBytes
+    shortcuts.go                 ctrl+shift+v and shift+insert paste; ctrl+shift =/-/0 zoom, on tea.Key
+    wl_backend.go wl_window.go   Wayland: xdg toplevel, shm buffers, frame callback. Draw goes straight
+    wl_input.go wl_keys.go       into the buffer (no copy). Seat, xkb keymap via unix.Mmap, key repeat
+    wl_clipboard.go              wl_data_device selection
+    fake.go                      Headless backend the core tests drive. No compositor
+    backend_other.go             `!unix || android`: Run prints an error and returns 1
+    render.go canvas.go          Cells → premultiplied pixels, row damage against what each buffer last
+                                 showed. Canvas order follows PixelFormat. Only the default background
+                                 takes `opacity` (default 0.55; ARGB8888 buffers unless it is 1)
+    font.go                      fc-match when it is on PATH; otherwise `$PREFIX/share/fonts` (Termux)
+                                 and `/system/fonts`, then the embedded Go Mono
     boxdraw.go                   Procedural box drawing, arcs, blocks, braille so borders join seamlessly
     palette.go                   gruvbox default, gui.yaml overrides, 256-colour cube
   mweb/                          `misa --web` / `--web-admin`: webui.Server whose terminal runs misa (MISA_WEB_CHILD stops
@@ -245,11 +252,14 @@ internal/
 - **Fetch builtin**: `fetch` command renders ASCII art + system info side by side (mfetch-style). Supports `--info`, `--theme`, `--ascii`, `-e` (emotes/nerd font), `--list-info`, `--list-ascii`, `--list-themes` flags. Configured via `fetch.yaml` (info, emotes, theme, color_mode, ascii, max_height); CLI flags override.
 - **SSH client (`sshc`)**: `sshc [-tT] [-F cfg] [-i id] [-l user] [-o Key=Value] [-p port] destination [command]`. Understands HostName, User, Port, IdentityFile, StrictHostKeyChecking and UserKnownHostsFile from ssh_config; everything else (ProxyJump, forwarding, ControlMaster) is ignored. A PTY is requested for a shell, or with `-t`, only when stdin is a terminal. Tests run against an in-process x/crypto server (`client_test.go`).
 - **Wayland window (`misa --gui`)**: A separate frontend process, not a Bubble Tea renderer: it starts the misa binary
-  (or the given command) in a `term.Terminal` and paints `Snapshot()` cells itself, so Misa runs unchanged. Protocol
-  objects are raw opcodes against `internal/wayland`, from wayland.xml/xdg-shell.xml (no generated bindings). The loop
-  draws only on terminal dirty + frame callback; damage is computed per row. Keys go keymap → keysym (`internal/xkb`,
-  no dead keys/compose) → `tea.Key` → `ui.KeyBytes`, so the xterm encoding lives in one place. Requires a compositor
-  with xdg_wm_base; decorations only where zxdg_decoration_manager_v1 exists (not GNOME). Settings in `gui.yaml`
+  (or the given command) in a `term.Terminal` and paints `Snapshot()` cells itself, so Misa runs unchanged. The
+  OS-neutral core (`internal/gui`) owns that session; the Wayland backend (`wl_*.go`, `unix && !android`) is the
+  only platform window so far. Protocol objects are raw opcodes against `internal/wayland`, from wayland.xml/xdg-shell.xml
+  (no generated bindings). The loop draws only on terminal dirty + frame callback; damage is computed per row.
+  Keys go keymap → keysym (`internal/xkb`, no dead keys/compose) → `tea.Key` → `ui.KeyBytes`, so the xterm encoding
+  lives in one place. The core draws premultiplied BGRA straight into the shm buffer. Requires a compositor with
+  xdg_wm_base; decorations only where zxdg_decoration_manager_v1 exists (not GNOME). On Android (and any target
+  without a backend) `misa --gui` prints an error and exits 1. Settings in `gui.yaml`
   (font, font_size, padding, columns, rows, foreground, background, cursor, palette, opacity, clipboard_write). `misa --gui cmd…` runs
   cmd; a Misa builtin missing from PATH (sshc) runs through the multicall binary. `misa --ssh [sshc opts] dest` is the
   ssh-client launcher. A program exiting non-zero leaves its screen up with a note until a key is pressed.

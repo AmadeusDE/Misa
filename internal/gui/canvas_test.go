@@ -21,7 +21,16 @@ func TestCanvasFillClips(t *testing.T) {
 		t.Fatalf("fill: %v %v", c.at(3, 3), c.at(1, 1))
 	}
 	if c.pix[(3*4+3)*4+3] != 0xff {
-		t.Error("fill left the X byte unset")
+		t.Error("fill left the alpha byte unset")
+	}
+}
+
+func TestCanvasRGBAFillOrder(t *testing.T) {
+	c := newCanvas(1, 1)
+	c.order = orderRGBA
+	c.fill(c.bounds(), rgb{1, 2, 3})
+	if c.pix[0] != 1 || c.pix[1] != 2 || c.pix[2] != 3 || c.pix[3] != 0xff {
+		t.Fatalf("RGBA fill %v", c.pix[:4])
 	}
 }
 

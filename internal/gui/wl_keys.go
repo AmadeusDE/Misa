@@ -1,3 +1,5 @@
+//go:build unix && !android
+
 package gui
 
 import (
@@ -83,34 +85,12 @@ func baseRune(r rune, base []xkb.Keysym, wantLatin bool) rune {
 	return first
 }
 
-type shortcut int
-
-const (
-	noShortcut shortcut = iota
-	pasteShortcut
-	zoomInShortcut
-	zoomOutShortcut
-	zoomResetShortcut
-)
-
-// guiShortcut recognizes the window's own bindings, which never reach the
-// program: ctrl+shift+v and shift+insert paste, ctrl+shift with = - 0 zoom.
+// guiShortcut recognizes the window's own bindings from a keysym. The core
+// decides the same thing from the tea.Key this produces.
 func guiShortcut(sym xkb.Keysym, base []xkb.Keysym, m keyMods) shortcut {
-	if sym == xkb.Insert && m.shift && !m.ctrl && !m.alt {
-		return pasteShortcut
-	}
-	if !m.ctrl || !m.shift || m.alt || len(base) == 0 {
+	k, ok := teaKey(sym, base, m)
+	if !ok {
 		return noShortcut
 	}
-	switch unicode.ToLower(base[0].Rune()) {
-	case 'v':
-		return pasteShortcut
-	case '=', '+':
-		return zoomInShortcut
-	case '-':
-		return zoomOutShortcut
-	case '0':
-		return zoomResetShortcut
-	}
-	return noShortcut
+	return shortcutOf(k)
 }
