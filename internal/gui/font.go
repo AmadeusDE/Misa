@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
+	"io/fs"
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -60,6 +62,10 @@ type fontLibrary struct {
 	files    map[string]*fontFile
 	fallback map[rune]*fontFile
 	fcMatch  bool
+	// dirs overrides systemFontDirs when dirsSet is true. An empty list
+	// searches nowhere, which is what tests that want Go Mono set.
+	dirs    []string
+	dirsSet bool
 }
 
 func newFontLibrary() *fontLibrary {
@@ -124,8 +130,9 @@ func (l *fontLibrary) match(pattern string) *fontFile {
 	return l.open(path, index)
 }
 
-// family returns the font for spec in style s: a file path (regular only) or a
-// fontconfig family, defaulting to monospace.
+// family returns the font for spec in style s: a file path (regular only), a
+// fontconfig family, or a file under the non-fontconfig search path,
+// defaulting to monospace.
 func (l *fontLibrary) family(spec string, s style) *fontFile {
 	if isFontPath(spec) {
 		if s == styleRegular {
@@ -136,7 +143,110 @@ func (l *fontLibrary) family(spec string, s style) *fontFile {
 	if spec == "" {
 		spec = "monospace"
 	}
-	return l.match(spec + fcStyles[s])
+	if l.fcMatch {
+		return l.match(spec + fcStyles[s])
+	}
+	return l.matchDirs(spec, s)
+}
+
+// systemFontDirs is the non-fontconfig search path: Termux's font directory
+// when PREFIX is set, then Android's system fonts. Fontconfig, when fc-match
+// is on PATH, is tried first and this list is not consulted.
+func systemFontDirs() []string {
+	var dirs []string
+	if prefix := os.Getenv("PREFIX"); prefix != "" {
+		dirs = append(dirs, filepath.Join(prefix, "share", "fonts"))
+	}
+	return append(dirs, "/system/fonts")
+}
+
+func (l *fontLibrary) searchDirs() []string {
+	if l.dirsSet {
+		return l.dirs
+	}
+	return systemFontDirs()
+}
+
+// matchDirs finds a monospace (or named) font file. It returns nil when
+// nothing matches, and the caller falls back to the embedded Go Mono.
+func (l *fontLibrary) matchDirs(spec string, s style) *fontFile {
+	var files []string
+	for _, dir := range l.searchDirs() {
+		files = append(files, fontFiles(dir)...)
+	}
+	want := strings.ToLower(strings.ReplaceAll(spec, " ", ""))
+	mono := want == "monospace" || want == ""
+	bestScore := -1
+	var best *fontFile
+	for _, path := range files {
+		name := strings.ToLower(filepath.Base(path))
+		compact := strings.ReplaceAll(name, " ", "")
+		if mono {
+			if !strings.Contains(compact, "mono") {
+				continue
+			}
+		} else if !strings.Contains(compact, want) {
+			continue
+		}
+		if !styleMatches(compact, s) {
+			continue
+		}
+		score := 1
+		if strings.Contains(compact, "regular") || s != styleRegular {
+			score = 2
+		}
+		if best != nil && score <= bestScore {
+			continue
+		}
+		f := l.open(path, 0)
+		if f == nil {
+			continue
+		}
+		best, bestScore = f, score
+	}
+	return best
+}
+
+func styleMatches(name string, s style) bool {
+	bold := strings.Contains(name, "bold")
+	italic := strings.Contains(name, "italic") || strings.Contains(name, "oblique")
+	switch s {
+	case styleBold:
+		return bold && !italic
+	case styleItalic:
+		return italic && !bold
+	case styleBoldItalic:
+		return bold && italic
+	default:
+		return !bold && !italic
+	}
+}
+
+func fontFiles(root string) []string {
+	root = filepath.Clean(root)
+	var out []string
+	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			rel, relErr := filepath.Rel(root, path)
+			if relErr == nil && rel != "." && strings.Count(rel, string(filepath.Separator)) >= 2 {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if hasFontExt(d.Name()) {
+			out = append(out, path)
+		}
+		return nil
+	})
+	return out
+}
+
+func hasFontExt(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".ttf") || strings.HasSuffix(lower, ".otf") || strings.HasSuffix(lower, ".ttc")
 }
 
 func isFontPath(spec string) bool {
@@ -186,11 +296,15 @@ type fontSet struct {
 	lineWidth    int
 }
 
-// newFontSet loads spec at size points for a buffer scale.
-func newFontSet(lib *fontLibrary, spec string, size float64, scale int) (*fontSet, error) {
+// newFontSet loads spec at size points for a buffer scale. An integral
+// scale matches the old integer buffer scale (DPI 96, 192, …).
+func newFontSet(lib *fontLibrary, spec string, size float64, scale float64) (*fontSet, error) {
+	if scale <= 0 {
+		scale = 1
+	}
 	fs := &fontSet{
 		lib:    lib,
-		opts:   opentype.FaceOptions{Size: size, DPI: 96 * float64(scale), Hinting: font.HintingFull},
+		opts:   opentype.FaceOptions{Size: size, DPI: 96 * scale, Hinting: font.HintingFull},
 		extra:  map[*fontFile]*sizedFace{},
 		glyphs: map[glyphKey]*glyph{},
 	}
