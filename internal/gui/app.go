@@ -152,6 +152,8 @@ func (a *app) Handle(ev Event) {
 		a.onPointer(ev)
 	case EventScroll:
 		a.onScroll(ev)
+	case EventFont:
+		a.onFont(ev)
 	}
 }
 
@@ -263,6 +265,20 @@ func (a *app) closeTerminal() {
 	}
 }
 
+// RunSession drives one terminal session against be until it ends. dir is
+// the child's working directory and argv is the program — on Android, the
+// libmisa.so path. Wayland keeps its own setup and does not call this.
+func RunSession(be Backend, dir string, argv []string) (int, error) {
+	if be == nil {
+		return 1, fmt.Errorf("gui: no backend")
+	}
+	a := newApp(be, config.LoadGUI(), dir, argv)
+	if err := a.loadFonts(); err != nil {
+		return 1, err
+	}
+	return a.loop()
+}
+
 // defaultSize is the logical window size for the configured grid.
 func (a *app) defaultSize() (int, int) {
 	cols, rows := a.cfg.Columns, a.cfg.Rows
@@ -336,14 +352,25 @@ func (a *app) startTerminal(rows, cols int) {
 	a.term = t
 }
 
-// zoom changes the font size by step points, or restores it for 0.
-func (a *app) zoom(step int) {
-	size := a.cfg.FontSize
+// maxPinchFont caps a pinch factor. Zoom from the keyboard is unbounded
+// aside from minFontSize, so a Wayland ctrl+shift+= still climbs past this.
+const maxPinchFont = 72.0
+
+// onFont applies EventFont. An absolute FontSize wins; otherwise Scale is
+// a factor on the current size.
+func (a *app) onFont(ev Event) {
+	size := ev.FontSize
 	if size <= 0 {
-		size = defaultFontSize
+		if ev.Scale <= 0 || a.fontSize <= 0 {
+			return
+		}
+		size = a.fontSize * ev.Scale
+		if size > maxPinchFont {
+			size = maxPinchFont
+		}
 	}
-	if step != 0 {
-		size = max(minFontSize, a.fontSize+float64(step))
+	if size < minFontSize {
+		size = minFontSize
 	}
 	if size == a.fontSize {
 		return
@@ -353,8 +380,22 @@ func (a *app) zoom(step int) {
 		return
 	}
 	a.be.DropBuffers()
-	a.resizeTerminal()
+	if a.logicalW > 0 || a.term != nil {
+		a.resizeTerminal()
+	}
 	a.requestDraw()
+}
+
+// zoom changes the font size by step points, or restores it for 0.
+func (a *app) zoom(step int) {
+	size := a.cfg.FontSize
+	if size <= 0 {
+		size = defaultFontSize
+	}
+	if step != 0 {
+		size = max(minFontSize, a.fontSize+float64(step))
+	}
+	a.onFont(Event{FontSize: size})
 }
 
 func (a *app) redrawIfPending() {

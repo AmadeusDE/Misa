@@ -25,6 +25,20 @@ func TestImportCIsAndroidCgo(t *testing.T) {
 			}
 			return nil
 		}
+		if strings.HasSuffix(path, ".c") || strings.HasSuffix(path, ".h") {
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Errorf("read %s: %v", path, err)
+				return nil
+			}
+			text := string(data)
+			if strings.Contains(text, "jni.h") || strings.Contains(text, "native_window.h") {
+				if !androidCgoConstraint(path) {
+					bad = append(bad, path)
+				}
+			}
+			return nil
+		}
 		if !strings.HasSuffix(path, ".go") {
 			return nil
 		}
