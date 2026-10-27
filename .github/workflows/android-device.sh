@@ -2,7 +2,8 @@
 # android-emulator-runner runs each script: line with /bin/sh -c (dash).
 # The loop lives here so one bash invocation owns set -e and the adb steps.
 # Test binaries read testdata relative to the package directory, the same
-# paths `go test` uses in the repo.
+# paths `go test` uses in the repo. ExtraKeys.java is staged at that same
+# relative path so guiandroid.test can check the mux button ids.
 set -euo pipefail
 
 stage="$RUNNER_TEMP/misa-device-tree"
@@ -13,12 +14,14 @@ mkdir -p \
 	"$stage/internal/gui" \
 	"$stage/internal/gui/android" \
 	"$stage/internal/sshclient" \
+	"$stage/android/app/src/main/java/app/misa" \
 	"$stage/tests/uutils/testdata/tests/fixtures"
 cp "$RUNNER_TEMP/android-tests/term.test" "$stage/internal/term/"
 cp "$RUNNER_TEMP/android-tests/builtins.test" "$stage/internal/builtins/"
 cp "$RUNNER_TEMP/android-tests/gui.test" "$stage/internal/gui/"
 cp "$RUNNER_TEMP/android-tests/guiandroid.test" "$stage/internal/gui/android/"
 cp "$RUNNER_TEMP/android-tests/sshclient.test" "$stage/internal/sshclient/"
+cp android/app/src/main/java/app/misa/ExtraKeys.java "$stage/android/app/src/main/java/app/misa/"
 cp -a internal/term/testdata "$stage/internal/term/testdata"
 cp -a tests/uutils/testdata/tests/fixtures/sum "$stage/tests/uutils/testdata/tests/fixtures/sum"
 cp -a tests/uutils/testdata/tests/fixtures/b2sum "$stage/tests/uutils/testdata/tests/fixtures/b2sum"

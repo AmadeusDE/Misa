@@ -81,6 +81,8 @@ func TestOnTextAndMuxActionReachTheSession(t *testing.T) {
 }
 
 func TestExtraKeysButtonsMatchMuxActions(t *testing.T) {
+	// android-device.sh copies this file to the same relative path. The
+	// emulator runs the test binary without the rest of the tree.
 	src, err := os.ReadFile("../../../android/app/src/main/java/app/misa/ExtraKeys.java")
 	if err != nil {
 		t.Fatal(err)
