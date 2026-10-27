@@ -53,7 +53,9 @@ if ((${#apks[@]} == 0)); then
 	exit 1
 fi
 adb install -r -t "${apks[0]}"
-adb logcat -c
+# API 26 logd sometimes returns "failed to clear the 'main' log" while busy.
+# set -e would abort the install check; a leftover buffer is still scanned below.
+adb logcat -c || true
 adb shell am start -n app.misa/.MisaActivity
 sleep 5
 # exec-out keeps the PNG intact; `adb shell screencap` can mangle it with CR.
