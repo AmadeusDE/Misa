@@ -194,11 +194,20 @@ func TestTimeoutProcessGroup(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	// A killed grandchild can remain a zombie until the host's init reaps it.
-	data, e = os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
-	// Z is a zombie; X is dead and not yet reaped. Either means the child did not survive.
-	if e == nil && !strings.Contains(string(data), ") Z ") && !strings.Contains(string(data), ") X ") {
-		t.Fatalf("grandchild survived timeout: %s", data)
+	// timeout waits only for the shell. The grandchild is reparented to init and
+	// can stay runnable for a few milliseconds after SIGTERM, or as a zombie
+	// until init reaps it. Z and X are already dead.
+	stat := filepath.Join("/proc", strconv.Itoa(pid), "stat")
+	deadline := time.Now().Add(time.Second)
+	for {
+		data, e = os.ReadFile(stat)
+		if e != nil || strings.Contains(string(data), ") Z ") || strings.Contains(string(data), ") X ") {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("grandchild survived timeout: %s", data)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
 
