@@ -1,6 +1,6 @@
 # Plan: Android port (native APK + Termux CLI)
 
-Status: A0 measured 2026-10-27; A1 and A2 landed; A3 in review; later phases not started. Written 2026-10-26 against `master` at `a5982a8`
+Status: A0 measured 2026-10-27; A1, A2 and A3 landed; A4 in review; later phases not started. Written 2026-10-26 against `master` at `a5982a8`
 ("Build binaries and AppImages in Actions (#1)"). This file is `docs/plans/android.md`.
 
 Part 1 is the shared groundwork and the Termux CLI (phases A0–A2). Part 2 is the native APK (A3–A6).
@@ -618,11 +618,11 @@ plus nightly `schedule` and `workflow_dispatch`, since emulators are slow):
 | A0 Measure | done | [#2](https://github.com/AmadeusDE/Misa/pull/2) | NDK r30 matrix, API floor, emulator, throwaway APK. Leftovers for A1 are listed in the measurement section. Decisions flagged, not rewritten |
 | A1 Termux CLI | done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | sysinfo/fetch, procmon degrade, clipboard, file secrets on Android, pkg, session walk. Termux-on-device still unmeasured; the emulator job covers amd64 |
 | A2 gui core/backend split | done | [#7](https://github.com/AmadeusDE/Misa/pull/7) | shared with Windows W2. Core in `internal/gui` (`app.go`, `backend.go`, renderer, fonts). Wayland is `wl_*.go` with `unix && !android` (Android matches both `linux` and `unix`). `misa --gui` on Android errors cleanly. Pixel format is `FormatBGRA8888` or `FormatRGBA8888`; the core draws in the backend's order |
-| A3 Android backend + c-shared | in review | [#8](https://github.com/AmadeusDE/Misa/pull/8) | `internal/gui/android` (ANativeWindow RGBA_8888, density, insets, sessions) and `cmd/misagui` (`libmisagui.so`, `RegisterNatives` on `app/misa/Native`). API 26 clang, `-tags nough`. Pure-Go tests run on Linux and in `android-device` |
-| A4 APK shell | not started | | |
+| A3 Android backend + c-shared | done | [#8](https://github.com/AmadeusDE/Misa/pull/8) | `internal/gui/android` (ANativeWindow RGBA_8888, density, insets, sessions) and `cmd/misagui` (`libmisagui.so`, `RegisterNatives` on `app/misa/Native`). API 26 clang, `-tags nough`. Pure-Go tests run on Linux and in `android-device` |
+| A4 APK shell | in review | | `android/` Gradle project (`app.misa`, no AndroidX): Activity, foreground service, Bootstrap, `build-go.sh`, `version.sh`, adaptive icon from `misa.svg`. `minSdk` 26, `compileSdk`/`targetSdk` 35 |
 | A5 Platform services | not started | | |
 | A6 Controller/touch/ssh UX | not started | | |
 | A7 F-Droid readiness | not started | | |
-| CI: android job | done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | NDK r30, `import "C"` guard, misa and ugh on both arches and the tag set, vet with cgo and cgo-less arm64. A3 adds `libmisagui.so` (`-buildmode=c-shared`) for both ABIs |
-| CI: android-device job | done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | Path filter, nightly schedule, `workflow_dispatch`. API 34 `aosp_atd` and API 26. APK checks stay with A4 |
-| Release: tarball + APK + signing | tarball done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | `android-arm64` and `android-amd64` tarballs (`misa`, `ugh`, no `ughbot`). APK and signing stay with A4 |
+| CI: android job | done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | NDK r30, `import "C"` guard, misa and ugh on both arches and the tag set, vet with cgo and cgo-less arm64. A3 adds `libmisagui.so` (`-buildmode=c-shared`) for both ABIs. A4 adds Temurin 17, wrapper validation, `assembleDebug lint`, and an unsigned release APK built twice and diffed |
+| CI: android-device job | done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | Path filter, nightly schedule, `workflow_dispatch`. API 34 `aosp_atd` and API 26. A4 installs the debug APK, fails on an `app.misa` crash in logcat, and uploads a screenshot |
+| Release: tarball + APK + signing | in review | [#3](https://github.com/AmadeusDE/Misa/pull/3) | `android-arm64` and `android-amd64` tarballs (`misa`, `ugh`, no `ughbot`). A4 adds per-ABI debug APKs plus a universal APK; `v*` tags are release-signed when `ANDROID_KEYSTORE_B64` is set (`environment: release`) |

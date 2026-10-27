@@ -1,0 +1,17 @@
+plugins {
+    id "com.android.application" version "8.7.3" apply false
+}
+
+def versionSh = { List<String> args ->
+    def cmd = ["bash", file("version.sh").absolutePath]
+    cmd.addAll(args)
+    def proc = new ProcessBuilder(cmd).redirectErrorStream(true).start()
+    def text = proc.inputStream.getText("UTF-8").trim()
+    if (proc.waitFor() != 0) {
+        throw new GradleException("android/version.sh ${args.join(' ')} failed: ${text}")
+    }
+    return text
+}
+
+ext.misaVersionName = versionSh(["name"])
+ext.misaVersionBase = versionSh(["base"]).toInteger()

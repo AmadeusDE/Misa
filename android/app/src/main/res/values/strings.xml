@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Misa</string>
+    <string name="notif_channel">Sessions</string>
+    <string name="notif_one">1 session</string>
+    <string name="notif_many">%d sessions</string>
+    <string name="stop">Stop</string>
+    <string name="new_session">New</string>
+    <string name="close_session">Close</string>
+    <string name="link_storage">Link shared storage</string>
+    <string name="storage_linked">Shared storage linked</string>
+</resources>

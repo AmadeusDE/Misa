@@ -164,3 +164,36 @@ android-lib arch="arm64":
     export GOOS=android GOARCH="$goarch" CGO_ENABLED=1 CC="$cc"
     go build -tags nough -buildmode=c-shared -trimpath -ldflags='-s -w' -o "$out" ./cmd/misagui
     ls -lh "$out"
+
+# Debug APK: libmisa.so + libmisagui.so for arm64-v8a and x86_64, plus a universal APK.
+# Needs the NDK (ANDROID_NDK_HOME, or android/ndk.version under the SDK) and an Android SDK.
+apk:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+    if [[ -z $sdk && -d /opt/android-sdk ]]; then sdk=/opt/android-sdk; fi
+    if [[ -z $sdk && -d /usr/local/lib/android/sdk ]]; then sdk=/usr/local/lib/android/sdk; fi
+    if [[ -n $sdk ]]; then
+        export ANDROID_SDK_ROOT=$sdk ANDROID_HOME=$sdk
+        if [[ ! -f android/local.properties ]]; then
+            printf 'sdk.dir=%s\n' "$sdk" > android/local.properties
+        fi
+    fi
+    ./android/build-go.sh
+    (cd android && ./gradlew assembleDebug -PskipGoBuild --console=plain)
+
+# Unsigned release APK, unless a release keystore is supplied out of band.
+apk-release:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+    if [[ -z $sdk && -d /opt/android-sdk ]]; then sdk=/opt/android-sdk; fi
+    if [[ -z $sdk && -d /usr/local/lib/android/sdk ]]; then sdk=/usr/local/lib/android/sdk; fi
+    if [[ -n $sdk ]]; then
+        export ANDROID_SDK_ROOT=$sdk ANDROID_HOME=$sdk
+        if [[ ! -f android/local.properties ]]; then
+            printf 'sdk.dir=%s\n' "$sdk" > android/local.properties
+        fi
+    fi
+    ./android/build-go.sh
+    (cd android && ./gradlew assembleRelease -PskipGoBuild --console=plain)

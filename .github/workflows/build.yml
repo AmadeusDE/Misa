@@ -123,9 +123,18 @@ jobs:
             triple: x86_64-linux-android24-clang
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version: '1.27.1'
+      - uses: actions/setup-java@v4
+        if: matrix.arch == 'arm64'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/wrapper-validation@v4
+        if: matrix.arch == 'arm64'
       - id: ndk
         run: echo "version=$(tr -d '[:space:]' < android/ndk.version)" >> "$GITHUB_OUTPUT"
       # The runner image owns /usr/local/lib/android/sdk as root. Cache
@@ -170,9 +179,130 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+      - name: Install compile SDK and build-tools
+        if: matrix.arch == 'arm64'
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          mkdir -p "$sdk/licenses"
+          printf '%s\n' 24333f8a63b6825ea9c5514f83c2829b004d1fee > "$sdk/licenses/android-sdk-license"
+          sdkmanager=$(find "$sdk/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          "$sdkmanager" --sdk_root="$sdk" "platforms;android-35" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: matrix.arch == 'arm64'
+
+      # Per-ABI APKs, plus a universal APK on non-tag builds. Tag builds stay
+      # unsigned here; apk-sign (environment: release) signs them.
+      - name: Build APKs
+        if: matrix.arch == 'arm64'
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          ANDROID_NDK_HOME: /usr/local/lib/android/sdk/ndk/${{ steps.ndk.outputs.version }}
+        run: |
+          set -euo pipefail
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > android/local.properties
+          ./android/build-go.sh
+          cd android
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            ./gradlew assembleRelease -PskipGoBuild -PuniversalApk=false --console=plain
+          else
+            ./gradlew assembleDebug -PskipGoBuild -PuniversalApk=true --console=plain
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.arch == 'arm64' && !startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.arch == 'arm64' && startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: apk-unsigned
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+  # Tag builds only. The release environment keeps the keystore secrets off
+  # pull requests. Without ANDROID_KEYSTORE_B64 the APKs are debug-signed
+  # and named -debug.apk.
+  apk-sign:
+    name: apk-sign
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: android
+    runs-on: ubuntu-24.04
+    environment: release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-unsigned
+          path: apk
+      - name: Sign release APKs
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          sdk="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          apksigner=$(find "$sdk/build-tools" -type f -name apksigner | sort | tail -n 1)
+          test -n "$apksigner"
+          sign_one() {
+            "$apksigner" sign \
+              --ks "$3" \
+              --ks-pass "env:ANDROID_KEYSTORE_PASSWORD" \
+              --key-pass "env:ANDROID_KEY_PASSWORD" \
+              --ks-key-alias "$ANDROID_KEY_ALIAS" \
+              --v2-signing-enabled true \
+              --v3-signing-enabled true \
+              --out "$2" "$1"
+            "$apksigner" verify --verbose "$2"
+          }
+          if [[ -n ${ANDROID_KEYSTORE_B64:-} ]]; then
+            echo "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            for apk in apk/*.apk; do
+              sign_one "$apk" "$apk.signed" "$RUNNER_TEMP/release.jks"
+              mv "$apk.signed" "$apk"
+            done
+            rm -f "$RUNNER_TEMP/release.jks"
+          else
+            echo "ANDROID_KEYSTORE_B64 is unset; debug-signing the release APKs" >&2
+            keytool -genkeypair -keystore "$RUNNER_TEMP/debug.jks" -storepass android \
+              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+              -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            export ANDROID_KEYSTORE_PASSWORD=android ANDROID_KEY_PASSWORD=android ANDROID_KEY_ALIAS=androiddebugkey
+            for apk in apk/*.apk; do
+              base=${apk%.apk}
+              dest=$apk
+              if [[ $base != *-debug ]]; then
+                dest="${base}-debug.apk"
+              fi
+              sign_one "$apk" "$dest" "$RUNNER_TEMP/debug.jks"
+              if [[ $dest != "$apk" ]]; then
+                rm -f "$apk"
+              fi
+            done
+            rm -f "$RUNNER_TEMP/debug.jks"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: apk/*.apk
+          if-no-files-found: error
+
   # One artifact with every platform, a directory each.
+  # apk-sign is skipped off tags; a skipped need would skip this job too.
   bundle:
-    needs: [binaries, appimage, android]
+    needs: [binaries, appimage, android, apk-sign]
+    if: |
+      always() &&
+      (needs.binaries.result == 'success' || needs.binaries.result == 'skipped') &&
+      (needs.appimage.result == 'success' || needs.appimage.result == 'skipped') &&
+      (needs.android.result == 'success' || needs.android.result == 'skipped') &&
+      (needs.apk-sign.result == 'success' || needs.apk-sign.result == 'skipped')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/upload-artifact/merge@v4
@@ -203,6 +333,8 @@ jobs:
             platform=$(basename "$dir")
             case $platform in
             appimage-*) mv "$dir"/*.AppImage release/ ;;
+            apk) mv "$dir"/*.apk release/ ;;
+            apk-unsigned) ;;
             *)
               chmod +x "$dir"/misa "$dir"/ugh
               [ -e "$dir/ughbot" ] && chmod +x "$dir/ughbot" || true

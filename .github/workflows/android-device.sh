@@ -38,3 +38,43 @@ run internal/builtins builtins.test
 run internal/gui gui.test
 run internal/gui/android guiandroid.test
 run internal/sshclient sshclient.test
+
+echo "=== apk ==="
+shopt -s nullglob
+apks=(android/app/build/outputs/apk/debug/*x86_64*.apk)
+if ((${#apks[@]} == 0)); then
+	apks=(android/app/build/outputs/apk/debug/*universal*.apk)
+fi
+if ((${#apks[@]} == 0)); then
+	apks=(android/app/build/outputs/apk/debug/*.apk)
+fi
+if ((${#apks[@]} == 0)); then
+	echo "no debug APK to install" >&2
+	exit 1
+fi
+adb install -r -t "${apks[0]}"
+adb logcat -c
+adb shell am start -n app.misa/.MisaActivity
+sleep 5
+# exec-out keeps the PNG intact; `adb shell screencap` can mangle it with CR.
+adb exec-out screencap -p > misa-apk-screen.png || true
+adb logcat -d -v threadtime > "$RUNNER_TEMP/misa-apk-logcat.txt"
+if ! adb shell pidof app.misa >/dev/null; then
+	echo "app.misa is not running" >&2
+	tail -n 80 "$RUNNER_TEMP/misa-apk-logcat.txt" >&2 || true
+	exit 1
+fi
+pid=$(adb shell pidof app.misa | tr -d '\r' | awk '{print $1}')
+adb logcat -d -v threadtime --pid="$pid" > "$RUNNER_TEMP/misa-apk-pid.txt" || true
+if ! awk '
+	index(FILENAME, "pid") && /panic:/ { bad = 1 }
+	index(FILENAME, "pid") && /fatal error: all goroutines/ { bad = 1 }
+	index(FILENAME, "logcat") && /FATAL EXCEPTION/ { blk = 1; next }
+	index(FILENAME, "logcat") && blk && /Process: app\.misa/ { bad = 1 }
+	END { exit bad ? 1 : 0 }
+' "$RUNNER_TEMP/misa-apk-logcat.txt" "$RUNNER_TEMP/misa-apk-pid.txt"; then
+	echo "app.misa crashed" >&2
+	tail -n 120 "$RUNNER_TEMP/misa-apk-logcat.txt" >&2 || true
+	exit 1
+fi
+echo "apk is up"
