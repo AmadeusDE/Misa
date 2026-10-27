@@ -615,7 +615,7 @@ plus nightly `schedule` and `workflow_dispatch`, since emulators are slow):
 
 | Phase | State | PR | Notes |
 |---|---|---|---|
-| A0 Measure | done | this PR | NDK r30 matrix, API floor, emulator, throwaway APK. Leftovers for A1 are listed in the measurement section. Decisions flagged, not rewritten |
+| A0 Measure | done | [#2](https://github.com/AmadeusDE/Misa/pull/2) | NDK r30 matrix, API floor, emulator, throwaway APK. Leftovers for A1 are listed in the measurement section. Decisions flagged, not rewritten |
 | A1 Termux CLI | not started | | |
 | A2 gui core/backend split | not started | | shared with Windows W2 |
 | A3 Android backend + c-shared | not started | | |
