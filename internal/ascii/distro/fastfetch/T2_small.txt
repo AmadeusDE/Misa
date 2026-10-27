@@ -1,0 +1,10 @@
+---
+pattern: T2_small | T2_SDE_small | T2_Linux_small
+colors: White, Blue
+---
+$2TTTTTTTTTT
+    tt   $1222$2
+    tt  $12   2$2
+    tt     $12$2
+    tt    $12$2
+    tt  $122222$2

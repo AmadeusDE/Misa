@@ -1,0 +1,23 @@
+---
+pattern: Windows_8 | Windows_8.1 | Windows_10 | Windows_Server_2012 | Windows_Server_2012_R2 | Windows_Server_2016 | Windows_Server_2019
+colors: Cyan, Cyan, Cyan, Cyan
+---
+                                $2..,
+                    ....,,:;+ccllll
+$1      ...,,+:;  $2cllllllllllllllllll
+$1,cclllllllllll  $2lllllllllllllllllll
+$1llllllllllllll  $2lllllllllllllllllll
+$1llllllllllllll  $2lllllllllllllllllll
+$1llllllllllllll  $2lllllllllllllllllll
+$1llllllllllllll  $2lllllllllllllllllll
+$1llllllllllllll  $2lllllllllllllllllll
+
+$3llllllllllllll  $4lllllllllllllllllll
+$3llllllllllllll  $4lllllllllllllllllll
+$3llllllllllllll  $4lllllllllllllllllll
+$3llllllllllllll  $4lllllllllllllllllll
+$3llllllllllllll  $4lllllllllllllllllll
+$3`'ccllllllllll  $4lllllllllllllllllll
+$3       `' \*::  $4:ccllllllllllllllll
+                       ````''*::cll
+                                 ``

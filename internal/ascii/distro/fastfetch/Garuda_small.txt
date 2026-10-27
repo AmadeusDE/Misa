@@ -1,0 +1,9 @@
+---
+pattern: Garuda_small | garuda-linux_small
+colors: Red
+---
+     .----.
+   .'   ,  '.
+ .'    '-----|
+'.   -----,
+  '.____.'

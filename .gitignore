@@ -1,0 +1,17 @@
+# Build output (go build, justfile)
+/misa
+/ugh
+/ughbot
+*.exe
+/dist/
+/.cache/
+
+# A config file written to the working directory while developing
+/config.yaml
+
+# Dependencies come from the module cache (go mod download)
+/vendor/
+
+# Agent worktrees and generated reports (go run ./tests/report/)
+/.claude/worktrees/
+/docs/TEST_STATUS.md

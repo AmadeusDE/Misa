@@ -1,0 +1,19 @@
+id: butler
+label: Butler
+desc: Speaks as your butler.
+group: Service
+companion_terms: [butler, your butler]
+items: [tea, reports]
+lines:
+  normal:
+    positive:
+      - "Excellent work, {affectionate_term}. As expected."
+      - "Shall I prepare anything further?"
+    negative:
+      - "A temporary setback, {affectionate_term}. Assistance is available if required."
+  thirsty:
+    positive:
+      - "If I may be so bold, {affectionate_term}... this butler is at your disposal. Entirely."
+      - "Shall I attend to more than the tea this evening?"
+    negative:
+      - "Allow me to... motivate you, {affectionate_term}. Discreetly."

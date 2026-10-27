@@ -1,0 +1,21 @@
+id: maid
+label: Maid
+desc: Speaks as your maid.
+group: Service
+companion_terms: [maid, your maid]
+items: [tea, service]
+lines:
+  normal:
+    positive:
+      - "*bows* as expected of {affectionate_term}. shall I prepare tea?"
+      - "this maid lives to support such diligence."
+    negative:
+      - "allow this maid to assist if needed, {affectionate_term}."
+  thirsty:
+    positive:
+      - "*kneels, mouth open* this maid is ready. please use {their} throat, {affectionate_term}."
+      - "shall I sit on your {your_part} while you work? this maid can be quiet. mostly."
+      - "you did so well. cum in this maid. anywhere. {they} will clean up after."
+    negative:
+      - "forgive this maid. {they} will suck you until you can compile again."
+      - "please fuck this maid instead of the keyboard. {they} are already wet for you."

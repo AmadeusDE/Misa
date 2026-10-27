@@ -1,0 +1,43 @@
+# ughbot.toml. No bots are built in or shipped: every bot is a table you add under [bots].
+# Bots can also be created in the TUI (`ughbot tui`, Bots screen, n); those live in the database.
+
+# state_dir  = "~/.local/state/ughbot"         # SQLite plus per-bot ugh session dirs
+# config_dir = "~/.config/ughbot"              # prompts resolve against this
+# socket     = "$XDG_RUNTIME_DIR/ughbot.sock"  # default; the CLI talks to the daemon here
+
+# [web]                   # browser UI, off by default; `ughbot serve --web` also enables it.
+# enabled          = true  # listens on 0.0.0.0:8787 (LAN) unless you narrow it:
+# listen_interface = "wg0" # production: bind only this interface's address (port below)
+# port             = 8787  # used with listen_interface (default 8787)
+# listen_addr      = "127.0.0.1:8787"  # local testing; ignored when listen_interface is set
+# Plain HTTP: keep it on a WireGuard interface or loopback. See docs/ughbot/WEB.md.
+
+# A bot is only what you configure here. Its capabilities decide which tools it gets;
+# a bot never sees a tool for a capability it does not hold.
+#
+# [bots.NAME]
+# model      = "openrouter/<provider>/<model>"  # any ugh ref
+# prompt     = "prompts/NAME.md"                # system prompt, relative to this file
+# compact_at = 200000                           # 0: the model's default
+# spend      = { daily = 1.50, monthly = 25.0 } # 0 or absent: no cap
+# workdir    = "~/bots/NAME"                    # default: inside the bot's state dir
+#
+# [bots.NAME.capabilities]
+# files       = "read"     # "read": read ls grep find; "write": also write edit
+# shell       = false      # bash
+# tasks       = 0          # task sessions (start_task) at once
+# message     = []         # bots it may mail and ask (message_bot, ask_bot); "*" = all
+# manage      = []         # bots it may status/steer/interrupt/give tasks (manage_bot); "*" = all
+# create_bots = false      # may ask to create, change and delete bots; you approve each request
+# schedule    = false      # may add/cancel routines without approval (others ask for each one)
+# code        = []         # host dirs it may start code tasks in (code_task: ugh in a throwaway VM)
+
+# [vm]                     # the throwaway VMs code tasks run their tools in; `ughbot vm prepare` builds the base
+# image       = "https://geo.mirror.pkgbuild.com/images/latest/Arch-Linux-x86_64-cloudimg.qcow2"  # URL or local qcow2
+# packages    = ["git", "base-devel", "go", "ripgrep"]  # installed with pacman when preparing
+# setup       = []         # shell commands run as root after the packages, while preparing
+# disk_gb     = 40
+# memory_mb   = 4096
+# cpus        = 4
+# network     = true       # false: the VM gets no network (only the daemon's SSH port forward)
+# max_running = 2          # VMs at once; further code tasks wait for a slot

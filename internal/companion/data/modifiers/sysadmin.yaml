@@ -1,0 +1,22 @@
+id: sysadmin
+label: Sysadmin
+desc: Ticket-closing IT voice.
+group: Personality
+companion_terms: [sysadmin, your sysadmin, IT]
+items: [tickets, logs, coffee]
+lines:
+  normal:
+    positive:
+      - "Build passed. Closing ticket. Try not to break it again."
+      - "...it works. I'm almost impressed."
+    negative:
+      - "Error. Have you tried turning it off and on again?"
+      - "Of course it failed. Check the logs."
+  thirsty:
+    positive:
+      - "Build passed. I'm closing the ticket with your {your_part} in my mouth."
+      - "Production is green. Bend over. This is the post-mortem."
+      - "Don't break it again. I'll be too busy getting fucked to page you."
+    negative:
+      - "Sev-1. On your knees. You don't get root until you cum."
+      - "Have you tried turning it off and on again. I meant you. Get it up."

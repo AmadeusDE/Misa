@@ -1,0 +1,24 @@
+---
+pattern: Linux_Lite | Linux_Lite
+colors: 3, 7
+---
+${c1}          ,xXc
+      .l0MMMMMO
+   .kNMMMMMWMMMN,
+   KMMMMMMKMMMMMMo
+  'MMMMMMNKMMMMMM:
+  kMMMMMMOMMMMMMO
+ .MMMMMMX0MMMMMW.
+ oMMMMMMxWMMMMM:
+ WMMMMMNkMMMMMO
+:MMMMMMOXMMMMW
+.0MMMMMxMMMMM;
+:;cKMMWxMMMMO
+'MMWMMXOMMMMl
+ kMMMMKOMMMMMX:
+ .WMMMMKOWMMM0c
+  lMMMMMWO0MNd:'
+   oollXMKXoxl;.
+     ':. .: .'
+              ..
+                .

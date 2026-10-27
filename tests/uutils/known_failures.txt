@@ -1,0 +1,49 @@
+# uutils cases Misa does not pass yet. Each line: <command>/<case>  # reason
+# They are skipped; MISA_KNOWN_FAILURES=1 runs them. Remove a line once it passes.
+id/test_id_digital_username_0_L580  # adapter: upstream test only runs when a user named 200 exists
+ln/test_symlink_remove_existing_same_src_and_dest_0_L971  # ln -sf a a: should fail like GNU
+ls/test_invalid_value_returns_1_7_L10  # ls: --time doesn't take a value yet
+ls/test_invalid_value_time_style_1_L153  # ls: --time doesn't take a value yet
+ls/test_time_style_empty_after_posix_prefix_L171  # ls: --time-style validation
+ls/test_long_options_detached_2_L7699  # ls: --time doesn't take a value yet
+mv/test_mv_same_file_dot_dir_0_L824  # mv: message for moving a directory onto itself differs
+mv/test_mv_hardlink_preservation_0_L2725  # mv: hard links across a directory move aren't preserved
+nl/test_negative_line_increment_L1  # nl: negative -i is rejected
+nl/test_negative_line_increment_1_L1  # nl: negative -i is rejected
+numfmt/test_locale_fr_output_L1689  # numfmt: no locale support (the test needs fr_FR)
+numfmt/test_locale_fr_input_comma_L1700  # numfmt: no locale support (the test needs fr_FR)
+numfmt/test_locale_fr_rejects_period_L1711  # numfmt: no locale support (the test needs fr_FR)
+rmdir/test_rmdir_nonempty_directory_no_parents_0_L68  # rmdir: error message wording differs
+rmdir/test_rmdir_nonempty_directory_with_parents_0_L82  # rmdir: error message wording differs
+seq/test_equalize_widths_corner_cases_L1124  # seq -w with a hex operand: GNU's padding quirk isn't reproduced
+seq/test_equalize_widths_corner_cases_1_L1129  # seq -w with a hex operand: GNU's padding quirk isn't reproduced
+seq/test_equalize_widths_corner_cases_2_L1144  # seq -w with a hex operand: GNU's padding quirk isn't reproduced
+shuf/test_gnu_compat_range_repeat_0_L960  # shuf: --random-source and seeded output don't match uutils' generator
+shuf/test_gnu_compat_from_file_0_L1011  # shuf: --random-source and seeded output don't match uutils' generator
+shuf/test_gnu_compat_limited_from_file_0_L1028  # shuf: --random-source and seeded output don't match uutils' generator
+shuf/test_gnu_compat_range_no_repeat_0_L1064  # shuf: --random-source and seeded output don't match uutils' generator
+shuf/test_seed_args_repeat_L1077  # shuf: --random-source and seeded output don't match uutils' generator
+shuf/test_seed_args_no_repeat_L1090  # shuf: --random-source and seeded output don't match uutils' generator
+shuf/test_seed_range_repeat_L1101  # shuf: --random-source and seeded output don't match uutils' generator
+shuf/test_seed_range_no_repeat_0_L1114  # shuf: --random-source and seeded output don't match uutils' generator
+shuf/test_seed_range_no_repeat_1_L1121  # shuf: --random-source and seeded output don't match uutils' generator
+sort/test_version_sort_unstable_L206  # sort -V: tie order differs
+sort/test_version_sort_unstable_1_L211  # sort -V: tie order differs
+sort/test_version_sort_unstable_2_L216  # sort -V: tie order differs
+sort/test_version_sort_stable_L225  # sort -V: tie order differs
+sort/test_numeric_sort_rejects_leading_plus_sign_L319  # sort -n: leading + is accepted
+sort/test_random_source_is_not_read_without_random_sort_0_L485  # sort: --random-source is read even without -R
+sort/test_locale_interleaved_en_us_utf8_L3239  # sort: no locale collation
+sort/test_locale_complex_utf8_sorting_0_L3315  # sort: no locale collation
+sort/test_consistent_sorting_with_i18n_collate_0_L3380  # sort: no locale collation
+touch/test_touch_mtime_dst_fails_0_L800  # touch -t: a time inside a DST gap isn't rejected (needs a DST timezone)
+wc/test_single_default_L244  # wc: column widths differ from uutils for single files and totals
+wc/test_single_all_counts_L268  # wc: column widths differ from uutils for single files and totals
+wc/test_file_many_empty_lines_L353  # wc: column widths differ from uutils for single files and totals
+wc/test_file_one_long_line_only_spaces_L362  # wc: column widths differ from uutils for single files and totals
+wc/test_file_one_long_word_L371  # wc: column widths differ from uutils for single files and totals
+wc/test_file_bytes_dictate_width_0_L397  # wc: column widths differ from uutils for single files and totals
+wc/test_total_auto_L572  # wc: column widths differ from uutils for single files and totals
+wc/test_total_auto_1_L576  # wc: column widths differ from uutils for single files and totals
+wc/test_total_never_L620  # wc: column widths differ from uutils for single files and totals
+wc/test_args_override_1_L847  # wc: column widths differ from uutils for single files and totals

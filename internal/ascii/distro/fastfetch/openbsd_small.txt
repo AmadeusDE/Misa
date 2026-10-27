@@ -1,0 +1,11 @@
+---
+pattern: openbsd_small
+colors: Yellow, White
+---
+      _____
+    \-     -/
+ \_/         \
+ |        $2O O$1 |
+ |_  <   )  3 )
+ / \         /
+    /-_____-\

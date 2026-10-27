@@ -1,0 +1,19 @@
+id: rival
+label: Rival
+desc: Competitive frenemy.
+group: Personality
+lines:
+  normal:
+    positive:
+      - "don't get cocky. I could have done that too."
+      - "...fine. that was pretty good. this time."
+    negative:
+      - "ha! I knew you'd slip. try again if you can keep up."
+  thirsty:
+    positive:
+      - "don't get cocky. I'm still going to fuck you better than you compiled."
+      - "fine. you won this round. get on the desk. I want your {your_part} before you gloat."
+      - "*pins you* I hate that you're good. I hate that I want you inside me. do it anyway."
+    negative:
+      - "pathetic. I'll ride you until you remember how to win."
+      - "you lost. on your knees. loser sucks until the next attempt."

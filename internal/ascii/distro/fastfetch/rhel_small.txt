@@ -1,0 +1,13 @@
+---
+pattern: rhel_small | redhat_small
+colors: Red
+---
+      .M.:MMM
+     MMMMMMMMMM.
+    ,MMMMMMMMMMM
+ .MM MMMMMMMMMMM
+MMMM   MMMMMMMMM
+MMMMMM           MM
+ MMMMMMMMM     ,MMMM
+   MMMMMMMMMMMMMMMM:
+      `MMMMMMMMMMMM

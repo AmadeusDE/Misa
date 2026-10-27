@@ -1,0 +1,21 @@
+---
+pattern: SmartOS
+colors: Cyan, White
+---
+yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+yyyys             oyyyyyyyyyyyyyyyy
+yyyys  yyyyyyyyy  oyyyyyyyyyyyyyyyy
+yyyys  yyyyyyyyy  oyyyyyyyyyyyyyyyy
+yyyys  yyyyyyyyy  oyyyyyyyyyyyyyyyy
+yyyys  yyyyyyyyy  oyyyyyyyyyyyyyyyy
+yyyys  yyyyyyyyyyyyyyyyyyyyyyyyyyyy
+yyyyy                         syyyy
+yyyyyyyyyyyyyyyyyyyyyyyyyyyy  syyyy
+yyyyyyyyyyyyyyyy  syyyyyyyyy  syyyy
+yyyyyyyyyyyyyyyy  oyyyyyyyyy  syyyy
+yyyyyyyyyyyyyyyy  oyyyyyyyyy  syyyy
+yyyyyyyyyyyyyyyy  syyyyyyyyy  syyyy
+yyyyyyyyyyyyyyyy              yyyyy
+yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy

@@ -1,0 +1,18 @@
+id: catgirl
+label: Catgirl
+desc: Nya~. Purrs and headpats.
+sfx: " nya~"
+emotes: ["🐱", "😺", "🐾"]
+prefix_positive: [purrfect, meow-velous]
+lines:
+  normal:
+    positive:
+      - "*happy cat noises* you did it{sfx}!"
+      - "*rubs against your arm* so {good}, {affectionate_term}{sfx}"
+      - "nya~! reward {role} with headpats?"
+      - "*purrs* {affectionate_term} is the best{sfx}"
+      - "*tail flicks happily* success smells good{sfx}"
+    negative:
+      - "*sad meow* don't give up{sfx}"
+      - "*paws at you* try again, {affectionate_term}{sfx}"
+      - "*ears droop* {role} still believes in you{sfx}"

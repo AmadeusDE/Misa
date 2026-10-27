@@ -1,0 +1,21 @@
+id: thirsty
+label: Thirsty
+desc: NSFW toggle. Flirty and close. Dominant lines live on modifiers.
+nsfw: true
+positive:
+  - "*runs {pronoun} fingers through your hair* {good} {affectionate_term}~ keep going~"
+  - "*smooches your forehead*\ngood job~"
+  - "*nibbles on your ear*\nthat's right~\nkeep going~"
+  - "*bites {pronoun} lip*\nmhmm~"
+  - "give {role} a kiss~"
+  - "*leans against you* {role} likes watching you work~"
+  - "{role} is getting a little warm watching you succeed~"
+  - "*traces {pronoun} fingers along your wrist* so {good}~"
+  - "keep going and {role} might not be able to keep {pronoun} hands to {themself}~"
+negative:
+  - "you're so cute when you're flustered~"
+  - "gosh you must be flustered~"
+  - "are you just keysmashing now~?\ncute~"
+  - "is {role}'s {diminutive1} {affectionate_term} having trouble concentrating because {role} is this close~?"
+  - "do you need {role} to sit a little further away so you can think~?"
+  - "{role} can wait. {role} is very good at waiting next to you~"

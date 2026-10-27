@@ -1,0 +1,25 @@
+id: bigboard
+name: Chess on a Really Big Board
+description: Ralph Betza, 1996. Sixteen pieces a side on 16×16; pawns may first move as far as the middle, and castling rooks move as far as in chess.
+extends: chess
+files: 16
+ranks: 16
+# Values are rough guesses for 16×16, where long-range pieces gain on short ones.
+pieces:
+  - {letter: Q, name: Queen, betza: Q, glyph: ♛, value: 1000}
+  - {letter: R, name: Rook, betza: R, glyph: ♜, value: 550}
+  - {letter: B, name: Bishop, betza: B, glyph: ♝, value: 380}
+  - {letter: N, name: Knight, betza: N, glyph: ♞, value: 290}
+  - {letter: P, name: Pawn, betza: fmWfcFifmW6, pawn: true, glyph: ♟, value: 100}
+  - {letter: A, name: Archbishop, betza: BN, value: 800}
+  - {letter: C, name: Chancellor, betza: RN, value: 850}
+  - {letter: J, name: Superknight, betza: NLJ, value: 550}
+  - {letter: O, name: Rose, betza: qN, value: 500}
+  - {letter: D, name: Unicorn (FD), betza: FD, value: 300}
+  - {letter: W, name: Elephant (WFA), betza: WFA, value: 330}
+setup: rndwboaqkcjbwdnr/pppppppppppppppp/16/16/16/16/16/16/16/16/16/16/16/16/PPPPPPPPPPPPPPPP/RNDWBOAQKCJBWDNR
+castling:
+  - {king: i1, rook: p1, king_to: o1, rook_to: n1}
+  - {king: i1, rook: a1, king_to: c1, rook_to: d1}
+promotion: [Q, C, A, R, B, O, J, N, W, D]
+move_limit: 100

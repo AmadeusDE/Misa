@@ -1,0 +1,7 @@
+{{define "content"}}
+<p id="status">Signing in with this device's key...</p>
+<p><a href="/enroll">Enroll this device</a></p>
+<div id="login" data-next="{{.Next}}"></div>
+<script src="/static/ed25519.js"></script>
+<script src="/static/auth.js"></script>
+{{end}}

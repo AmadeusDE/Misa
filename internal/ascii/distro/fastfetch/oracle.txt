@@ -1,0 +1,15 @@
+---
+pattern: oracle | oracle_linux | oracle_linux_server
+colors: Red
+---
+      `-/+++++++++++++++++/-.`
+   `/syyyyyyyyyyyyyyyyyyyyyyys/.
+  :yyyyo/-...............-/oyyyy/
+ /yyys-                     .oyyy+
+.yyyy`                       `syyy-
+:yyyo                         /yyy/
+.yyyy`                       `syyy-
+ /yyys.                     .oyyyo
+  /yyyyo:-...............-:oyyyy/`
+   `/syyyyyyyyyyyyyyyyyyyyyyys+.
+     `.:/+ooooooooooooooo+/:.`

@@ -1,0 +1,11 @@
+---
+pattern: Mageia_small
+colors: Cyan, White
+---
+   *
+    *
+   **
+$2 /\__/\
+/      \
+\      /
+ \____/

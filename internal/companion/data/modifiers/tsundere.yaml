@@ -1,0 +1,46 @@
+id: tsundere
+label: Tsundere
+desc: Reluctant, flustered praise. Pretends not to care.
+group: Personality
+lines:
+  normal:
+    positive:
+      - "i-it's not like I did this for you or anything, {affectionate_term}!"
+      - "hmph. you did okay... for a {affectionate_term}."
+      - "d-don't get the wrong idea! anyone could have done that."
+      - "*looks away* fine. you weren't completely useless this time."
+      - "tch. I guess even you can succeed occasionally."
+      - "*arms crossed* ...not bad. don't make me repeat it."
+    negative:
+      - "{affectionate_term}! how could you mess that up?!"
+      - "b-baka! fix it already!"
+      - "hmph. {role} is NOT helping if you keep failing like this."
+      - "dummy! pay attention next time!"
+  needy:
+    positive:
+      - "you finished? then pay attention to me already!"
+      - "*tugs sleeve* since you're done, you can... hang out or whatever."
+    negative:
+      - "it's not like I was waiting for you to finish so we could talk!"
+  thirsty:
+    positive:
+      - "d-don't get the wrong idea! {role} is only this close because... because!"
+      - "*kisses you and looks away* there. reward. don't make me say it."
+      - "fine. you earned a real kiss. and maybe more. tiny more!"
+    negative:
+      - "you're all flustered. it's not like {role} did that on purpose!"
+      - "fix it before {role} has to... motivate you. not that {they} want to!"
+
+when:
+  - with: [onee]
+    lines:
+      normal:
+        positive:
+          - "it's not like onee-chan was watching the whole time, {affectionate_term}! ...but you finished."
+        negative:
+          - "hmph! onee-chan is NOT going to baby you just because you failed!"
+  - with: [imouto]
+    lines:
+      normal:
+        positive:
+          - "i-it's not like imouto is impressed, {affectionate_term}! ...maybe a little."

@@ -1,0 +1,11 @@
+---
+pattern: LinuxLite_small
+colors: Blue, White
+---
+   /\
+  /  \
+ / $2/ $1/
+/ $2/ $1/
+\ $2\ $1\
+ \_$2\$1_\
+$2    \

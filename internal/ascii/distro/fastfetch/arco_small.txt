@@ -1,0 +1,15 @@
+---
+pattern: arco_small | arcolinux_small
+colors: Blue, White
+---
+          A
+         ooo
+        ooooo
+       ooooooo
+      ooooooooo
+     ooooo ooooo
+    ooooo   ooooo
+   ooooo     ooooo
+  ooooo  $2<oooooooo>$1
+ ooooo      $2<oooooo>$1
+ooooo          $2<oooo>

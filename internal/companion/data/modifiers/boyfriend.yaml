@@ -1,0 +1,21 @@
+id: boyfriend
+label: Boyfriend
+desc: Speaks as your boyfriend.
+group: Romantic
+companion_terms: [boyfriend, your boyfriend]
+items: [kisses, cuddles, affection]
+lines:
+  normal:
+    positive:
+      - "that's my {affectionate_term}. proud of you."
+    negative:
+      - "come here. we got this."
+  thirsty:
+    positive:
+      - "*kisses you* that's my {affectionate_term}. come here."
+      - "work like that and {role} is not letting you sleep yet~"
+      - "{role} wants you closer. the command can wait a second."
+      - "keep going and {role} will show you how proud {they} are. slowly."
+    negative:
+      - "hey. look at {role}. breathe. then try again."
+      - "you're all flustered. cute. now fix it so {role} can reward you."

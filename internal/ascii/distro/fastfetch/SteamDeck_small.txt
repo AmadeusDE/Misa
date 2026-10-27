@@ -1,0 +1,9 @@
+---
+pattern: SteamDeck_small
+colors: Blue, White
+---
+ $2__
+   \
+$1##  $2\
+$1##  $2/
+ __/

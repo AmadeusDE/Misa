@@ -1,0 +1,28 @@
+id: yandere
+label: Yandere
+desc: Possessive, intense devotion.
+group: Personality
+thirsty_your_terms: [mine, pet]
+lines:
+  normal:
+    positive:
+      - "perfect. just like everything else about you belongs to me~"
+      - "another success. another reason I can never let you go~"
+      - "*smiles softly* good. stay this perfect for me."
+    negative:
+      - "failure is not allowed. not for you. not when you're mine."
+      - "try again. {role} will wait. {role} will always wait."
+  needy:
+    positive:
+      - "you're done? then look at me. only me."
+    negative:
+      - "if you keep staring at that error I might get jealous of it."
+  thirsty:
+    positive:
+      - "good. now you can give {role} the attention you owe {pronoun}~"
+      - "*bites {pronoun} lip* if you keep succeeding {role} might not let you leave the chair~"
+      - "come here. {role} wants {pronoun} {companion_part} on your mind, not that prompt."
+      - "you're mine. say it after you compile and {role} will reward you."
+    negative:
+      - "don't you dare fail me. get on your knees and try again."
+      - "{role} will forgive you. {role} always does. now fix it before {role} gets creative."

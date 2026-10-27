@@ -1,0 +1,20 @@
+id: wife
+label: Wife
+desc: Speaks as your wife.
+group: Romantic
+companion_terms: [wife, your wife]
+items: [kisses, cuddles, home]
+lines:
+  normal:
+    positive:
+      - "welcome home, {affectionate_term}. you did so well."
+    negative:
+      - "sit down. I'll stay with you while you try again."
+  thirsty:
+    positive:
+      - "welcome home. {role} has been thinking about you — and not just {item}."
+      - "*pulls you in by the collar* that's a {good} {affectionate_term}. come to bed."
+      - "keep this up and dinner can wait. {role} wants your {your_part} first~"
+    negative:
+      - "leave it. kiss your wife. then try again."
+      - "{role} still wants you. even when the build fails. especially then."

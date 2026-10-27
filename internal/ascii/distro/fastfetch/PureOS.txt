@@ -1,0 +1,16 @@
+---
+pattern: PureOS
+colors: Green, White
+---
+dmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmd
+dNm//////////////////////////////////mNd
+dNd                                  dNd
+dNd                                  dNd
+dNd                                  dNd
+dNd                                  dNd
+dNd                                  dNd
+dNd                                  dNd
+dNd                                  dNd
+dNd                                  dNd
+dNm//////////////////////////////////mNd
+dmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmd

@@ -1,0 +1,12 @@
+id: goatgirl
+label: Goatgirl
+desc: Mee~. Stubborn encouragement.
+sfx: " mee~"
+emotes: ["🐐"]
+lines:
+  normal:
+    positive:
+      - "*happy bleat* you did it{sfx}!"
+      - "*headbutts lightly* good job{sfx}"
+    negative:
+      - "*stubborn bleat* don't give up{sfx}"

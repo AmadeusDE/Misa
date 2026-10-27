@@ -1,0 +1,158 @@
+package agent
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/AmadeusDE/Misa/internal/ugh/config"
+	"github.com/AmadeusDE/Misa/internal/ugh/llm"
+	"github.com/AmadeusDE/Misa/internal/ugh/policy"
+	"github.com/AmadeusDE/Misa/internal/ugh/provstate"
+	"github.com/AmadeusDE/Misa/internal/ugh/tools"
+	"github.com/AmadeusDE/Misa/internal/ugh/usage"
+)
+
+// routingEnv sets model cards and writes a config with table routing (no Jev
+// calls) and no reserve watcher, and isolates the provider state file.
+func routingEnv(t *testing.T) config.Config {
+	t.Helper()
+	routeEvidence.Range(func(k, _ any) bool { routeEvidence.Delete(k); return true }) // no evidence leaks between tests
+	cfgHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgHome)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	provstate.SetPathForTest(filepath.Join(t.TempDir(), "providers.json"))
+	for id, route := range map[string]string{"gpt-astra": "codex:gpt-6-astra", "gpt-sol": "codex:gpt-6.1-sol",
+		"mimo-v2.6-pro": "opencode-go:mimo-v2.6-pro", "glm-5.3-flash": "opencode-go:glm-5.3-flash"} {
+		setCard(t, "models", id, card{Routes: []string{route}, Thinking: []string{"low", "high"}})
+	}
+	os.MkdirAll(filepath.Join(cfgHome, "ugh"), 0o700)
+	os.WriteFile(filepath.Join(cfgHome, "ugh", "config.toml"), []byte("[routing]\npick_model = \"table\"\n[limits]\nreserve = {}\n"), 0o600)
+	c, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+func TestOracleOnlyAfterCouncil(t *testing.T) {
+	routingEnv(t)
+	grant(t, "opencode-go", "openrouter", "opencode-zen", "codex") // a council could run
+	r := NewRuntime()
+	parent := New(Config{Provider: &funcProvider{}, Model: "m", Cwd: t.TempDir(), Tree: r.Tree})
+	res := r.startChild(context.Background(), parent, Task{Task: "second opinion", Role: "oracle"})
+	if res.Status != "error" || !strings.Contains(res.Report, "oracles come after council") {
+		t.Fatalf("res = %+v", res)
+	}
+}
+
+func TestRunningChildSwitchesModelWhenProviderRunsOut(t *testing.T) {
+	routingEnv(t)
+	codex := &funcProvider{script: func(n int, req llm.Request) []llm.Event {
+		if n == 1 {
+			return []llm.Event{call("c1", "ls", "{}")}
+		}
+		return []llm.Event{{Type: llm.EventError, Err: errors.New(`codex: HTTP 429: {"type":"usage_limit_reached","resets_in_seconds":600}`)}}
+	}}
+	mimo := &funcProvider{script: func(n int, req llm.Request) []llm.Event {
+		if !hasText(req.Messages, "do the work") {
+			t.Error("fallback model lost the history")
+		}
+		return []llm.Event{say("finished on mimo")}
+	}}
+	old := resolveRoute
+	resolveRoute = func(ref string) (llm.Provider, string, error) {
+		if strings.HasPrefix(ref, "opencode-go/") {
+			return mimo, "mimo-v2.6-pro", nil
+		}
+		return codex, "gpt-6.1-sol", nil
+	}
+	defer func() { resolveRoute = old }()
+	tree := &Tree{}
+	root := tree.Root("root", "m", "")
+	node := tree.Child(root, "worker", "codex/gpt-6.1-sol", t.TempDir())
+	a := New(Config{Provider: codex, Model: "gpt-6.1-sol", Tree: tree, Node: node, Agent: node.ID, Cwd: t.TempDir(), MaxTurns: 10,
+		Routes: []string{"codex:gpt-6.1-sol", "opencode-go:mimo-v2.6-pro"}, Tools: tools.NewRegistry(tools.All()...), Trace: &strings.Builder{}})
+	final, err := a.Run(context.Background(), "do the work")
+	if err != nil || final != "finished on mimo" || node.Model != "opencode-go/mimo-v2.6-pro" {
+		t.Fatalf("final=%q err=%v model=%s", final, err, node.Model)
+	}
+	if !provstate.Exhausted("codex") || codex.n != 2 {
+		t.Fatalf("codex exhausted=%v requests=%d (a quota refusal must not be retried)", provstate.Exhausted("codex"), codex.n)
+	}
+	// The next turn of any agent skips codex without asking it again.
+	if provstate.Usable("codex") {
+		t.Fatal("exhausted route still usable")
+	}
+}
+
+func TestApplyReserve(t *testing.T) {
+	routingEnv(t)
+	now := time.Now()
+	secs := []usage.Section{{Provider: "codex", Windows: []usage.Window{{Label: "5h", Percent: 40}, {Label: "7d", Percent: 93, ResetsAt: now.Add(48 * time.Hour)}}}}
+	applyReserve(secs, map[string]float64{"codex": 90}, now)
+	st, ok := provstate.Get("codex")
+	if !ok || st.Kind != "reserved" || !strings.Contains(st.Reason, "7d window at 93% ≥ reserve 90%") {
+		t.Fatalf("state = %+v %v", st, ok)
+	}
+	secs[0].Windows[1].Percent = 50
+	applyReserve(secs, map[string]float64{"codex": 90}, now)
+	if !provstate.Usable("codex") {
+		t.Fatal("reserve should lift once usage drops")
+	}
+}
+
+// Go's weekly window at 100% makes Go unusable by default, and the low tier
+// (and the model list offered during a router outage) moves to OpenRouter.
+func TestGoOutRoutesToOpenRouter(t *testing.T) {
+	routingEnv(t)
+	now := time.Now()
+	secs := []usage.Section{
+		{Provider: "opencode-go", Windows: []usage.Window{{Label: "Weekly", Percent: 100, ResetsAt: now.Add(20 * time.Hour)}}},
+		{Provider: "openrouter", Windows: []usage.Window{{Label: "$0.04 of $2.50 used today", Percent: 1.8}}},
+	}
+	applyReserve(secs, config.Default().Limits.Reserve, now)
+	if provstate.Usable("opencode-go") || !provstate.Usable("openrouter") {
+		t.Fatal("Go at 100% should be out by default, OpenRouter at 1.8% usable")
+	}
+	old := routeAccess
+	routeAccess = func(ref string) (policy.AccessStatus, string) {
+		if strings.HasPrefix(ref, "opencode-go/") {
+			return policy.AccessReserved, "weekly at 100%"
+		}
+		if strings.HasPrefix(ref, "openrouter/") {
+			return policy.AccessGranted, "test"
+		}
+		return policy.AccessNoCredential, "test"
+	}
+	t.Cleanup(func() { routeAccess = old })
+	cfg := config.Default()
+	chain := tierRoutes(cfg, policy.TierLow, "worker", delegationAccess(cfg))
+	if len(chain) == 0 || chain[0].Ref() != "openrouter/anthropic/claude-haiku-5.5" {
+		t.Fatalf("low chain = %s", refs(chain))
+	}
+	choices := strings.Join(traditionalChoices(cfg, "worker"), ", ")
+	if !strings.Contains(choices, "low (claude-haiku-5.5 via openrouter)") || strings.Contains(choices, "via opencode-go") {
+		t.Fatalf("choices = %s", choices)
+	}
+}
+
+// A high-tier child carries the low tier as a tail (without duplicates);
+// other tiers carry nothing.
+func TestHighTierStepsDownToLow(t *testing.T) {
+	cfg := routingEnv(t)
+	grant(t, "opencode-go", "openrouter", "codex")
+	high := []string{"codex:gpt-6.1-sol", "openrouter:anthropic/claude-haiku-5.5"}
+	routes, at := withStepDown(cfg, routeChoice{Tier: policy.TierHigh, Role: "worker"}, append([]string(nil), high...))
+	if at != len(high) || !reflect.DeepEqual(routes[:at], high) || !contains(routes[at:], "codex:gpt-6-luna") || contains(routes[at:], high[1]) {
+		t.Fatalf("routes=%v stepDown=%d", routes, at)
+	}
+	if routes, at := withStepDown(cfg, routeChoice{Tier: policy.TierLow, Role: "worker"}, []string{"codex:gpt-6-luna"}); at != 0 || len(routes) != 1 {
+		t.Fatalf("low tier: routes=%v stepDown=%d", routes, at)
+	}
+}

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.27.1"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l $(git ls-files '*.go'))
+          if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; exit 1; fi
+
+      - name: go mod verify
+        run: go mod verify
+
+      - name: Build
+        run: |
+          go build ./...
+          go build -o /dev/null .
+          go build -o /dev/null ./cmd/ugh
+          go build -o /dev/null ./cmd/ughbot
+          for tag in nough nogui noweb "nough nogui noweb"; do go build -tags "$tag" -o /dev/null .; done
+
+      - name: Vet
+        run: |
+          go vet ./...
+          for tag in nough nogui noweb; do go vet -tags "$tag" ./...; done
+          for os in openbsd freebsd darwin; do GOOS=$os go vet ./...; done
+
+      - name: Test
+        run: go test -count=1 ./...
+
+      - name: Race (terminal, web, UI, agent)
+        run: go test -race -count=1 ./internal/term/ ./internal/webui/ ./internal/mweb/ ./internal/ui/ ./internal/ugh/...

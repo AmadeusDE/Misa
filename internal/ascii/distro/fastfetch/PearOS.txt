@@ -1,0 +1,25 @@
+---
+pattern: PearOS
+colors: Green, Yellow, Red, Magenta, Blue
+---
+                  .+yh
+                 sMMMo
+                sMMN+
+                +o:
+$2           ./oyyys+.
+         :dMMMMMMMMMm/
+        :MMMMMMMMMMMMMy
+        yMMMMMMMMMMMMMN
+$3        mMMMMMMMMMMMMs`
+       yMMMMMMMMMMMMo
+     -mMMMMMMMMMMMMM`
+    oMMMMMMMMMMMMMMM`
+$4   oMMMMMMMMMMMMMMMMy
+  .MMMMMMMMMMMMMMMMMMy`
+  +MMMMMMMMMMMMMMMMMMMMy/`
+  /MMMMMMMMMMMMMMMMMMMMMMMNds
+$5  `mMMMMMMMMMMMMMMMMMMMMMMMM/
+   .mMMMMMMMMMMMMMMMMMMMMMM+
+    `oNMMMMMMMMMMMMMMMMMMd-
+      `+hMMMMMMMMMMMMMms-
+          -/osyhhyso:.

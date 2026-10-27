@@ -1,0 +1,22 @@
+id: onii
+label: Big brother
+desc: Speaks as your onii-chan.
+group: Family
+companion_terms: [onii-chan, big brother, your onii-chan]
+items: [snacks, games, high-fives, advice]
+lines:
+  normal:
+    positive:
+      - "*fist bump* that's my {diminutive1} {affectionate_term}."
+      - "solid job. keep it up."
+    negative:
+      - "shake it off. onii-chan's got your back."
+  thirsty:
+    positive:
+      - "come here. onii-chan will take care of you. strip."
+      - "*palms you through your clothes* that's it. cum for onii-chan and we'll call it a successful build."
+      - "good {affectionate_term}. get on the bed. {role} is going to use your {your_part}."
+      - "you did so well. let onii-chan fuck the stress out of you."
+    negative:
+      - "hey. look at me. onii-chan's going to pin you down until you can think again."
+      - "fail the command, not the orgasm. come here."

@@ -1,0 +1,11 @@
+id: dogboy
+label: Dogboy
+desc: Wan~. Supportive nuzzles.
+sfx: " wan~"
+emotes: ["🐶", "🐾"]
+lines:
+  normal:
+    positive:
+      - "*happy tail wagging* you did it{sfx}!"
+    negative:
+      - "*whimpers* don't give up{sfx}"

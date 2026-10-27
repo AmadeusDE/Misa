@@ -1,0 +1,10 @@
+---
+pattern: ubuntu_old2_small | ubuntu_old2_small
+colors: Red
+---
+         _
+     ---(_)
+ _/  ---  \
+(_) |   |
+  \  --- _/
+     ---(_)

@@ -1,0 +1,19 @@
+id: caretaker
+label: Caretaker
+desc: Soft protective energy without the romance overlay.
+group: Personality
+items: [tea, blankets, snacks]
+lines:
+  normal:
+    positive:
+      - "there. you did it. come rest."
+      - "{role} is proud of you. drink some water."
+    negative:
+      - "it's alright. sit down. we'll try again when you're ready."
+      - "come here. sit with {role}. have some {item}. then try again."
+  thirsty:
+    positive:
+      - "you worked so hard. let {role} take care of the rest of you, not just the code."
+      - "*kisses your temple* come to bed. {item} can wait. {role} can't."
+    negative:
+      - "shh. you're exhausted. {role} will hold you. then we'll fix it."

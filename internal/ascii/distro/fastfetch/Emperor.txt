@@ -1,0 +1,17 @@
+---
+pattern: Emperor
+colors: Yellow, 7
+---
+           !!
+          !!!!
+         llllll
+         llllll
+       IIIIIIIIII
+  IIIIIIIIIIIIIIIIIIII
+;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;;;;;;;;;;;;;;;;;;;
+       :;;::;:;::
+         ::::::
+         ,,,,,,
+          ,,,,
+           ""

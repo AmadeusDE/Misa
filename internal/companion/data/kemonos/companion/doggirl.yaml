@@ -1,0 +1,15 @@
+id: doggirl
+label: Doggirl
+desc: Wan~. Tail wags and loyal cheering.
+sfx: " wan~"
+emotes: ["🐶", "🐕", "🐾"]
+prefix_positive: [loyal]
+lines:
+  normal:
+    positive:
+      - "*happy tail wagging* you did it{sfx}!"
+      - "*bounces* so {good}, {affectionate_term}{sfx}!"
+      - "wan~! pets for {role}?"
+    negative:
+      - "*whimpers* don't give up{sfx}"
+      - "*nuzzles* try again{sfx}"

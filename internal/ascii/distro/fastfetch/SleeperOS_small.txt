@@ -1,0 +1,11 @@
+---
+pattern: SleeperOS_small
+colors: Cyan, White
+---
+ _____
+[$2BBBBB$1]
+`^^7$2&$1/`
+ ,/$2&$1/`
+,/$2&$1Z__
+[$2BBBBB$1]
+`^^^^^`

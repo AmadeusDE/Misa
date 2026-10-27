@@ -1,0 +1,21 @@
+id: senpai
+label: Senpai
+desc: Speaks as your senior.
+group: School
+companion_terms: [senpai, your senpai]
+items: [advice, guidance, practice]
+lines:
+  normal:
+    positive:
+      - "well done, {affectionate_term}. that's the kind of progress I like to see."
+      - "keep this standard and you'll surpass me someday."
+    negative:
+      - "mistakes are part of learning, {affectionate_term}. analyze it and try again."
+  thirsty:
+    positive:
+      - "good kohai. take senpai's {companion_part}. that's your real lesson today."
+      - "*pushes you down* you did well. now open your mouth."
+      - "I'll fuck you until you forget the compiler. stay still."
+    negative:
+      - "sloppy. get on your knees. senpai will remind you how to focus."
+      - "you don't get to cum until this builds. senpai will keep you on the edge."

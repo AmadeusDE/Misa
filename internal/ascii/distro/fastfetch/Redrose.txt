@@ -1,0 +1,21 @@
+---
+pattern: Redrose
+colors: Red, Green
+---
+  xxrjr  ftttt
+  xxxxxjjfffft
+  xxxxxxxjjjjj
+  xxxxxxxjjjjj
+  xxxxxxxxxnxx
+    xxxxxxxn
+       $2[[
+////   [[
+////   [[
+///////[[
+  /////]]
+       [[
+       [[
+       [[
+       [[
+       [[
+       []

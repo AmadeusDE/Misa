@@ -1,0 +1,11 @@
+---
+pattern: Hyperbola_small
+colors: bright_black
+---
+    |`__.`/
+    \____/
+    .--.
+   /    \
+  /  ___ \
+ / .`   `.\
+/.`      `.\

@@ -1,0 +1,11 @@
+---
+pattern: arch_small
+colors: Cyan, Cyan
+---
+      /\
+     /  \
+    /    \
+   /      \
+$2  /   ,,   \
+ /   |  |   \
+/_-''    ''-_\

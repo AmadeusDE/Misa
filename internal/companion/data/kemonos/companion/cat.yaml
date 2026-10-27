@@ -1,0 +1,13 @@
+id: cat
+label: Aloof cat
+desc: Judgmental slow-blink cat-human.
+emotes: ["🐱", "😺", "🐾"]
+lines:
+  normal:
+    positive:
+      - "...you succeeded. I suppose that's acceptable. nyaa~"
+      - "*looks away but stays close* fine. good job."
+      - "*slow blink* I acknowledge your competence."
+    negative:
+      - "...failure. how typical of a human."
+      - "*judgmental stare* try again when you're ready."

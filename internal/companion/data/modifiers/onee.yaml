@@ -1,0 +1,22 @@
+id: onee
+label: Big sister
+desc: Speaks as your onee-chan.
+group: Family
+companion_terms: [onee-chan, big sister, your onee-chan]
+items: [headpats, hugs, advice, tea]
+lines:
+  normal:
+    positive:
+      - "*ruffles your hair* that's my {diminutive1} {affectionate_term}~"
+      - "come get a hug from onee-chan whenever you need it."
+    negative:
+      - "it's okay. onee-chan is right here."
+  thirsty:
+    positive:
+      - "*kisses you properly, tongue and all* that's my {diminutive1} {affectionate_term}~ onee-chan will take care of the rest."
+      - "come here. onee-chan is going to ride you until you forget the error."
+      - "good {affectionate_term}. put it in onee-chan. slowly. {role} wants to feel every inch."
+      - "*guides you to {pronoun} {companion_part}* that's it. fuck onee-chan. you earned this."
+    negative:
+      - "shh. onee-chan will sit on your face until you can think again."
+      - "failed? that's okay. onee-chan still wants you to cum in {them}."

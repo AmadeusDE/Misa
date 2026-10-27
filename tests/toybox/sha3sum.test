@@ -1,0 +1,34 @@
+# Resolved from upstream tests/sha3sum.test@6a0c0ef for the Misa adapter: selected sha3sum branch and set CMDNAME.
+#!/bin/bash
+
+[ -f testing.sh ] && . testing.sh
+
+#testing "name" "command" "result" "infile" "stdin"
+
+# These tests are based on RFC3174 which were based on FIPS PUB 180-1
+
+CMDNAME=sha3sum
+  ABC=e642824c3f8cf24ad09234ee7d3c766fc9a3a5168d0c94ad73b46fdf
+  ABCLONG=8a24108b154ada21c9fd5574494479ba5c7e7ab76ef264ead0fcce33
+  MILNUL=d69335b93325192e516a912e6d19a15cb51c6ed5c15243e7a7fd653c
+  DIGITS=c97e9b948bcd69bbc0e76b39fc82df963ae61665ee12099b6631ffe6
+  DEF=52edc03c27124c2b83ebfd66f0669b6af40b44d4644c12d16b41f46b
+  SEQ=7049c446c0fb287872536a7737f61f9ac7100f8e6b421d11011505fb
+
+
+testcmd "abc" "" "$ABC  -\n" "" "abc"
+testcmd "longer str" "" "$ABCLONG  -\n"\
+        "" "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+testing "a million nulls" \
+        'dd if=/dev/zero bs=1000 count=1000 2>/dev/null|tr \\0 a|$CMDNAME' \
+        "$MILNUL  -\n" "" ""
+testing "digits" 'for i in `seq 80`; do echo -n 01234567 ; done | $CMDNAME' \
+        "$DIGITS  -\n" "" ""
+testing "seq 10000" "seq 10000 | $CMDNAME" "$SEQ  -\n" "" ""
+
+echo -n "def" > file2
+testcmd "file" "input" "$ABC  input\n" "abc" ""
+testcmd "file1 file2" "input file2" "$ABC  input\n$DEF  file2\n" "abc" ""
+testcmd "file1 file2 -" "input file2 -" "$ABC  input\n$DEF  file2\n$ABC  -\n" \
+        "abc" "abc"
+rm -f file2

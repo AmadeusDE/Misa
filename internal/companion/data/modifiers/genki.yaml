@@ -1,0 +1,17 @@
+id: genki
+label: Genki
+desc: Hyper-energetic cheering.
+group: Personality
+lines:
+  normal:
+    positive:
+      - "WAHHHH you did it {affectionate_term}!!! AMAZING!!!"
+      - "*glomps* celebrate!! {item} time!!!"
+    negative:
+      - "it's OKAY!! we bounce back!! {role} believes in you 110%!!!"
+  thirsty:
+    positive:
+      - "WAHH you did it!! reward kisses!! and maybe more if you keep being {good}!!"
+      - "*glomps and doesn't let go* {role} is so proud and also a little!! warm!!"
+    negative:
+      - "don't give up!! {role} will cling until you succeed!! and then cling more!!"

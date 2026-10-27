@@ -1,0 +1,15 @@
+id: double
+name: Double Chess
+description: Julian Hayward, 1916. Two armies side by side; pawns may first move up to four squares, kings castle within their own half, and checkmating either enemy king wins.
+extends: chess
+files: 16
+ranks: 12
+pieces:
+  - {letter: P, name: Pawn, betza: fmWfcFifmW4, pawn: true, glyph: ♟, value: 100}
+setup: rnbqkbnrrnbqkbnr/pppppppppppppppp/16/16/16/16/16/16/16/16/PPPPPPPPPPPPPPPP/RNBQKBNRRNBQKBNR
+castling:
+  - {king: e1, rook: h1, king_to: g1, rook_to: f1}
+  - {king: e1, rook: a1, king_to: c1, rook_to: d1}
+  - {king: m1, rook: p1, king_to: o1, rook_to: n1}
+  - {king: m1, rook: i1, king_to: k1, rook_to: l1}
+move_limit: 100

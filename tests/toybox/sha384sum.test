@@ -1,0 +1,34 @@
+# Resolved from upstream tests/sha384sum.test@6a0c0ef for the Misa adapter: selected sha384sum branch and set CMDNAME.
+#!/bin/bash
+
+[ -f testing.sh ] && . testing.sh
+
+#testing "name" "command" "result" "infile" "stdin"
+
+# These tests are based on RFC3174 which were based on FIPS PUB 180-1
+
+CMDNAME=sha384sum
+  ABC=cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7
+  ABCLONG=3391fdddfc8dc7393707a65b1b4709397cf8b1d162af05abfe8f450de5f36bc6b0455a8520bc4e6f5fe95b1fe3c8452b
+  MILNUL=9d0e1809716474cb086e834e310a4a1ced149e9c00f248527972cec5704c2a5b07b8b3dc38ecc4ebae97ddd87f3d8985
+  DIGITS=2fc64a4f500ddb6828f6a3430b8dd72a368eb7f3a8322a70bc84275b9c0b3ab00d27a5cc3c2d224aa6b61a0d79fb4596
+  DEF=180c325cccb299e76ec6c03a5b5a7755af8ef499906dbf531f18d0ca509e4871b0805cac0f122b962d54badc6119f3cf
+  SEQ=7d2a49098f0df0f3c152ca9916a3864542258b2bd487e00ea33cb68e7d27c5c0f25b540d29f62fb33720846073c51b66
+
+
+testcmd "abc" "" "$ABC  -\n" "" "abc"
+testcmd "longer str" "" "$ABCLONG  -\n"\
+        "" "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+testing "a million nulls" \
+        'dd if=/dev/zero bs=1000 count=1000 2>/dev/null|tr \\0 a|$CMDNAME' \
+        "$MILNUL  -\n" "" ""
+testing "digits" 'for i in `seq 80`; do echo -n 01234567 ; done | $CMDNAME' \
+        "$DIGITS  -\n" "" ""
+testing "seq 10000" "seq 10000 | $CMDNAME" "$SEQ  -\n" "" ""
+
+echo -n "def" > file2
+testcmd "file" "input" "$ABC  input\n" "abc" ""
+testcmd "file1 file2" "input file2" "$ABC  input\n$DEF  file2\n" "abc" ""
+testcmd "file1 file2 -" "input file2 -" "$ABC  input\n$DEF  file2\n$ABC  -\n" \
+        "abc" "abc"
+rm -f file2

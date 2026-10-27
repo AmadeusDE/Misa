@@ -1,0 +1,10 @@
+---
+pattern: parabola_small | parabola-gnulinux_small
+colors: Magenta
+---
+  __ __ __  _
+.`_//_//_/ / `.
+          /  .`
+         / .`
+        /.`
+       /`

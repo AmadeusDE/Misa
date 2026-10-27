@@ -1,0 +1,11 @@
+---
+pattern: Gentoo_small
+colors: Magenta, White
+---
+ _-----_
+(       \
+\    0   \
+ $2\        )
+ /      _/
+(     _-
+\____-

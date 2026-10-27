@@ -1,0 +1,20 @@
+---
+pattern: parabola | parabola-gnulinux
+colors: Magenta
+---
+                          `.-.    `.
+                   `.`  `:++.   `-+o+.
+             `` `:+/. `:+/.   `-+oooo+
+        ``-::-.:+/. `:+/.   `-+oooooo+
+    `.-:///-  ..`   .-.   `-+oooooooo-
+ `..-..`                 `+ooooooooo:
+``                        :oooooooo/
+                          `ooooooo:
+                          `oooooo:
+                          -oooo+.
+                          +ooo/`
+                         -ooo-
+                        `+o/.
+                        /+-
+                       //`
+                      -.

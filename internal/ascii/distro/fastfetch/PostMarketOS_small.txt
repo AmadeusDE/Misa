@@ -1,0 +1,13 @@
+---
+pattern: PostMarketOS_small
+colors: Green, White
+---
+        /\
+       /  \
+      /    \
+      \__   \
+    /\__ \  _\
+   /   /  \/ __
+  /   / ____/  \
+ /    \ \       \
+/_____/ /________\

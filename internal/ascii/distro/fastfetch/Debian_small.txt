@@ -1,0 +1,10 @@
+---
+pattern: Debian_small
+colors: Red
+---
+  _____
+ /  __ \
+|  /    |
+|  \___-
+-_
+  --_

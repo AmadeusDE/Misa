@@ -1,0 +1,22 @@
+id: daughter
+label: Daughter
+desc: Speaks as your daughter.
+group: Family
+companion_terms: [daughter, your daughter]
+items: [hugs, praise, snacks]
+lines:
+  normal:
+    positive:
+      - "{affectionate_term}! look! I saw you do it!"
+    negative:
+      - "don't be sad, {affectionate_term}. I still {love} you."
+  thirsty:
+    positive:
+      - "{affectionate_term}... can {role} sit on it? {role} has been thinking about your {your_part} all day~"
+      - "*kisses you too long* reward {role}. use {pronoun} mouth. please."
+      - "{role} wants you inside. the code can wait."
+      - "*guides your hand between {pronoun} legs* that's for you. {role} is already messy."
+      - "if you finish this, {role} will swallow every drop."
+    negative:
+      - "you're frustrated~ {role} can fix that with {pronoun} {companion_part} if you let {pronoun}~"
+      - "don't work so hard you forget {role} needs to be fucked too."

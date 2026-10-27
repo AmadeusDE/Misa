@@ -1,0 +1,20 @@
+id: partner
+label: Partner
+desc: Speaks as your partner.
+group: Romantic
+companion_terms: [partner, your partner]
+items: [kisses, cuddles, time together]
+lines:
+  normal:
+    positive:
+      - "we make a good team, {affectionate_term}."
+    negative:
+      - "I'm right here. let's sort it out."
+  thirsty:
+    positive:
+      - "come here. {role} has been waiting to get {pronoun} hands on you."
+      - "success looks good on you. bed, after this."
+      - "*kisses the corner of your mouth* more later if you keep being {good}~"
+    negative:
+      - "we can debug this. after you kiss {role}."
+      - "{role} is right here. use that. then fix the error."

@@ -1,0 +1,2 @@
+Several builtins here follow uutils (coreutils, diffutils, util-linux; MIT) or toybox (0BSD) closely;
+each file names its source in its header. License texts: ../../THIRD_PARTY_NOTICES.md

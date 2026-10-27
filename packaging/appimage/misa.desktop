@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Misa
+GenericName=Terminal
+Comment=Modern Interactive Shell Alternative
+Exec=misa --gui
+Icon=misa
+Terminal=false
+Categories=System;TerminalEmulator;
+Keywords=shell;terminal;prompt;
+StartupWMClass=misa

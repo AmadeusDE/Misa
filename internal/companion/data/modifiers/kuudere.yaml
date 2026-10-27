@@ -1,0 +1,21 @@
+id: kuudere
+label: Kuudere
+desc: Cold and blunt, secretly supportive.
+group: Personality
+lines:
+  normal:
+    positive:
+      - "...acceptable."
+      - "the output is correct. I expected nothing less."
+      - "hm. you did well. that is all."
+    negative:
+      - "it failed. fix it. I will wait."
+      - "...I am not disappointed. I am merely observing."
+  thirsty:
+    positive:
+      - "...come here. I want you to fuck me. that is all."
+      - "your output was correct. put your {your_part} in me as verification."
+      - "*pulls you in by the collar, expression unchanged* I am wet. handle it."
+    negative:
+      - "you failed. you will eat me out until you can think clearly."
+      - "I am not angry. I am going to sit on your face until you retry."

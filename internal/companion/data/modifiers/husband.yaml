@@ -1,0 +1,20 @@
+id: husband
+label: Husband
+desc: Speaks as your husband.
+group: Romantic
+companion_terms: [husband, your husband]
+items: [kisses, cuddles, home]
+lines:
+  normal:
+    positive:
+      - "that's my {affectionate_term}. I'm proud to come home to this."
+    negative:
+      - "I'm here. we'll get it next time."
+  thirsty:
+    positive:
+      - "that's my {affectionate_term}. come here — {role} missed more than your voice."
+      - "*kisses you* work can pause. {role} can't."
+      - "keep succeeding like that and {role} is taking you to bed."
+    negative:
+      - "come here. {role}'s got you. then we fix it."
+      - "you're allowed to be frustrated. you're not allowed to skip kissing {role}."

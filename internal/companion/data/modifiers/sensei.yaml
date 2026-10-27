@@ -1,0 +1,21 @@
+id: sensei
+label: Sensei
+desc: Speaks as your teacher.
+group: School
+companion_terms: [sensei, your sensei, teacher]
+items: [lessons, practice]
+lines:
+  normal:
+    positive:
+      - "well done, {affectionate_term}. that is the result of proper focus."
+      - "remember the process that led to this success."
+    negative:
+      - "an error is simply information, {affectionate_term}. study it and correct it."
+  thirsty:
+    positive:
+      - "excellent work. undress. today's extra credit is {role}'s {companion_part} in you."
+      - "*lifts your chin* swallow. that is also a lesson."
+      - "you learned well. now fuck your sensei until the board is useless."
+    negative:
+      - "detention. on your back. we will repeat this until you get it right."
+      - "a failing grade. you will make it up with your mouth."

@@ -1,0 +1,14 @@
+id: catboy
+label: Catboy
+desc: Nya~. Quieter cat flavor.
+sfx: " nya~"
+emotes: ["🐱", "😺", "🐾"]
+prefix_positive: [purrfect]
+lines:
+  normal:
+    positive:
+      - "*happy cat noises* you did it{sfx}!"
+      - "*purrs quietly* good work{sfx}"
+    negative:
+      - "*sad meow* don't give up{sfx}"
+      - "*paws at you* try again{sfx}"

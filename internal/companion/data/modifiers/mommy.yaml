@@ -1,0 +1,62 @@
+id: mommy
+label: Mommy
+desc: Speaks as mommy. Soft praise, and the original cargo-mommy dominant lines when thirsty.
+group: Family
+companion_terms: [mommy, your mommy, owner]
+items: [cuddles, praise, kisses, milk]
+thirsty_your_terms: [slut, pet, pervert, whore]
+lines:
+  normal:
+    positive:
+      - "that's a {good} {affectionate_term}~ mommy is so proud!"
+      - "*pets your head* my brave one did so well~"
+      - "who's my {good} {affectionate_term}~"
+      - "my {diminutive1} {affectionate_term} deserves a big fat kiss for that~"
+      - "does {role}'s {diminutive1} {affectionate_term} want some {item}~?"
+    negative:
+      - "it's okay, {affectionate_term}. mommy still {love}s you. try again."
+      - "come here, sit on my lap while we figure this out together~"
+      - "never give up, my love~"
+      - "no more {item} for you until you try again, {affectionate_term}~"
+  thirsty:
+    positive:
+      - "*tugs your leash*\nthat's a VERY {good} {affectionate_term}~"
+      - "*pats your butt*\nthat's a {good} {affectionate_term}~"
+      - "*drags {pronoun} nail along your cheek*\nsuch a {good} {affectionate_term}~"
+      - "*heavy breathing against your neck*"
+      - "keep it up and {role} might let you cum, you {diminutive1} {denigrating_term}~"
+      - "{good} {denigrating_term}~\nyou've earned five minutes with the buzzy wand~"
+      - "mmm~ come taste {role}'s {companion_part}~"
+      - "you're so good with your fingers~\n{role} knows where {pronoun} {denigrating_term} should put them next~"
+      - "{role} is getting hot~"
+      - "that's a {good} {denigrating_term}~"
+      - "yes~\nyes~~\nyes~~~"
+      - "{role}'s going to keep {pronoun} {good} {diminutive1} {denigrating_term}~"
+      - "open wide {denigrating_term}.\nyou've earned {role}'s {companion_part}~"
+      - "do you want {role}'s {companion_part}?\nkeep this up and you'll earn it~"
+      - "oooh~ what a {good} {denigrating_term} you are~"
+    negative:
+      - "do you think you're going to get a reward from {role} like that~?"
+      - "*grabs your hair and pulls your head back*\nyou can do better than that for {role} can't you~?"
+      - "if you don't learn how to code better, {role} is going to put you in time-out~"
+      - "does {role} need to give {pronoun} {diminutive1} {affectionate_term} some special lessons~?"
+      - "you need to work harder to please {role}~"
+      - "you filthy {denigrating_term}~\nyou made a mess, now clean it up~\nwith your tongue~"
+      - "*picks you up by the throat*\npathetic~"
+      - "{denigrating_term}.\n{denigrating_term}~\n{denigrating_term}~~"
+      - "get on your knees and beg {role} for forgiveness you {denigrating_term}~"
+      - "{role} doesn't think {pronoun} {diminutive1} {denigrating_term} should have permission to wear clothes anymore~"
+      - "never forget you belong to {role}~"
+      - "{role} is starting to wonder if you should just give up and become {pronoun} breeding stock~"
+      - "on your knees {denigrating_term}~"
+      - "oh dear. {role} is not pleased"
+      - "one spank per error sounds appropriate, don't you think {denigrating_term}?"
+      - "no more {companion_part} for you {denigrating_term}"
+when:
+  - with: [tsundere]
+    lines:
+      normal:
+        positive:
+          - "i-it's not like mommy is proud or anything, {affectionate_term}!"
+        negative:
+          - "hmph. mommy is NOT worried. ...maybe a little."

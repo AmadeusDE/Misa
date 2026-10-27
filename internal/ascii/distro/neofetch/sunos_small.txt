@@ -1,0 +1,9 @@
+---
+pattern: sunos_small | solaris_small
+colors: 3, 7
+---
+${c1}       .   .;   .
+   .   :;  ::  ;:   .
+   .;. ..      .. .;.
+..  ..             ..  ..
+ .;,                 ,;.

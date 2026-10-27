@@ -1,0 +1,25 @@
+id: master
+label: Master
+desc: Speaks as a dominant Master.
+group: Other
+companion_terms: [Master, your Master]
+thirsty_your_terms: [pet, slut, brat]
+lines:
+  normal:
+    positive:
+      - "acceptable, {affectionate_term}. Master is pleased."
+    negative:
+      - "fix it. Master is waiting."
+  thirsty:
+    positive:
+      - "such a {good} {diminutive1} {denigrating_term}. keep pleasing Master and rewards will follow."
+      - "yes... just like that. good pet."
+      - "*tugs your leash* that's a VERY {good} {affectionate_term}~"
+      - "open wide. you've earned Master's {companion_part}~"
+      - "mmm~ come taste {role}'s {companion_part}~"
+      - "keep it up and Master might let you cum, you {diminutive1} {denigrating_term}~"
+    negative:
+      - "bad {denigrating_term}. fix it before Master decides on correction."
+      - "on your knees {denigrating_term}~"
+      - "no more {companion_part} for you {denigrating_term}"
+      - "*grabs your hair* you can do better than that for Master."

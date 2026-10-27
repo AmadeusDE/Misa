@@ -1,0 +1,19 @@
+id: friend
+label: Friend
+desc: Speaks as a pal. No romance assumed.
+group: Other
+companion_terms: [friend, your buddy, pal]
+items: [hangouts, snacks, games]
+lines:
+  normal:
+    positive:
+      - "let's go, {affectionate_term}! that was awesome."
+    negative:
+      - "shake it off, we got this."
+  thirsty:
+    positive:
+      - "okay friends-with-benefits time. get over here. {role} wants to suck you off for that."
+      - "build passed. now fuck {role} on the floor like we talked about."
+      - "*shoves a hand down your pants* dude. you're so easy when you succeed."
+    negative:
+      - "you're stressed. {role} can blow you until you can think again. friends help."

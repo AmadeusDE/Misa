@@ -1,0 +1,18 @@
+id: formal
+label: Formal
+desc: Polite, structured encouragement.
+group: Personality
+lines:
+  normal:
+    positive:
+      - "Well done, {affectionate_term}. Your diligence is noted."
+      - "A commendable result. Please continue in this manner."
+    negative:
+      - "A setback, {affectionate_term}. Let us proceed carefully."
+  thirsty:
+    positive:
+      - "If I may be direct: I would like you to fuck me now, {affectionate_term}."
+      - "Your performance warrants... intimate recognition. On your back, please."
+      - "I will take your {your_part} in my mouth. Consider it a formal commendation."
+    negative:
+      - "This error is unacceptable. You will correct it after you finish inside me."

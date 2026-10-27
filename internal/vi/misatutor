@@ -1,0 +1,463 @@
+________________________________________________________________________________
+|                                                                              |
+|                    Misa Tutor -- learn vi the right way                      |
+|______________________________________________________________________________|
+
+Welcome to the Misa vi tutorial. This file teaches you how to use misa's
+built-in editor. It is meant to be read inside the editor -- try things as
+you go. Edits here are harmless; just :q! to quit without saving.
+
+This tutorial is based on smartutor by unix-supremacist.
+________________________________________________________________________________
+
+                              Moving your cursor
+
+You can move around in normal mode with the hjkl keys.
+h is left.
+j is down.
+k is up.
+l is right.
+
+Try moving around this section before continuing.
+________________________________________________________________________________
+
+                                  Exiting vi
+
+To save and exit press ZZ, to exit without saving press ZQ.
+The command line alternatives are:
+:wq    write and quit
+:w     write (save)
+:q     quit (fails if unsaved changes)
+:q!    force quit without saving
+________________________________________________________________________________
+
+                             Exiting to Normal Mode
+
+You can return to normal mode at any time by pressing escape.
+________________________________________________________________________________
+
+                                Movement Commands
+
+w goes forward to next word
+b goes backwards to last word
+e goes to end of next word
+$ and [end] goes to end of line
+0 and [home] goes to beginning of line
+^ or _ to first non-blank character
+H goes to top of screen
+M goes to middle of screen
+L goes to bottom of screen
++ and [enter] to first character of next line
+- to first character of previous line
+( to beginning of the current sentence
+) to beginning of the next sentence
+{ to beginning of the current paragraph
+} to beginning of the next paragraph
+[[ to beginning of current section
+]] to beginning of next section
+G goes to last line (or 5G goes to line 5)
+gg goes to first line (or 5gg goes to line 5)
+________________________________________________________________________________
+
+                                Deletion Commands
+
+Select a character you want to delete like this tygpo and press x to delete it.
+X deletes the character before the cursor (like backspace).
+
+You can combine the d command with movement commands like so:
+delete a misplaced word like this one one with dw.
+or delete the garbage on the end of this line with d$ dasfnaesfnasefas
+
+You can delete until the end of the line with just D as well.
+
+asdnaofnasdoansdan
+You can delete an entire line with dd.
+________________________________________________________________________________
+
+                              Change/Replace Commands
+
+Select a character you want to replace and press r like in this tylo.
+
+adnaofanf
+You can replace an entire line with R, replace this one with "vi is great"
+
+You can combine the c command with movement commands like so:
+change a typoed word like this oen with cw.
+
+You can use C to change until end of the line.
+
+You can replace a character and keep typing with s, fix this dpo.
+
+You can replace an entire line with S.
+________________________________________________________________________________
+
+                                Insertion Commands
+
+If you press the a key you will enter insert mode after the character you had
+selected; type like a normal editor then press esc to exit.
+
+If you press i you will be in insert mode before the character you had selected.
+
+If you press o you will be in insert mode on a new line below your cursor.
+
+If you press A you will be in insert mode at the end of a line.
+
+If you press I you will be in insert mode at the beginning of a line.
+
+If you press O you will be in insert mode on a new line above your cursor.
+________________________________________________________________________________
+
+                                  Count Commands
+
+You can type a number before any command to repeat it. For example 10x deletes
+10 characters, or 3dd deletes 3 lines, or 5j moves down 5 lines.
+
+Counts also work with insert commands: 3oESC creates 3 new lines.
+________________________________________________________________________________
+
+                             Undo, Redo, and History
+
+Press u to undo the last change. You can type a count first: 4u undoes 4
+changes at once.
+
+Press ctrl+r to redo (undo the undo).
+
+Press U to undo all changes made on the current line since you moved to it.
+
+For navigating edit history by count:
+:earlier 5    undo 5 changes
+:later 3      redo 3 changes
+________________________________________________________________________________
+
+                                  Put Command
+
+p pastes after the cursor (or below the current line for line-wise yanks).
+P pastes before the cursor (or above the current line for line-wise yanks).
+________________________________________________________________________________
+
+                                  Yank Command
+
+y lets you copy text without deleting it.
+yw yanks a word.
+yy yanks a line.
+Works with all motions: y$ yanks to end of line, y{ yanks to paragraph start.
+________________________________________________________________________________
+
+                                 Repeat Command
+
+You can repeat the last editing command by pressing . (dot).
+This works with insert, delete, change, replace, indent, and more.
+________________________________________________________________________________
+
+                                  Join Command
+
+J joins the current line with the next line.
+
+Press J here to
+ join these two lines together.
+________________________________________________________________________________
+
+                               Screen Movement
+
+^f moves forwards a screen.
+^b moves backwards a screen.
+^d moves down half a screen.
+^u moves up half a screen.
+^e scrolls down one line.
+^y scrolls up one line.
+z[enter] or zt snaps screen to put cursor on top.
+z. or zz snaps screen to put cursor centered.
+z- or zb snaps screen to put cursor on bottom.
+________________________________________________________________________________
+
+                                   Searching
+
+/ searches forward for text. Type /word and press enter.
+? searches backward. Type ?word and press enter.
+
+After a search:
+n repeats the search in the same direction.
+N repeats the search in the opposite direction.
+
+Case-insensitive search:
+  /word\c     forces case insensitive for this search
+  /word\C     forces case sensitive for this search
+  :set ic     makes all searches case insensitive
+  :set noic   makes all searches case sensitive
+________________________________________________________________________________
+
+                              Bracket Matching
+
+Press % when on a bracket character to jump to its match.
+Works with (), [], and {}. If the cursor is not on a bracket, it scans
+forward on the current line to find one.
+
+Try it on these: (hello (world)) or {some [nested] braces}
+________________________________________________________________________________
+
+                              Find on Line
+
+f followed by a character finds that character forward on the current line.
+F finds backward.
+t goes up to (but not on) the character forward.
+T goes up to the character backward.
+
+; repeats the last f/F/t/T in the same direction.
+, repeats it in the opposite direction.
+
+These work with operators: dt) deletes up to the next closing parenthesis.
+
+Try: delete the parenthetical (this part) using dt) then d2l or df)
+________________________________________________________________________________
+
+                            Indent and Dedent
+
+>> indents the current line (adds a tab).
+<< dedents the current line (removes a tab or up to 8 spaces).
+
+These work as operators with motions:
+>} indents from here to the next paragraph.
+<5j dedents the next 5 lines.
+>5> indents 5 lines (count works with doubled operator too).
+________________________________________________________________________________
+
+                                 Visual Mode
+
+v enters character-wise visual mode. Move the cursor to select text.
+V enters line-wise visual mode. Selects whole lines.
+
+Once you have a selection, apply an operator:
+d or x     delete selection
+c or s     change selection (delete and enter insert mode)
+y          yank (copy) selection
+>          indent selection
+<          dedent selection
+~          toggle case of selection
+u          lowercase selection
+U          uppercase selection
+J          join selected lines
+:          enter command mode with the selection as a range
+
+Press o to swap which end of the selection the cursor is on.
+Press esc to cancel the selection.
+________________________________________________________________________________
+
+                               Named Registers
+
+By default, yanks and deletes go to the unnamed register. You can use named
+registers to store text in specific slots.
+
+"ayw      yank a word into register a
+"ap       paste from register a
+"Ayw      append a word to register a (capital letter appends)
+
+Registers a-z are available. The numbered registers 1-9 automatically store
+your last 9 line-wise deletes (1 is most recent). Register 0 always holds
+the last yank. Register - holds small deletes (less than a line).
+
+To see what is in a register, you can paste from it: "1p pastes the last
+line you deleted with dd.
+________________________________________________________________________________
+
+                                    Macros
+
+Macros let you record and replay a sequence of keystrokes.
+
+qa        start recording into register a
+(do your editing)
+q         stop recording
+
+@a        play back macro a
+@@        repeat the last played macro
+5@a       play macro a five times
+
+Since macros are stored in registers, you can edit them:
+1. Paste the macro text: "ap
+2. Edit the text
+3. Yank it back: "ayy
+
+This is one of the most powerful features in vi -- automate any repetitive
+editing task.
+________________________________________________________________________________
+
+                                    Marks
+
+Marks let you bookmark positions in a file.
+
+ma        set mark a at the current position
+'a        jump to the line of mark a (first non-blank character)
+`a        jump to the exact position of mark a (line and column)
+
+Marks a-z are available. Set them anywhere and jump back instantly.
+________________________________________________________________________________
+
+                                  Jump List
+
+When you make big jumps (G, gg, /, ?, n, N, %), the editor remembers where
+you were.
+
+ctrl+o    jump back to previous position
+ctrl+i    jump forward to next position
+
+This is useful when you search for something then want to get back.
+________________________________________________________________________________
+
+                               File Information
+
+ctrl+g shows information about the current file: filename, whether it has
+been modified, total line count, your position as a percentage, and your
+current line and column numbers.
+________________________________________________________________________________
+
+                              Substitute Command
+
+:s/old/new      replace first occurrence of "old" with "new" on current line
+:s/old/new/g    replace all occurrences on current line
+:%s/old/new/g   replace all occurrences in entire file
+:5,10s/old/new  replace on lines 5 through 10
+
+Flags:
+  g    replace all occurrences per line (not just the first)
+  i    case insensitive matching
+
+The delimiter can be any character: :s|old|new|g works too.
+________________________________________________________________________________
+
+                              Global Commands
+
+:g/pattern/command    run command on every line matching pattern
+:v/pattern/command    run command on every line NOT matching pattern
+
+The default command is d (delete), so:
+:g/TODO/d       deletes all lines containing TODO
+:v/keep/d       deletes all lines that don't contain "keep"
+:g/old/s/old/new/g   substitute on matching lines only
+
+These are extremely powerful for bulk editing.
+________________________________________________________________________________
+
+                           Reading and Shell Commands
+
+:r filename     insert contents of filename below the cursor
+:r !date        insert output of shell command "date" below the cursor
+:r !ls          insert directory listing below the cursor
+
+:!command       run a shell command and show its output
+
+:%!command      filter the entire file through a command
+:%!sort         sort all lines
+:%!jq .         format JSON through jq
+:5,10!sort      sort only lines 5 through 10
+________________________________________________________________________________
+
+                               Abbreviations
+
+:iabbrev teh the         when you type "teh " it becomes "the "
+:iabbrev recieve receive
+:iabbrev @@ user@example.com
+
+Abbreviations expand automatically when you type a space, punctuation, or
+press enter after the trigger word in insert mode.
+
+:iabbrev       (with no arguments) lists all current abbreviations
+________________________________________________________________________________
+
+                               Settings
+
+:set ic           ignore case in searches
+:set noic         case sensitive searches (default)
+:set nocp         no compatible mode (acknowledged, always on)
+________________________________________________________________________________
+
+                            Line Ranges in Commands
+
+Most ex commands accept a range before them:
+.              current line
+$              last line
+%              all lines (same as 1,$)
+5              line 5
+'a             line of mark a
+.+3            three lines below current
+$-2            two lines before last
+
+Examples:
+:5d            delete line 5
+:3,7y          yank lines 3 through 7
+:'a,'bd        delete from mark a to mark b
+:.,$s/x/y/g    substitute from current line to end of file
+________________________________________________________________________________
+
+                          Operator + Motion Summary
+
+vi's power comes from combining operators with motions.
+
+Operators: d (delete), c (change), y (yank), > (indent), < (dedent)
+
+Each operator can be combined with any motion:
+dw       delete word              yw       yank word
+d$       delete to end of line    y$       yank to end of line
+d}       delete to paragraph end  c}       change to paragraph end
+dG       delete to end of file    ygg      yank to start of file
+df)      delete through next )    ct"      change up to next "
+d%       delete to matching bracket
+>}       indent to next paragraph
+
+Double the operator to apply to the whole line: dd, cc, yy, >>, <<
+
+Counts work everywhere: 3dw deletes 3 words, d3w also deletes 3 words,
+2d3w deletes 6 words.
+________________________________________________________________________________
+
+                              Quick Reference
+
+Normal mode:
+  hjkl          move cursor
+  w b e         word forward, backward, end
+  0 $ ^         line start, end, first non-blank
+  G gg          go to end/start of file
+  x X           delete char forward/backward
+  dd D          delete line / to end
+  cc C          change line / to end
+  yy            yank line
+  p P           paste after/before
+  u ^r          undo / redo
+  U             undo line
+  .             repeat last change
+  /  ?          search forward / backward
+  n N           next / previous match
+  %             bracket match
+  f F t T       find char on line
+  ; ,           repeat / reverse find
+  v V           visual mode (char / line)
+  >> <<         indent / dedent
+  ~             toggle case
+  J             join lines
+  ZZ ZQ         save+quit / quit
+  "x            use register x
+  ma 'a `a      set mark / jump to mark line / exact
+  qa @a         record macro / play macro
+  ^o ^i         jump back / forward
+  ^g            file info
+  ^f ^b ^d ^u   scroll full/half page
+  ^e ^y         scroll one line
+
+Command mode:
+  :w :q :wq :q!         save / quit
+  :s/old/new/g          substitute
+  :g/pat/cmd :v/pat/cmd global / inverse global
+  :r file  :r !cmd      read file / command output
+  :!cmd                 run shell command
+  :%!cmd                filter through command
+  :earlier N :later N   undo/redo N changes
+  :iabbrev x y          abbreviation
+  :set ic :set noic     case sensitivity
+  :d :y                 delete / yank lines
+________________________________________________________________________________
+
+That covers misa's vi. For more practice, just start editing real files.
+The best way to learn vi is to use it every day. You will be slow at first,
+but the efficiency compounds -- a few weeks of vi and you will never want to
+go back.
+
+Type :q! to exit this tutorial.
+________________________________________________________________________________

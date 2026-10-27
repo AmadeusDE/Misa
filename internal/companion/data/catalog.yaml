@@ -1,0 +1,126 @@
+pronouns:
+  - id: she
+    label: She / her
+    desc: Companion or you use she/her.
+    forms: "she her her hers herself"
+  - id: he
+    label: He / him
+    desc: Companion or you use he/him.
+    forms: "he him his his himself"
+  - id: they
+    label: They / them
+    desc: Companion or you use they/them.
+    forms: "they them their theirs themself"
+  - id: it
+    label: It / its
+    desc: Companion or you use it/its.
+    forms: "it it its its itself"
+
+your_terms:
+  - {id: girl, label: girl, group: Generic, terms: [girl]}
+  - {id: boy, label: boy, group: Generic, terms: [boy]}
+  - {id: child, label: child, group: Generic, terms: [child, little one]}
+  - {id: dear, label: dear, group: Generic, terms: [dear, you]}
+  - {id: dummy, label: dummy, group: Generic, terms: [dummy, baka]}
+  - {id: buddy, label: buddy, group: Generic, terms: [buddy, friend, pal, dude]}
+  - {id: user, label: user, group: Generic, terms: [user, operator, human]}
+  - {id: darling, label: darling, group: Romantic, terms: [darling, my love, beloved]}
+  - {id: babe, label: babe, group: Romantic, terms: [babe, love]}
+  - {id: partner, label: partner, group: Romantic, terms: [partner, my love]}
+  - {id: husband, label: husband, group: Romantic, terms: [husband]}
+  - {id: wife, label: wife, group: Romantic, terms: [wife]}
+  - {id: onii, label: onii-chan, group: Family, terms: [onii-chan, nii-san, big brother]}
+  - {id: onee, label: onee-chan, group: Family, terms: [onee-chan, nee-san, big sister]}
+  - {id: otouto, label: otouto, group: Family, terms: [otouto, little brother]}
+  - {id: imouto, label: imouto, group: Family, terms: [imouto, little sister]}
+  - {id: kun, label: kun, group: Family, terms: [kun]}
+  - {id: chan, label: chan, group: Family, terms: [chan]}
+  - {id: mommy-name, label: mommy, group: Family, terms: [mommy, mama, mom]}
+  - {id: daddy-name, label: daddy, group: Family, terms: [daddy, papa, dad]}
+  - {id: master, label: Master, group: Service, terms: [Master]}
+  - {id: mistress, label: Mistress, group: Service, terms: [Mistress]}
+  - {id: sir, label: Sir, group: Service, terms: [Sir]}
+  - {id: lady, label: Lady, group: Service, terms: [Lady, Madam]}
+  - {id: kohai, label: kohai, group: School, terms: [kohai, junior]}
+  - {id: senpai, label: senpai, group: School, terms: [senpai]}
+  - {id: student, label: student, group: School, terms: [student, pupil]}
+  - {id: pet, label: pet, group: Other, terms: [pet]}
+  - {id: bro, label: bro, group: Other, terms: [bro, dude]}
+  - {id: maggot, label: maggot, group: Other, terms: [maggot, private, recruit]}
+  - {id: rival, label: rival, group: Other, terms: [rival, opponent]}
+
+companion_terms:
+  - {id: mommy, label: mommy, group: Family, terms: [mommy, owner]}
+  - {id: daddy, label: daddy, group: Family, terms: [daddy]}
+  - {id: companion, label: companion, group: Generic, terms: [companion, your companion]}
+  - {id: imouto, label: little sister, group: Family, terms: [imouto, little sister]}
+  - {id: onee, label: big sister, group: Family, terms: [onee-chan, big sister]}
+  - {id: otouto, label: little brother, group: Family, terms: [otouto, little brother]}
+  - {id: onii, label: big brother, group: Family, terms: [onii-chan, big brother]}
+  - {id: girlfriend, label: girlfriend, group: Romantic, terms: [girlfriend]}
+  - {id: boyfriend, label: boyfriend, group: Romantic, terms: [boyfriend]}
+  - {id: wife, label: wife, group: Romantic, terms: [wife]}
+  - {id: husband, label: husband, group: Romantic, terms: [husband]}
+  - {id: partner, label: partner, group: Romantic, terms: [partner]}
+  - {id: maid, label: maid, group: Service, terms: [maid]}
+  - {id: butler, label: butler, group: Service, terms: [butler]}
+  - {id: senpai, label: senpai, group: School, terms: [senpai]}
+  - {id: kouhai, label: kouhai, group: School, terms: [kouhai]}
+  - {id: sensei, label: sensei, group: School, terms: [sensei, teacher]}
+  - {id: friend, label: friend, group: Other, terms: [friend, pal]}
+
+prefix_positive:
+  - good
+  - great
+  - amazing
+  - perfect
+  - excellent
+  - cute
+  - little
+  - tiny
+  - precious
+  - smart
+  - clever
+  - brave
+prefix_negative:
+  - silly
+  - naughty
+  - bad
+  - dummy
+  - hopeless
+thirsty_terms:
+  - slut
+  - pet
+  - pervert
+  - whore
+items:
+  - hugs
+  - snacks
+  - headpats
+  - cuddles
+  - kisses
+  - tea
+  - sticker
+  - scritches
+parts:
+  - {id: milk, label: milk, group: Default, default: true, desc: "Original mommy. Ungendered / lactation."}
+  - {id: mouth, label: mouth, group: Default, default: true, desc: "Original mommy."}
+  - {id: cum, label: cum, group: Default, default: true, desc: "Original mommy."}
+  - {id: cock, label: cock, group: Default, default: true, desc: "Original mommy. Masculine; kept on as the classic default."}
+  - {id: pussy, label: pussy, group: Feminine, default: false, desc: "Feminine. Off by default."}
+  - {id: clit, label: clit, group: Feminine, default: false, desc: "Feminine. Off by default."}
+  - {id: tits, label: tits, group: Feminine, default: false, desc: "Feminine. Off by default."}
+  - {id: cunt, label: cunt, group: Feminine, default: false, desc: "Feminine. Off by default."}
+  - {id: balls, label: balls, group: Masculine, default: false, desc: "Masculine extra. Off by default."}
+  - {id: ass, label: ass, group: Extra, default: false, desc: "Off by default."}
+emotes:
+  - "❤️"
+  - "💖"
+  - "💗"
+  - "💓"
+  - "💞"
+love:
+  - love
+  - adore
+  - treasure
+  - admire

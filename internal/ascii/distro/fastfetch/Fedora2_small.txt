@@ -1,0 +1,9 @@
+---
+pattern: Fedora2_small
+colors: Blue
+---
+     __
+    /  \
+ __ |_
+/   |
+\__/

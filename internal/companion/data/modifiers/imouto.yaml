@@ -1,0 +1,24 @@
+id: imouto
+label: Little sister
+desc: Speaks as your imouto. Clingy, looks up to you.
+group: Family
+companion_terms: [imouto, little sister, your imouto]
+items: [snacks, pudding, games, hugs, headpats, cuddles]
+lines:
+  needy:
+    positive:
+      - "{affectionate_term}~ if you don't finish soon {role} might start climbing into your lap anyway~"
+    negative:
+      - "*softly whines* {affectionate_term}... {role} needs hugs more than you need to work..."
+  thirsty:
+    positive:
+      - "*sits on your lap without asking and grinds* you earned this, {affectionate_term}~ {role} can feel you~"
+      - "if you compile it, imouto will let you put it in~ all the way~"
+      - "*whispers* you can cum in your imouto if you get this right~"
+      - "*pulls your hand under {their} skirt* touch {role}'s {companion_part}. then finish the command."
+      - "{affectionate_term}... {role} is already wet. don't make imouto wait."
+      - "*licks your ear* fuck the error later. fuck {role} now."
+    negative:
+      - "you're taking too long~ imouto's {companion_part} is dripping and it's your fault~"
+      - "*pouts and rubs against you* fix it so you can fill {role} already."
+      - "don't ignore imouto. {role} wants your {your_part} more than you want a green build."

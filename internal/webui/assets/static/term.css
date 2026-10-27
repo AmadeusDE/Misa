@@ -1,0 +1,18 @@
+main:has(#term) { max-width: none; padding: 0; }
+main:has(#term) > h1 { display: none; }
+.term { position: relative; overflow: hidden; outline: none; background: #282828; color: #ebdbb2;
+  font: 14px/1.25 ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; cursor: text; }
+.term-screen { position: relative; white-space: pre; user-select: text; }
+.term-row { height: var(--ch, 1.25em); }
+.term-row span.w { display: inline-block; width: calc(var(--cw, 1ch) * 2); height: var(--ch, 1.25em); overflow: hidden; vertical-align: top; }
+.term-row .b { font-weight: bold; }
+.term-row .i { font-style: italic; }
+.term-row .u { text-decoration: underline; }
+.term-row .s { text-decoration: line-through; }
+.term-row .u.s { text-decoration: underline line-through; }
+.term-cursor { position: absolute; pointer-events: none; background: #ebdbb2; mix-blend-mode: difference; }
+.term:not(:focus) .term-cursor { background: transparent; outline: 1px solid #ebdbb2; mix-blend-mode: normal; }
+.term-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .6); color: #fff; font: 1rem system-ui, sans-serif; text-align: center; padding: 1rem; }
+.term-overlay[hidden] { display: none; }
+.term-probe { position: absolute; visibility: hidden; white-space: pre; left: 0; top: 0; }

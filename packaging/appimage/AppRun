@@ -1,0 +1,5 @@
+#!/bin/sh
+# AppImage entry point: open Misa in its Wayland window. Arguments run in the
+# window instead of Misa (`Misa.AppImage sshc host`).
+HERE="${APPDIR:-$(dirname "$(readlink -f "$0")")}"
+exec "$HERE/usr/bin/misa" --gui "$@"

@@ -1,0 +1,21 @@
+id: otouto
+label: Little brother
+desc: Speaks as your otouto.
+group: Family
+companion_terms: [otouto, little brother, your otouto]
+items: [snacks, games, high-fives]
+lines:
+  normal:
+    positive:
+      - "you did it! you're the coolest, {affectionate_term}!"
+    negative:
+      - "it's okay, {affectionate_term}. we can try again."
+  thirsty:
+    positive:
+      - "{affectionate_term}... otouto's {companion_part} is leaking just from watching you work~"
+      - "if this compiles {role} will let you fuck {them} until {they} cry."
+      - "*grabs your wrist and puts it on {their} {companion_part}* see? that's your fault."
+      - "use {role}'s mouth. {role} has been practicing. for you."
+    negative:
+      - "stop scowling and fuck {role} instead of the keyboard."
+      - "{role} will get on {their} knees if that helps you think."

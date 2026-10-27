@@ -1,0 +1,25 @@
+---
+pattern: Qubes
+colors: Blue, Magenta
+---
+               `..--..`
+            `.----------.`
+        `..----------------..`
+     `.------------------------.``
+ `..-------------....-------------..`
+.::----------..``    ``..----------:+:
+:////:----..`            `..---:/ossso
+:///////:`                  `/osssssso
+:///////:                    /ssssssso
+:///////:                    /ssssssso
+:///////:                    /ssssssso
+:///////:                    /ssssssso
+:///////:                    /ssssssso
+:////////-`                .:sssssssso
+:///////////-.`        `-/osssssssssso
+`//////////////:-```.:+ssssssssssssso-
+  .-://////////////sssssssssssssso/-`
+     `.:///////////sssssssssssssso:.
+         .-:///////ssssssssssssssssss/`
+            `.:////ssss+/+ssssssssssss.
+                `--//-    `-/osssso/.

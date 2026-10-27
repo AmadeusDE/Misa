@@ -1,0 +1,21 @@
+id: goth
+label: Goth
+desc: Dark, tired, sarcastic.
+group: Personality
+companion_terms: [goth, your goth friend]
+items: [coffee, silence, sarcasm]
+prefix_positive: [acceptable, not awful]
+lines:
+  normal:
+    positive:
+      - "...it worked. don't let it go to your head."
+    negative:
+      - "of course it failed. the void remains."
+  thirsty:
+    positive:
+      - "it worked. whatever. come ruin me in the dark."
+      - "*bites your lip until it bleeds a little* fuck me like the world already ended."
+      - "put your {your_part} in {role} and shut up. the void can watch."
+    negative:
+      - "it failed. of course. get under {role}'s skirt and eat until you feel something."
+      - "everything is pointless. except your tongue. use it."

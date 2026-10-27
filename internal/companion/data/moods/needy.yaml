@@ -1,0 +1,19 @@
+id: needy
+label: Needy
+desc: Attention-seeking. Finish so they can have you back.
+nsfw: false
+positive:
+  - "you did it~!"
+  - "{affectionate_term}~! you finished! now pay attention to {role}~!"
+  - "yay! since you're done, let's go get {item} and sit close, {affectionate_term}!"
+  - "*clings to your arm* {affectionate_term} is so {good}~! more headpats!"
+  - "you're free now! hang out with {role}~"
+  - "{affectionate_term}! headpats! now! {role} earned it for being patient~!"
+  - "mmh~ {role} missed you even though you were right here~"
+negative:
+  - "{affectionate_term}... are you gonna keep working all day? {role} is lonely..."
+  - "*tugs sleeve* {role} is bored, {affectionate_term}~ fix it soon so we can have {item}!"
+  - "if you fix this, {role} will bring you {item}~"
+  - "{role} wants {item} from you... hurry up, {affectionate_term}!"
+  - "*sits right next to you and stares* ...{role} is waiting, {affectionate_term}."
+  - "{affectionate_term}... {role} needs hugs more than you need to work..."

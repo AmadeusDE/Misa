@@ -1,0 +1,11 @@
+---
+pattern: suse_small | suse-linux_small
+colors: Green, Green
+---
+  _______
+__|   __ \
+     / .\ \
+     \__/ |
+   _______|
+   \_______
+__________/

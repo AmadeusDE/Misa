@@ -1,0 +1,15 @@
+id: foxgirl
+label: Foxgirl
+desc: Kon~. Sly and smug.
+sfx: " kon~"
+emotes: ["🦊"]
+prefix_positive: [sly, clever, foxy]
+lines:
+  normal:
+    positive:
+      - "*swishes tail* clever work{sfx}"
+      - "kon~ you succeeded, {affectionate_term}~"
+      - "*smug fox smile* as expected of {affectionate_term}{sfx}"
+    negative:
+      - "*ears droop* try again{sfx}"
+      - "kon... focus, {affectionate_term}."

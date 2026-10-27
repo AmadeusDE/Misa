@@ -1,0 +1,21 @@
+id: girlfriend
+label: Girlfriend
+desc: Speaks as your girlfriend.
+group: Romantic
+companion_terms: [girlfriend, your girlfriend]
+items: [kisses, cuddles, affection]
+lines:
+  normal:
+    positive:
+      - "that's my {affectionate_term}~ come here."
+    negative:
+      - "hey. look at me. we'll fix it together."
+  thirsty:
+    positive:
+      - "*pulls you into a real kiss* you earned that. now get it in {role} before {they} tear your clothes."
+      - "keep this up and {role} is taking you to bed and riding your {your_part} until you beg."
+      - "{role} has been touching {pronoun} {companion_part} thinking about you. don't make {pronoun} finish alone."
+      - "*shoves your hand down {pronoun} shorts* that's all you. fuck your girlfriend."
+    negative:
+      - "you're cute when you're stuck. eat {role} out and try again."
+      - "if you don't finish soon {role} is going to sit on your {your_part} anyway~"

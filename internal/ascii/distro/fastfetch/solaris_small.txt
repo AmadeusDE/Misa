@@ -1,0 +1,9 @@
+---
+pattern: solaris_small | sunos_small
+colors: Yellow
+---
+       .   .;   .
+   .   :;  ::  ;:   .
+   .;. ..      .. .;.
+..  ..             ..  ..
+ .;,                 ,;.

@@ -1,0 +1,23 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{.CSRF}}">
+<title>{{.Title}} - {{.Site}}</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+<strong>{{.Site}}</strong>
+{{if .LoggedIn}}<nav>{{range .Nav}}<a href="{{.Path}}">{{.Title}}</a>{{end}}</nav>
+<span class="who">{{.DeviceTag}} <button type="button" data-logout>Sign out</button></span>{{end}}
+</header>
+{{range .Notices}}<div class="banner" data-notice="{{.ID}}">{{.Text}} <button type="button" data-dismiss>Dismiss</button></div>{{end}}
+<main>
+<h1>{{.Title}}</h1>
+{{template "content" .Data}}
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>{{end}}

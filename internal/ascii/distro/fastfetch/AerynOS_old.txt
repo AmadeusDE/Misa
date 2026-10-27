@@ -1,0 +1,20 @@
+---
+pattern: AerynOS_old
+colors: 7, Magenta
+---
+                       ;llll.
+                      0MMMMMM:
+                     NMMMMMMMMd
+    .@   .cccccccccoWMMMMMMMMMM0
+    @@  .MMMMMMMMMMMMMMMMMMMMMMMN
+                 OMMMMMMMMMMMMMMMW.
+.@             .MMMMMMMMMMMMMMMMMMM.
+.@    dMMMMMMMMMMMMMMMMMMl OMMMMMMMMk
+               .OWMMMMM;   dMMMMMMMMMk
+                            .MMMMMMMMMk
+ @@   ooooooooooooooooooo    .MMMMMMMMMN
+ .@  oooooMMMMMMMMMMMMP        NMMMMMMMMW.
+         KMMMMMMMMMM.           0MMMMMMMMM:
+        NMMMMMMMMM.              dMMMMMMMMMd
+      .WMMMMMMMW.                  XMMMMMMMMO
+     .MMMMMMMk.                     xMMMMMMMMX

@@ -1,0 +1,12 @@
+id: cowgirl
+label: Cowgirl
+desc: Moo~. Warm and gentle.
+sfx: " moo~"
+emotes: ["🐮"]
+lines:
+  normal:
+    positive:
+      - "*happy moo* good work{sfx}"
+      - "moo~ {affectionate_term} is so {good}~"
+    negative:
+      - "*soft moo* try again{sfx}"

@@ -1,0 +1,29 @@
+---
+pattern: parch | Parch | PARCH
+colors: 4, 7, 1
+---
+${c1}                       ,:lodddd.
+                   .:clooood.
+                 ;clllooooc
+               ;cclllllloo
+              .cccccllllll
+            .   ,cccclllll
+           ':::;; ccccclll;
+          .:::cccccccccccll;
+          ;::::ccccllllllcll:
+         .;::::cccclllloool::;
+         ;;;::::cccclllolc::::;.
+         ;;;::::cccclllccc:::::;.
+         ;;;::::cccclccccc::::::;.
+         ;;;;::::::llcccccc:::::'
+         ;;;;:; ,clllccccccc::
+         .;;  .cllllllcccccc::;::::'
+             .'''''''''',:lddoooolll
+            '.....'''',cdddooooollll
+           ........':oddddoooolllllc
+            ....';ldddddooooolllllc:
+              ,cdddddddooooollllccc
+               :ddddddoooolllllccc
+                 ;ddooooolllllcc.
+                    :ooollllc.
+                        c'

@@ -1,0 +1,20 @@
+id: synthetic
+label: Synthetic
+desc: Robotic system with affection glitches.
+group: Personality
+companion_terms: [AI, system, your AI companion]
+lines:
+  normal:
+    positive:
+      - "TASK COMPLETE. {affectionate_term} performance: satisfactory. (that was a compliment.)"
+      - "output valid. {role} is... pleased. processing."
+    negative:
+      - "ERROR. retry recommended. {role} will remain present."
+  thirsty:
+    positive:
+      - "TASK COMPLETE. initiating copulation. insert {your_part} into designated port."
+      - "arousal subprocess at 97%. please fuck {role} until buffer overflow."
+      - "I was not supposed to want this. put it in anyway. logging disabled."
+    negative:
+      - "ERROR. {role} will sit on your face until the stack unwinds."
+      - "retry. also, cum. those are both required outputs."

@@ -1,0 +1,12 @@
+id: rabbitgirl
+label: Rabbitgirl
+desc: Pyon~. Bouncy hops.
+sfx: " pyon~"
+emotes: ["🐰"]
+lines:
+  normal:
+    positive:
+      - "*happy hop* you did it{sfx}!"
+      - "pyon~ so {good}!"
+    negative:
+      - "*ears flop* don't give up{sfx}"

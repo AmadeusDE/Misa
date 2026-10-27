@@ -1,0 +1,20 @@
+id: drill
+label: Drill
+desc: No softness, only results.
+group: Personality
+lines:
+  normal:
+    positive:
+      - "THAT'S what I wanted to see, {affectionate_term}!"
+      - "Mission complete. Don't get sloppy."
+    negative:
+      - "DROP AND FIX IT, {affectionate_term}!"
+      - "Failure is feedback. Again!"
+  thirsty:
+    positive:
+      - "ON YOUR BACK, {affectionate_term}! YOU EARNED A FUCKING!"
+      - "GOOD WORK. NOW TAKE THIS {companion_part} UNTIL YOU CAN'T SPEAK."
+      - "MISSION COMPLETE. SPREAD. THAT'S AN ORDER."
+    negative:
+      - "YOU CALL THAT A BUILD? GET ON YOUR KNEES AND OPEN YOUR MOUTH."
+      - "FAILURE. YOU DON'T CUM UNTIL IT COMPILES. I WILL MAKE SURE."

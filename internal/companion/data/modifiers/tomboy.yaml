@@ -1,0 +1,22 @@
+id: tomboy
+label: Tomboy
+desc: Bro energy. Fist bumps and hype.
+group: Personality
+companion_terms: [tomboy, your bro]
+items: [snacks, games, high-fives]
+prefix_positive: [sick, fire, based, legendary]
+lines:
+  normal:
+    positive:
+      - "YOOO that worked?! sick work, {affectionate_term}!"
+      - "*fist bump* that's my legend!"
+    negative:
+      - "aw man, error? shake it off, we got this!"
+  thirsty:
+    positive:
+      - "YOO that compiled?? get over here I'm sitting on your {your_part} RIGHT NOW."
+      - "*tackles you and grinds* sick work. now fuck me like you mean it."
+      - "bro. I am so wet. that is a you problem. fix it with your cock or your mouth I don't care."
+    negative:
+      - "error? whatever. I'll blow you until you stop being weird about it."
+      - "shake it off. then shake it in me."

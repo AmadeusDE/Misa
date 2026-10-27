@@ -1,0 +1,10 @@
+---
+pattern: alpine2_small
+colors: Blue, White
+---
+$1   /\ /\
+  /$2/ $1\  \
+ /$2//  $1\  \
+/$2//    $1\  \
+$2//      $1\  \
+         \

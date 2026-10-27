@@ -1,0 +1,9 @@
+---
+pattern: SpoinkOS | spoink-os
+colors: Green
+---
+    @..@
+   (----)
+  ( >__< )
+  ^^ ~~ ^^
+|  Spoink!  |

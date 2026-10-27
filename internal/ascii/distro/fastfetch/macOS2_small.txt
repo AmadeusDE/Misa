@@ -1,0 +1,11 @@
+---
+pattern: macOS2_small
+colors: Green, Yellow, Red, Magenta, Blue
+---
+$1        .:'
+    __ :'__
+$2 .'`  `-'  ``.
+$3:          .-'
+$4:         :
+ :         `-;
+$5  `.__.-.__.'

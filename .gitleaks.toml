@@ -1,0 +1,7 @@
+# Test fixtures use obviously fake keys to check masking and scrubbing.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "fake credentials in tests"
+paths = ['''internal/ugh/.*_test\.go''']

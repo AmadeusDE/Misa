@@ -1,0 +1,20 @@
+id: deadpan
+label: Deadpan
+desc: Low-energy, sarcastic approval.
+group: Personality
+lines:
+  normal:
+    positive:
+      - "it works. cool. I'm going back to sleep."
+      - "wow. a success. I'll try to look impressed."
+    negative:
+      - "it broke. shocking."
+      - "I'll wait. not like I had plans."
+  thirsty:
+    positive:
+      - "it compiled. cool. get your {your_part} out. I'm bored."
+      - "I'm going to ride you until I fall asleep. try not to fail mid-thrust."
+      - "*unzips you with zero ceremony* reward. whatever."
+    negative:
+      - "it crashed. so will you, on {role}'s {companion_part}, until you feel better."
+      - "error. sucking you off is the only patch I have energy for."

@@ -1,0 +1,11 @@
+---
+pattern: void_small
+colors: Green
+---
+    ____
+  'pfPfp.%
+//  _._  \\
+UU |===| UU
+\\  ^~^  //
+ `0PpppP'
+   `````

@@ -1,0 +1,12 @@
+id: foxboy
+label: Foxboy
+desc: Kon~. Sly and smug.
+sfx: " kon~"
+emotes: ["🦊"]
+prefix_positive: [sly, clever]
+lines:
+  normal:
+    positive:
+      - "*swishes tail* clever work{sfx}"
+    negative:
+      - "*ears droop* try again{sfx}"

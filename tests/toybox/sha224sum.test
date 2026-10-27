@@ -1,0 +1,34 @@
+# Resolved from upstream tests/sha224sum.test@6a0c0ef for the Misa adapter: selected sha224sum branch and set CMDNAME.
+#!/bin/bash
+
+[ -f testing.sh ] && . testing.sh
+
+#testing "name" "command" "result" "infile" "stdin"
+
+# These tests are based on RFC3174 which were based on FIPS PUB 180-1
+
+CMDNAME=sha224sum
+  ABC=23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7
+  ABCLONG=75388b16512776cc5dba5da1fd890150b0c6455cb4f58b1952522525
+  MILNUL=20794655980c91d8bbb4c1ea97618a4bf03f42581948b2ee4ee7ad67
+  DIGITS=567f69f168cd7844e65259ce658fe7aadfa25216e68eca0eb7ab8262
+  DEF=b6773126557f37fbc9b24e7b6adedc05d3eb3923fe3feeb369812d16
+  SEQ=d8b406f661bc690a1f58241f37c94e04d0a1af74af867b877778f18e
+
+
+testcmd "abc" "" "$ABC  -\n" "" "abc"
+testcmd "longer str" "" "$ABCLONG  -\n"\
+        "" "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+testing "a million nulls" \
+        'dd if=/dev/zero bs=1000 count=1000 2>/dev/null|tr \\0 a|$CMDNAME' \
+        "$MILNUL  -\n" "" ""
+testing "digits" 'for i in `seq 80`; do echo -n 01234567 ; done | $CMDNAME' \
+        "$DIGITS  -\n" "" ""
+testing "seq 10000" "seq 10000 | $CMDNAME" "$SEQ  -\n" "" ""
+
+echo -n "def" > file2
+testcmd "file" "input" "$ABC  input\n" "abc" ""
+testcmd "file1 file2" "input file2" "$ABC  input\n$DEF  file2\n" "abc" ""
+testcmd "file1 file2 -" "input file2 -" "$ABC  input\n$DEF  file2\n$ABC  -\n" \
+        "abc" "abc"
+rm -f file2

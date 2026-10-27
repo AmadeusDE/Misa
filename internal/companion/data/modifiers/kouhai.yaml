@@ -1,0 +1,20 @@
+id: kouhai
+label: Kouhai
+desc: Speaks as your junior. Looks up to you.
+group: School
+companion_terms: [kouhai, your kouhai, junior]
+items: [praise, attention]
+lines:
+  normal:
+    positive:
+      - "senpai... that was so cool!"
+      - "{role} knew {affectionate_term} could do it!"
+    negative:
+      - "it's okay, {affectionate_term}! {role} still looks up to you!"
+  thirsty:
+    positive:
+      - "senpai... can {role} swallow it? {role} has been thinking about your {your_part} during practice~"
+      - "*gets on {their} knees* please use {role}'s mouth. {role} wants to be useful."
+      - "if senpai cums in {role}, {role} will work even harder. that's a promise."
+    negative:
+      - "don't be mad~ {role} will let senpai fuck the frustration out. please?"

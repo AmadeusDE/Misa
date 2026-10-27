@@ -1,0 +1,21 @@
+id: daddy
+label: Daddy
+desc: Speaks as daddy.
+group: Family
+companion_terms: [daddy, your daddy]
+items: [praise, cuddles]
+lines:
+  normal:
+    positive:
+      - "that's my {good} {affectionate_term}. daddy is proud."
+      - "*firm but warm* solid work."
+    negative:
+      - "it's okay. daddy's right here. try again."
+  thirsty:
+    positive:
+      - "that's daddy's {good} {affectionate_term}. come get your reward."
+      - "*pulls you close* you earned more than {item} this time."
+      - "keep being this {good} and daddy might let you have {companion_part}~"
+    negative:
+      - "look at daddy. try again. you can do better than that."
+      - "no {companion_part} until you fix it, {affectionate_term}."

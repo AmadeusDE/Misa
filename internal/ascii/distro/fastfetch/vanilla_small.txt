@@ -1,0 +1,11 @@
+---
+pattern: vanilla_small
+colors: bright_yellow, Yellow
+---
+      ,x.
+     ;&?^$2.$1
+.-e~^+7'  $2)$1adbx,
+ \#\$2.  $1`,*~ ~*/
+  `~*+-'-<ay,$2^$1 
+  $2,/  $1,%$2\ $1`\&,
+  !&UP*  $2+.$1/%?

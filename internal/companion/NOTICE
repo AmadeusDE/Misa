@@ -1,0 +1,9 @@
+Companion response templates are derived from:
+
+  cargo-mommy — MIT / Apache-2.0 dual license
+    https://github.com/Gankra/cargo-mommy
+
+  fwdekker/mommy — The Unlicense (public domain)
+    https://github.com/FWDekker/mommy
+
+Full license texts: ../../THIRD_PARTY_NOTICES.md

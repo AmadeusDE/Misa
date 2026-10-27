@@ -1,0 +1,10 @@
+---
+pattern: alpine3_small
+colors: 7
+---
+         ,db,
+       ,d%%%%b,  ,db,
+     ,%%%%P'%%%b,d%%%b,
+   ,%%%%P,   `%%%b'^q%%b,
+ ,%%%%P,d|     `%%%b '^%%b,
+`%%%' 'q$|       'q%%b'`q%%b

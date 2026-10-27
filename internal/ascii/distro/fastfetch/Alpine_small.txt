@@ -1,0 +1,10 @@
+---
+pattern: Alpine_small
+colors: Blue, White
+---
+   /\ /\
+  // \  \
+ //   \  \
+///    \  \
+//      \  \
+         \

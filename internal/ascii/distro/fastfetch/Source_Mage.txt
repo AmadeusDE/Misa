@@ -1,0 +1,25 @@
+---
+pattern: Source_Mage | Source_Mage_GNU_Linux | source_mage | sourcemage
+colors: 7
+---
+       :ymNMNho.
+.+sdmNMMMMMMMMMMy`
+.-::/yMMMMMMMMMMMm-
+      sMMMMMMMMMMMm/
+     /NMMMMMMMMMMMMMm:
+    .MMMMMMMMMMMMMMMMM:
+    `MMMMMMMMMMMMMMMMMN.
+     NMMMMMMMMMMMMMMMMMd
+     mMMMMMMMMMMMMMMMMMMo
+     hhMMMMMMMMMMMMMMMMMM.
+     .`/MMMMMMMMMMMMMMMMMs
+        :mMMMMMMMMMMMMMMMN`
+         `sMMMMMMMMMMMMMMM+
+           /NMMMMMMMMMMMMMN`
+             oMMMMMMMMMMMMM+
+          ./sd.-hMMMMMMMMmmN`
+      ./+oyyyh- `MMMMMMMMMmNh
+                 sMMMMMMMMMmmo
+                 `NMMMMMMMMMd:
+                  -dMMMMMMMMMo
+                    -shmNMMms.

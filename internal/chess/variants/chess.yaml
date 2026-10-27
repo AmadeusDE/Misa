@@ -1,0 +1,19 @@
+id: chess
+name: Chess
+description: Orthodox chess.
+files: 8
+ranks: 8
+pieces:
+  - {letter: K, name: King, betza: K, royal: true, glyph: ♚}
+  - {letter: Q, name: Queen, betza: Q, glyph: ♛, value: 900}
+  - {letter: R, name: Rook, betza: R, glyph: ♜, value: 500}
+  - {letter: B, name: Bishop, betza: B, glyph: ♝, value: 330}
+  - {letter: N, name: Knight, betza: N, glyph: ♞, value: 310}
+  - {letter: P, name: Pawn, betza: fmWfcFifmW2, pawn: true, glyph: ♟, value: 100}
+setup: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR
+# White's squares; Black's mirror them.
+castling:
+  - {king: e1, rook: h1, king_to: g1, rook_to: f1}
+  - {king: e1, rook: a1, king_to: c1, rook_to: d1}
+promotion: [Q, R, B, N]
+move_limit: 50
