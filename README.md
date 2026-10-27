@@ -15,6 +15,13 @@ a set of built-in tools, and it ships as one self-contained binary.
 - `misa --web`: Misa in a browser over a small authenticated web terminal
 - `ugh`: a coding agent, embedded as a pane (`ugh`, or `ctrl+w a` for a split)
 
+## Download
+
+Tagged versions are on the [releases page](https://github.com/AmadeusDE/Misa/releases): `misa`, `ugh` and
+`ughbot` for Linux (amd64, arm64, riscv64), FreeBSD, OpenBSD and macOS, plus Linux AppImages (x86_64,
+aarch64) that open Misa's Wayland window. Every commit on `master` builds the same files as artifacts of
+the [Build workflow](https://github.com/AmadeusDE/Misa/actions/workflows/build.yml).
+
 ## Build
 
 Go 1.27.1 or newer. There are no other build tools and no cgo.
@@ -27,6 +34,7 @@ go build -o ughbot ./cmd/ughbot    # experimental, see below
 go build -tags nough -o misa .     # without the embedded agent (~19 MB instead of ~34 MB)
 go build -tags nogui -o misa .     # without the Wayland window
 go build -tags noweb -o misa .     # without misa --web
+just appimage                      # dist/Misa-<version>-<arch>.AppImage
 ```
 
 Linux is the main platform. OpenBSD, FreeBSD and macOS build and are checked with `go vet` in CI

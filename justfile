@@ -5,7 +5,6 @@ arch := `uname -m`
 version := `git describe --tags --always --dirty 2>/dev/null || echo dev`
 dist := "dist"
 release_bin := dist / "misa-" + arch
-appdir := dist / "Misa.AppDir"
 appimage := dist / "Misa-" + version + "-" + arch + ".AppImage"
 appimagetool_cache := ".cache" / "appimagetool-" + arch + ".AppImage"
 appimagetool_url := "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-" + arch + ".AppImage"
@@ -72,14 +71,7 @@ install prefix="~/.local": release
 
 # AppImage that opens Misa's window (args run in the window: `Misa.AppImage sshc host`)
 appimage: release
-    rm -rf {{appdir}}
-    install -Dm755 {{release_bin}} {{appdir}}/usr/bin/misa
-    install -Dm755 packaging/appimage/AppRun {{appdir}}/AppRun
-    install -Dm644 packaging/appimage/misa.desktop {{appdir}}/misa.desktop
-    install -Dm644 packaging/appimage/misa.desktop {{appdir}}/usr/share/applications/misa.desktop
-    install -Dm644 packaging/appimage/misa.svg {{appdir}}/misa.svg
-    install -Dm644 packaging/appimage/misa.svg {{appdir}}/usr/share/icons/hicolor/scalable/apps/misa.svg
-    ARCH={{arch}} APPIMAGE_EXTRACT_AND_RUN=1 "$(just _appimagetool)" --no-appstream {{appdir}} {{appimage}}
+    APPIMAGETOOL="$(just _appimagetool)" packaging/appimage/build.sh {{release_bin}} {{appimage}} {{arch}}
     @ls -lh {{appimage}}
 
 # Path to appimagetool: the installed one, else a cached download

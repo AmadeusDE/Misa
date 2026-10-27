@@ -21,7 +21,9 @@ GOOS=openbsd go vet ./... && GOOS=freebsd go vet ./... && GOOS=darwin go vet ./.
 ```
 
 Single binary, no external build tools needed. Go 1.27.1 (OpenBSD: `GOTOOLCHAIN=go1.27.1`). CI (`.github/workflows/ci.yml`)
-runs gofmt, the builds, vet for every tag and the other unixes, and the tests.
+runs gofmt, the builds, vet for every tag and the other unixes, and the tests. `build.yml` builds the binaries
+for every platform and the AppImages (`packaging/appimage/build.sh`, appimagetool pinned by checksum); a pushed
+`v*` tag publishes them as a release.
 ugh lives in this repo: `internal/ugh/*` (agent, tools, llm, perm, session, …; `internal/ugh/ughtui` is the embeddable TUI)
 and `cmd/ugh`. Three binaries: `go build -o misa .`, `go build -o ugh ./cmd/ugh`, `go build -o ughbot ./cmd/ughbot`.
 ugh's user documentation is `docs/UGH.md`; ughbot's is `docs/ughbot/`.
