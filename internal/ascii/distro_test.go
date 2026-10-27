@@ -7,11 +7,14 @@ import (
 
 func TestAndroidAndTermuxArt(t *testing.T) {
 	android := LoadDistroArt("android", "")
-	if android == nil || !strings.EqualFold(android.Name, "android") {
+	if android == nil || android.Source != "pfetch" || !strings.EqualFold(android.Name, "android") {
 		t.Fatalf("android art: %+v", android)
 	}
-	if len(android.Lines) == 0 {
-		t.Fatal("android art is empty")
+	if !strings.Contains(strings.Join(android.Lines, "\n"), "';,.-----.,;'") {
+		t.Fatalf("android art is not the pfetch bugdroid: %q", android.Lines)
+	}
+	if named := LoadDistroArt("Android", ""); named == nil || named.Source != android.Source || named.Name != android.Name {
+		t.Fatalf("Android query = %+v, want pfetch android", named)
 	}
 	termux := LoadDistroArt("termux", "")
 	if termux == nil || !strings.EqualFold(termux.Name, "termux") {

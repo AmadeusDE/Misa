@@ -1,5 +1,5 @@
 ---
-pattern: termux|Termux
+pattern: termux
 colors: 2, 7
 ---
 ${c2}  .-----.
