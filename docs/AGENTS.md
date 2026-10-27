@@ -281,5 +281,6 @@ When adding code derived from external sources:
 - `docs/UGH.md` — ugh: providers, running, TUI, tools, permissions, subagents, configuration.
 - `docs/ughbot/DEPLOY.md`, `docs/ughbot/WEB.md` — ughbot (experimental): setup, bots, approvals, web UI.
 - `docs/plans/` — Plans for upcoming work: `terminal.md`, `web.md`, `ugh-confinement.md`, `ughbot.md`,
-  `builtins.md` (with `utility-comparison.md` and `builtins-coverage.md`), `windows.md`, `pkg-frontend.md`.
+  `builtins.md` (with `utility-comparison.md` and `builtins-coverage.md`), `windows.md`, `android.md`,
+  `pkg-frontend.md`.
 - `SECURITY.md`, `CONTRIBUTING.md` — Reporting vulnerabilities; how changes are made here.
