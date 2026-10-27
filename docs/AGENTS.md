@@ -27,6 +27,9 @@ GOOS=openbsd go vet ./... && GOOS=freebsd go vet ./... && GOOS=darwin go vet ./.
 # CC is the NDK's *-linux-android24-clang (API 24).
 ANDROID_NDK_HOME=... just android-cli          # dist/misa-android-arm64/ (misa, ugh; no ughbot)
 ANDROID_NDK_HOME=... just android-cli amd64    # dist/misa-android-amd64/
+# GUI library (c-shared, API 26 / minSdk, -tags nough). JNI class app/misa/Native.
+ANDROID_NDK_HOME=... just android-lib          # dist/libmisagui-arm64.so
+ANDROID_NDK_HOME=... just android-lib amd64    # dist/libmisagui-amd64.so
 # Vet matches CI: CGO_ENABLED=1 for both arches (and tags nough, nogui, noweb).
 # CGO_ENABLED=0 go vet ./... is arm64 only. android/amd64 cannot load test
 # binaries without the external linker, so that arch typechecks libraries
@@ -36,9 +39,10 @@ ANDROID_NDK_HOME=... just android-cli amd64    # dist/misa-android-amd64/
 Single binary, no external build tools needed except the Android NDK for `GOOS=android`.
 Go 1.27.1 (OpenBSD: `GOTOOLCHAIN=go1.27.1`). CI (`.github/workflows/ci.yml`)
 runs gofmt, the builds, vet for every tag and the other unixes, the tests, and an `android`
-job (NDK r30 from `android/ndk.version`, both ABIs, the tag set, cgo and cgo-less vet).
+job (NDK r30 from `android/ndk.version`, both ABIs, the tag set, cgo and cgo-less vet,
+and `libmisagui.so` for both ABIs).
 `android-device` (path-filtered, plus nightly and `workflow_dispatch`) runs the portable
-test binaries on an emulator. `build.yml` builds the binaries
+test binaries on an emulator, including `internal/gui/android`. `build.yml` builds the binaries
 for every platform, including `android-arm64` and `android-amd64` CLI trees, and the AppImages
 (`packaging/appimage/build.sh`, appimagetool pinned by checksum); a pushed
 `v*` tag publishes them as a release. The Android tarball is `misa` and `ugh` only.
@@ -201,7 +205,10 @@ internal/
     wl_input.go wl_keys.go       into the buffer (no copy). Seat, xkb keymap via unix.Mmap, key repeat
     wl_clipboard.go              wl_data_device selection
     fake.go                      Headless backend the core tests drive. No compositor
-    backend_other.go             `!unix || android`: Run prints an error and returns 1
+    backend_other.go             `!unix || android`: Run prints an error and returns 1.
+                                 The APK does not call Run
+    app.go RunSession            One terminal session on a Backend. Android's library uses it;
+                                 Wayland keeps its own setup
     render.go canvas.go          Cells → premultiplied pixels, row damage against what each buffer last
                                  showed. Canvas order follows PixelFormat. Only the default background
                                  takes `opacity` (default 0.55; ARGB8888 buffers unless it is 1)
@@ -209,6 +216,19 @@ internal/
                                  and `/system/fonts`, then the embedded Go Mono
     boxdraw.go                   Procedural box drawing, arcs, blocks, braille so borders join seamlessly
     palette.go                   gruvbox default, gui.yaml overrides, 256-colour cube
+  gui/android/                   ANativeWindow backend. Pure Go geometry, input, damage blit
+                                 and the session manager build on every OS (Linux tests and
+                                 the emulator job). `window_android.go` is `android && cgo`:
+                                 `ANativeWindow_setBuffersGeometry(..., WINDOW_FORMAT_RGBA_8888)`,
+                                 lock with the damage rect, copy rows at `buffer.stride`,
+                                 unlockAndPost. Density is the core's buffer scale. Insets
+                                 shrink the grid. Sessions survive surface loss
+  cmd/misagui/                   `libmisagui.so` (`-buildmode=c-shared`, `android && cgo`).
+                                 `JNI_OnLoad` in `jni_onload.c` calls `RegisterNatives` on
+                                 `app/misa/Native` (`MISA_JNI_CLASS` overrides it). A4 loads
+                                 the library from that class's static initializer. API 26
+                                 clang, `-tags nough` (the agent runs in the child).
+                                 `just android-lib`
   mweb/                          `misa --web` / `--web-admin`: webui.Server whose terminal runs misa (MISA_WEB_CHILD stops
                                  recursion); flags over config.yaml `web:`; XDG state/config dirs. internal/ui never imports webui
   ughbot/sandbox/                Code-task tool protocol: Serve (`ughbot vm-agent` in the VM), Client (tools.Executor +
@@ -230,7 +250,7 @@ internal/
 - **Menu stack**: `pushMenu()`/`popMenu()` for nested menus. `pushFilterableMenu()` enables bubbles list filtering.
 - **Mux architecture**: Outer non-nested Model uses `updateMuxRoot`/`muxView()`. Nested Misa panes use `nestedMode=true`. `forceFrame()` renders lines at `w-1` characters to prevent terminal auto-wrap.
 - **Data-driven package managers**: `pkgmanager.Manager` defines detection, actions (run/shell_prefill/list). Built-in pacman and flatpak; Termux `pkg` when `TERMUX_VERSION` or a `com.termux` `PREFIX` is set; external YAML in `~/.config/misa/managers/` or next to binary. `MISA_ANDROID_APP=1` drops managers with `Distro: true`.
-- **Android build tags**: `GOOS=android` satisfies `linux`. Android-only files are tagged `android`. `import "C"` only with `android && cgo`. `CGO_ENABLED=0` everywhere else. NDK version is `android/ndk.version`; API level for the CLI is 24.
+- **Android build tags**: `GOOS=android` satisfies `linux`. Android-only files are tagged `android`. `import "C"` only with `android && cgo` (the same constraint covers `.c` files that include `jni.h` or `native_window.h`). `CGO_ENABLED=0` everywhere else. NDK version is `android/ndk.version`; API level for the CLI is 24. `libmisagui.so` is built with the API 26 clang (`just android-lib`).
 - **External asset loading**: Distro art from `~/.config/misa/ascii/distro/`, anime only from `~/.config/misa/ascii/anime/` or `ascii/anime/` next to the binary (none is bundled; no art means an empty right column), themes from `presets.json`, all also searched next to binary.
 - **Picker screen**: Reusable searchable toggle-list with preview. Used by settings, onboarding. `finishPicker()` checks `m.picker == nil` before overwriting screen to handle chained pickers.
 - **Config search order**: next to executable → `~/.config/misa/`. Same for companion, mux, fetch and gui configs. Never the working directory: a cloned repo must not be able to supply `autorun:` or aliases.
@@ -257,9 +277,12 @@ internal/
   only platform window so far. Protocol objects are raw opcodes against `internal/wayland`, from wayland.xml/xdg-shell.xml
   (no generated bindings). The loop draws only on terminal dirty + frame callback; damage is computed per row.
   Keys go keymap → keysym (`internal/xkb`, no dead keys/compose) → `tea.Key` → `ui.KeyBytes`, so the xterm encoding
-  lives in one place. The core draws premultiplied BGRA straight into the shm buffer. Requires a compositor with
+  lives in one place. The core draws premultiplied pixels straight into the buffer in the backend's order
+  (BGRA on Wayland, RGBA on Android). Requires a compositor with
   xdg_wm_base; decorations only where zxdg_decoration_manager_v1 exists (not GNOME). On Android (and any target
-  without a backend) `misa --gui` prints an error and exits 1. Settings in `gui.yaml`
+  without a backend) `misa --gui` prints an error and exits 1. The APK's window is `libmisagui.so`
+  (`cmd/misagui`, JNI class `app/misa/Native`): `internal/gui/android` presents through ANativeWindow and
+  keeps one PTY session per tab across surface loss. Settings in `gui.yaml`
   (font, font_size, padding, columns, rows, foreground, background, cursor, palette, opacity, clipboard_write). `misa --gui cmd…` runs
   cmd; a Misa builtin missing from PATH (sshc) runs through the multicall binary. `misa --ssh [sshc opts] dest` is the
   ssh-client launcher. A program exiting non-zero leaves its screen up with a note until a key is pressed.

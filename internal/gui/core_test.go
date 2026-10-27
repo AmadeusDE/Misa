@@ -217,6 +217,27 @@ func TestCoreKeyTextMouseAndPasteReachTerminal(t *testing.T) {
 	waitFor(t, "aézz"+click+wheel, got)
 }
 
+func TestCoreFontEventScalesAndClamps(t *testing.T) {
+	fb := newFakeBackend()
+	a := newTestApp(t, fb)
+	a.Handle(Event{Kind: EventFont, Scale: 2})
+	if a.fontSize != defaultFontSize*2 || fb.drops != 1 {
+		t.Fatalf("size %v drops %d", a.fontSize, fb.drops)
+	}
+	a.Handle(Event{Kind: EventFont, FontSize: 15})
+	if a.fontSize != 15 {
+		t.Fatalf("absolute size %v", a.fontSize)
+	}
+	a.Handle(Event{Kind: EventFont, FontSize: 1})
+	if a.fontSize != minFontSize {
+		t.Fatalf("min size %v", a.fontSize)
+	}
+	a.Handle(Event{Kind: EventFont, Scale: 100})
+	if a.fontSize != maxPinchFont {
+		t.Fatalf("pinch cap %v", a.fontSize)
+	}
+}
+
 func TestCoreZoomAndTitleAndClipboard(t *testing.T) {
 	fb := newFakeBackend()
 	a := newTestApp(t, fb)

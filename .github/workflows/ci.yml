@@ -126,6 +126,20 @@ jobs:
             for tags in nough nogui noweb; do
               go vet -tags "$tags" ./...
             done
+            # libmisagui.so targets minSdk 26. -tags nough: the agent runs in
+            # the child libmisa.so, so the GUI library does not embed it.
+            case "$arch" in
+              arm64) cc26="$bin/aarch64-linux-android26-clang" ;;
+              amd64) cc26="$bin/x86_64-linux-android26-clang" ;;
+            esac
+            test -x "$cc26"
+            out="$RUNNER_TEMP/libmisagui-$arch.so"
+            CC="$cc26" go build -tags nough -buildmode=c-shared -trimpath -ldflags='-s -w' -o "$out" ./cmd/misagui
+            if ! nm -D "$out" | grep -q JNI_OnLoad; then
+              echo "libmisagui ($arch) is missing JNI_OnLoad" >&2
+              nm -D "$out" | head >&2 || true
+              exit 1
+            fi
           done
           # Pure-Go android files. arm64 links without cgo, so vet the module.
           # android/amd64 cannot load a test binary (or any main) with
@@ -173,6 +187,7 @@ jobs:
               - 'android/**'
               - 'internal/gui/**'
               - 'internal/term/**'
+              - 'cmd/misagui/**'
               - '**/*android*'
 
       - id: gate
@@ -228,6 +243,7 @@ jobs:
           go test -c -o "$RUNNER_TEMP/android-tests/term.test" ./internal/term
           go test -c -o "$RUNNER_TEMP/android-tests/builtins.test" ./internal/builtins
           go test -c -o "$RUNNER_TEMP/android-tests/gui.test" ./internal/gui
+          go test -c -o "$RUNNER_TEMP/android-tests/guiandroid.test" ./internal/gui/android
           go test -c -o "$RUNNER_TEMP/android-tests/sshclient.test" ./internal/sshclient
 
       - name: Enable KVM group permissions

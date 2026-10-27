@@ -36,6 +36,9 @@ const (
 	EventFocus
 	EventClose
 	EventFrame // a frame may be presented again (callback done, buffer free)
+	// EventFont changes the point size. FontSize is absolute; when it is
+	// zero, Scale is a factor applied to the current size (a pinch).
+	EventFont
 )
 
 // PointerAction is a pointer event's phase. Coordinates are logical pixels,
@@ -69,6 +72,10 @@ type Event struct {
 	Steps   float64
 	Mod     tea.KeyMod
 	Focused bool
+
+	// FontSize is the absolute point size for EventFont. Zero means Scale
+	// is a factor (pinch) rather than a point size.
+	FontSize float64
 }
 
 // Clipboard is the window selection. Write publishes text. Read requests
