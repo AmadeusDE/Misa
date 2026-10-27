@@ -618,7 +618,7 @@ plus nightly `schedule` and `workflow_dispatch`, since emulators are slow):
 | A0 Measure | done | [#2](https://github.com/AmadeusDE/Misa/pull/2) | NDK r30 matrix, API floor, emulator, throwaway APK. Leftovers for A1 are listed in the measurement section. Decisions flagged, not rewritten |
 | A1 Termux CLI | done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | sysinfo/fetch, procmon degrade, clipboard, file secrets on Android, pkg, session walk. Termux-on-device still unmeasured; the emulator job covers amd64 |
 | A2 gui core/backend split | done | [#7](https://github.com/AmadeusDE/Misa/pull/7) | shared with Windows W2. Core in `internal/gui` (`app.go`, `backend.go`, renderer, fonts). Wayland is `wl_*.go` with `unix && !android` (Android matches both `linux` and `unix`). `misa --gui` on Android errors cleanly. Pixel format is `FormatBGRA8888` or `FormatRGBA8888`; the core draws in the backend's order |
-| A3 Android backend + c-shared | in review | | `internal/gui/android` (ANativeWindow RGBA_8888, density, insets, sessions) and `cmd/misagui` (`libmisagui.so`, `RegisterNatives` on `app/misa/Native`). API 26 clang, `-tags nough`. Pure-Go tests run on Linux and in `android-device` |
+| A3 Android backend + c-shared | in review | [#5](https://github.com/AmadeusDE/Misa/pull/5) | `internal/gui/android` (ANativeWindow RGBA_8888, density, insets, sessions) and `cmd/misagui` (`libmisagui.so`, `RegisterNatives` on `app/misa/Native`). API 26 clang, `-tags nough`. Pure-Go tests run on Linux and in `android-device` |
 | A4 APK shell | not started | | |
 | A5 Platform services | not started | | |
 | A6 Controller/touch/ssh UX | not started | | |
