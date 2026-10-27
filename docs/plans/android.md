@@ -326,7 +326,7 @@ The symlink lives in `app_data_file` and its target is `apk_data_file`. Exec of 
 | `os.Executable()` after a multicall symlink | not printed |
 | targetSdk = current stable, and a non-debuggable APK | this APK is targetSdk 34, debuggable |
 | KVM emulator in CI | nested KVM hit the host BUG above; TCG booted this AVD. CI hardware may differ |
-| `go vet` for `GOOS=android` | not run. Linking amd64 with `CGO_ENABLED=0` fails, so a cgo-less cross-vet of main packages cannot include `android/amd64` |
+| `go vet` for `GOOS=android` | run in A1. `CGO_ENABLED=1` vets both arches. `CGO_ENABLED=0` vets arm64. android/amd64 still cannot load a test binary without cgo, so that arch typechecks libraries with `go build` |
 
 A0 found no Misa compile error on the cgo builds, either arch, any of the four tag sets. A1's "fix every compile failure" list from this matrix is empty. Runtime work in A1 is unchanged. `internal/wayland` and `internal/gui` are in the OK set, including amd64 `CGO_ENABLED=0` (they are libraries). Excluding them from the Android backend is an A2 decision. `internal/ughbot/...` compiled too; D1 still leaves `ughbot` out of both deliverables.
 
@@ -616,13 +616,13 @@ plus nightly `schedule` and `workflow_dispatch`, since emulators are slow):
 | Phase | State | PR | Notes |
 |---|---|---|---|
 | A0 Measure | done | [#2](https://github.com/AmadeusDE/Misa/pull/2) | NDK r30 matrix, API floor, emulator, throwaway APK. Leftovers for A1 are listed in the measurement section. Decisions flagged, not rewritten |
-| A1 Termux CLI | not started | | |
+| A1 Termux CLI | done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | sysinfo/fetch, procmon degrade, clipboard, file secrets on Android, pkg, session walk. Termux-on-device still unmeasured; the emulator job covers amd64 |
 | A2 gui core/backend split | not started | | shared with Windows W2 |
 | A3 Android backend + c-shared | not started | | |
 | A4 APK shell | not started | | |
 | A5 Platform services | not started | | |
 | A6 Controller/touch/ssh UX | not started | | |
 | A7 F-Droid readiness | not started | | |
-| CI: android job | not started | | lands with A1 |
-| CI: android-device job | not started | | lands with A1, APK checks with A4 |
-| Release: tarball + APK + signing | not started | | tarball with A1, APK with A4 |
+| CI: android job | done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | NDK r30, `import "C"` guard, misa and ugh on both arches and the tag set, vet with cgo and cgo-less arm64 |
+| CI: android-device job | done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | Path filter, nightly schedule, `workflow_dispatch`. API 34 `aosp_atd` and API 26. APK checks stay with A4 |
+| Release: tarball + APK + signing | tarball done | [#3](https://github.com/AmadeusDE/Misa/pull/3) | `android-arm64` and `android-amd64` tarballs (`misa`, `ugh`, no `ughbot`). APK and signing stay with A4 |
