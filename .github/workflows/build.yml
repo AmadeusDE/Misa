@@ -1,7 +1,8 @@
 name: Build
 
-# Binaries for every platform Misa builds on, plus the Linux AppImages, as
-# workflow artifacts. A pushed v* tag also publishes them as a GitHub release.
+# Binaries for every platform Misa builds on, plus the Linux AppImages, as one
+# workflow artifact (a directory per platform; the zip drops executable bits).
+# A pushed v* tag also publishes them as a release, one .tar.xz per platform.
 
 on:
   push:
@@ -45,17 +46,16 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: '0'
         run: |
-          name="misa-$(git describe --tags --always)-$GOOS-$GOARCH"
-          mkdir -p "dist/$name"
-          go build -trimpath -ldflags='-s -w' -o "dist/$name/misa" .
-          go build -trimpath -ldflags='-s -w' -o "dist/$name/ugh" ./cmd/ugh
-          go build -trimpath -ldflags='-s -w' -o "dist/$name/ughbot" ./cmd/ughbot
-          cp LICENSE README.md THIRD_PARTY_NOTICES.md "dist/$name/"
-          tar -C dist -czf "dist/$name.tar.gz" "$name"
+          mkdir -p dist
+          go build -trimpath -ldflags='-s -w' -o dist/misa .
+          go build -trimpath -ldflags='-s -w' -o dist/ugh ./cmd/ugh
+          go build -trimpath -ldflags='-s -w' -o dist/ughbot ./cmd/ughbot
+          cp LICENSE README.md THIRD_PARTY_NOTICES.md dist/
+      # Raw files: the artifact zip is the only compression.
       - uses: actions/upload-artifact@v4
         with:
-          name: misa-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dist/*.tar.gz
+          name: ${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/
           if-no-files-found: error
 
   appimage:
@@ -106,26 +106,54 @@ jobs:
             packaging/appimage/build.sh dist/misa "dist/Misa-$(git describe --tags --always)-$ARCH.AppImage" "$ARCH"
       - uses: actions/upload-artifact@v4
         with:
-          name: misa-appimage-${{ matrix.arch }}
+          name: appimage-${{ matrix.arch }}
           path: dist/*.AppImage
           if-no-files-found: error
 
+  # One artifact with every platform, a directory each.
+  bundle:
+    needs: [binaries, appimage]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/upload-artifact/merge@v4
+        with:
+          name: misa
+          separate-directories: true
+          delete-merged: true
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [binaries, appimage]
+    needs: [bundle]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
-          path: dist
-          merge-multiple: true
+          name: misa
+          path: misa
+      # The binaries share most of their code, so xz with a large window
+      # halves each platform's archive compared with gzip.
+      - name: Package the platforms
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir release
+          for dir in misa/*/; do
+            platform=$(basename "$dir")
+            case $platform in
+            appimage-*) mv "$dir"/*.AppImage release/ ;;
+            *)
+              chmod +x "$dir"/misa "$dir"/ugh "$dir"/ughbot
+              mv "$dir" "misa-$TAG-$platform"
+              tar -cf - "misa-$TAG-$platform" | xz -9e --lzma2=preset=9e,dict=128MiB > "release/misa-$TAG-$platform.tar.xz"
+              ;;
+            esac
+          done
+          chmod +x release/*.AppImage
+          cd release && sha256sum -- * > SHA256SUMS
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: |
-          cd dist
-          sha256sum -- * > SHA256SUMS
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes ./*
+        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes release/*

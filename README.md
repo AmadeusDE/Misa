@@ -17,10 +17,11 @@ a set of built-in tools, and it ships as one self-contained binary.
 
 ## Download
 
-Tagged versions are on the [releases page](https://github.com/AmadeusDE/Misa/releases): `misa`, `ugh` and
-`ughbot` for Linux (amd64, arm64, riscv64), FreeBSD, OpenBSD and macOS, plus Linux AppImages (x86_64,
-aarch64) that open Misa's Wayland window. Every commit on `master` builds the same files as artifacts of
-the [Build workflow](https://github.com/AmadeusDE/Misa/actions/workflows/build.yml).
+Tagged versions are on the [releases page](https://github.com/AmadeusDE/Misa/releases): a `.tar.xz` per
+platform with `misa`, `ugh` and `ughbot` for Linux (amd64, arm64, riscv64), FreeBSD, OpenBSD and macOS, plus
+Linux AppImages (x86_64, aarch64) that open Misa's Wayland window. Every commit on `master` builds the same
+files as one artifact of the [Build workflow](https://github.com/AmadeusDE/Misa/actions/workflows/build.yml)
+(a zip, which drops the executable bit: `chmod +x` after unpacking).
 
 ## Build
 
