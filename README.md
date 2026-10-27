@@ -19,13 +19,16 @@ a set of built-in tools, and it ships as one self-contained binary.
 
 Tagged versions are on the [releases page](https://github.com/AmadeusDE/Misa/releases): a `.tar.xz` per
 platform with `misa`, `ugh` and `ughbot` for Linux (amd64, arm64, riscv64), FreeBSD, OpenBSD and macOS, plus
-Linux AppImages (x86_64, aarch64) that open Misa's Wayland window. Every commit on `master` builds the same
-files as one artifact of the [Build workflow](https://github.com/AmadeusDE/Misa/actions/workflows/build.yml)
+Linux AppImages (x86_64, aarch64) that open Misa's Wayland window. Android Termux builds are
+`misa-<tag>-android-arm64.tar.xz` and `misa-<tag>-android-amd64.tar.xz` (`misa` and `ugh` only; no `ughbot`).
+Every commit on `master` builds the same files as one artifact of the
+[Build workflow](https://github.com/AmadeusDE/Misa/actions/workflows/build.yml)
 (a zip, which drops the executable bit: `chmod +x` after unpacking).
 
 ## Build
 
-Go 1.27.1 or newer. There are no other build tools and no cgo.
+Go 1.27.1 or newer. There are no other build tools and no cgo, except the Android CLI,
+which links against the NDK (bionic `getaddrinfo` and, on `android/amd64`, the external linker).
 
 ```sh
 go build -o misa .
@@ -36,10 +39,16 @@ go build -tags nough -o misa .     # without the embedded agent (~19 MB instead 
 go build -tags nogui -o misa .     # without the Wayland window
 go build -tags noweb -o misa .     # without misa --web
 just appimage                      # dist/Misa-<version>-<arch>.AppImage
+
+# Termux CLI. ANDROID_NDK_HOME is an NDK unpacked at the version in android/ndk.version.
+ANDROID_NDK_HOME=/opt/android-ndk just android-cli          # dist/misa-android-arm64/
+ANDROID_NDK_HOME=/opt/android-ndk just android-cli amd64    # dist/misa-android-amd64/
 ```
 
 Linux is the main platform. OpenBSD, FreeBSD and macOS build and are checked with `go vet` in CI
-but get less testing (OpenBSD: `GOTOOLCHAIN=go1.27.1`). Windows is planned (`docs/plans/windows.md`).
+but get less testing (OpenBSD: `GOTOOLCHAIN=go1.27.1`). The Android CLI targets NDK API 24
+(`*-linux-android24-clang`, `CGO_ENABLED=1`). Windows is planned (`docs/plans/windows.md`);
+the Android port is `docs/plans/android.md`.
 
 ## Run
 

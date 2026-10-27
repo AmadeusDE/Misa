@@ -132,7 +132,6 @@ func (t *TopViewer) View() string {
 	SortProcs(procs, t.sortField, false)
 	total, running, sleeping, stopped, zombie := CountStates(procs)
 
-	us, sy, ni, id, wa, hi, si, st := CalcCPUDelta(t.prev.CPUAll, t.cur.CPUAll)
 	mem := t.cur.Mem
 
 	var lines []string
@@ -147,8 +146,14 @@ func (t *TopViewer) View() string {
 		topLabelStyle.Render("Tasks:"), total, running, sleeping, stopped, zombie)
 	lines = append(lines, TruncStr(line2, t.width))
 
-	line3 := fmt.Sprintf("%s %4.1f us, %4.1f sy, %4.1f ni, %4.1f id, %4.1f wa, %4.1f hi, %4.1f si, %4.1f st",
-		topLabelStyle.Render("%CPU(s):"), us, sy, ni, id, wa, hi, si, st)
+	var line3 string
+	if !t.cur.CPUAvailable {
+		line3 = fmt.Sprintf("%s %s", topLabelStyle.Render("%CPU(s):"), unavailable)
+	} else {
+		us, sy, ni, id, wa, hi, si, st := CalcCPUDelta(t.prev.CPUAll, t.cur.CPUAll)
+		line3 = fmt.Sprintf("%s %4.1f us, %4.1f sy, %4.1f ni, %4.1f id, %4.1f wa, %4.1f hi, %4.1f si, %4.1f st",
+			topLabelStyle.Render("%CPU(s):"), us, sy, ni, id, wa, hi, si, st)
+	}
 	lines = append(lines, TruncStr(line3, t.width))
 
 	line4 := fmt.Sprintf("%s %9s total, %9s free, %9s used, %9s buff/cache",

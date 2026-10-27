@@ -12,7 +12,6 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/atotto/clipboard"
 
 	"github.com/AmadeusDE/Misa/internal/ascii"
 	"github.com/AmadeusDE/Misa/internal/builtins"
@@ -989,7 +988,7 @@ func (m *Model) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+v":
 			text := m.registerText()
 			if text == "" {
-				text, _ = clipboard.ReadAll()
+				text = readClipboard()
 			}
 			if text != "" {
 				insertAtCursor(&m.cmdInput, text)

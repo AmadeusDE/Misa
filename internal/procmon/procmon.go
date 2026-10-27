@@ -30,6 +30,15 @@ var (
 	ClkTck   = uint64(100)
 )
 
+// procRoot is the procfs root. Tests point it at a fake tree.
+var procRoot = "/proc"
+
+const unavailable = "—"
+
+func procFile(elem ...string) string {
+	return filepath.Join(append([]string{procRoot}, elem...)...)
+}
+
 type CPUTimes struct {
 	User    uint64
 	Nice    uint64
@@ -126,15 +135,16 @@ type DiskStat struct {
 }
 
 type Snapshot struct {
-	Time    time.Time
-	Uptime  float64
-	LoadAvg [3]float64
-	CPUAll  CPUTimes
-	CPUs    []CPUTimes
-	Mem     MemInfo
-	Procs   []Process
-	Net     []NetDev
-	Disks   []DiskStat
+	Time         time.Time
+	Uptime       float64
+	LoadAvg      [3]float64
+	CPUAll       CPUTimes
+	CPUs         []CPUTimes
+	CPUAvailable bool
+	Mem          MemInfo
+	Procs        []Process
+	Net          []NetDev
+	Disks        []DiskStat
 }
 
 var uidCache = map[uint32]string{}
@@ -152,7 +162,7 @@ func LookupUser(uid uint32) string {
 }
 
 func ReadUptime() float64 {
-	data, err := os.ReadFile("/proc/uptime")
+	data, err := os.ReadFile(procFile("uptime"))
 	if err != nil {
 		return 0
 	}
@@ -166,7 +176,7 @@ func ReadUptime() float64 {
 
 func ReadLoadAvg() [3]float64 {
 	var la [3]float64
-	data, err := os.ReadFile("/proc/loadavg")
+	data, err := os.ReadFile(procFile("loadavg"))
 	if err != nil {
 		return la
 	}
@@ -204,10 +214,12 @@ func parseCPULine(fields []string) (CPUTimes, bool) {
 	return ct, true
 }
 
-func ReadCPUTimes() (CPUTimes, []CPUTimes) {
-	f, err := os.Open("/proc/stat")
+// ReadCPUTimes reports whether /proc/stat could be read. EACCES and a missing
+// file are unavailable (ok == false): callers show "—" and do not fail.
+func ReadCPUTimes() (CPUTimes, []CPUTimes, bool) {
+	f, err := os.Open(procFile("stat"))
 	if err != nil {
-		return CPUTimes{}, nil
+		return CPUTimes{}, nil, false
 	}
 	defer f.Close()
 
@@ -228,12 +240,12 @@ func ReadCPUTimes() (CPUTimes, []CPUTimes) {
 			}
 		}
 	}
-	return all, cores
+	return all, cores, true
 }
 
 func ReadMemInfo() MemInfo {
 	var mi MemInfo
-	f, err := os.Open("/proc/meminfo")
+	f, err := os.Open(procFile("meminfo"))
 	if err != nil {
 		return mi
 	}
@@ -277,7 +289,7 @@ func ReadMemInfo() MemInfo {
 }
 
 func readProcess(pid int) (Process, bool) {
-	dir := fmt.Sprintf("/proc/%d", pid)
+	dir := procFile(strconv.Itoa(pid))
 
 	statData, err := os.ReadFile(filepath.Join(dir, "stat"))
 	if err != nil {
@@ -346,7 +358,7 @@ func readProcess(pid int) (Process, bool) {
 }
 
 func ReadAllProcs() []Process {
-	entries, err := os.ReadDir("/proc")
+	entries, err := os.ReadDir(procRoot)
 	if err != nil {
 		return nil
 	}
@@ -367,7 +379,7 @@ func ReadAllProcs() []Process {
 }
 
 func ReadNetDev() []NetDev {
-	f, err := os.Open("/proc/net/dev")
+	f, err := os.Open(procFile("net", "dev"))
 	if err != nil {
 		return nil
 	}
@@ -399,7 +411,7 @@ func ReadNetDev() []NetDev {
 }
 
 func ReadDiskStats() []DiskStat {
-	f, err := os.Open("/proc/diskstats")
+	f, err := os.Open(procFile("diskstats"))
 	if err != nil {
 		return nil
 	}
@@ -429,7 +441,7 @@ func ReadDiskStats() []DiskStat {
 }
 
 func enrichDiskMounts(ioDisks []DiskStat) []DiskStat {
-	f, err := os.Open("/proc/mounts")
+	f, err := os.Open(procFile("mounts"))
 	if err != nil {
 		return ioDisks
 	}
@@ -485,31 +497,34 @@ func enrichDiskMounts(ioDisks []DiskStat) []DiskStat {
 }
 
 func TakeSnapshot() Snapshot {
+	cpuAll, cpus, cpuOK := ReadCPUTimes()
 	return Snapshot{
-		Time:    time.Now(),
-		Uptime:  ReadUptime(),
-		LoadAvg: ReadLoadAvg(),
-		CPUAll:  func() CPUTimes { a, _ := ReadCPUTimes(); return a }(),
-		CPUs:    func() []CPUTimes { _, c := ReadCPUTimes(); return c }(),
-		Mem:     ReadMemInfo(),
-		Procs:   ReadAllProcs(),
-		Net:     ReadNetDev(),
-		Disks:   enrichDiskMounts(ReadDiskStats()),
+		Time:         time.Now(),
+		Uptime:       ReadUptime(),
+		LoadAvg:      ReadLoadAvg(),
+		CPUAll:       cpuAll,
+		CPUs:         cpus,
+		CPUAvailable: cpuOK,
+		Mem:          ReadMemInfo(),
+		Procs:        ReadAllProcs(),
+		Net:          ReadNetDev(),
+		Disks:        enrichDiskMounts(ReadDiskStats()),
 	}
 }
 
 func TakeFullSnapshot() Snapshot {
-	cpuAll, cpus := ReadCPUTimes()
+	cpuAll, cpus, cpuOK := ReadCPUTimes()
 	return Snapshot{
-		Time:    time.Now(),
-		Uptime:  ReadUptime(),
-		LoadAvg: ReadLoadAvg(),
-		CPUAll:  cpuAll,
-		CPUs:    cpus,
-		Mem:     ReadMemInfo(),
-		Procs:   ReadAllProcs(),
-		Net:     ReadNetDev(),
-		Disks:   enrichDiskMounts(ReadDiskStats()),
+		Time:         time.Now(),
+		Uptime:       ReadUptime(),
+		LoadAvg:      ReadLoadAvg(),
+		CPUAll:       cpuAll,
+		CPUs:         cpus,
+		CPUAvailable: cpuOK,
+		Mem:          ReadMemInfo(),
+		Procs:        ReadAllProcs(),
+		Net:          ReadNetDev(),
+		Disks:        enrichDiskMounts(ReadDiskStats()),
 	}
 }
 

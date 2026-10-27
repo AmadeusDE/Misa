@@ -307,6 +307,11 @@ func (t *TMViewer) processView() []string {
 	cats := categorizeProcs(procs)
 
 	cpuUsage := CalcCPUUsage(t.prev.CPUAll, t.cur.CPUAll)
+	cpuText := fmt.Sprintf("%4.1f%%", cpuUsage)
+	if !t.cur.CPUAvailable {
+		cpuUsage = 0
+		cpuText = unavailable
+	}
 	mem := t.cur.Mem
 	memPct := 0.0
 	if mem.Total > 0 {
@@ -320,8 +325,8 @@ func (t *TMViewer) processView() []string {
 	barW := 12
 
 	var lines []string
-	summaryLine := fmt.Sprintf("  CPU %s %4.1f%%    Mem %s %4.1f%%    Disk R:%s W:%s    Net ▼%s ▲%s",
-		tmBar(barW, cpuUsage), cpuUsage,
+	summaryLine := fmt.Sprintf("  CPU %s %s    Mem %s %4.1f%%    Disk R:%s W:%s    Net ▼%s ▲%s",
+		tmBar(barW, cpuUsage), cpuText,
 		tmBar(barW, memPct), memPct,
 		FmtRate(diskRead), FmtRate(diskWrite),
 		FmtRate(rxRate), FmtRate(txRate))
@@ -430,8 +435,13 @@ func (t *TMViewer) performanceView() []string {
 		barW = 10
 	}
 
+	cpuText := fmt.Sprintf("%4.1f%%", cpuUsage)
+	if !t.cur.CPUAvailable {
+		cpuUsage = 0
+		cpuText = unavailable
+	}
 	lines = append(lines, tmSectionStyle.Render("  CPU"))
-	lines = append(lines, fmt.Sprintf("  Utilization  %s  %4.1f%%", tmBar(barW, cpuUsage), cpuUsage))
+	lines = append(lines, fmt.Sprintf("  Utilization  %s  %s", tmBar(barW, cpuUsage), cpuText))
 	lines = append(lines, fmt.Sprintf("  Cores: %d    Load: %.2f %.2f %.2f    Uptime: %s",
 		len(t.cur.CPUs), t.cur.LoadAvg[0], t.cur.LoadAvg[1], t.cur.LoadAvg[2],
 		FmtUptime(t.cur.Uptime)))

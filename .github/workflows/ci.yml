@@ -5,6 +5,8 @@ on:
     branches: [master]
   workflow_dispatch:
   pull_request:
+  schedule:
+    - cron: '30 5 * * *'
 
 permissions:
   contents: read
@@ -53,3 +55,183 @@ jobs:
 
       - name: Race (terminal, web, UI, agent)
         run: go test -race -count=1 ./internal/term/ ./internal/webui/ ./internal/mweb/ ./internal/ui/ ./internal/ugh/...
+
+  # Termux CLI cross-build. Kept off `check` so a missing NDK cannot hide a
+  # Linux failure. NDK revision is android/ndk.version (D2).
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.27.1"
+
+      - name: import "C" is android && cgo only
+        run: go test -count=1 -run TestImportCIsAndroidCgo .
+
+      - id: ndk
+        run: echo "version=$(tr -d '[:space:]' < android/ndk.version)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: ndk-cache
+        with:
+          path: /usr/local/lib/android/sdk/ndk/${{ steps.ndk.outputs.version }}
+          key: ndk-${{ steps.ndk.outputs.version }}
+
+      - name: Install the pinned NDK
+        if: steps.ndk-cache.outputs.cache-hit != 'true'
+        env:
+          NDK_VERSION: ${{ steps.ndk.outputs.version }}
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          sdkmanager=$(find "$sdk/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          mkdir -p "$sdk/licenses"
+          printf '%s\n' 24333f8a63b6825ea9c5514f83c2829b004d1fee > "$sdk/licenses/android-sdk-license"
+          "$sdkmanager" --sdk_root="$sdk" "ndk;${NDK_VERSION}"
+
+      - name: Build and vet misa and ugh
+        env:
+          NDK_VERSION: ${{ steps.ndk.outputs.version }}
+        run: |
+          set -euo pipefail
+          ndk="/usr/local/lib/android/sdk/ndk/${NDK_VERSION}"
+          bin="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$bin/aarch64-linux-android24-clang"
+          export GOOS=android
+          for arch in arm64 amd64; do
+            case "$arch" in
+              arm64) triple=aarch64-linux-android24-clang ;;
+              amd64) triple=x86_64-linux-android24-clang ;;
+            esac
+            export GOARCH="$arch" CGO_ENABLED=1 CC="$bin/$triple"
+            for tags in default nough nogui noweb; do
+              if [ "$tags" = default ]; then
+                go build -o /dev/null .
+                go build -o /dev/null ./cmd/ugh
+              else
+                go build -tags "$tags" -o /dev/null .
+                go build -tags "$tags" -o /dev/null ./cmd/ugh
+              fi
+            done
+            go vet ./...
+            for tags in nough nogui noweb; do
+              go vet -tags "$tags" ./...
+            done
+          done
+          # Pure-Go android files. arm64 links without cgo, so vet the module.
+          # android/amd64 cannot load a test binary (or any main) with
+          # CGO_ENABLED=0: the Go tool demands the external linker. Vet
+          # cannot be pointed at that arch; typecheck its libraries instead.
+          # The arm64 vet above already covers the pure-Go android files.
+          unset CC
+          export CGO_ENABLED=0 GOARCH=arm64
+          go vet ./...
+          export GOARCH=amd64
+          errs=$(go list -e -f '{{if and (ne .Name "main") .Error}}{{.ImportPath}}: {{.Error.Err}}{{"\n"}}{{end}}' ./...)
+          if [ -n "$errs" ]; then
+            printf '%s\n' "$errs" >&2
+            exit 1
+          fi
+          # Test-only packages have no library to build.
+          go list -e -f '{{if and (ne .Name "main") (not .Error) (gt (len .GoFiles) 0)}}{{.ImportPath}}{{end}}' ./... |
+            xargs -r -n 1 go build -o /dev/null
+
+  # Emulator checks. Path-filtered on pull requests and pushes; always on a
+  # nightly schedule and workflow_dispatch. APK install lands with A4.
+  android-device:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api-level: 34
+            target: aosp_atd
+          - api-level: 26
+            target: google_apis
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.27.1"
+
+      - id: changes
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            run:
+              - 'android/**'
+              - 'internal/gui/**'
+              - 'internal/term/**'
+              - '**/*android*'
+
+      - id: gate
+        run: |
+          set -euo pipefail
+          run=false
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            run=true
+          elif [ "${{ steps.changes.outputs.run }}" = "true" ]; then
+            run=true
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
+      - id: ndk
+        if: steps.gate.outputs.run == 'true'
+        run: echo "version=$(tr -d '[:space:]' < android/ndk.version)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        if: steps.gate.outputs.run == 'true'
+        id: ndk-cache
+        with:
+          path: /usr/local/lib/android/sdk/ndk/${{ steps.ndk.outputs.version }}
+          key: ndk-${{ steps.ndk.outputs.version }}
+
+      - name: Install the pinned NDK
+        if: steps.gate.outputs.run == 'true' && steps.ndk-cache.outputs.cache-hit != 'true'
+        env:
+          NDK_VERSION: ${{ steps.ndk.outputs.version }}
+        run: |
+          set -euo pipefail
+          sdk="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          sdkmanager=$(find "$sdk/cmdline-tools" -type f -name sdkmanager | head -n 1)
+          mkdir -p "$sdk/licenses"
+          printf '%s\n' 24333f8a63b6825ea9c5514f83c2829b004d1fee > "$sdk/licenses/android-sdk-license"
+          "$sdkmanager" --sdk_root="$sdk" "ndk;${NDK_VERSION}"
+
+      - name: Compile android/amd64 tests
+        if: steps.gate.outputs.run == 'true'
+        env:
+          NDK_VERSION: ${{ steps.ndk.outputs.version }}
+        run: |
+          set -euo pipefail
+          cc="/usr/local/lib/android/sdk/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android24-clang"
+          test -x "$cc"
+          mkdir -p "$RUNNER_TEMP/android-tests"
+          export GOOS=android GOARCH=amd64 CGO_ENABLED=1 CC="$cc"
+          go test -c -o "$RUNNER_TEMP/android-tests/term.test" ./internal/term
+          go test -c -o "$RUNNER_TEMP/android-tests/builtins.test" ./internal/builtins
+          go test -c -o "$RUNNER_TEMP/android-tests/gui.test" ./internal/gui
+          go test -c -o "$RUNNER_TEMP/android-tests/sshclient.test" ./internal/sshclient
+
+      - name: Run tests on the emulator
+        if: steps.gate.outputs.run == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: ${{ matrix.target }}
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            set -euo pipefail
+            adb shell 'mkdir -p /data/local/tmp/misa-tests'
+            adb push "$RUNNER_TEMP/android-tests/." /data/local/tmp/misa-tests/
+            adb shell 'chmod 755 /data/local/tmp/misa-tests/*.test'
+            for t in term builtins gui sshclient; do
+              echo "=== $t ==="
+              adb shell "cd /data/local/tmp/misa-tests && TMPDIR=/data/local/tmp HOME=/data/local/tmp ./$t.test -test.count=1 -test.timeout 15m"
+            done

@@ -2,12 +2,27 @@ package sysinfo
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// procRoot is the procfs root. Tests point it at a tree they can chmod.
+var procRoot = "/proc"
+
+func procFile(name string) string {
+	return filepath.Join(procRoot, name)
+}
+
+const unavailable = "—"
+
+func permissionDenied(err error) bool {
+	return errors.Is(err, os.ErrPermission)
+}
 
 type Info struct {
 	Time     string
@@ -34,6 +49,9 @@ func Fetch(cwd string) Info {
 }
 
 func getDistro() string {
+	if id := detectPlatform().distroID(); id != "" {
+		return id
+	}
 	f, err := os.Open("/etc/os-release")
 	if err != nil {
 		return "linux"
@@ -60,7 +78,10 @@ func getDistro() string {
 }
 
 func getKernel() string {
-	data, err := os.ReadFile("/proc/sys/kernel/osrelease")
+	data, err := os.ReadFile(procFile("sys/kernel/osrelease"))
+	if permissionDenied(err) {
+		return unavailable
+	}
 	if err != nil {
 		return "?"
 	}
@@ -68,7 +89,10 @@ func getKernel() string {
 }
 
 func getUptime() string {
-	data, err := os.ReadFile("/proc/uptime")
+	data, err := os.ReadFile(procFile("uptime"))
+	if permissionDenied(err) {
+		return unavailable
+	}
 	if err != nil {
 		return "?"
 	}
@@ -98,7 +122,10 @@ func getUptime() string {
 }
 
 func getMemory() string {
-	total, available, free, buffers, cached, sreclaimable, shmem := parseMeminfo()
+	total, available, free, buffers, cached, sreclaimable, shmem, err := parseMeminfo()
+	if permissionDenied(err) {
+		return unavailable
+	}
 	if total == 0 {
 		return "?"
 	}
@@ -114,7 +141,10 @@ func getMemory() string {
 }
 
 func getSwap() string {
-	f, err := os.Open("/proc/meminfo")
+	f, err := os.Open(procFile("meminfo"))
+	if permissionDenied(err) {
+		return unavailable
+	}
 	if err != nil {
 		return ""
 	}
@@ -147,8 +177,8 @@ func getSwap() string {
 	return fmt.Sprintf("%dMB / %dMB (%d%%)", used, total, pct)
 }
 
-func parseMeminfo() (total, available, free, buffers, cached, sreclaimable, shmem uint64) {
-	f, err := os.Open("/proc/meminfo")
+func parseMeminfo() (total, available, free, buffers, cached, sreclaimable, shmem uint64, err error) {
+	f, err := os.Open(procFile("meminfo"))
 	if err != nil {
 		return
 	}

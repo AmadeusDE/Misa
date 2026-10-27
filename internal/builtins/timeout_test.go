@@ -126,9 +126,9 @@ func TestTimeoutScripts(t *testing.T) {
 	}{
 		{"no shebang", "printf '%s' \"$1\"", 0700, []string{"1", "./script", "argument"}, 0, "argument"},
 		{"not executable", "echo nope", 0600, []string{"1", "./script"}, 126, ""},
-		{"trap", "#!/bin/sh\ntrap 'exit 3' TERM\nwhile :; do :; done", 0700, []string{".1", "./script"}, 124, ""},
-		{"trap preserve", "#!/bin/sh\ntrap 'exit 3' TERM\nwhile :; do :; done", 0700, []string{"-p", ".1", "./script"}, 3, ""},
-		{"ignore then kill", "#!/bin/sh\ntrap '' TERM\nwhile :; do :; done", 0700, []string{"-v", "-k.05", ".1", "./script"}, 137, ""},
+		{"trap", shBang() + "trap 'exit 3' TERM\nwhile :; do :; done", 0700, []string{".1", "./script"}, 124, ""},
+		{"trap preserve", shBang() + "trap 'exit 3' TERM\nwhile :; do :; done", 0700, []string{"-p", ".1", "./script"}, 3, ""},
+		{"ignore then kill", shBang() + "trap '' TERM\nwhile :; do :; done", 0700, []string{"-v", "-k.05", ".1", "./script"}, 137, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			file := filepath.Join(dir, "script")
@@ -149,7 +149,7 @@ func TestTimeoutScripts(t *testing.T) {
 func TestTimeoutContext(t *testing.T) {
 	dir := t.TempDir()
 	script := filepath.Join(dir, "child")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\nprintf '%s\\n' \"$VALUE\"\npwd\n/bin/cat"), 0700); err != nil {
+	if err := os.WriteFile(script, []byte(shBang()+"printf '%s\\n' \"$VALUE\"\npwd\n"+hostCat()), 0700); err != nil {
 		t.Fatal(err)
 	}
 	var out, err bytes.Buffer
@@ -183,7 +183,8 @@ func TestTimeoutProcessGroup(t *testing.T) {
 	}
 	// A killed grandchild can remain a zombie until the host's init reaps it.
 	data, e = os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
-	if e == nil && !strings.Contains(string(data), ") Z ") {
+	// Z is a zombie; X is dead and not yet reaped. Either means the child did not survive.
+	if e == nil && !strings.Contains(string(data), ") Z ") && !strings.Contains(string(data), ") X ") {
 		t.Fatalf("grandchild survived timeout: %s", data)
 	}
 }
@@ -194,4 +195,20 @@ func TestTimeoutWaitDelay(t *testing.T) {
 	if code != 0 || time.Since(start) > 400*time.Millisecond {
 		t.Fatalf("code=%d elapsed=%v stderr=%q", code, time.Since(start), err)
 	}
+}
+
+func shBang() string {
+	return "#!" + hostBin("sh") + "\n"
+}
+
+func hostCat() string { return hostBin("cat") }
+
+func hostBin(name string) string {
+	for _, dir := range []string{"/bin", "/usr/bin", "/system/bin"} {
+		p := filepath.Join(dir, name)
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			return p
+		}
+	}
+	return "/bin/" + name
 }

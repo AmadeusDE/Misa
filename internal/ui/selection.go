@@ -7,7 +7,6 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/AmadeusDE/Misa/internal/term"
@@ -125,44 +124,38 @@ func (s *textSel) highlightRows(view string, offset int) string {
 	return strings.Join(lines, "\n")
 }
 
-func (s *textSel) copyToClipboard(t *term.Terminal) {
-	text := s.extractFromTerminal(t)
-	if text != "" {
-		clipboard.WriteAll(text)
-	}
+func (s *textSel) copyToClipboard(t *term.Terminal) tea.Cmd {
+	return writeClipboard(s.extractFromTerminal(t))
 }
 
-func (s *textSel) copyLinesToClipboard(lines []string) {
-	text := s.extractFromLines(lines)
-	if text != "" {
-		clipboard.WriteAll(text)
-	}
+func (s *textSel) copyLinesToClipboard(lines []string) tea.Cmd {
+	return writeClipboard(s.extractFromLines(lines))
 }
 
-func (m *Model) selMouse(msg mouseMsg, t *term.Terminal) bool {
+func (m *Model) selMouse(msg mouseMsg, t *term.Terminal) (bool, tea.Cmd) {
 	if t == nil {
-		return false
+		return false, nil
 	}
 
 	switch {
 	case msg.Button == tea.MouseLeft && msg.Action == mousePress:
 		m.sel.begin(msg.Y, msg.X)
-		return true
+		return true, nil
 
 	case msg.Action == mouseMotion && m.sel.active:
 		m.sel.extend(msg.Y, msg.X)
-		return true
+		return true, nil
 
 	case msg.Action == mouseRelease && m.sel.active:
 		m.sel.extend(msg.Y, msg.X)
 		m.sel.active = false
 		if m.sel.hasRange {
-			m.sel.copyToClipboard(t)
+			return true, m.sel.copyToClipboard(t)
 		}
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 func (m *Model) selKey(msg tea.KeyPressMsg, t *term.Terminal) bool {
@@ -214,36 +207,36 @@ func (m *Model) selKey(msg tea.KeyPressMsg, t *term.Terminal) bool {
 	return false
 }
 
-func (m *Model) handleVPSelMouse(msg mouseMsg, vpYOffset int, plainLines []string, contentStartY int) bool {
+func (m *Model) handleVPSelMouse(msg mouseMsg, vpYOffset int, plainLines []string, contentStartY int) (bool, tea.Cmd) {
 	row := msg.Y - contentStartY + vpYOffset
 	col := msg.X
 
 	switch {
 	case msg.Button == tea.MouseLeft && msg.Action == mousePress:
 		m.sel.begin(row, col)
-		return true
+		return true, nil
 
 	case msg.Action == mouseMotion && m.sel.active:
 		m.sel.extend(row, col)
-		return true
+		return true, nil
 
 	case msg.Action == mouseRelease && m.sel.active:
 		m.sel.extend(row, col)
 		m.sel.active = false
 		if m.sel.hasRange {
-			m.sel.copyLinesToClipboard(plainLines)
+			return true, m.sel.copyLinesToClipboard(plainLines)
 		}
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
 
 func pasteToTerm(t *term.Terminal) {
 	if t == nil {
 		return
 	}
-	if text, err := clipboard.ReadAll(); err == nil {
+	if text := readClipboard(); text != "" {
 		sendPaste(t, text)
 	}
 }

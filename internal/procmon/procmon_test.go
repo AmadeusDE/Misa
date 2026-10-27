@@ -1,6 +1,10 @@
 package procmon
 
 import (
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -19,7 +23,10 @@ func TestReadLoadAvg(t *testing.T) {
 }
 
 func TestReadCPUTimes(t *testing.T) {
-	all, cores := ReadCPUTimes()
+	all, cores, ok := ReadCPUTimes()
+	if !ok {
+		t.Fatal("host /proc/stat should be readable here")
+	}
 	if all.Total() == 0 {
 		t.Error("total CPU time should be non-zero")
 	}
@@ -197,7 +204,7 @@ func TestTakeFullSnapshot(t *testing.T) {
 
 func TestLookupUser(t *testing.T) {
 	name := LookupUser(0)
-	if name != "root" {
+	if name != "root" && name != "0" {
 		t.Errorf("UID 0 should be root, got %q", name)
 	}
 	name2 := LookupUser(0)
@@ -226,5 +233,108 @@ func TestTruncStr(t *testing.T) {
 	got3 := TruncStr(bars, 4)
 	if got3 != "████" {
 		t.Errorf("should truncate multi-byte runes correctly: got %q, want %q", got3, "████")
+	}
+}
+
+func fakeStat(pid int, comm string) string {
+	return strconv.Itoa(pid) + " (" + comm + ") S 1 1 1 0 -1 0 0 0 0 0 0 0 0 20 0 1 0 100 200 3 0\n"
+}
+
+func TestFakeProcFSUnavailableAndMissingPIDs(t *testing.T) {
+	dir := t.TempDir()
+	old := procRoot
+	procRoot = dir
+	t.Cleanup(func() { procRoot = old })
+
+	if _, _, ok := ReadCPUTimes(); ok {
+		t.Fatal("missing stat was readable")
+	}
+	snap := TakeSnapshot()
+	if snap.CPUAvailable || len(snap.Procs) != 0 {
+		t.Fatalf("empty procfs: available=%v procs=%d", snap.CPUAvailable, len(snap.Procs))
+	}
+
+	stat := filepath.Join(dir, "stat")
+	body := "cpu  10 20 30 40 1 2 3 4\ncpu0 5 10 15 20 0 0 0 0\n"
+	if err := os.WriteFile(stat, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	all, cores, ok := ReadCPUTimes()
+	if !ok || all.User != 10 || len(cores) != 1 || cores[0].User != 5 {
+		t.Fatalf("parsed stat ok=%v all=%+v cores=%+v", ok, all, cores)
+	}
+
+	if os.Geteuid() != 0 {
+		if err := os.Chmod(stat, 0); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, ok := ReadCPUTimes(); ok {
+			t.Fatal("EACCES on stat was treated as available")
+		}
+		if err := os.Chmod(stat, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := os.Mkdir(filepath.Join(dir, "20"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "20", "stat"), []byte(fakeStat(20, "alive")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "21"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "not-a-pid"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if os.Geteuid() != 0 {
+		if err := os.Mkdir(filepath.Join(dir, "22"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		denied := filepath.Join(dir, "22", "stat")
+		if err := os.WriteFile(denied, []byte(fakeStat(22, "hidden")), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(denied, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	procs := ReadAllProcs()
+	if len(procs) != 1 || procs[0].PID != 20 || procs[0].Comm != "alive" {
+		t.Fatalf("procs = %+v, want only pid 20", procs)
+	}
+	if _, ok := readProcess(99); ok {
+		t.Fatal("missing pid was readable")
+	}
+}
+
+func TestViewsShowDashWhenCPUUnavailable(t *testing.T) {
+	top := &TopViewer{width: 80, height: 16, sortField: SortCPU}
+	if !strings.Contains(top.View(), "—") {
+		t.Fatalf("top hid unavailable CPU: %q", top.View())
+	}
+	if strings.Contains(top.View(), " id,") {
+		t.Fatalf("top rendered an idle breakdown: %q", top.View())
+	}
+
+	htop := &HtopViewer{width: 80, height: 16}
+	if !strings.Contains(htop.View(), "—") {
+		t.Fatalf("htop hid unavailable CPU: %q", htop.View())
+	}
+
+	btop := &BtopViewer{width: 80, height: 24}
+	if !strings.Contains(strings.Join(btop.renderCPUBox(80, 8), "\n"), "—") {
+		t.Fatal("btop hid unavailable CPU")
+	}
+
+	tm := &TMViewer{width: 100, height: 20, tab: tabProcesses}
+	if !strings.Contains(tm.View(), "—") {
+		t.Fatalf("task manager hid unavailable CPU: %q", tm.View())
+	}
+	tm.tab = tabPerformance
+	if !strings.Contains(tm.View(), "—") {
+		t.Fatalf("performance tab hid unavailable CPU: %q", tm.View())
 	}
 }

@@ -398,6 +398,9 @@ func (h *HtopViewer) procRows() int {
 
 func (h *HtopViewer) headerHeight() int {
 	cpuRows := len(h.cur.CPUs)
+	if cpuRows == 0 && !h.cur.CPUAvailable {
+		cpuRows = 1
+	}
 	if h.width >= 80 && cpuRows > 1 {
 		cpuRows = (cpuRows + 1) / 2
 	}
@@ -514,7 +517,9 @@ func (h *HtopViewer) View() string {
 	}
 
 	twoCol := h.width >= 80 && len(h.cur.CPUs) > 1
-	if twoCol {
+	if !h.cur.CPUAvailable {
+		lines = append(lines, sLabel.Render("CPU ")+unavailable)
+	} else if twoCol {
 		colW := (h.width - 4) / 2
 		cbarW := colW - 12
 		if cbarW < 8 {

@@ -2,6 +2,7 @@ package term
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -33,12 +34,14 @@ func processAlive(pid int) bool {
 	}
 	s := string(b)
 	i := strings.LastIndexByte(s, ')')
-	return i >= 0 && !strings.HasPrefix(strings.TrimSpace(s[i+1:]), "Z")
+	// Z is a zombie, X is dead and not yet reaped. Both are gone.
+	state := strings.TrimSpace(s[i+1:])
+	return i >= 0 && !strings.HasPrefix(state, "Z") && !strings.HasPrefix(state, "X")
 }
 
 func TestCloseKillsBackgroundJobsInPTYSession(t *testing.T) {
 	tm := New(5, 40)
-	if err := tm.StartArgv("", "/bin/sh", "-c", "sleep 300 & echo $!; wait"); err != nil {
+	if err := tm.StartArgv("", testBin(t, "sh"), "-c", "sleep 300 & echo $!; wait"); err != nil {
 		t.Fatal(err)
 	}
 	tm.StartReader()
@@ -67,7 +70,7 @@ func TestCloseKillsBackgroundJobsInPTYSession(t *testing.T) {
 
 func TestCloseKillsBackgroundJobsAfterTheLeaderExited(t *testing.T) {
 	tm := New(5, 40)
-	if err := tm.StartArgv("", "/bin/sh", "-c", "trap '' HUP; sleep 300 & echo $!; exit 0"); err != nil {
+	if err := tm.StartArgv("", testBin(t, "sh"), "-c", "trap '' HUP; sleep 300 & echo $!; exit 0"); err != nil {
 		t.Fatal(err)
 	}
 	tm.StartReader()
@@ -98,5 +101,44 @@ func TestCloseKillsBackgroundJobsAfterTheLeaderExited(t *testing.T) {
 func killPid(pid int) {
 	if p, err := os.FindProcess(pid); err == nil {
 		p.Kill()
+	}
+}
+
+func TestSessionMembersSkipsUnreadableAndMissing(t *testing.T) {
+	root := t.TempDir()
+	write := func(pid, sid, comm string) {
+		t.Helper()
+		dir := filepath.Join(root, pid)
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		body := pid + " (" + comm + ") S 1 1 " + sid + " 0\n"
+		if err := os.WriteFile(filepath.Join(dir, "stat"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("10", "42", "ok")
+	write("11", "99", "other")
+	if err := os.Mkdir(filepath.Join(root, "12"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "not-a-pid"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if os.Geteuid() != 0 {
+		write("13", "42", "denied")
+		if err := os.Chmod(filepath.Join(root, "13", "stat"), 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := sessionMembers(root, 42)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != 10 {
+		t.Fatalf("members = %v, want [10]", got)
+	}
+	if _, err := sessionMembers(filepath.Join(root, "missing"), 1); err == nil {
+		t.Fatal("missing proc root was readable")
 	}
 }
