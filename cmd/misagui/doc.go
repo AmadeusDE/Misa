@@ -18,7 +18,8 @@
 //	    public static native void onSurfaceChanged(int w, int h, float density,
 //	        int insetLeft, int insetTop, int insetRight, int insetBottom);
 //	    public static native void onSurfaceDestroyed();
-//	    public static native void onText(String text);
+//	    public static native void onText(String text, int meta);
+//	    public static native void muxAction(String name);
 //	    public static native void onKey(int code, int meta, boolean down);
 //	    public static native void onMotion(int action, float x, float y, int buttonState);
 //	    public static native void onPinch(float scale);
@@ -33,7 +34,9 @@
 // onMotion: for ACTION_SCROLL (8), x and y are wheel steps (positive down
 // and to the right). Every other action passes view pixels and the
 // MotionEvent button state. onPinch's scale is a factor on the current
-// point size. onCreate's env entries are KEY=VALUE; exePath is libmisa.so.
+// point size. onText's meta is the latched Ctrl/Alt state (0 sends the
+// commit as text). muxAction names a multiplexer button (internal/gui/android
+// MuxChords). onCreate's env entries are KEY=VALUE; exePath is libmisa.so.
 //
 // Build (API 26, the APK minSdk; -tags nough because the agent runs in the
 // child): ANDROID_NDK_HOME=... just android-lib

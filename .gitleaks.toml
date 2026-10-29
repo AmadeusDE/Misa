@@ -5,3 +5,9 @@ useDefault = true
 [allowlist]
 description = "fake credentials in tests"
 paths = ['''internal/ugh/.*_test\.go''']
+
+[[rules]]
+id = "android-keystore"
+description = "Android or Java keystore"
+regex = '''(?s).+'''
+path = '''(?i).+\.(jks|keystore)$'''

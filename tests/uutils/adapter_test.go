@@ -72,6 +72,7 @@ const (
 	setupSetReadonly
 	setupSetMode
 	setupMkfifo
+	setupChtime
 )
 
 type setupAction struct {
@@ -762,6 +763,7 @@ func collectCases(body string, baseLine int, bindings map[string]string, namePre
 	ucmdVars := map[string]bool{}
 	atVars := map[string]bool{}
 	scenarioVars := map[string]bool{}
+	fileVars := map[string]string{}
 	var pendingSetup []setupAction
 	iter := 0
 	for _, st := range stmts {
@@ -806,8 +808,20 @@ func collectCases(body string, baseLine int, bindings map[string]string, namePre
 		// Parse setup actions from at.touch(), at.write(), etc.
 		if sa, ok := tryParseSetupAction(text, atVars, scenarioVars, localBindings); ok {
 			pendingSetup = append(pendingSetup, sa...)
+			if m := makeFileBindRe.FindStringSubmatch(text); m != nil {
+				if path, ok := resolveLiteral(strings.TrimSpace(m[2]), localBindings); ok {
+					fileVars[m[1]] = path
+				}
+			}
 			iter++
 			continue
+		}
+		if m := fileSetModifiedRe.FindStringSubmatch(strings.TrimSpace(text)); m != nil {
+			if path, ok := fileVars[m[1]]; ok {
+				pendingSetup = append(pendingSetup, setupAction{kind: setupChtime, path: path})
+				iter++
+				continue
+			}
 		}
 
 		// Try parsing as a ucmd chain
@@ -888,6 +902,8 @@ var setPermsRe = regexp.MustCompile(`^(?:fs::)?set_permissions\s*\(\s*([^,]+),\s
 var randomFileRe = regexp.MustCompile(`^RandomFile::new\s*\(\s*(?:&at|&\w+(?:\.fixtures)?),\s*([^)]+)\)\.(add_bytes|add_lines|add_lines_with_line_size)\(([^)]+)\)`)
 
 var atMethodRe = regexp.MustCompile(`^(?:let\s+(?:mut\s+)?\w+\s*=\s*)?(\w+)\.(touch|write|write_bytes|mkdir|mkdir_all|make_file|symlink_file|relative_symlink_file|symlink_dir|relative_symlink_dir|hard_link|append|truncate|set_readonly|set_mode|mkfifo)\(`)
+var makeFileBindRe = regexp.MustCompile(`let\s+(?:mut\s+)?(\w+)\s*=\s*\w+\.make_file\(\s*([^)]+)\)`)
+var fileSetModifiedRe = regexp.MustCompile(`^(\w+)\.set_modified\(\s*std::time::UNIX_EPOCH\s*\)`)
 var fixturesMethodRe = regexp.MustCompile(`^(?:let\s+(?:mut\s+)?\w+\s*=\s*)?(\w+)\.fixtures\.(touch|write|write_bytes|mkdir|mkdir_all|make_file|symlink_file|relative_symlink_file|symlink_dir|relative_symlink_dir|hard_link|append|truncate|set_readonly|set_mode|mkfifo)\(`)
 
 func tryParseSetupAction(text string, atVars, scenarioVars map[string]bool, bindings map[string]string) ([]setupAction, bool) {
@@ -1630,6 +1646,12 @@ func executeSetup(t *testing.T, dir string, actions []setupAction) bool {
 				return false
 			}
 			f.Close()
+		case setupChtime:
+			epoch := time.Unix(0, 0)
+			if err := os.Chtimes(full, epoch, epoch); err != nil {
+				t.Skipf("setup chtime %q: %v", sa.path, err)
+				return false
+			}
 		case setupWrite:
 			os.MkdirAll(filepath.Dir(full), 0755)
 			if err := os.WriteFile(full, []byte(sa.content), 0644); err != nil {

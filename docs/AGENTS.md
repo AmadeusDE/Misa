@@ -30,20 +30,30 @@ ANDROID_NDK_HOME=... just android-cli amd64    # dist/misa-android-amd64/
 # GUI library (c-shared, API 26 / minSdk, -tags nough). JNI class app/misa/Native.
 ANDROID_NDK_HOME=... just android-lib          # dist/libmisagui-arm64.so
 ANDROID_NDK_HOME=... just android-lib amd64    # dist/libmisagui-amd64.so
+# APK shell. build-go.sh writes jniLibs/<abi>/{libmisa.so,libmisagui.so}
+# (CLI at API 24; c-shared GUI at API 26, -tags nough). version.sh is the
+# versionName/versionCode used by Gradle and CI.
+ANDROID_NDK_HOME=... ANDROID_HOME=... just apk
+ANDROID_NDK_HOME=... ANDROID_HOME=... just apk-release
 # Vet matches CI: CGO_ENABLED=1 for both arches (and tags nough, nogui, noweb).
 # CGO_ENABLED=0 go vet ./... is arm64 only. android/amd64 cannot load test
 # binaries without the external linker, so that arch typechecks libraries
 # with go build. The arm64 vet covers the pure-Go android files.
 ```
 
-Single binary, no external build tools needed except the Android NDK for `GOOS=android`.
+Single binary, no external build tools needed except the Android NDK for `GOOS=android`
+and, for the APK, a JDK 17 plus the Android SDK.
 Go 1.27.1 (OpenBSD: `GOTOOLCHAIN=go1.27.1`). CI (`.github/workflows/ci.yml`)
 runs gofmt, the builds, vet for every tag and the other unixes, the tests, and an `android`
 job (NDK r30 from `android/ndk.version`, both ABIs, the tag set, cgo and cgo-less vet,
-and `libmisagui.so` for both ABIs).
+`libmisagui.so` for both ABIs, then `./android/build-go.sh` and `./gradlew assembleDebug lint`,
+and an unsigned release APK built twice and diffed).
 `android-device` (path-filtered, plus nightly and `workflow_dispatch`) runs the portable
-test binaries on an emulator, including `internal/gui/android`. `build.yml` builds the binaries
-for every platform, including `android-arm64` and `android-amd64` CLI trees, and the AppImages
+test binaries on an emulator, including `internal/gui/android`, then installs the debug APK,
+checks logcat for an `app.misa` crash, and uploads a screenshot.
+`build.yml` builds the binaries
+for every platform, including `android-arm64` and `android-amd64` CLI trees, per-ABI and
+universal debug APKs (release-signed on `v*` tags when `ANDROID_KEYSTORE_B64` is set), and the AppImages
 (`packaging/appimage/build.sh`, appimagetool pinned by checksum); a pushed
 `v*` tag publishes them as a release. The Android tarball is `misa` and `ugh` only.
 ugh lives in this repo: `internal/ugh/*` (agent, tools, llm, perm, session, …; `internal/ugh/ughtui` is the embeddable TUI)
@@ -229,6 +239,14 @@ internal/
                                  the library from that class's static initializer. API 26
                                  clang, `-tags nough` (the agent runs in the child).
                                  `just android-lib`
+  android/                       APK shell (`app.misa`), pure Java, no AndroidX. `MisaActivity`
+                                 (SurfaceView, InputConnection, extra-keys row with a latched
+                                 Ctrl/Alt that applies to IME text, a MUX row of one-tap
+                                 multiplexer buttons, insets, pinch),
+                                 `SessionService` (foreground `specialUse` notification, Stop),
+                                 `Bootstrap` (D10 env, `filesDir/bin` symlinks to `libmisa.so`,
+                                 first-run config). `Native` loads `libmisagui` from its static
+                                 initializer. `build-go.sh`, `version.sh`, `just apk` / `apk-release`
   mweb/                          `misa --web` / `--web-admin`: webui.Server whose terminal runs misa (MISA_WEB_CHILD stops
                                  recursion); flags over config.yaml `web:`; XDG state/config dirs. internal/ui never imports webui
   ughbot/sandbox/                Code-task tool protocol: Serve (`ughbot vm-agent` in the VM), Client (tools.Executor +

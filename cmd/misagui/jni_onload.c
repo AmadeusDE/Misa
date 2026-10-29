@@ -83,7 +83,7 @@ static void jni_onSurfaceDestroyed(JNIEnv *env, jclass cls) {
     misaOnSurfaceDestroyed();
 }
 
-static void jni_onText(JNIEnv *env, jclass cls, jstring text) {
+static void jni_onText(JNIEnv *env, jclass cls, jstring text, jint meta) {
     (void)cls;
     const char *s = "";
     const char *owned = NULL;
@@ -93,9 +93,25 @@ static void jni_onText(JNIEnv *env, jclass cls, jstring text) {
             s = owned;
         }
     }
-    misaOnText((char *)s);
+    misaOnText((char *)s, (int)meta);
     if (owned) {
         (*env)->ReleaseStringUTFChars(env, text, owned);
+    }
+}
+
+static void jni_muxAction(JNIEnv *env, jclass cls, jstring name) {
+    (void)cls;
+    const char *s = "";
+    const char *owned = NULL;
+    if (name) {
+        owned = (*env)->GetStringUTFChars(env, name, NULL);
+        if (owned) {
+            s = owned;
+        }
+    }
+    misaMuxAction((char *)s);
+    if (owned) {
+        (*env)->ReleaseStringUTFChars(env, name, owned);
     }
 }
 
@@ -175,7 +191,8 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
         {"onSurfaceCreated", "(Landroid/view/Surface;)V", (void *)jni_onSurfaceCreated},
         {"onSurfaceChanged", "(IIFIIII)V", (void *)jni_onSurfaceChanged},
         {"onSurfaceDestroyed", "()V", (void *)jni_onSurfaceDestroyed},
-        {"onText", "(Ljava/lang/String;)V", (void *)jni_onText},
+        {"onText", "(Ljava/lang/String;I)V", (void *)jni_onText},
+        {"muxAction", "(Ljava/lang/String;)V", (void *)jni_muxAction},
         {"onKey", "(IIZ)V", (void *)jni_onKey},
         {"onMotion", "(IFFI)V", (void *)jni_onMotion},
         {"onPinch", "(F)V", (void *)jni_onPinch},

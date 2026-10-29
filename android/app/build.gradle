@@ -1,0 +1,115 @@
+plugins {
+    id "com.android.application"
+}
+
+def apkVersion = rootProject.ext.misaVersionName
+def versionBase = rootProject.ext.misaVersionBase as int
+def universal = (findProperty("universalApk") ?: "true").toString() != "false"
+
+android {
+    namespace "app.misa"
+    compileSdk 35
+    buildToolsVersion "36.0.0"
+
+    defaultConfig {
+        applicationId "app.misa"
+        minSdk 26
+        targetSdk 35
+        versionCode versionBase * 10
+        versionName apkVersion
+        ndk {
+            abiFilters "arm64-v8a", "x86_64"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+        }
+        debug {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig false
+        aidl false
+        renderScript false
+        shaders false
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    splits {
+        abi {
+            enable true
+            reset()
+            include "arm64-v8a", "x86_64"
+            universalApk universal
+        }
+    }
+
+    lint {
+        abortOnError true
+        checkReleaseBuilds false
+        textReport true
+    }
+
+    // AGP 8's Variant API can set versionCode but not the APK file name.
+    // The legacy outputs API still names each split.
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach { output ->
+            def abi = output.getFilter(com.android.build.OutputFile.ABI)
+            def digit = 0
+            if (abi == "arm64-v8a") {
+                digit = 1
+            } else if (abi == "x86_64") {
+                digit = 2
+            }
+            def abiName = abi == null ? "universal" : abi
+            def suffix = variant.buildType.name == "debug" ? "-debug" : ""
+            output.versionCodeOverride = versionBase * 10 + digit
+            output.outputFileName = "Misa-${apkVersion}-${abiName}${suffix}.apk"
+        }
+    }
+}
+
+def repo = rootProject.projectDir.parentFile
+def jniLibs = [
+    file("src/main/jniLibs/arm64-v8a/libmisa.so"),
+    file("src/main/jniLibs/arm64-v8a/libmisagui.so"),
+    file("src/main/jniLibs/x86_64/libmisa.so"),
+    file("src/main/jniLibs/x86_64/libmisagui.so"),
+]
+
+tasks.register("buildGo", Exec) {
+    group = "build"
+    description = "Cross-compile libmisa.so and libmisagui.so into jniLibs."
+    workingDir repo
+    commandLine "bash", new File(repo, "android/build-go.sh").absolutePath
+    onlyIf { !project.hasProperty("skipGoBuild") }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("buildGo")
+    doFirst {
+        def missing = jniLibs.findAll { !it.isFile() || it.length() == 0 }
+        if (!missing.isEmpty()) {
+            throw new GradleException("Native libraries missing. Run android/build-go.sh.\n" + missing.join("\n"))
+        }
+    }
+}
+
+dependencies {
+    testImplementation "junit:junit:4.13.2"
+}

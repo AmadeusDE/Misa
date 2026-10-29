@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -28,14 +29,43 @@ func (t *Terminal) ptyIoctl(req uint, out *int32) bool {
 	return ok
 }
 
-// session is the PTY's session id when the leader we started owns it.
-// The PTY forgets its session once the leader exits, so it is read at start.
-func (t *Terminal) session() int {
+// ptySession is the PTY's controlling session (TIOCGSID). A test replaces it.
+var ptySession = func(t *Terminal) (int, bool) {
 	var tty int32
-	if t.ptm == nil || !t.ptyIoctl(unix.TIOCGSID, &tty) || int(tty) != t.cmd.Process.Pid {
-		return 0
+	if t.ptm == nil || !t.ptyIoctl(unix.TIOCGSID, &tty) {
+		return 0, false
 	}
-	return int(tty)
+	return int(tty), true
+}
+
+// session is the id of the session the leader owns, sampled at start.
+// Once the leader exits the PTY drops it, so TIOCGSID fails, but the leader's
+// /proc stat keeps the id until it is reaped. After setsid that id is the
+// leader's own pid.
+func (t *Terminal) session() int {
+	pid := t.cmd.Process.Pid
+	deadline := time.Now().Add(100 * time.Millisecond)
+	for {
+		if sid, ok := ptySession(t); ok && sid == pid {
+			return pid
+		}
+		if sid, ok := leaderSession(pid); ok && sid == pid {
+			return pid
+		}
+		if time.Now().After(deadline) {
+			return 0
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+// leaderSession reads the session field of a live or zombie leader.
+func leaderSession(pid int) (int, bool) {
+	stat, err := os.ReadFile(filepath.Join(procRoot, strconv.Itoa(pid), "stat"))
+	if err != nil {
+		return 0, false
+	}
+	return procSession(string(stat))
 }
 
 // killSession SIGKILLs every process in the PTY's session (foreground and

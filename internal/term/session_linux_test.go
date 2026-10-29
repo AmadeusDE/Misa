@@ -69,6 +69,18 @@ func TestCloseKillsBackgroundJobsInPTYSession(t *testing.T) {
 }
 
 func TestCloseKillsBackgroundJobsAfterTheLeaderExited(t *testing.T) {
+	// A leader that has already exited makes TIOCGSID fail. Hold the sample
+	// until then, so Close has to learn the session from the leader's stat.
+	prev := ptySession
+	ptySession = func(tm *Terminal) (int, bool) {
+		deadline := time.Now().Add(2 * time.Second)
+		for time.Now().Before(deadline) && processAlive(tm.cmd.Process.Pid) {
+			time.Sleep(time.Millisecond)
+		}
+		return 0, false
+	}
+	t.Cleanup(func() { ptySession = prev })
+
 	tm := New(5, 40)
 	if err := tm.StartArgv("", testBin(t, "sh"), "-c", "trap '' HUP; sleep 300 & echo $!; exit 0"); err != nil {
 		t.Fatal(err)

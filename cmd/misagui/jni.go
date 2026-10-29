@@ -43,7 +43,12 @@ func misaOnSurfaceChanged(w, h C.int, density C.float, left, top, right, bottom 
 func misaOnSurfaceDestroyed() { android.Default.OnSurfaceDestroyed() }
 
 //export misaOnText
-func misaOnText(s *C.char) { android.Default.OnText(C.GoString(s)) }
+func misaOnText(s *C.char, meta C.int) {
+	android.Default.OnText(C.GoString(s), int(meta))
+}
+
+//export misaMuxAction
+func misaMuxAction(s *C.char) { android.Default.MuxAction(C.GoString(s)) }
 
 //export misaOnKey
 func misaOnKey(code, meta, down C.int) {
