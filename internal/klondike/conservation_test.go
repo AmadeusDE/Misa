@@ -6,17 +6,32 @@ import (
 	"testing"
 )
 
+func TestFuzzMoveEncodingCoversAllPilePairs(t *testing.T) {
+	for from := 1; from <= 12; from++ {
+		for to := 2; to <= 12; to++ {
+			for row := 0; row < 52; row++ {
+				draw, gotFrom, gotRow, gotTo := decodeFuzzAction([]byte{1, byte(from + 1), byte(row + 1), byte(to)})
+				if draw || gotFrom != from || gotRow != row || gotTo != to {
+					t.Fatalf("unreachable source %d row %d destination %d", from, row, to)
+				}
+			}
+		}
+	}
+}
+
 func FuzzActions(f *testing.F) {
-	f.Add(uint64(42), []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
+	f.Add(uint64(42), []byte{0, 0, 0, 0, 1, 2, 1, 9, 1, 10, 1, 2, 1, 2, 24, 10})
 	f.Fuzz(func(t *testing.T, seed uint64, actions []byte) {
 		tab := &table{state: NewState(seed, 1+2*int(seed%2))}
-		for i, b := range actions[:min(len(actions), 500)] {
+		actions = actions[:min(len(actions), 2000)]
+		for i := 0; i+3 < len(actions); i += 4 {
+			draw, from, row, to := decodeFuzzAction(actions[i : i+4])
 			before := tab.state.Clone()
 			ok := false
-			if b%4 == 0 {
+			if draw {
 				ok = tab.Act(-1, 0, 0)
 			} else {
-				ok = tab.Act(int(b)%14-1, i%20, int(b/14)%14)
+				ok = tab.Act(from, row, to)
 			}
 			after := tab.state.Clone()
 			if !ok && !reflect.DeepEqual(before, after) {
@@ -52,4 +67,8 @@ func FuzzActions(f *testing.F) {
 			}
 		}
 	})
+}
+
+func decodeFuzzAction(b []byte) (draw bool, from, row, to int) {
+	return b[0]%4 == 0, int(b[1])%15 - 1, int(b[2])%54 - 1, int(b[3]) % 14
 }

@@ -28,6 +28,10 @@ Hearts targets must fit the platform's signed integer with room for another
 26-point hand. Invalid options/operands produce an error without starting a game.
 
 The table and Help show `v1:<game>:<seed>:<rule-option>` (FreeCell's option is 0).
+The table wraps long IDs instead of truncating them, reserving at least one
+playable card row even at 24×14. Hearts shows phase instructions/results and the
+last trick winner before score metadata. If status text exceeds the available
+space, `? more status in Help` marks the omission; scroll Help for the full text.
 Restart replays that deal; New obtains a fresh seed. Hearts restart resets the
 scores and pass cycle too: it is explicitly a replay, not an undo. No deal is
 silently replaced to make it easier. Random solitaire deals can be unwinnable.
@@ -183,6 +187,12 @@ shuffle vectors/rejection sampling, atomic rejections, undo/redo, command flags,
 menu/shell return paths, both builtin modes, resize bounds, pane closure and stale
 computer replies. Layout tests include 80×24, 120×40, 32×18 and 24×14 grids.
 Fuzz entry points exercise shuffle and solitaire action histories.
+Known-deal SHA-256 vectors freeze complete physical IDs/ranks/suits for seeds 0,
+42 and 18446744073709551615 in all games, both Klondike draw modes and all Spider
+suit modes. The vectors were calculated independently from the documented v1
+protocol; each test specifies its JSON checksum input. Klondike fuzz actions
+encode draw/move, source, row and destination independently, with an exhaustive
+encoding test covering every movable pile pair and card row.
 
 Local check record (2026-10-29):
 
