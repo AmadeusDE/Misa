@@ -107,11 +107,22 @@ func (e *Engine) think(root *Position, past []uint64, lim Limits, policy selecti
 	}
 	best := Result{Move: legal[0], Found: true}
 	// Obsolete queued work must not wait for a newer search's table lock.
-	if lim.Stop != nil && lim.Stop.Load() {
+	cancelled := func() bool {
+		return (lim.Stop != nil && lim.Stop.Load()) || (lim.Time > 0 && time.Since(start) >= lim.Time)
+	}
+	for {
+		if cancelled() {
+			return best
+		}
+		if e.mu.TryLock() {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	defer e.mu.Unlock()
+	if cancelled() {
 		return best
 	}
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	e.begin(past, lim)
 	if lim.Time > 0 {
 		e.deadline = start.Add(lim.Time)
