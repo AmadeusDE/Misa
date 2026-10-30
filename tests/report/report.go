@@ -124,12 +124,12 @@ func extractCmdFromTestName(name string) string {
 		"base32", "base64", "factor", "groups", "mktemp", "printf",
 		"strings", "whoami",
 		"arch", "cat", "chmod", "chown", "cksum", "cmp", "comm",
-		"cp", "cut", "date", "du", "echo", "env", "expand", "expr",
+		"cp", "cut", "date", "dos2unix", "du", "echo", "env", "expand", "expr",
 		"false", "fmt", "fold", "head", "id", "kill", "ln", "ls",
 		"mkdir", "mktemp", "mv", "nice", "nl", "nproc",
 		"paste", "proc", "pwd", "rev", "rm", "rmdir", "seq",
 		"sleep", "sort", "split", "stat", "tac", "tail", "tee",
-		"touch", "tr", "true", "tsort", "tty", "uname", "uniq",
+		"touch", "tr", "true", "tsort", "tty", "uname", "uniq", "unix2dos",
 		"wc", "which", "yes",
 	}
 	for _, cmd := range cmds {

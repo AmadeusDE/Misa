@@ -151,7 +151,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `dircolors` | – | – | coreutils:20 | 17 | – | uutils: Rust, 17/20 simple new_ucmd! cases parseable by tests/uutils adapter | – | 554 | medium |
 | `dmesg` | lsb | – | util-linux:17 | 11 | – | uutils: Rust, 11/17 simple new_ucmd! cases parseable by tests/uutils adapter | 187 | 851 | light |
 | `dnsdomainname` | lsb | – | – | – | – | no tests | 77 | – | light |
-| `dos2unix` | other | – | – | – | – | no tests | 76 | – | light |
 | `dumpleases` | pending | – | – | – | – | no tests | 77 | – | light |
 | `egrep` | posix | – | – | – | – | no tests | 548 | – | medium |
 | `eject` | other | – | – | – | – | no tests | 66 | – | light |
@@ -369,7 +368,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `ulimit` | posix | – | – | – | – | no tests | 124 | – | light |
 | `umount` | lsb | – | – | – | – | no tests | 150 | – | light |
 | `unicode` | other | 7 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 86 | – | light |
-| `unix2dos` | other | – | – | – | – | no tests | 76 | – | light |
 | `unlink` | posix | – | coreutils:7 | 2 | – | uutils: Rust, 2/7 simple new_ucmd! cases parseable by tests/uutils adapter | 24 | 50 | light |
 | `unshare` | other | – | – | – | – | no tests | 166 | – | light |
 | `updatedb` | – | – | findutils:27 | 0 | – | uutils: Rust, 0/27 simple new_ucmd! cases parseable by tests/uutils adapter | – | – | medium |

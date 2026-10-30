@@ -31,7 +31,7 @@ uutils org repos checked that ship no utilities (libraries/docs/trackers): rust-
 
 | Column | Utilities |
 |---|---|
-| Misa | 114 |
+| Misa | 117 |
 | toybox (all) | 349 |
 | toybox: non-pending, default y | 250 |
 | toybox: non-pending, default n | 3 |
@@ -167,7 +167,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `dmesg` |  | ✓ lsb | ✓ | ✓ util-linux |
 | `dnsd` |  |  | ✓ |  |
 | `dnsdomainname` |  | ✓ lsb | ✓ |  |
-| `dos2unix` |  | ✓ other | ✓ |  |
+| `dos2unix` | ✓ | ✓ other | ✓ |  |
 | `dpkg` |  |  | ✓ |  |
 | `dpkg-deb` |  |  | ✓ |  |
 | `du` | ✓ | ✓ posix | ✓ | ✓ coreutils |
@@ -607,7 +607,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `unicode` |  | ✓ other |  |  |
 | `uniq` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `unit` |  |  | ✓ |  |
-| `unix2dos` |  | ✓ other | ✓ |  |
+| `unix2dos` | ✓ | ✓ other | ✓ |  |
 | `unlink` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `unlzma` |  |  | ✓ |  |
 | `unlzop` |  |  | ✓ |  |
