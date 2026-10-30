@@ -51,7 +51,7 @@ Builtins are Go implementations written to pass these projects' test suites. Som
 (their file headers say "adapted from" or "ported from"), and the test suites under `tests/` are copied or ported
 from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the copied tests.
 
-- **toybox** by Rob Landley et al. — 0BSD
+- **toybox** by Rob Landley et al. — 0BSD (`hexdump`)
   https://github.com/landley/toybox
 
 - **uutils/coreutils** by the uutils contributors — MIT (`numfmt`, `od`)

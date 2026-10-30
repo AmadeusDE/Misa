@@ -193,12 +193,12 @@ func parseTestFile(path string) (testSuite, error) {
 		}
 
 		if continuation != "" {
-			line = continuation + " " + strings.TrimSpace(line)
+			line = continuation + line
 			continuation = ""
 		}
 
-		if strings.HasSuffix(strings.TrimSpace(line), "\\") {
-			continuation = strings.TrimSuffix(strings.TrimSpace(line), "\\")
+		if strings.HasSuffix(line, "\\") {
+			continuation = strings.TrimSuffix(line, "\\")
 			continue
 		}
 
