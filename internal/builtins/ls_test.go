@@ -251,3 +251,39 @@ func TestLsSymlinkSlashDereferences(t *testing.T) {
 	assertExitCode(t, r, 0)
 	assertStdout(t, r, "total 0\n")
 }
+
+// TestLsEscapeQuoting covers -b/--escape, the quoting style the dir and
+// vdir aliases default to (uutils coreutils quoting::ESCAPE).
+func TestLsEscapeQuoting(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "plain", "")
+	writeFile(t, dir, "a b", "")
+	writeFile(t, dir, "tab\there", "")
+	writeFile(t, dir, "back\\slash", "")
+
+	for _, flag := range []string{"-b", "--escape", "--quoting-style=escape"} {
+		r := runBuiltinIn(t, dir, "ls", "-1", flag)
+		assertExitCode(t, r, 0)
+		assertStdout(t, r, "a\\ b\nback\\\\slash\nplain\ntab\\there\n")
+	}
+}
+
+func TestLsEscapeOnlyEscapesNongraphicNames(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "plain", "")
+
+	r := runBuiltinIn(t, dir, "ls", "-1", "-b")
+	assertExitCode(t, r, 0)
+	assertStdout(t, r, "plain\n")
+
+	// An explicit --quoting-style still wins over -b.
+	explicit := runBuiltinIn(t, dir, "ls", "-1", "-b", "--quoting-style=literal")
+	assertExitCode(t, explicit, 0)
+	assertStdout(t, explicit, "plain\n")
+
+	// Piped output stays one entry per line without -C.
+	writeFile(t, dir, "second", "")
+	grid := runBuiltinIn(t, dir, "ls", "-b")
+	assertExitCode(t, grid, 0)
+	assertStdout(t, grid, "plain\nsecond\n")
+}

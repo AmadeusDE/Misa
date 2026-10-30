@@ -6,7 +6,7 @@ from their own repositories and carry their own licenses (see `go.mod` and `docs
 
 | Project | Used in | License |
 |---|---|---|
-| [uutils/coreutils](https://github.com/uutils/coreutils) | The Rust test suite and fixtures under `tests/uutils/testdata/` (copied); behaviour of several builtins in `internal/builtins/` (headers say "adapted from uutils coreutils"). | MIT |
+| [uutils/coreutils](https://github.com/uutils/coreutils) | The Rust test suite and fixtures under `tests/uutils/testdata/` (copied); behaviour of several builtins in `internal/builtins/` (headers say "adapted from uutils coreutils"); the default `dircolors` database in `internal/builtins/data/dircolors.database` (copied from its `--print-database` output) and the colour tables in `internal/builtins/dircolors_data.go`. | MIT |
 | [uutils/diffutils](https://github.com/uutils/diffutils) | Tests ported in `tests/diffutils/`; `internal/builtins/cmp*.go` and `diff*.go` follow its source. | MIT |
 | [uutils/util-linux](https://github.com/uutils/util-linux) | Behaviour of `cal`, `mcookie`, `uuidgen` in `internal/builtins/`. | MIT |
 | [toybox](https://github.com/landley/toybox) | Test files under `tests/toybox/` (copied); the vi command set (`internal/vi`); behaviour of several builtins. | 0BSD |

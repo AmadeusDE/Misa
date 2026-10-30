@@ -121,6 +121,7 @@ internal/
     chmod.go chown.go link.go    Permissions and links
     tail.go proc.go sysutil.go   System utilities
     man.go install.go util.go    Misc helpers
+    dir.go dircolors*.go         `dir`/`vdir` (ls aliases) and `dircolors` with its embedded database (data/)
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
     mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game

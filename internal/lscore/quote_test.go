@@ -43,3 +43,21 @@ func TestSanitizeControl(t *testing.T) {
 		t.Errorf("sanitizeControl(%q) = %q, want %q", "n\nl", got, "n?l")
 	}
 }
+
+// TestQuoteEscape covers --quoting-style=escape (ls -b, the style dir and
+// vdir default to).
+func TestQuoteEscape(t *testing.T) {
+	cases := map[string]string{
+		"plain":       "plain",
+		"a b":         "a\\ b",
+		"tab\there":   "tab\\there",
+		"new\nline":   "new\\nline",
+		"back\\slash": "back\\\\slash",
+		"quote'":      "quote\\'",
+	}
+	for in, want := range cases {
+		if got := QuoteName(in, "escape"); got != want {
+			t.Errorf("QuoteName(%q, escape) = %q, want %q", in, got, want)
+		}
+	}
+}

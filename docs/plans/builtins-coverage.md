@@ -147,8 +147,8 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `dhcp` | pending | – | – | – | – | no tests | 1513 | – | heavy |
 | `dhcp6` | pending | – | – | – | – | no tests | 686 | – | heavy |
 | `dhcpd` | pending | – | – | – | – | no tests | 2049 | – | heavy |
-| `dir` | – | – | coreutils:12 | 6 | tty | uutils: Rust, 6/12 simple new_ucmd! cases parseable by tests/uutils adapter | – | 44 | light |
-| `dircolors` | – | – | coreutils:20 | 17 | – | uutils: Rust, 17/20 simple new_ucmd! cases parseable by tests/uutils adapter | – | 554 | medium |
+| `dir` | – | – | coreutils:12 | 6 | tty | implemented: `internal/builtins/dir.go` (ls -C -b alias); uutils: Rust, 6/12 simple new_ucmd! cases parseable by tests/uutils adapter | – | 44 | light |
+| `dircolors` | – | – | coreutils:20 | 17 | – | implemented: `internal/builtins/dircolors.go`; uutils: Rust, 17/20 simple new_ucmd! cases parseable by tests/uutils adapter | – | 554 | medium |
 | `dmesg` | lsb | – | util-linux:17 | 11 | – | uutils: Rust, 11/17 simple new_ucmd! cases parseable by tests/uutils adapter | 187 | 851 | light |
 | `dnsdomainname` | lsb | – | – | – | – | no tests | 77 | – | light |
 | `dos2unix` | other | – | – | – | – | no tests | 76 | – | light |
@@ -383,7 +383,7 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `uuencode` | posix | 9 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 59 | – | light |
 | `uuidgen` | other | 1 | util-linux:7 | 7 | kernel/fs | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 7/7 simple new_ucmd! cases parseable by tests/uutils adapter | 25 | 210 | light |
 | `vconfig` | other | – | – | – | – | no tests | 87 | – | light |
-| `vdir` | – | – | coreutils:12 | 6 | tty | uutils: Rust, 6/12 simple new_ucmd! cases parseable by tests/uutils adapter | – | 43 | light |
+| `vdir` | – | – | coreutils:12 | 6 | tty | implemented: `internal/builtins/dir.go` (ls -l -b alias); uutils: Rust, 6/12 simple new_ucmd! cases parseable by tests/uutils adapter | – | 43 | light |
 | `vigr` | – | – | shadow:– | – | – | no tests | – | 49 | light |
 | `vipw` | – | – | shadow:13 | 0 | root | uutils: Rust, 0/13 simple new_ucmd! cases parseable by tests/uutils adapter | – | 586 | heavy |
 | `vmstat` | other | – | procps:14 | 14 | – | uutils: Rust, 14/14 simple new_ucmd! cases parseable by tests/uutils adapter | 155 | 1219 | light |

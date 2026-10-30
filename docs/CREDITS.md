@@ -57,6 +57,12 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils
 
+- **uutils/coreutils dircolors** (the embedded default LS_COLORS database,
+  `internal/builtins/data/dircolors.database`, and the colour tables in
+  `internal/builtins/dircolors_data.go`) — MIT
+  https://github.com/uutils/coreutils at commit
+  fee61ff5d4f87e0f912a52e639942b5f7ad58663
+
 - **uutils/diffutils** by the uutils contributors — MIT / Apache-2.0
   https://github.com/uutils/diffutils
 

@@ -13,7 +13,7 @@ import (
 	"github.com/AmadeusDE/Misa/internal/lscore"
 )
 
-const lsSpec = "a(all)A(almost-all)l(long)1(oneline)h(human-readable)r(reverse)" +
+const lsSpec = "a(all)A(almost-all)b(escape)l(long)1(oneline)h(human-readable)r(reverse)" +
 	"S(sort-size)t(sort-time)Fd(directory)R(recurse)gGok" +
 	"x(across)m(comma)i(inode)n(numeric-uid-gid)s(size)" +
 	"(tree)(table)(icons)(git)(dirs-first)(group-directories-first)(depth)#(color):?(no-color)(no-smart)" +
@@ -32,6 +32,28 @@ func init() {
 	Register(Command{Name: "ls", Run: runLs})
 	Register(Command{Name: "lc", Run: runLc})
 	Register(Command{Name: "l1", Run: runL1})
+}
+
+// lsMode distinguishes ls from the two output-mode aliases, which differ
+// only in their defaults (dir: columns, vdir: long, both quoting with
+// escapes) and in the program name used in diagnostics.
+type lsMode int
+
+const (
+	lsModeLs lsMode = iota
+	lsModeDir
+	lsModeVdir
+)
+
+// prog is the utility name as invoked, for diagnostics.
+func (m lsMode) prog() string {
+	switch m {
+	case lsModeDir:
+		return "dir"
+	case lsModeVdir:
+		return "vdir"
+	}
+	return "ls"
 }
 
 func runTree(ctx *Context) int {
@@ -61,13 +83,15 @@ func parseWhen(v string) (string, bool) {
 	return "", false
 }
 
-var timeStyleErr = `Valid arguments are:
+func timeStyleErr(prog string) string {
+	return `Valid arguments are:
   - [posix-]full-iso
   - [posix-]long-iso
   - [posix-]iso
   - [posix-]locale
   - +FORMAT (e.g., +%H:%M) for a 'date'-style format
-Try 'ls --help' for more information.`
+Try '` + prog + ` --help' for more information.`
+}
 
 // parseNum parses decimal, octal (0...), or hex (0x...) numbers
 // Returns the parsed value and an error if invalid (but not for overflow)
@@ -177,10 +201,13 @@ func applySortWord(word string, sortOpts *lscore.SortOpts) bool {
 	return true
 }
 
-func runLs(ctx *Context) int {
+func runLs(ctx *Context) int { return runLsMode(ctx, lsModeLs) }
+
+func runLsMode(ctx *Context, mode lsMode) int {
+	prog := mode.prog()
 	flags, err := lsSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
-		fmt.Fprintln(ctx.Stderr, "ls:", err)
+		fmt.Fprintln(ctx.Stderr, prog+":", err)
 		return 2
 	}
 	if HandleHelpVersion(ctx, flags, lsSpecParsed) {
@@ -189,7 +216,7 @@ func runLs(ctx *Context) int {
 
 	if bs, ok := flags.String("block-size"); ok && bs != "" {
 		if bs == "invalid" || bs == "definitely_invalid_value" || bs == "0" || bs == "1fb" {
-			fmt.Fprintf(ctx.Stderr, "ls: invalid --block-size argument '%s'\n", bs)
+			fmt.Fprintf(ctx.Stderr, prog+": invalid --block-size argument '%s'\n", bs)
 			return 2
 		}
 	}
@@ -198,7 +225,7 @@ func runLs(ctx *Context) int {
 	if wStr, ok := flags.String("w"); ok && wStr != "" {
 		wval, err := parseNum(wStr)
 		if err != nil {
-			fmt.Fprintf(ctx.Stderr, "ls: invalid value '%s' for option -w/--width\n", wStr)
+			fmt.Fprintf(ctx.Stderr, prog+": invalid value '%s' for option -w/--width\n", wStr)
 			return 2
 		}
 		// Cap to a reasonable max value (SIZE_MAX on 64-bit is 18446744073709551615)
@@ -211,7 +238,7 @@ func runLs(ctx *Context) int {
 	if tStr, ok := flags.String("tab-size"); ok && tStr != "" {
 		_, err := parseNum(tStr)
 		if err != nil {
-			fmt.Fprintf(ctx.Stderr, "ls: invalid tab size '%s'\n", tStr)
+			fmt.Fprintf(ctx.Stderr, prog+": invalid tab size '%s'\n", tStr)
 			return 2
 		}
 	}
@@ -226,7 +253,7 @@ func runLs(ctx *Context) int {
 		colorMode = c
 		if colorMode != "" {
 			if _, valid := parseWhen(colorMode); !valid {
-				fmt.Fprintf(ctx.Stderr, "ls: invalid argument '%s' for '--color'\n", colorMode)
+				fmt.Fprintf(ctx.Stderr, prog+": invalid argument '%s' for '--color'\n", colorMode)
 				return 1
 			}
 		}
@@ -275,8 +302,15 @@ func runLs(ctx *Context) int {
 		case "columns", "vertical":
 			table = false
 		default:
-			fmt.Fprintf(ctx.Stderr, "ls: invalid argument '%s' for '--format'\n", formatVal)
+			fmt.Fprintf(ctx.Stderr, prog+": invalid argument '%s' for '--format'\n", formatVal)
 			return 1
+		}
+	}
+
+	// vdir is "ls -l" by default; any explicit format flag still wins.
+	if mode == lsModeVdir && !hasFormatFlag && !flags.Bool("zero") {
+		if fv, ok := flags.String("format"); !ok || fv == "" {
+			long = true
 		}
 	}
 
@@ -284,7 +318,7 @@ func runLs(ctx *Context) int {
 		if ts, ok := flags.String("time-style"); ok && ts != "" {
 			if !validTimeStyle(ts) {
 				val := strings.TrimPrefix(ts, "posix-")
-				fmt.Fprintf(ctx.Stderr, "ls: invalid argument '%s' for 'time style'\n%s\n", val, timeStyleErr)
+				fmt.Fprintf(ctx.Stderr, prog+": invalid argument '%s' for 'time style'\n%s\n", val, timeStyleErr(prog))
 				return 2
 			}
 		}
@@ -292,7 +326,7 @@ func runLs(ctx *Context) int {
 
 	if hl, ok := flags.String("hyperlink"); ok && hl != "" {
 		if _, valid := parseWhen(hl); !valid {
-			fmt.Fprintf(ctx.Stderr, "ls: invalid argument '%s' for '--hyperlink'\n", hl)
+			fmt.Fprintf(ctx.Stderr, prog+": invalid argument '%s' for '--hyperlink'\n", hl)
 			return 1
 		}
 	}
@@ -301,7 +335,7 @@ func runLs(ctx *Context) int {
 		almostAll = true
 	}
 
-	smartTable := !noSmart && !hasFormatFlag && isStdoutTTY(ctx)
+	smartTable := mode == lsModeLs && !noSmart && !hasFormatFlag && isStdoutTTY(ctx)
 	if smartTable {
 		humanSize = true
 	}
@@ -340,7 +374,7 @@ func runLs(ctx *Context) int {
 	}
 	if word, ok := flags.String("sort"); ok && word != "" {
 		if !applySortWord(word, &sortOpts) {
-			fmt.Fprintf(ctx.Stderr, "ls: invalid argument '%s' for '--sort'\n", word)
+			fmt.Fprintf(ctx.Stderr, prog+": invalid argument '%s' for '--sort'\n", word)
 			return 1
 		}
 	}
@@ -349,7 +383,7 @@ func runLs(ctx *Context) int {
 		switch tVal {
 		case "atime", "access", "use", "ctime", "status", "birth", "creation", "mtime", "modification":
 		default:
-			fmt.Fprintf(ctx.Stderr, "ls: invalid argument '%s' for '--time'\n", tVal)
+			fmt.Fprintf(ctx.Stderr, prog+": invalid argument '%s' for '--time'\n", tVal)
 			return 1
 		}
 	}
@@ -368,7 +402,7 @@ func runLs(ctx *Context) int {
 		case "slash", "file-type", "classify":
 			indicatorStyle = v
 		default:
-			fmt.Fprintf(ctx.Stderr, "ls: invalid argument '%s' for '--indicator-style'\n", v)
+			fmt.Fprintf(ctx.Stderr, prog+": invalid argument '%s' for '--indicator-style'\n", v)
 			return 1
 		}
 	}
@@ -381,7 +415,7 @@ func runLs(ctx *Context) int {
 		}
 		norm, ok := parseWhen(when)
 		if !ok {
-			fmt.Fprintf(ctx.Stderr, "ls: invalid argument '%s' for '--classify'\n", when)
+			fmt.Fprintf(ctx.Stderr, prog+": invalid argument '%s' for '--classify'\n", when)
 			return 1
 		}
 		switch norm {
@@ -404,9 +438,15 @@ func runLs(ctx *Context) int {
 		case "literal", "shell", "shell-always", "shell-escape", "shell-escape-always", "c", "c-maybe", "escape", "locale", "clocale":
 			quotingStyle = qs
 		default:
-			fmt.Fprintf(ctx.Stderr, "ls: invalid argument '%s' for '--quoting-style'\n", qs)
+			fmt.Fprintf(ctx.Stderr, prog+": invalid argument '%s' for '--quoting-style'\n", qs)
 			return 1
 		}
+	}
+
+	// dir and vdir quote with escapes unless --quoting-style says otherwise;
+	// ls only does so when -b/--escape is given.
+	if quotingStyle == "" && (mode != lsModeLs || flags.Bool("escape")) {
+		quotingStyle = "escape"
 	}
 
 	// Handle -Q (quote names) and -q (replace non-printing chars)
@@ -452,13 +492,13 @@ func runLs(ctx *Context) int {
 		formatOpts.TimeStyle = ts
 	}
 
-	if !hasFormatFlag && !isStdoutTTY(ctx) && !formatOpts.Across && !formatOpts.Comma {
+	if mode == lsModeLs && !hasFormatFlag && !isStdoutTTY(ctx) && !formatOpts.Across && !formatOpts.Comma {
 		formatOpts.OnePerLine = true
 	}
 
 	if flags.Bool("zero") {
 		if flags.Bool("dired") {
-			fmt.Fprintln(ctx.Stderr, "ls: --dired and --zero are incompatible")
+			fmt.Fprintln(ctx.Stderr, prog+": --dired and --zero are incompatible")
 			return 2
 		}
 		formatOpts.Zero = true
@@ -505,13 +545,13 @@ func runLs(ctx *Context) int {
 		files, err := lscore.Collect(target, targetCollectOpts)
 		if err != nil {
 			if errors.Is(err, lscore.ErrDerefFailed) {
-				fmt.Fprintf(ctx.Stderr, "ls: cannot access %s: No such file or directory\n", rawTarget)
+				fmt.Fprintf(ctx.Stderr, prog+": cannot access %s: No such file or directory\n", rawTarget)
 				exitCode = 2
 			} else if os.IsNotExist(err) {
-				fmt.Fprintf(ctx.Stderr, "ls: %s: No such file or directory\n", rawTarget)
+				fmt.Fprintf(ctx.Stderr, prog+": %s: No such file or directory\n", rawTarget)
 				exitCode = 1
 			} else {
-				fmt.Fprintf(ctx.Stderr, "ls: %s: %v\n", rawTarget, err)
+				fmt.Fprintf(ctx.Stderr, prog+": %s: %v\n", rawTarget, err)
 				exitCode = 1
 			}
 			continue
@@ -557,7 +597,7 @@ func runLs(ctx *Context) int {
 			fmt.Fprintf(ctx.Stdout, "%s:\n", headerName(dt.raw, formatOpts.Quoting))
 		}
 
-		files, code := listFormatDir(ctx, dt.abs, dt.raw, collectOpts, sortOpts, formatOpts, width, height, smartTable, &minorProblem)
+		files, code := listFormatDir(ctx, prog, dt.abs, dt.raw, collectOpts, sortOpts, formatOpts, width, height, smartTable, &minorProblem)
 		if code > exitCode {
 			exitCode = code
 		}
@@ -570,7 +610,7 @@ func runLs(ctx *Context) int {
 			if id, ok := lscore.Identify(dt.abs); ok {
 				visited = append(visited, id)
 			}
-			code := walkChildren(ctx, dt.abs, dt.raw, files, collectOpts, sortOpts, formatOpts, width, height, smartTable, visited, &minorProblem)
+			code := walkChildren(ctx, prog, dt.abs, dt.raw, files, collectOpts, sortOpts, formatOpts, width, height, smartTable, visited, &minorProblem)
 			if code > exitCode {
 				exitCode = code
 			}
@@ -607,10 +647,10 @@ func identVisited(visited []lscore.DirIdent, id lscore.DirIdent) bool {
 	return false
 }
 
-func listFormatDir(ctx *Context, absPath string, dispPath string, collectOpts lscore.CollectOpts, sortOpts lscore.SortOpts, formatOpts lscore.FormatOpts, width, height int, smartTable bool, minorProblem *bool) ([]*lscore.FileInfo, int) {
+func listFormatDir(ctx *Context, prog string, absPath string, dispPath string, collectOpts lscore.CollectOpts, sortOpts lscore.SortOpts, formatOpts lscore.FormatOpts, width, height int, smartTable bool, minorProblem *bool) ([]*lscore.FileInfo, int) {
 	files, err := lscore.Collect(absPath, collectOpts)
 	if err != nil {
-		fmt.Fprintf(ctx.Stderr, "ls: cannot access %s: %v\n", dispPath, err)
+		fmt.Fprintf(ctx.Stderr, prog+": cannot access %s: %v\n", dispPath, err)
 		return nil, 1
 	}
 
@@ -636,7 +676,7 @@ func listFormatDir(ctx *Context, absPath string, dispPath string, collectOpts ls
 	return files, 0
 }
 
-func walkChildren(ctx *Context, absPath, dispPath string, files []*lscore.FileInfo, collectOpts lscore.CollectOpts, sortOpts lscore.SortOpts, formatOpts lscore.FormatOpts, width, height int, smartTable bool, visited []lscore.DirIdent, minorProblem *bool) int {
+func walkChildren(ctx *Context, prog, absPath, dispPath string, files []*lscore.FileInfo, collectOpts lscore.CollectOpts, sortOpts lscore.SortOpts, formatOpts lscore.FormatOpts, width, height int, smartTable bool, visited []lscore.DirIdent, minorProblem *bool) int {
 	code := 0
 
 	for _, fi := range files {
@@ -652,7 +692,7 @@ func walkChildren(ctx *Context, absPath, dispPath string, files []*lscore.FileIn
 
 		id, idOK := lscore.Identify(childAbs)
 		if idOK && identVisited(visited, id) {
-			fmt.Fprintf(ctx.Stderr, "ls: %s: not listing already-listed directory\n", childDisp)
+			fmt.Fprintf(ctx.Stderr, prog+": %s: not listing already-listed directory\n", childDisp)
 			code = 2
 			continue
 		}
@@ -665,7 +705,7 @@ func walkChildren(ctx *Context, absPath, dispPath string, files []*lscore.FileIn
 			nextVisited = append(append([]lscore.DirIdent{}, visited...), id)
 		}
 
-		childFiles, listCode := listFormatDir(ctx, childAbs, childDisp, collectOpts, sortOpts, formatOpts, width, height, smartTable, minorProblem)
+		childFiles, listCode := listFormatDir(ctx, prog, childAbs, childDisp, collectOpts, sortOpts, formatOpts, width, height, smartTable, minorProblem)
 		if listCode > code {
 			code = listCode
 		}
@@ -673,7 +713,7 @@ func walkChildren(ctx *Context, absPath, dispPath string, files []*lscore.FileIn
 			continue
 		}
 
-		sub := walkChildren(ctx, childAbs, childDisp, childFiles, collectOpts, sortOpts, formatOpts, width, height, smartTable, nextVisited, minorProblem)
+		sub := walkChildren(ctx, prog, childAbs, childDisp, childFiles, collectOpts, sortOpts, formatOpts, width, height, smartTable, nextVisited, minorProblem)
 		if sub > code {
 			code = sub
 		}
