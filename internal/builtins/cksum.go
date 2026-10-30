@@ -12,7 +12,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -254,7 +253,10 @@ type checkItem struct {
 var bsdTagRe = regexp.MustCompile(`^([A-Za-z0-9_\-]+)\s*\((.+)\)\s*=\s*([0-9a-fA-F+/=]+)$`)
 var untaggedRe = regexp.MustCompile(`^([A-Za-z0-9+/=]+)\s+[\ \*]?(.*)$`)
 
-func runCksum(ctx *Context) int {
+func runCksum(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	flags, err := cksumSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "cksum:", err)
@@ -360,7 +362,7 @@ func runCksum(ctx *Context) int {
 			displayName = ""
 		} else {
 			path := resolvePath(ctx, f)
-			data, err = os.ReadFile(path)
+			data, err = ReadFileContext(ctx.CancellationContext(), path)
 			displayName = f
 		}
 		if err != nil {
@@ -466,7 +468,7 @@ func runCheckMode(ctx *Context, checkFiles []string, expectedAlgo string, digest
 			content, err = io.ReadAll(ctx.Stdin)
 		} else {
 			path := resolvePath(ctx, checkFile)
-			content, err = os.ReadFile(path)
+			content, err = ReadFileContext(ctx.CancellationContext(), path)
 		}
 		if err != nil {
 			msg := fmtOsErr(err)
@@ -513,7 +515,7 @@ func runCheckMode(ctx *Context, checkFiles []string, expectedAlgo string, digest
 
 		for _, item := range items {
 			path := resolvePath(ctx, item.filename)
-			data, err := os.ReadFile(path)
+			data, err := ReadFileContext(ctx.CancellationContext(), path)
 			if err != nil {
 				readFailCount++
 				fmt.Fprintf(ctx.Stderr, "cksum: %s: %s\n", item.filename, fmtOsErr(err))

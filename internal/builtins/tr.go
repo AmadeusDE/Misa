@@ -205,7 +205,13 @@ func expandTrSet(spec string, warnings io.Writer) ([]byte, error) {
 	return out, nil
 }
 
-func runTr(ctx *Context) int {
+func runTr(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	flags, err := trSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "tr:", err)

@@ -28,7 +28,10 @@ func seqIsNumArg(s string) bool {
 	return (s[1] >= '0' && s[1] <= '9') || s[1] == '.'
 }
 
-func runSeq(ctx *Context) int {
+func runSeq(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	var flagArgs []string
 	var operands []string
 	for i := 0; i < len(ctx.Args); i++ {
@@ -227,6 +230,9 @@ func runSeq(ctx *Context) int {
 	printed := false
 	prevV := first
 	for step := 0; ; step++ {
+		if err := ctx.CancellationContext().Err(); err != nil {
+			return ExitStatus(err)
+		}
 		var v float64
 		if step == 0 {
 			v = first
@@ -317,6 +323,9 @@ func runSeqBig(ctx *Context, ops []string, flags *ParseResult) int {
 	printed := false
 	curr := new(big.Int).Set(&first)
 	for {
+		if err := ctx.CancellationContext().Err(); err != nil {
+			return ExitStatus(err)
+		}
 		if incr.Sign() > 0 && curr.Cmp(&last) > 0 {
 			break
 		}
@@ -324,14 +333,20 @@ func runSeqBig(ctx *Context, ops []string, flags *ParseResult) int {
 			break
 		}
 		if printed {
-			fmt.Fprint(ctx.Stdout, sep)
+			if _, err := fmt.Fprint(ctx.Stdout, sep); err != nil {
+				return 1
+			}
 		}
-		fmt.Fprint(ctx.Stdout, curr.String())
+		if _, err := fmt.Fprint(ctx.Stdout, curr.String()); err != nil {
+			return 1
+		}
 		printed = true
 		curr.Add(curr, &incr)
 	}
 	if printed {
-		fmt.Fprint(ctx.Stdout, term)
+		if _, err := fmt.Fprint(ctx.Stdout, term); err != nil {
+			return 1
+		}
 	}
 	return 0
 }
