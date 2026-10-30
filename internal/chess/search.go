@@ -216,7 +216,7 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 		return 0
 	}
 	hash := p.Hash()
-	if e.repeated(hash, p.Clock) || p.Clock >= 2*e.v.MoveLimit {
+	if !e.v.PartnerHands && (e.repeated(hash, p.Clock) || p.Clock >= 2*e.v.MoveLimit) {
 		return 0
 	}
 	if ply >= maxPly-1 {

@@ -94,11 +94,11 @@ func (m *Match) refresh() {
 		m.status = Checkmate
 	case len(m.legal) == 0:
 		m.status = Stalemate
-	case m.repetitions() >= 3:
+	case !m.variant.PartnerHands && m.repetitions() >= 3:
 		m.status = DrawRepetition
-	case p.Clock >= 2*m.variant.MoveLimit:
+	case !m.variant.PartnerHands && p.Clock >= 2*m.variant.MoveLimit:
 		m.status = DrawMoveLimit
-	case onlyRoyals(p):
+	case !m.variant.PartnerHands && onlyRoyals(p):
 		m.status = DrawMaterial
 	}
 }

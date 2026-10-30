@@ -17,6 +17,9 @@ const DefaultThinkTime = 3 * time.Second
 type Game struct {
 	variants      []*Variant
 	match         *Match
+	bug           *BugMatch
+	bugPly        int
+	bugStart      int
 	cx, cy        int    // cursor square as file and rank
 	sel           int    // selected square, or -1
 	drop          uint8  // selected pocket type, or 0
@@ -58,7 +61,7 @@ func (g *Game) SetComputer(white, black bool) {
 	g.cancel()
 	g.computer = [2]bool{white, black}
 	g.sel, g.drop, g.promo = -1, 0, nil
-	g.flipped = white && !black
+	g.flipped = g.bug == nil && white && !black
 }
 
 func (g *Game) SetThinkTime(d time.Duration) {
@@ -83,13 +86,31 @@ func (g *Game) SetSeed(seed uint64) {
 // Load replaces the starting position, e.g. one read with ParseFEN.
 func (g *Game) Load(p *Position) {
 	g.cancel()
-	g.match.Load(p)
+	if g.bug != nil {
+		g.bug.Load(p, NewPosition(p.V))
+		g.match = g.bug.Board(0)
+		g.bugPly = 0
+		if p.Turn == Black {
+			g.bugPly = 2
+		}
+		g.bugStart = g.bugPly
+	} else {
+		g.match.Load(p)
+	}
 	g.reset()
 }
 
 func (g *Game) newGame(v *Variant) {
 	g.cancel()
-	g.match = NewMatch(v)
+	g.bug = nil
+	g.bugPly, g.bugStart = 0, 0
+	if v.PartnerHands {
+		g.bug = NewBugMatch(v)
+		g.match = g.bug.Board(0)
+		g.flipped = false
+	} else {
+		g.match = NewMatch(v)
+	}
 	g.reset()
 	g.note = v.Description
 }
@@ -166,12 +187,16 @@ func (g *Game) key(k string) {
 	case "u", "backspace":
 		g.undo()
 	case "c":
-		g.cycleComputer()
+		if g.bug == nil {
+			g.cycleComputer()
+		}
 	case "d":
 		g.SetLevel(g.level.next())
 		g.note = "Computer level: " + g.level.String()
 	case "f":
-		g.flipped = !g.flipped
+		if g.bug == nil {
+			g.flipped = !g.flipped
+		}
 	case "t":
 		g.letters = !g.letters
 	case "n":
@@ -199,8 +224,20 @@ func (g *Game) promotionKey(k string) {
 
 func (g *Game) click(m tea.Mouse) {
 	l := g.layout()
+	if g.bug != nil {
+		l = g.bugLayout().a
+	}
 	if g.promo != nil {
-		if i := l.promoChoice(g, m.X, m.Y); i >= 0 && m.Button == tea.MouseLeft {
+		promoLayout := l
+		if g.bug != nil {
+			geo := g.bugLayout()
+			promoLayout.top = geo.a.top + geo.height - 1
+			if !geo.side {
+				promoLayout.top += geo.height
+			}
+			promoLayout.top -= promoLayout.rows + 4
+		}
+		if i := promoLayout.promoChoice(g, m.X, m.Y); i >= 0 && m.Button == tea.MouseLeft {
 			g.play(g.promo[i])
 		} else if m.Button == tea.MouseRight {
 			g.promo = nil
@@ -212,7 +249,13 @@ func (g *Game) click(m tea.Mouse) {
 		return
 	}
 	if m.Button == tea.MouseLeft {
-		if typ := l.pocketChoice(g, m.X, m.Y); typ != 0 {
+		typ := uint8(0)
+		if g.bug != nil {
+			typ = g.bugPocketChoice(l, m.X, m.Y)
+		} else {
+			typ = l.pocketChoice(g, m.X, m.Y)
+		}
+		if typ != 0 {
 			g.selectDrop(typ)
 			return
 		}
@@ -241,7 +284,7 @@ func (g *Game) moveCursor(dx, dy int) {
 
 // activate selects the piece on sq, or moves the selected piece there.
 func (g *Game) activate(sq int) {
-	if g.match.Over() || g.computerToMove() {
+	if g.gameOver() || g.computerToMove() {
 		return
 	}
 	if g.drop != 0 {
@@ -273,7 +316,7 @@ func (g *Game) activate(sq int) {
 // selectDrop selects an available type in the side-to-move's pocket.
 func (g *Game) selectDrop(typ uint8) bool {
 	p := g.match.Position()
-	if !p.V.Drops || g.match.Over() || g.computerToMove() || int(typ) >= len(p.Hands[p.Turn]) || p.Hands[p.Turn][typ] <= 0 {
+	if !p.V.Drops || g.gameOver() || g.computerToMove() || int(typ) >= len(p.Hands[p.Turn]) || p.Hands[p.Turn][typ] <= 0 {
 		return false
 	}
 	g.sel, g.drop, g.note = -1, typ, ""
@@ -302,7 +345,15 @@ func (g *Game) movesBetween(from, to int) []Move {
 }
 
 func (g *Game) play(mv Move) {
-	g.match.Play(mv)
+	if g.bug != nil {
+		if !g.bug.Play(g.bugPly%2, mv) {
+			return
+		}
+		g.bugPly++
+		g.match = g.bug.Board(0)
+	} else {
+		g.match.Play(mv)
+	}
 	g.sel, g.drop, g.promo, g.note = -1, 0, nil, ""
 }
 
@@ -310,6 +361,24 @@ func (g *Game) play(mv Move) {
 // takes back its reply along with your move.
 func (g *Game) undo() {
 	g.sel, g.drop, g.promo = -1, 0, nil
+	if g.bug != nil {
+		g.cancel()
+		if g.bugPly == g.bugStart {
+			g.note = "Nothing to take back"
+			return
+		}
+		for {
+			if !g.bug.Undo() {
+				break
+			}
+			g.bugPly--
+			if g.bugPly%4 == 0 || g.bugPly == g.bugStart {
+				break
+			}
+		}
+		g.match = g.bug.Board(0)
+		return
+	}
 	played := len(g.match.Played())
 	plies := 0
 	for plies < played {
@@ -350,7 +419,19 @@ func (g *Game) opponent() string {
 	return "neither side: two players"
 }
 
-func (g *Game) computerToMove() bool { return g.computer[g.match.Turn()] }
+func (g *Game) gameOver() bool {
+	if g.bug != nil {
+		return g.bug.Over()
+	}
+	return g.match.Over()
+}
+
+func (g *Game) computerToMove() bool {
+	if g.bug != nil {
+		return g.bugPly%4 != 0
+	}
+	return g.computer[g.match.Turn()]
+}
 
 func (g *Game) engine() *Engine {
 	v := g.match.Variant()
@@ -363,14 +444,18 @@ func (g *Game) engine() *Engine {
 // think starts a search when the computer is to move and none is running.
 // It runs as a command, off the UI goroutine.
 func (g *Game) think() tea.Cmd {
-	if g.thinking || g.quit || g.match.Over() || !g.computerToMove() {
+	if g.thinking || g.quit || g.gameOver() || !g.computerToMove() {
 		return nil
 	}
 	g.thinking = true
 	g.gen++
 	g.stop = &atomic.Bool{}
 	gen, stop, engine := g.gen, g.stop, g.engine()
-	root, past := g.match.Position(), g.match.Hashes()
+	m := g.match
+	if g.bug != nil {
+		m = g.bug.Board(g.bugPly % 2)
+	}
+	root, past := m.Position(), m.Hashes()
 	level, seed := g.level, g.seed^root.Hash()^uint64(len(g.match.Played()))
 	limits := level.Limits(g.thinkTime)
 	limits.Stop = stop
@@ -394,11 +479,19 @@ func (g *Game) thought(msg thoughtMsg) {
 	}
 	g.thinking = false
 	r := msg.result
-	if !r.Found || !slices.Contains(g.match.Legal(), r.Move) {
+	m := g.match
+	if g.bug != nil {
+		m = g.bug.Board(g.bugPly % 2)
+	}
+	if !r.Found || !slices.Contains(m.Legal(), r.Move) {
 		return
 	}
-	mover := g.match.Turn()
+	mover := m.Turn()
 	g.play(r.Move)
+	if g.bug != nil {
+		g.note = "Computer played on board " + []string{"A", "B"}[(g.bugPly-1)%2]
+		return
+	}
 	if r.Depth == 0 {
 		g.note = "Computer played " + g.match.Notation()[len(g.match.Notation())-1] + " · search stopped before analysis"
 		return

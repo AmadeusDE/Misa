@@ -207,6 +207,9 @@ func (g *Game) View() string {
 	if g.width <= 0 || g.height <= 0 {
 		return ""
 	}
+	if g.bug != nil {
+		return g.bugView()
+	}
 	l := g.layout()
 	if !l.fits {
 		return g.tooSmall(l)

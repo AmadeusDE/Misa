@@ -240,7 +240,7 @@ func (p *Position) Apply(m Move) *Position {
 		return q
 	}
 	if m.Take >= 0 {
-		if v.Drops {
+		if v.Drops && !v.PartnerHands {
 			captured := p.Board[m.Take]
 			typ := captured.Type
 			if captured.Promoted != 0 {
