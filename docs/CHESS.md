@@ -46,6 +46,14 @@ known immediate win or chooses known forced mate against itself over a safe
 scored alternative. Scores remain the engine's imperfect assessments, not an
 oracle. Each weak search has fresh tables and locally seeded randomness.
 
+## Bundled variants
+
+- **Amazon Chess** (`chess amazon`): 8×8 orthodox chess with queens replaced by Amazons, moving as queen or knight. Castling, en passant, and checkmate/stalemate follow orthodox rules; promotion is to Amazon, rook, bishop, or knight. The Amazon's value (1200 cp) is approximate. This queen-replacement variant follows the published Amazon piece definition at [Chess Variants](https://www.chessvariants.com/diffmove.dir/amazone.html) and [Wikipedia](https://en.wikipedia.org/wiki/Amazon_(chess)).
+
+- **No-castling Chess** (`chess nocastling`): orthodox chess with castling disabled.
+  It is based on the AlphaZero rule-change variant described by Tomašev et al.,
+  [Assessing Game Balance with AlphaZero](https://arxiv.org/abs/2009.04374) (2020).
+
 ## During play
 
 - Arrows or `h/j/k/l`: move the cursor; space/enter or click: select/move.
@@ -67,7 +75,3 @@ Variants support 1–702 files (labels `a` through `zz`) and 1–99 ranks.
 
 Large boards can be expensive to load and play: reach tables, move generation,
 and search consume more memory and time as the board grows.
-
-## Bundled variants
-
-- **Amazon Chess** (`chess amazon`): 8×8 orthodox chess with queens replaced by Amazons, moving as queen or knight. Castling, en passant, and checkmate/stalemate follow orthodox rules; promotion is to Amazon, rook, bishop, or knight. The Amazon's value (1200 cp) is approximate. This queen-replacement variant follows the published Amazon piece definition at [Chess Variants](https://www.chessvariants.com/diffmove.dir/amazone.html) and [Wikipedia](https://en.wikipedia.org/wiki/Amazon_(chess)).
