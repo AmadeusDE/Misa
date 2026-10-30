@@ -14,6 +14,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/AmadeusDE/Misa/internal/ascii"
+	"github.com/AmadeusDE/Misa/internal/battleship"
 	"github.com/AmadeusDE/Misa/internal/builtins"
 	"github.com/AmadeusDE/Misa/internal/color"
 	"github.com/AmadeusDE/Misa/internal/companion"
@@ -443,6 +444,45 @@ func buildRootItems(dir string, entries []config.Entry) []list.Item {
 					},
 				}
 				m.pushMenu("Performance", perfItems)
+				return nil
+			},
+		},
+		menuItem{
+			title: "Games",
+			desc:  "Battleship, Minesweeper and Chess",
+			action: func(m *Model) tea.Cmd {
+				gamesItems := []list.Item{
+					menuItem{
+						title: "Battleship",
+						desc:  "Sink the computer's fleet on a 10×10 grid",
+						action: func(m *Model) tea.Cmd {
+							m.enterProcMon(battleship.New(battleship.Options{}))
+							return m.procViewer.Init()
+						},
+					},
+					menuItem{
+						title: "Mines",
+						desc:  "Minesweeper, beginner 9×9",
+						action: func(m *Model) tea.Cmd {
+							m.enterProcMon(mines.New(mines.Levels[0]))
+							return m.procViewer.Init()
+						},
+					},
+					menuItem{
+						title: "Chess",
+						desc:  "Chess against the computer",
+						action: func(m *Model) tea.Cmd {
+							game, err := builtins.ChessGame(nil)
+							if err != nil {
+								m.status = err.Error()
+								return nil
+							}
+							m.enterProcMon(game)
+							return m.procViewer.Init()
+						},
+					},
+				}
+				m.pushMenu("Games", gamesItems)
 				return nil
 			},
 		},
@@ -1250,6 +1290,14 @@ func (m *Model) handleBuiltinCmd(input string) (bool, tea.Cmd) {
 		return true, m.procViewer.Init()
 	case "chess":
 		game, err := builtins.ChessGame(fields[1:])
+		if err != nil {
+			return false, nil
+		}
+		m.enterProcMon(game)
+		m.cmdInput.SetValue("")
+		return true, m.procViewer.Init()
+	case "battleship":
+		game, err := builtins.BattleshipGame(fields[1:])
 		if err != nil {
 			return false, nil
 		}

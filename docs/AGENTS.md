@@ -126,6 +126,8 @@ internal/
     mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game
     chess.go                     `chess [variant] [-f file.yaml] [--fen pos] [-c white|black|both|none] [--think s] [-l]`
                                  — ChessGame builds the game (computer plays Black by default)
+    battleship.go                `battleship [-r|--random]` — -r picks a random fleet instead of interactive
+                                 placement
   sshclient/                     Built-in SSH client (golang.org/x/crypto/ssh); named sshc so it never shadows OpenSSH
     client.go                    Run: dial, remote PTY + raw local terminal, exit status (remote's, or 255)
     target.go                    Destination ([user@]host, ssh://) + flags + config → address, user, identities
@@ -139,6 +141,10 @@ internal/
   mines/                         Minesweeper clone: board.go (rules, first reveal always safe, flood fill, chording),
                                  game.go (keys/mouse, clock), view.go (centred layout + hit test), run.go (standalone).
                                  Game satisfies procmon.Viewer, so typing `mines` in Misa opens it as an in-process screen
+  battleship/                    Battleship on a standard 10×10 grid (fleet 5-4-3-3-2): board.go (rules, placement,
+                                 shots), ai.go (hunt/target), game.go view.go run.go (interactive placement, then
+                                 alternating shots; satisfies procmon.Viewer, so typing `battleship` in Misa opens it
+                                 in-process — the game also sits in the Games submenu of internal/ui/app.go)
   chess/                         Data-driven chess for any board size and fairy pieces, vs computer or hotseat:
     betza.go                     Betza funny-notation subset → Components (atoms, riders, m/c/f/b/l/r/s/v/i/n/p/g/q)
     variant.go                   Variant YAML (embedded variants/ + chess/*.yaml next to binary/~/.config/misa),
