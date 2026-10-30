@@ -349,6 +349,7 @@ Project rules:
 - Builtins register via `init()` with `Register(Command{...})` and use the `Spec`/`ParseArgs` option parser.
 - Plans stay plans: never open a GitHub issue or a pull request for a plan alone. Keep plans in
   `docs/plans/` locally until there is actual code to implement, then open the pull request with that code.
+- Don't open a GitHub issue just to track a pull request. If the work warrants a pull request, open it directly.
 
 ugh (`internal/ugh/*`, `cmd/ugh`):
 
