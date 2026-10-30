@@ -56,6 +56,7 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils
+  (`pr`: page layout, option semantics and error messages follow `src/uu/pr`, including its tests and fixtures)
 
 - **uutils/diffutils** by the uutils contributors — MIT / Apache-2.0
   https://github.com/uutils/diffutils
