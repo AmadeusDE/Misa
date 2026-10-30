@@ -88,6 +88,10 @@ Original Go implementation; rules and notation referenced from:
   https://gitlab.freedesktop.org/wayland
   Opcodes and message layouts in `internal/wayland` and `internal/gui` follow the protocol XML.
 
+- **DejaVu Sans Mono** by Bitstream and the DejaVu authors — Bitstream Vera license / public domain
+  https://dejavu-fonts.github.io/
+  Its chess symbols (U+2654-265F) are embedded as `internal/gui/fonts/chessglyphs.ttf` for systems with no font that has them.
+
 ## Go Libraries
 
 - **Bubble Tea** by Charmbracelet — MIT
