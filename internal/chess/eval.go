@@ -155,8 +155,18 @@ func (e *evaluator) evaluate(p *Position) int {
 		}
 		score[pc.Color] += s
 	}
+	for c, hand := range p.Hands {
+		for typ, count := range hand {
+			if typ > 0 && count > 0 {
+				score[c] += count * pocketValue(v.Pieces[typ-1].Value)
+			}
+		}
+	}
 	return score[p.Turn] - score[p.Turn.Other()] + tempo
 }
+
+// pocketValue discounts material in hand until it is deployed.
+func pocketValue(value int) int { return value * 80 / 100 }
 
 // pawnAdvance grows with the square of the distance covered towards the
 // promotion zone. In the middlegame only centre pawns gain by it, so flank

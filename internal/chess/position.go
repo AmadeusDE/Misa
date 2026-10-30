@@ -1,9 +1,7 @@
 package chess
 
 import (
-	"fmt"
 	"slices"
-	"strings"
 )
 
 type Color uint8
@@ -31,85 +29,51 @@ func (c Color) forward() int {
 }
 
 type Piece struct {
-	Type  uint8 // 0 for an empty square, else Variant.Pieces[Type-1]
-	Color Color
-	Moved bool
+	Type     uint8 // 0 for an empty square, else Variant.Pieces[Type-1]
+	Color    Color
+	Moved    bool
+	Promoted uint8 // original type before promotion, or 0
 }
 
 type Move struct {
 	From, To int
 	Take     int   // square of the captured piece (differs from To en passant), or -1
+	Drop     uint8 // type dropped from hand, or 0
 	Promote  uint8 // piece type the pawn becomes, or 0
 	Castle   int   // index into Variant.Castling, or -1
 }
 
 type Position struct {
-	V      *Variant
-	Board  []Piece
-	Turn   Color
-	EP     []int // squares the last move's pawn crossed
-	EPPawn int   // that pawn, or -1
-	Clock  int   // plies since the last capture or pawn move
+	V        *Variant
+	Board    []Piece
+	Hands    [2][]int // counts indexed by piece type
+	Turn     Color
+	EP       []int // squares the last move's pawn crossed
+	EPPawn   int   // that pawn, or -1
+	Clock    int   // plies since the last capture or pawn move
+	Fullmove int   // move number, incremented after Black moves
 
 	royalSq [2][]int // kept by Apply so check tests need not scan the board
 }
 
 func NewPosition(v *Variant) *Position {
-	p := &Position{V: v, Board: slices.Clone(v.start), EPPawn: -1}
+	p := &Position{V: v, Board: slices.Clone(v.start), EPPawn: -1, Fullmove: 1}
+	for c := range p.Hands {
+		p.Hands[c] = slices.Clone(v.startHands[c])
+		if len(p.Hands[c]) != len(v.Pieces)+1 {
+			p.Hands[c] = make([]int, len(v.Pieces)+1)
+		}
+	}
 	p.findRoyals()
 	return p
-}
-
-// ParseFEN reads "placement [w|b] [castling]". Pieces on their setup squares
-// count as unmoved. The castling field, when given, takes rights away: "-"
-// all of them, otherwise each castle whose letter (K when the rook is on the
-// king's right, Q on its left; lower case for Black) is missing.
-func ParseFEN(v *Variant, fen string) (*Position, error) {
-	fields := strings.Fields(fen)
-	if len(fields) == 0 {
-		return nil, fmt.Errorf("empty position")
-	}
-	board, err := v.parsePlacement(fields[0])
-	if err != nil {
-		return nil, err
-	}
-	p := &Position{V: v, Board: board, EPPawn: -1}
-	for sq, pc := range board {
-		start := v.start[sq]
-		board[sq].Moved = pc.Type != 0 && (start.Type != pc.Type || start.Color != pc.Color)
-	}
-	if len(fields) > 1 {
-		switch fields[1] {
-		case "w":
-		case "b":
-			p.Turn = Black
-		default:
-			return nil, fmt.Errorf("side to move %q is not w or b", fields[1])
-		}
-	}
-	if len(fields) > 2 {
-		for _, color := range []Color{White, Black} {
-			for _, c := range v.Castling {
-				letter := "Q"
-				if c.Rook%v.Files > c.King%v.Files {
-					letter = "K"
-				}
-				if color == Black {
-					letter = strings.ToLower(letter)
-				}
-				if !strings.Contains(fields[2], letter) {
-					board[v.orient(c.Rook, color)].Moved = true
-				}
-			}
-		}
-	}
-	p.findRoyals()
-	return p, nil
 }
 
 func (p *Position) clone() *Position {
 	q := *p
 	q.Board = slices.Clone(p.Board)
+	for c := range q.Hands {
+		q.Hands[c] = slices.Clone(p.Hands[c])
+	}
 	q.EP = nil
 	q.EPPawn = -1
 	return &q
@@ -199,7 +163,8 @@ func (p *Position) generate(tactical bool) []Move {
 	if tactical {
 		return moves
 	}
-	return append(moves, p.castles()...)
+	moves = append(moves, p.castles()...)
+	return append(moves, p.dropMoves()...)
 }
 
 func (p *Position) enPassant(sq int) bool {
@@ -252,6 +217,13 @@ func (p *Position) castles() []Move {
 func (p *Position) Apply(m Move) *Position {
 	v := p.V
 	q := p.clone()
+	if p.Turn == Black {
+		q.Fullmove++
+	}
+	if m.Drop != 0 {
+		q.applyDrop(m)
+		return q
+	}
 	mover := p.Board[m.From]
 	mover.Moved = true
 	if m.Castle >= 0 {
@@ -268,9 +240,22 @@ func (p *Position) Apply(m Move) *Position {
 		return q
 	}
 	if m.Take >= 0 {
+		if v.Drops {
+			captured := p.Board[m.Take]
+			typ := captured.Type
+			if captured.Promoted != 0 {
+				typ = captured.Promoted
+			}
+			if typ != 0 {
+				q.Hands[p.Turn][typ]++
+			}
+		}
 		q.Board[m.Take] = Piece{}
 	}
 	if m.Promote != 0 {
+		if v.Drops && mover.Promoted == 0 {
+			mover.Promoted = mover.Type
+		}
 		mover.Type = m.Promote
 	}
 	q.Board[m.From] = Piece{}

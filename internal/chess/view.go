@@ -46,6 +46,7 @@ type layout struct {
 	labelW     int
 	cw, pad    int
 	boardW     int
+	pocketW    int
 	panel      bool
 	cols, rows int
 	fits       bool
@@ -59,12 +60,16 @@ func (g *Game) layout() layout {
 	}
 	l.boardW = l.labelW + l.cols*l.cw + l.pad + 2
 	width := l.boardW
+	if v.Drops {
+		l.pocketW = max(lipgloss.Width(g.pocketText(White)), lipgloss.Width(g.pocketText(Black)))
+		width += 2 + l.pocketW
+	}
 	if width+2+panelWidth <= g.width {
 		l.panel = true
 		width += 2 + panelWidth
 	}
 	height := l.rows + chromeLines
-	l.fits = l.boardW <= g.width && height <= g.height
+	l.fits = width <= g.width && height <= g.height
 	l.left = max(0, (g.width-width)/2)
 	l.top = max(0, (g.height-height)/2)
 	return l
@@ -92,6 +97,87 @@ func (g *Game) boardXY(col, row int) (int, int) {
 		return v.Files - 1 - col, row
 	}
 	return col, v.Ranks - 1 - row
+}
+
+// Pockets sit beside the board, the upper side matching the board orientation.
+func (g *Game) pocketRow(l layout, row int) (Color, bool) {
+	top := Black
+	if g.flipped {
+		top = White
+	}
+	if row == 1 {
+		return top, true
+	}
+	if row == l.rows {
+		return top.Other(), true
+	}
+	return White, false
+}
+
+func (g *Game) pocketEntries(c Color, render bool) string {
+	p := g.match.Position()
+	var b strings.Builder
+	b.WriteString(c.String() + ":")
+	empty := true
+	for i, pt := range p.V.Pieces {
+		typ := i + 1
+		if typ >= len(p.Hands[c]) || p.Hands[c][typ] <= 0 {
+			continue
+		}
+		empty = false
+		b.WriteByte(' ')
+		text := g.pocketLabel(pt, c, p.Hands[c][typ])
+		if render {
+			st := pieceFg[c].Background(darkSq)
+			if c == Black {
+				st = pieceFg[c].Background(lightSq)
+			}
+			if c == p.Turn && g.drop == uint8(typ) {
+				st = st.Background(selectBg)
+			}
+			text = st.Render(text)
+		}
+		b.WriteString(text)
+	}
+	if empty {
+		b.WriteString(" —")
+	}
+	return b.String()
+}
+
+func (g *Game) pocketLabel(pt *PieceType, c Color, count int) string {
+	glyph := g.glyph(pt, c)
+	if !strings.EqualFold(glyph, string(pt.Letter)) {
+		glyph += " " + string(pt.Letter)
+	}
+	return fmt.Sprintf("%s×%d", glyph, count)
+}
+
+func (g *Game) pocketText(c Color) string   { return g.pocketEntries(c, false) }
+func (g *Game) pocketRender(c Color) string { return g.pocketEntries(c, true) }
+
+func (l layout) pocketChoice(g *Game, x, y int) uint8 {
+	if !l.fits || l.pocketW == 0 {
+		return 0
+	}
+	c, ok := g.pocketRow(l, y-l.top-1)
+	if !ok || c != g.match.Turn() {
+		return 0
+	}
+	p := g.match.Position()
+	at := l.left + l.boardW + 2 + len(c.String()) + 1
+	for i, pt := range p.V.Pieces {
+		typ := i + 1
+		if typ >= len(p.Hands[c]) || p.Hands[c][typ] <= 0 {
+			continue
+		}
+		w := lipgloss.Width(g.pocketLabel(pt, c, p.Hands[c][typ]))
+		if x >= at && x < at+w {
+			return uint8(typ)
+		}
+		at += w + 1
+	}
+	return 0
 }
 
 const promoPrefix = "Promote to: "
@@ -131,6 +217,13 @@ func (g *Game) View() string {
 	lines := make([]string, l.top, g.height)
 	lines = append(lines, g.place(l, headerSt, g.header()))
 	for i, row := range board {
+		if l.pocketW > 0 {
+			pocket := ""
+			if c, ok := g.pocketRow(l, i); ok {
+				pocket = g.pocketRender(c)
+			}
+			row += "  " + pocket + strings.Repeat(" ", l.pocketW-lipgloss.Width(pocket))
+		}
 		if l.panel {
 			row += "  " + panel[i]
 		}
@@ -140,7 +233,11 @@ func (g *Game) View() string {
 	if g.promo == nil {
 		status = g.place(l, statusSt, g.status())
 	}
-	lines = append(lines, status, g.place(l, helpSt, help))
+	helpText := help
+	if g.match.Variant().Drops {
+		helpText = "A–Z pocket  " + help
+	}
+	lines = append(lines, status, g.place(l, helpSt, helpText))
 	for len(lines) < g.height {
 		lines = append(lines, "")
 	}
@@ -229,10 +326,17 @@ const (
 // hints marks where the selected piece may go.
 func (g *Game) hints() map[int]hint {
 	h := map[int]hint{}
-	if g.sel < 0 {
+	if g.sel < 0 && g.drop == 0 {
 		return h
 	}
-	for _, mv := range g.movesBetween(g.sel, -1) {
+	for _, mv := range g.match.Legal() {
+		if g.drop != 0 {
+			if mv.Drop != g.drop {
+				continue
+			}
+		} else if mv.From != g.sel || mv.Drop != 0 {
+			continue
+		}
 		if mv.Take >= 0 {
 			h[mv.To] = hintCapture
 		} else {
@@ -354,6 +458,8 @@ func (g *Game) status() string {
 	case text != "":
 	case g.thinking:
 		text = "The computer is thinking…"
+	case g.drop != 0:
+		text = "Choose a highlighted square to drop " + g.match.Variant().Pieces[g.drop-1].Name
 	case g.sel >= 0 && len(g.movesBetween(g.sel, g.sel)) > 0:
 		text = "Choose its own square again to pass"
 	default:
@@ -368,7 +474,12 @@ func (g *Game) status() string {
 }
 
 func (g *Game) tooSmall(l layout) string {
-	need := fmt.Sprintf("%d×%d", l.boardW, l.rows+chromeLines)
+	need := fmt.Sprintf("%d×%d", l.boardW+func() int {
+		if l.pocketW > 0 {
+			return 2 + l.pocketW
+		}
+		return 0
+	}(), l.rows+chromeLines)
 	msg := []string{
 		statusSt.Render(truncate("Terminal too small for "+g.match.Variant().Name+" ("+need+")", g.width)),
 		helpSt.Render(truncate("v change variant  q quit", g.width)),

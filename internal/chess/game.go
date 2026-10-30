@@ -19,6 +19,7 @@ type Game struct {
 	match         *Match
 	cx, cy        int    // cursor square as file and rank
 	sel           int    // selected square, or -1
+	drop          uint8  // selected pocket type, or 0
 	promo         []Move // promotion choices waiting for an answer
 	flipped       bool
 	letters       bool
@@ -56,6 +57,7 @@ func New(variants []*Variant, v *Variant) *Game {
 func (g *Game) SetComputer(white, black bool) {
 	g.cancel()
 	g.computer = [2]bool{white, black}
+	g.sel, g.drop, g.promo = -1, 0, nil
 	g.flipped = white && !black
 }
 
@@ -98,7 +100,7 @@ func (g *Game) reset() {
 	if g.match.Turn() == Black {
 		g.cy = max(0, v.Ranks-2)
 	}
-	g.sel, g.promo, g.note = -1, nil, ""
+	g.sel, g.drop, g.promo, g.note = -1, 0, nil, ""
 }
 
 func (g *Game) Init() tea.Cmd   { return g.think() }
@@ -111,7 +113,13 @@ func (g *Game) Update(msg tea.Msg) tea.Cmd {
 	case tea.WindowSizeMsg:
 		g.Resize(msg.Width, msg.Height)
 	case tea.KeyPressMsg:
-		g.key(msg.String())
+		k := msg.String()
+		// Text may omit modifiers in String; modified printable text must not
+		// accidentally select a pocket (or trigger a plain shortcut).
+		if msg.Mod&^tea.ModShift != 0 && len(k) == 1 {
+			break
+		}
+		g.key(k)
 	case tea.MouseClickMsg:
 		g.click(msg.Mouse())
 	case thoughtMsg:
@@ -125,17 +133,23 @@ func (g *Game) Update(msg tea.Msg) tea.Cmd {
 }
 
 func (g *Game) key(k string) {
+	if g.match.Variant().Drops && len(k) == len("shift+n") && k[:6] == "shift+" && k[6] >= 'a' && k[6] <= 'z' {
+		k = string(upper(k[6]))
+	}
 	if g.promo != nil {
 		g.promotionKey(k)
 		return
 	}
 	g.note = ""
+	if len(k) == 1 && k[0] >= 'A' && k[0] <= 'Z' && g.selectDropLetter(k[0]) {
+		return
+	}
 	switch k {
 	case "q", "ctrl+c":
 		g.quit = true
 	case "esc":
-		if g.sel >= 0 {
-			g.sel = -1
+		if g.sel >= 0 || g.drop != 0 {
+			g.sel, g.drop = -1, 0
 		} else {
 			g.quit = true
 		}
@@ -193,6 +207,16 @@ func (g *Game) click(m tea.Mouse) {
 		}
 		return
 	}
+	if m.Button == tea.MouseRight {
+		g.sel, g.drop = -1, 0
+		return
+	}
+	if m.Button == tea.MouseLeft {
+		if typ := l.pocketChoice(g, m.X, m.Y); typ != 0 {
+			g.selectDrop(typ)
+			return
+		}
+	}
 	sq, ok := l.square(g, m.X, m.Y)
 	switch {
 	case !ok || g.computerToMove():
@@ -200,8 +224,6 @@ func (g *Game) click(m tea.Mouse) {
 		g.note = ""
 		g.cx, g.cy = g.match.Variant().XY(sq)
 		g.activate(sq)
-	case m.Button == tea.MouseRight:
-		g.sel = -1
 	}
 }
 
@@ -222,6 +244,15 @@ func (g *Game) activate(sq int) {
 	if g.match.Over() || g.computerToMove() {
 		return
 	}
+	if g.drop != 0 {
+		for _, mv := range g.match.Legal() {
+			if mv.Drop == g.drop && mv.To == sq {
+				g.play(mv)
+				return
+			}
+		}
+		return // illegal destinations leave the pocket selection intact
+	}
 	if g.sel >= 0 {
 		if moves := g.movesBetween(g.sel, sq); len(moves) > 0 {
 			if len(moves) > 1 && moves[0].Promote != 0 {
@@ -239,6 +270,25 @@ func (g *Game) activate(sq int) {
 	g.sel = -1
 }
 
+// selectDrop selects an available type in the side-to-move's pocket.
+func (g *Game) selectDrop(typ uint8) bool {
+	p := g.match.Position()
+	if !p.V.Drops || g.match.Over() || g.computerToMove() || int(typ) >= len(p.Hands[p.Turn]) || p.Hands[p.Turn][typ] <= 0 {
+		return false
+	}
+	g.sel, g.drop, g.note = -1, typ, ""
+	return true
+}
+
+func (g *Game) selectDropLetter(letter byte) bool {
+	for i, pt := range g.match.Variant().Pieces {
+		if pt.Letter == letter {
+			return g.selectDrop(uint8(i + 1))
+		}
+	}
+	return false
+}
+
 // movesBetween lists the legal moves from one square to another, or to
 // anywhere when to is -1.
 func (g *Game) movesBetween(from, to int) []Move {
@@ -253,13 +303,13 @@ func (g *Game) movesBetween(from, to int) []Move {
 
 func (g *Game) play(mv Move) {
 	g.match.Play(mv)
-	g.sel, g.promo, g.note = -1, nil, ""
+	g.sel, g.drop, g.promo, g.note = -1, 0, nil, ""
 }
 
 // undo takes back moves until a human is to move, so against the computer it
 // takes back its reply along with your move.
 func (g *Game) undo() {
-	g.sel, g.promo = -1, nil
+	g.sel, g.drop, g.promo = -1, 0, nil
 	played := len(g.match.Played())
 	plies := 0
 	for plies < played {
@@ -284,7 +334,7 @@ func (g *Game) cycleComputer() {
 	i := slices.Index(modes, g.computer)
 	next := modes[(i+1)%len(modes)]
 	g.SetComputer(next[0], next[1])
-	g.sel, g.promo = -1, nil
+	g.sel, g.drop, g.promo = -1, 0, nil
 	g.note = "Computer plays " + g.opponent()
 }
 

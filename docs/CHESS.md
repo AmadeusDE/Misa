@@ -66,3 +66,73 @@ an unanalysed legal fallback is labelled instead of showing a fabricated score.
 Variants support 1–702 files (labels `a` through `zz`) and 1–99 ranks.
 Large boards can be expensive to load and play: reach tables, move generation,
 and search consume more memory and time as the board grows.
+
+## Bundled variants
+
+- **Chess** (`chess`): orthodox chess on an 8×8 board.
+- **Double Chess** (`double`): two armies per side on a 16×12 board.
+- **Big Board** (`bigboard`): Betza's 16×16 fairy-piece variant.
+- **Double Big Board** (`doublebig`): two armies per side on a 32×16 board.
+- **Crazyhouse** (`crazyhouse`): orthodox chess with pockets and drops. Captures
+  change a piece's colour and put it in the capturer's pocket; captured promoted
+  pieces return as pawns. Instead of moving, drop a pocket piece onto an empty
+  square. Pawns cannot be dropped on rank 1 or 8. Drops must leave your king safe,
+  but may give check or checkmate. Castling, en passant, promotion, and stalemate
+  draws otherwise work as in chess. A pawn dropped on its starting rank can make
+  the usual initial double step; a dropped rook cannot restore castling rights.
+  Rules: [Lichess](https://lichess.org/variant/crazyhouse) and
+  [Wikipedia](https://en.wikipedia.org/wiki/Crazyhouse).
+
+### Playing with pockets
+
+Both sides' pockets show each available piece and its count beside the board.
+Click a piece in your pocket, then a legal empty board square to drop it.
+Alternatively, press the **uppercase** piece letter (for example `N` or `P`),
+move the cursor, and press enter/space. Uppercase pocket keys leave the usual
+lowercase game shortcuts unchanged. Illegal destinations are ignored; escape
+cancels pocket selection. Drops appear in the move list as `N@f3` (with `+` or
+`#` for check or checkmate).
+
+## Custom drop rules
+
+Drop support is opt-in and independent of variant ids. A variant can inherit
+orthodox chess and enable it with `drops: true`. Captures then add the captured
+piece to the capturing side's hand, and a move may instead place one hand piece
+on an empty square, subject to the same royal-safety check as any other move.
+Dropped pieces count as moved; a `pawn: true` piece dropped on a rank
+containing that side's setup pawns of the same type may use its initial-only
+movement components. Drops are quiet moves, not quiescence captures (check
+evasions still consider all legal drops). The computer values pocket material at 80% of its board value.
+
+Piece definitions support:
+
+- `drop_forbid_ranks: [1, 8]`: ranks on which this type may not be dropped,
+  counted from the dropping side, starting at 1. An omitted list allows all
+  ranks. This is a per-piece restriction, not an engine pawn special case.
+- `demote: P`: original type to use when reading a promoted piece marked `~`
+  in FEN. Actual promotions remember the original piece type, so capturing a
+  promoted piece returns that original type to the hand. Promotion does not
+  change ordinary movement or royal-safety rules.
+
+As with other inherited pieces, overriding a piece definition replaces its
+whole definition, so repeat its movement and flags as well as drop settings.
+`drops: false` disables inherited drop rules.
+
+### Pocket FEN
+
+Drop variants accept a bracketed hand after the placement field. Uppercase
+letters belong to White, lowercase to Black, and repeated letters give counts:
+
+```text
+rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Qn] w KQkq - 0 1
+```
+
+Mark a promoted board piece with `~`, for example `Q~`, so it returns as the
+configured `demote` type when captured. `Position.FEN()` writes this form for
+drop variants, including an empty `[]` hand. Existing ordinary FEN placements
+remain valid; non-drop variants do not acquire pockets or promoted-piece rules.
+
+The remaining fields are side, castling rights, en passant target, halfmove
+clock, and fullmove number. Standard FEN has only one en passant target: for a
+custom pawn that crosses several squares, serialization retains only the first
+crossed square. This limitation does not affect orthodox chess or Crazyhouse.

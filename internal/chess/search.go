@@ -244,7 +244,8 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 		}
 	}
 
-	if allowNull && !inCheck && depth >= 3 && beta < mateScore-maxPly && e.hasPieces(p) {
+	// A pass is not a safe pruning assumption in variants with reserves.
+	if allowNull && !p.V.Drops && !inCheck && depth >= 3 && beta < mateScore-maxPly && e.hasPieces(p) {
 		r := 2
 		if depth >= 6 {
 			r = 3
@@ -394,9 +395,10 @@ func (e *Engine) expired() bool {
 }
 
 // repeated reports whether the position already occurred since the last
-// capture or pawn move, in the game or the line searched.
+// irreversible move, in the game or the line searched. In drop variants even
+// captures and pawn moves can be reversed through pockets, so scan all history.
 func (e *Engine) repeated(hash uint64, clock int) bool {
-	for i := len(e.path) - 1; i >= 0 && i >= len(e.path)-clock; i-- {
+	for i := len(e.path) - 1; i >= 0 && (e.v.Drops || i >= len(e.path)-clock); i-- {
 		if e.path[i] == hash {
 			return true
 		}
@@ -405,6 +407,11 @@ func (e *Engine) repeated(hash uint64, clock int) bool {
 }
 
 func (e *Engine) hasPieces(p *Position) bool {
+	for typ, count := range p.Hands[p.Turn] {
+		if typ > 0 && count > 0 && !e.v.Pieces[typ-1].Royal && !e.v.Pieces[typ-1].Pawn {
+			return true
+		}
+	}
 	for _, pc := range p.Board {
 		if pc.Type != 0 && pc.Color == p.Turn {
 			if t := e.v.Pieces[pc.Type-1]; !t.Royal && !t.Pawn {
@@ -436,7 +443,7 @@ func (e *Engine) order(p *Position, moves []Move, first Move, ply int) []Move {
 		case mv == first:
 			s = 1 << 30
 		case mv.Take >= 0 || mv.Promote != 0:
-			s = 1<<24 + 16*e.victimValue(p, mv) - e.v.Pieces[p.Board[mv.From].Type-1].Value/16
+			s = 1<<24 + 16*e.victimValue(p, mv) - e.v.Pieces[e.movingType(p, mv)-1].Value/16
 			if mv.Promote != 0 {
 				s += e.v.Pieces[mv.Promote-1].Value
 			}
@@ -460,11 +467,27 @@ func (e *Engine) victimValue(p *Position, mv Move) int {
 	if mv.Take < 0 {
 		return 0
 	}
-	return e.v.Pieces[p.Board[mv.Take].Type-1].Value
+	victim := p.Board[mv.Take]
+	value := e.v.Pieces[victim.Type-1].Value
+	if e.v.Drops {
+		typ := victim.Type
+		if victim.Promoted != 0 {
+			typ = victim.Promoted
+		}
+		value += pocketValue(e.v.Pieces[typ-1].Value)
+	}
+	return value
+}
+
+func (e *Engine) movingType(p *Position, mv Move) uint8 {
+	if mv.Drop != 0 {
+		return mv.Drop
+	}
+	return p.Board[mv.From].Type
 }
 
 func (e *Engine) historyIndex(p *Position, mv Move) int {
-	return mv.To*(len(e.v.Pieces)+1) + int(p.Board[mv.From].Type)
+	return mv.To*(len(e.v.Pieces)+1) + int(e.movingType(p, mv))
 }
 
 func (e *Engine) isKiller(mv Move, ply int) bool {

@@ -42,6 +42,20 @@ func (p *Position) Hash() uint64 {
 		moved := pc.Moved && v.Pieces[pc.Type-1].tracksMoved
 		h ^= z.pieces[((sq*n+int(pc.Type-1))*2+int(pc.Color))*2+int(b2i(moved))]
 	}
+	if v.Drops {
+		for sq, pc := range p.Board {
+			if pc.Type != 0 && pc.Promoted != 0 {
+				h ^= hashDropKey(uint64(sq)<<8 | uint64(pc.Promoted) | 1<<63)
+			}
+		}
+		for color, hand := range p.Hands {
+			for typ, count := range hand {
+				if typ > 0 && count > 0 {
+					h ^= hashDropKey(uint64(count) ^ uint64(typ)<<48 ^ uint64(color)<<56)
+				}
+			}
+		}
+	}
 	if p.Turn == Black {
 		h ^= z.black
 	}
@@ -51,4 +65,12 @@ func (p *Position) Hash() uint64 {
 		}
 	}
 	return h
+}
+
+// SplitMix64 mixes arbitrary hand counts without a fixed-size key table.
+func hashDropKey(x uint64) uint64 {
+	x += 0x9e3779b97f4a7c15
+	x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9
+	x = (x ^ (x >> 27)) * 0x94d049bb133111eb
+	return x ^ (x >> 31)
 }

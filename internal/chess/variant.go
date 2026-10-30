@@ -18,18 +18,20 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "crazyhouse.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
 type PieceType struct {
-	Letter byte // upper case; White's pieces print in upper case, Black's in lower
-	Name   string
-	Betza  string
-	Glyph  string // one terminal cell; the letter is used when empty
-	Royal  bool   // may not be left attacked, and castles
-	Pawn   bool   // promotes, takes and is taken en passant, resets the move clock
-	Value  int    // centipawns for the computer player; estimated when the file leaves it out
+	Letter          byte // upper case; White's pieces print in upper case, Black's in lower
+	Name            string
+	Betza           string
+	Glyph           string // one terminal cell; the letter is used when empty
+	Royal           bool   // may not be left attacked, and castles
+	Pawn            bool   // promotes, takes and is taken en passant, resets the move clock
+	DropForbidRanks []int  // side-relative ranks on which this piece cannot be dropped
+	Demote          uint8  // original type of a promoted piece, or 0
+	Value           int    // centipawns for the computer player; estimated when the file leaves it out
 
 	moves       []Component
 	tracksMoved bool
@@ -43,6 +45,7 @@ type Castle struct{ King, Rook, KingTo, RookTo int }
 type Variant struct {
 	ID, Name, Description string
 	Files, Ranks          int
+	Drops                 bool
 	Pieces                []*PieceType
 	Castling              []Castle
 	Promotion             []uint8 // piece types a pawn may become
@@ -51,18 +54,21 @@ type Variant struct {
 	Setup                 string
 	Source                string
 
-	start   []Piece
-	zobrist zobrist
+	startHands [2][]int
+	start      []Piece
+	zobrist    zobrist
 }
 
 type pieceDef struct {
-	Letter string `yaml:"letter"`
-	Name   string `yaml:"name"`
-	Betza  string `yaml:"betza"`
-	Glyph  string `yaml:"glyph"`
-	Royal  bool   `yaml:"royal"`
-	Pawn   bool   `yaml:"pawn"`
-	Value  int    `yaml:"value"`
+	Letter          string `yaml:"letter"`
+	Name            string `yaml:"name"`
+	Betza           string `yaml:"betza"`
+	Glyph           string `yaml:"glyph"`
+	Royal           bool   `yaml:"royal"`
+	Pawn            bool   `yaml:"pawn"`
+	Value           int    `yaml:"value"`
+	DropForbidRanks []int  `yaml:"drop_forbid_ranks"`
+	Demote          string `yaml:"demote"`
 }
 
 type castleDef struct {
@@ -78,6 +84,7 @@ type variantDef struct {
 	ID            string      `yaml:"id"`
 	Name          string      `yaml:"name"`
 	Description   string      `yaml:"description"`
+	Drops         *bool       `yaml:"drops"`
 	Extends       string      `yaml:"extends"`
 	Files         int         `yaml:"files"`
 	Ranks         int         `yaml:"ranks"`
@@ -250,6 +257,9 @@ func load(srcs []source) ([]*Variant, []error) {
 
 func merge(parent, child variantDef) variantDef {
 	d := parent
+	if child.Drops != nil {
+		d.Drops = child.Drops
+	}
 	d.ID, d.Name, d.Description, d.source = child.ID, child.Name, child.Description, child.source
 	if child.Files != 0 {
 		d.Files = child.Files
@@ -290,6 +300,9 @@ func build(d variantDef) (*Variant, error) {
 		Files: d.Files, Ranks: d.Ranks, Setup: d.Setup, Source: d.source,
 		PromotionZone: d.PromotionZone, MoveLimit: d.MoveLimit,
 	}
+	if d.Drops != nil {
+		v.Drops = *d.Drops
+	}
 	if v.Name == "" {
 		v.Name = v.ID
 	}
@@ -317,7 +330,26 @@ func build(d variantDef) (*Variant, error) {
 		}
 		v.Pieces = append(v.Pieces, t)
 	}
-	start, err := v.parsePlacement(d.Setup)
+	for i, p := range d.Pieces {
+		for _, rank := range p.DropForbidRanks {
+			if rank < 1 || rank > v.Ranks {
+				return nil, fmt.Errorf("piece %c: invalid forbidden rank %d", v.Pieces[i].Letter, rank)
+			}
+		}
+		v.Pieces[i].DropForbidRanks = slices.Clone(p.DropForbidRanks)
+		if p.Demote != "" {
+			if len(p.Demote) != 1 || v.TypeOf(p.Demote[0]) == 0 {
+				return nil, fmt.Errorf("piece %c: unknown demote piece %q", v.Pieces[i].Letter, p.Demote)
+			}
+			v.Pieces[i].Demote = v.TypeOf(p.Demote[0])
+		}
+	}
+	placement, hands, err := v.splitFENHands(d.Setup)
+	if err != nil {
+		return nil, fmt.Errorf("setup: %v", err)
+	}
+	v.startHands = hands
+	start, err := v.parsePlacement(placement)
 	if err != nil {
 		return nil, fmt.Errorf("setup: %v", err)
 	}
@@ -480,7 +512,15 @@ func (v *Variant) parsePlacement(s string) ([]Piece, error) {
 					if c >= 'a' {
 						color = Black
 					}
-					board[v.Square(x, y)] = Piece{Type: t, Color: color}
+					pc := Piece{Type: t, Color: color}
+					if j+1 < len(row) && row[j+1] == '~' {
+						if !v.Drops || v.Pieces[t-1].Demote == 0 {
+							return nil, fmt.Errorf("piece %c cannot be marked promoted", c)
+						}
+						pc.Promoted = v.Pieces[t-1].Demote
+						j++
+					}
+					board[v.Square(x, y)] = pc
 				}
 				x++
 			default:
