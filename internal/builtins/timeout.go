@@ -22,6 +22,8 @@ func init() {
 	Register(Command{Name: "timeout", Run: runTimeout})
 }
 
+// TODO(F06): migrate only when the executor can supervise signals, process groups,
+// status preservation, and ENOEXEC fallback with the same semantics.
 func runTimeout(ctx *Context) int {
 	spec, _ := ParseSpec("^k(kill-after):s(signal):v(verbose)f(foreground)p(preserve-status)")
 	opts, err := spec.ParseArgs(ctx.Args)
