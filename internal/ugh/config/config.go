@@ -733,6 +733,9 @@ func validateProvider(name string, p Provider) error {
 	return nil
 }
 
+// ValidateProvider checks one [providers.<name>] entry the way Load does.
+func ValidateProvider(name string, p Provider) error { return validateProvider(name, p) }
+
 // Provider is a config-defined OpenAI-compatible (Chat Completions) endpoint.
 type Provider struct {
 	BaseURL       string            `toml:"base_url"`

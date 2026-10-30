@@ -199,12 +199,28 @@ func Resolve(provider string, lookup func(string) (string, bool), s *Store) (str
 		if env := EnvVar(provider); env != "" {
 			hint = "set " + env + " or " + hint
 		}
-		return "", fmt.Errorf("auth: no credential for %q (%s)", provider, hint)
+		return "", &NoCredentialError{Provider: provider, Hint: hint}
 	}
 	if cred.Type != "api_key" {
 		return "", fmt.Errorf("auth: credential for %q is %s, not an api_key", provider, cred.Type)
 	}
 	return cred.Key, nil
+}
+
+// NoCredentialError is Resolve's answer when neither the environment nor the
+// store holds a key. Callers that can do without one (a local server) match it
+// with IsNoCredential.
+type NoCredentialError struct{ Provider, Hint string }
+
+func (e *NoCredentialError) Error() string {
+	return fmt.Sprintf("auth: no credential for %q (%s)", e.Provider, e.Hint)
+}
+
+// IsNoCredential reports whether err says a provider has no key at all, as
+// opposed to a broken store or a credential of the wrong type.
+func IsNoCredential(err error) bool {
+	var e *NoCredentialError
+	return errors.As(err, &e)
 }
 
 // MaskKey renders a secret for display: prefix + "…" + last 4, never the

@@ -80,3 +80,9 @@ func Names() []string {
 	}
 	return append(n, "codex")
 }
+
+// LookupBase is a provider's base URL under r, or "" when it is not wired.
+func LookupBase(r roots.Roots, name string) string {
+	s, _ := LookupIn(r, name)
+	return s.BaseURL
+}

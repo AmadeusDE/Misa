@@ -80,7 +80,9 @@ func (c *Client) stream(ctx context.Context, req llm.Request, extra map[string]a
 	if err != nil {
 		return nil, fmt.Errorf("chat: build request: %w", err)
 	}
-	r.Header.Set("Authorization", "Bearer "+c.key)
+	if c.key != "" {
+		r.Header.Set("Authorization", "Bearer "+c.key)
+	}
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Accept", "text/event-stream")
 	for k, v := range c.Headers {
