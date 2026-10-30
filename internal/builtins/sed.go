@@ -36,7 +36,7 @@ func runSed(ctx *Context) int {
 	if HandleHelpVersion(ctx, flags, sedSpecParsed) {
 		return 0
 	}
-	for _, opt := range [][2]string{{"i", "-i"}, {"debug", "--debug"}, {"sandbox", "--sandbox"}, {"follow-symlinks", "--follow-symlinks"}} {
+	for _, opt := range [][2]string{{"debug", "--debug"}, {"sandbox", "--sandbox"}} {
 		if _, ok := flags.String(opt[0]); ok {
 			fmt.Fprintf(ctx.Stderr, "sed: %s is not supported yet\n", opt[1])
 			return 1
@@ -72,6 +72,10 @@ func runSed(ctx *Context) int {
 	}
 	if flags.Bool("z") {
 		r.delim, r.out.delim = 0, 0
+	}
+	if suffix, ok := flags.String("i"); ok {
+		r.inPlace = &sedInPlace{suffix: suffix, follow: flags.Bool("follow-symlinks")}
+		r.separate = true
 	}
 	return r.run()
 }

@@ -68,7 +68,7 @@ func (f *sedFiles) close() {
 
 func (r *sedRun) writeFile(name string, b []byte) {
 	if name == "/dev/stdout" {
-		r.out.record(b, true)
+		r.stdout.record(b, true)
 		return
 	}
 	w := r.files.writers[name]

@@ -34,16 +34,23 @@ type sedRun struct {
 	appends   []sedAppend
 	lineWidth int64
 	files     *sedFiles
+
+	stdout     *sedOutput
+	inPlace    *sedInPlace
+	readFailed bool
+	editFailed bool
 }
 
 var errSedNoPrevious = errors.New("no previous regular expression")
 
 func newSedRun(ctx *Context, cmds []*sedCmd, files []string) *sedRun {
+	out := &sedOutput{w: bufio.NewWriter(ctx.Stdout), delim: '\n'}
 	return &sedRun{
 		ctx:       ctx,
 		cmds:      cmds,
 		in:        &sedInput{ctx: ctx, names: files, delim: '\n'},
-		out:       &sedOutput{w: bufio.NewWriter(ctx.Stdout), delim: '\n'},
+		out:       out,
+		stdout:    out,
 		delim:     '\n',
 		lineWidth: 70,
 	}
@@ -57,23 +64,12 @@ func (r *sedRun) run() int {
 		return 4
 	}
 	defer r.files.close()
-	r.in.fill(true)
-	for !r.quitting && r.fatal == nil {
-		rec, nl, ok := r.in.read()
-		if !ok {
-			break
-		}
-		if r.in.restarted && r.separate {
-			r.lineNo = 0
-		}
-		r.in.restarted = false
-		r.ps, r.psNL = append(r.ps[:0], rec...), nl
-		r.lineNo++
-		r.replaced = false
-		r.cycle()
-		if r.out.unbuffered {
-			r.out.w.Flush()
-		}
+	if r.inPlace != nil {
+		r.editAll()
+	} else {
+		r.in.fill(true)
+		r.process()
+		r.readFailed = r.in.failed
 	}
 	if err := r.out.w.Flush(); err != nil && r.out.err == nil {
 		r.out.err = err
@@ -90,10 +86,33 @@ func (r *sedRun) run() int {
 		return 4
 	case r.exitCode != 0:
 		return r.exitCode
-	case r.in.failed:
+	case r.editFailed:
+		return 4
+	case r.readFailed:
 		return 2
 	}
 	return 0
+}
+
+// process runs cycles until the input ends or a command quits.
+func (r *sedRun) process() {
+	for !r.quitting && r.fatal == nil {
+		rec, nl, ok := r.in.read()
+		if !ok {
+			return
+		}
+		if r.in.restarted && r.separate {
+			r.lineNo = 0
+		}
+		r.in.restarted = false
+		r.ps, r.psNL = append(r.ps[:0], rec...), nl
+		r.lineNo++
+		r.replaced = false
+		r.cycle()
+		if r.out.unbuffered {
+			r.out.w.Flush()
+		}
+	}
 }
 
 type sedAction uint8

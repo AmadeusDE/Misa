@@ -109,7 +109,6 @@ func TestSedErrors(t *testing.T) {
 		{[]string{"1,2q"}, "command only uses one address"},
 		{[]string{"s/[/x/"}, "unterminated `s' command"},
 		{[]string{"/a/M p"}, "the M modifier is not supported"},
-		{[]string{"-i", "p"}, "sed: -i is not supported yet"},
 		{[]string{"y/ab/c/"}, "`y' command"},
 		{[]string{}, "Usage: sed"},
 	}
