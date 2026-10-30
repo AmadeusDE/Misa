@@ -131,9 +131,9 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `chsh` | pending | – | shadow:5 | 0 | root | uutils: Rust, 0/5 simple new_ucmd! cases parseable by tests/uutils adapter | 69 | 599 | medium |
 | `chvt` | other | – | – | – | – | no tests | 115 | – | light |
 | `clear` | other | – | – | – | – | no tests | 19 | – | light |
-| `count` | other | – | – | – | – | no tests | 85 | – | light |
+| `count` | other | – | – | – | – | no tests; implemented in Misa (internal/builtins/count.go) | 85 | – | light |
 | `cpio` | posix | 21 | – | – | root | toybox: shell .test (runs in tests/toybox adapter) | 324 | – | heavy |
-| `crc32` | posix | – | – | – | – | no tests | 77 | – | light |
+| `crc32` | posix | – | – | – | – | no tests; implemented in Misa (internal/builtins/crc32.go) | 77 | – | light |
 | `crond` | pending | – | – | – | – | no tests | 672 | – | heavy |
 | `crontab` | pending | – | – | – | – | no tests | 366 | – | medium |
 | `csplit` | pending | – | coreutils:105 | 8 | root | uutils: Rust, 8/105 simple new_ucmd! cases parseable by tests/uutils adapter | 173 | 1939 | medium |
@@ -378,7 +378,7 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `userdel` | pending | – | shadow:16 | 0 | root | uutils: Rust, 0/16 simple new_ucmd! cases parseable by tests/uutils adapter | 114 | 621 | medium |
 | `usermod` | – | – | shadow:25 | 0 | root | uutils: Rust, 0/25 simple new_ucmd! cases parseable by tests/uutils adapter | – | 793 | heavy |
 | `users` | – | – | coreutils:5 | 4 | – | uutils: Rust, 4/5 simple new_ucmd! cases parseable by tests/uutils adapter | – | 116 | light |
-| `usleep` | other | – | – | – | – | no tests | 26 | – | light |
+| `usleep` | other | – | – | – | – | no tests; implemented in Misa (internal/builtins/usleep.go) | 26 | – | light |
 | `uudecode` | posix | 9 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 113 | – | light |
 | `uuencode` | posix | 9 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 59 | – | light |
 | `uuidgen` | other | 1 | util-linux:7 | 7 | kernel/fs | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 7/7 simple new_ucmd! cases parseable by tests/uutils adapter | 25 | 210 | light |
