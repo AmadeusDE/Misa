@@ -347,6 +347,9 @@ Project rules:
 - Config search order: next to executable → `~/.config/misa/` (never the working directory).
 - Never write to external shell history files (bash, zsh). Read-only imports.
 - Builtins register via `init()` with `Register(Command{...})` and use the `Spec`/`ParseArgs` option parser.
+- Plans stay plans: never open a GitHub issue or a pull request for a plan alone. Keep plans in
+  `docs/plans/` locally until there is actual code to implement, then open the pull request with that code.
+- Don't open a GitHub issue just to track a pull request. If the work warrants a pull request, open it directly.
 
 ugh (`internal/ugh/*`, `cmd/ugh`):
 
@@ -363,6 +366,11 @@ When adding code derived from external sources:
 - Add a comment at the top of the file noting the source and license.
 - Add an entry to `docs/CREDITS.md`.
 - For substantial derivations, add or update a `NOTICE` file in the package directory.
+
+Commit trailers for agent-made commits:
+- Add `Co-authored-by: Cursor <cursoragent@cursor.com>` to commits made through Grok Bot/Cursor.
+- Add `Co-Authored-By: DeepSeek V4.1 Flash 1017 <noreply@deepseek.com>` only when DeepSeek actually worked on that
+  commit. Never add it to commits written by other models or agents, or by hand.
 
 ## Docs
 
