@@ -151,6 +151,9 @@ func isJobCommand(name string) bool {
 // would otherwise never act on the hangup that ends the others.
 func (m *Model) closeTerminals() {
 	m.stopAgent()
+	if closer, ok := m.procViewer.(interface{ Close() }); ok {
+		closer.Close()
+	}
 	if m.terminal != nil {
 		m.terminal.Close()
 		m.terminal = nil

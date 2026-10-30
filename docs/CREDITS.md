@@ -1,3 +1,11 @@
+## Original Card Games
+
+The card game rule engines, tests, help text, compact faces, geometric backs and
+classic table design are original Misa contributions, licensed under OSL-3.0.
+No third-party card artwork, fonts, sounds, source code or UI resources are included.
+Rule-fact references and variant decisions are recorded in [CARD_GAMES.md](CARD_GAMES.md).
+There is no Microsoft affiliation or endorsement.
+
 ## Companion Response Templates
 
 - **cargo-mommy** by Aria Beingessner — MIT / Apache-2.0
