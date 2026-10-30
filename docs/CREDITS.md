@@ -56,6 +56,8 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils
+  `join` (`internal/builtins/join.go`, `join_merge.go`) is adapted from `src/uu/join/src/join.rs` and
+  `tests/by-util/test_join.rs` at commit fee61ff5d4f87e0f912a52e639942b5f7ad58663.
 
 - **uutils/diffutils** by the uutils contributors — MIT / Apache-2.0
   https://github.com/uutils/diffutils

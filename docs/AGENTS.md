@@ -121,6 +121,7 @@ internal/
     chmod.go chown.go link.go    Permissions and links
     tail.go proc.go sysutil.go   System utilities
     man.go install.go util.go    Misc helpers
+    join.go join_merge.go        `join` — options/validation and the streaming merge
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
     mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game

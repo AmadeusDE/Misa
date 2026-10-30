@@ -228,7 +228,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `iproute` | pending | – | – | – | – | no tests | 2934 | – | heavy |
 | `iprule` | pending | – | – | – | – | no tests | 2934 | – | heavy |
 | `iptunnel` | pending | – | – | – | – | no tests | 2934 | – | heavy |
-| `join` | – | – | coreutils:49 | 38 | tty | uutils: Rust, 38/49 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1226 | medium |
 | `killall` | lsb | 2 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 123 | – | light |
 | `killall5` | posix | – | – | – | – | no tests | 158 | – | light |
 | `klogd` | pending | – | – | – | – | no tests | 98 | – | light |
