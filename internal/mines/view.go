@@ -10,7 +10,7 @@ import (
 const (
 	faceWidth   = 4
 	chromeLines = 5 // header, two border rows, status, help
-	help        = "space open  f flag  n new  1-3 level  q quit"
+	help        = "space open  f flag  n new  1-3 level  c custom  q quit"
 )
 
 var (
@@ -49,15 +49,19 @@ type layout struct {
 }
 
 func (g *Game) layout() layout {
-	l := layout{cw: 3, cols: g.board.Width(), rows: g.board.Height()}
-	if l.cols*3+2 > g.width {
+	return boardLayout(g.board.Width(), g.board.Height(), g.width, g.height)
+}
+
+func boardLayout(cols, rows, width, height int) layout {
+	l := layout{cw: 3, cols: cols, rows: rows}
+	if l.cols*3+2 > width {
 		l.cw, l.pad = 2, 1
 	}
 	l.boardW = l.cols*l.cw + l.pad + 2
-	height := l.rows + chromeLines
-	l.fits = l.boardW <= g.width && height <= g.height
-	l.left = max(0, (g.width-l.boardW)/2)
-	l.top = max(0, (g.height-height)/2)
+	boardHeight := l.rows + chromeLines
+	l.fits = l.boardW <= width && boardHeight <= height
+	l.left = max(0, (width-l.boardW)/2)
+	l.top = max(0, (height-boardHeight)/2)
 	return l
 }
 
@@ -80,6 +84,9 @@ func (l layout) hit(x, y int) (hitTarget, int, int) {
 func (g *Game) View() string {
 	if g.width <= 0 || g.height <= 0 {
 		return ""
+	}
+	if g.setup != nil {
+		return g.customView()
 	}
 	l := g.layout()
 	if !l.fits {
@@ -172,7 +179,7 @@ func (g *Game) tooSmall(l layout) string {
 	need := fmt.Sprintf("%d×%d", l.boardW, l.rows+chromeLines)
 	msg := []string{
 		statusSt.Render(truncate("Terminal too small for "+g.level.Name+" ("+need+")", g.width)),
-		helpSt.Render(truncate("1-3 change level  q quit", g.width)),
+		helpSt.Render(truncate("1-3 change level  c custom  q quit", g.width)),
 	}
 	return strings.Join(msg, "\n")
 }

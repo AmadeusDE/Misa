@@ -31,6 +31,7 @@ type Game struct {
 	quit           bool
 	now            func() time.Time
 	rng            *rand.Rand
+	setup          *customSetup
 }
 
 type tickMsg struct{ gen int }
@@ -62,9 +63,11 @@ func (g *Game) Update(msg tea.Msg) tea.Cmd {
 	case tea.KeyPressMsg:
 		return g.key(msg.String())
 	case tea.MouseClickMsg:
-		return g.click(msg.Mouse())
+		if g.setup == nil {
+			return g.click(msg.Mouse())
+		}
 	case tickMsg:
-		if msg.gen == g.gen && g.board.State() == Playing {
+		if g.setup == nil && msg.gen == g.gen && g.board.State() == Playing {
 			return g.tick()
 		}
 	}
@@ -72,7 +75,16 @@ func (g *Game) Update(msg tea.Msg) tea.Cmd {
 }
 
 func (g *Game) key(k string) tea.Cmd {
+	if g.setup != nil {
+		return g.setupKey(k)
+	}
 	switch k {
+	case "c":
+		w := max(MinWidth, min(MaxWidth, g.level.W))
+		h := max(MinHeight, min(MaxHeight, g.level.H))
+		mines := max(MinMines, min(min(MaxMines, w*h-1), g.level.Mines))
+		g.setup = &customSetup{level: Level{Name: "Custom", W: w, H: h, Mines: mines}, paused: g.now()}
+		g.gen++
 	case "q", "esc", "ctrl+c":
 		g.quit = true
 	case "up", "k":
@@ -158,6 +170,8 @@ func (g *Game) Elapsed() time.Duration {
 		return 0
 	case !g.ended.IsZero():
 		return g.ended.Sub(g.started)
+	case g.setup != nil:
+		return g.setup.paused.Sub(g.started)
 	}
 	return g.now().Sub(g.started)
 }
