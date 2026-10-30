@@ -1,7 +1,9 @@
 package chess
 
 import (
+	"runtime"
 	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -176,5 +178,113 @@ setup: 4k3/8/8/8/8/8/8/NQXPK3
 	}
 	if p := value('P'); p != 100 {
 		t.Errorf("pawn = %d, want 100", p)
+	}
+}
+
+//go:noinline
+func queuedSearch(e *Engine, p *Position, lim Limits, done chan<- Result) {
+	done <- e.Think(p, nil, lim)
+}
+
+// queuedSearchWaiting observes B in the lock-acquisition path, rather than
+// merely knowing that its goroutine was started. This also distinguishes the
+// old blocking Mutex.Lock implementation from a pre-cancelled call.
+func queuedSearchWaiting() bool {
+	buf := make([]byte, 1<<20)
+	n := runtime.Stack(buf, true)
+	for _, stack := range strings.Split(string(buf[:n]), "\n\n") {
+		if strings.Contains(stack, "chess.queuedSearch(") &&
+			strings.Contains(stack, "chess.(*Engine).think(") &&
+			(strings.Contains(stack, "sync.(*Mutex).lockSlow(") || strings.Contains(stack, "time.Sleep(")) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestEngineQueuedLimits(t *testing.T) {
+	for _, mode := range []string{"cancel", "deadline"} {
+		t.Run(mode, func(t *testing.T) {
+			v := builtin(t, "bigboard")
+			p := NewPosition(v)
+			e := NewEngine(v)
+			var stopA, stopB atomic.Bool
+			doneA := make(chan Result, 1)
+			doneB := make(chan Result, 1)
+			go func() { doneA <- e.Think(p, nil, Limits{Depth: 48, Stop: &stopA}) }()
+			defer func() {
+				stopA.Store(true)
+				stopB.Store(true)
+				select {
+				case <-doneA:
+				case <-time.After(3 * time.Second):
+					t.Error("search A did not exit")
+				}
+			}()
+
+			// Wait until A owns the lock, not just until its goroutine starts.
+			limit := time.After(3 * time.Second)
+			for {
+				if !e.mu.TryLock() {
+					break
+				}
+				e.mu.Unlock()
+				select {
+				case <-limit:
+					t.Fatal("search A never acquired the lock")
+				default:
+					runtime.Gosched()
+				}
+			}
+			lim := Limits{Depth: 1, Stop: &stopB}
+			if mode == "deadline" {
+				lim.Time = 500 * time.Millisecond
+			}
+			go queuedSearch(e, p, lim, doneB)
+			defer func() {
+				stopB.Store(true)
+				stopA.Store(true)
+				select {
+				case <-doneB:
+				case <-time.After(3 * time.Second):
+					t.Error("search B did not exit")
+				}
+			}()
+			limit = time.After(3 * time.Second)
+			for !queuedSearchWaiting() {
+				select {
+				case <-limit:
+					t.Fatal("search B never reached the lock acquisition path")
+				default:
+					runtime.Gosched()
+				}
+			}
+			if mode == "cancel" {
+				stopB.Store(true)
+			}
+			// Deadline includes the 500ms budget; cancellation should return
+			// quickly. A must still be running when B returns.
+			wait := 200 * time.Millisecond
+			if mode == "deadline" {
+				wait += lim.Time
+			}
+			select {
+			case result := <-doneB:
+				// Put it back for the cleanup join.
+				doneB <- result
+				if !result.Found || !slices.Contains(p.Moves(), result.Move) || result.Depth != 0 || result.Nodes != 0 {
+					t.Errorf("queued search returned invalid fallback: %+v", result)
+				}
+			case <-time.After(wait):
+				t.Error("queued search did not return promptly while A held the lock")
+			}
+			select {
+			case <-doneA:
+				t.Error("search A finished before B")
+				// Preserve the result for cleanup.
+				doneA <- Result{}
+			default:
+			}
+		})
 	}
 }

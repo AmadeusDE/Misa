@@ -124,7 +124,7 @@ internal/
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
     mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game
-    chess.go                     `chess [variant] [-f file.yaml] [--fen pos] [-c white|black|both|none] [--think s] [-l]`
+    chess.go                     `chess [variant] [-f file.yaml] [--fen pos] [-c white|black|both|none] [--level name] [--think s] [-l]`
                                  — ChessGame builds the game (computer plays Black by default)
     battleship.go                `battleship [-r|--random]` — -r picks a random fleet instead of interactive
                                  placement
@@ -159,7 +159,9 @@ internal/
     eval.go                      Piece values (YAML `value`, else estimated from empty-board mobility) and a
                                  variant-agnostic evaluation: material, centre, pawn race, royal shelter/edge
     search.go                    Engine: iterative deepening PVS, TT, quiescence, null move, LMR, killers/history,
-                                 check extension, repetition vs game history; Limits{Time, Depth, Stop}
+                                 check extension, repetition vs game history; Limits{Time, Depth, Nodes, Stop}
+    difficulty.go                Typed levels (normal default), shallow weak profiles with isolated tables,
+                                 seeded full-window root candidate selection; --think changes time only
     game.go view.go run.go       procmon.Viewer screen: cursor/mouse, selection hints, promotion prompt, flip,
                                  letters toggle, move list panel; the computer thinks in a tea.Cmd (thoughtMsg,
                                  gen drops abandoned searches); standalone runner
@@ -320,6 +322,10 @@ internal/
   The engine only uses what variants define (values, royal/pawn flags, ranks to promotion), so new pieces need at
   most a `value:`. Search runs off the UI goroutine on immutable Positions; cancel() sets the Stop flag and bumps
   `gen`. Undo takes back plies until a human is to move, and refuses when only computer moves remain.
+  `--level beginner|easy|normal|hard|expert` and `d` during play select one level for both computer sides,
+  retained across new games, variant changes and hotseat. Weak searches use fresh tables and a per-search
+  seed; all recursive nodes, including quiescence, count toward a strict node cap. Profile budgets and
+  partial calibration limitations are documented in `docs/CHESS.md` and `docs/CHESS_CALIBRATION.md`.
 - **Split config files**: Main `config.yaml` (menu, ascii, colors, ui, statusbar, aliases, autorun, builtin_mode, job_control). Mux settings in `mux.yaml` (auto_pane, bar_auto_hide, bar_position, bar_info, focus_follows_mouse). Saving them from a pane sends `muxConfigChanged` so the root applies them. Fetch settings in `fetch.yaml` (info, emotes, theme, color_mode, ascii, max_height). Window frontend settings in `gui.yaml`. All use same search order (`findConfigFile`).
 
 ## Conventions

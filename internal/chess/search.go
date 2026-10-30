@@ -27,15 +27,20 @@ func MateIn(score int) int {
 }
 
 // Limits bound a search; zero fields mean no limit, except that a search with
-// neither Time nor Depth stops at maxPly.
+// neither Time nor Depth stops at maxPly/2 iterations. Nodes counts entries to
+// both negamax and quiesce, without overshoot. Cancellation is checked at each
+// entry; time every 64 entries and at root moves. Move generation is not
+// interruptible, so wall-clock deadlines can overrun between those checks.
 type Limits struct {
 	Time  time.Duration
 	Depth int
+	Nodes int
 	Stop  *atomic.Bool
 }
 
 // Result is the move a search settled on. Score is in centipawns for the side
-// to move; Found is false when there was no legal move.
+// to move, and describes Move, not an unselected candidate. Depth zero means
+// no iteration completed and Score is unknown. Found is false without moves.
 type Result struct {
 	Move  Move
 	Score int
@@ -70,11 +75,12 @@ type Engine struct {
 	killers [maxPly][2]Move
 	history []int // by destination square and piece type
 
-	path     []uint64 // hashes of the game so far and the line being searched
-	nodes    int
-	deadline time.Time
-	stop     *atomic.Bool
-	aborted  bool
+	path      []uint64 // hashes of the game so far and the line being searched
+	nodes     int
+	nodeLimit int
+	deadline  time.Time
+	stop      *atomic.Bool
+	aborted   bool
 }
 
 func NewEngine(v *Variant) *Engine {
@@ -90,34 +96,69 @@ func NewEngine(v *Variant) *Engine {
 // the deepest finished iteration. past holds the hashes of the positions
 // before root, so lines that repeat them count as draws.
 func (e *Engine) Think(root *Position, past []uint64, lim Limits) Result {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	return e.think(root, past, lim, selection{}, 0)
+}
+
+func (e *Engine) think(root *Position, past []uint64, lim Limits, policy selection, seed uint64) Result {
+	start := time.Now()
 	legal := root.Moves()
 	if len(legal) == 0 {
 		return Result{}
 	}
+	best := Result{Move: legal[0], Found: true}
+	// Obsolete queued work must not wait for a newer search's table lock.
+	cancelled := func() bool {
+		return (lim.Stop != nil && lim.Stop.Load()) || (lim.Time > 0 && time.Since(start) >= lim.Time)
+	}
+	for {
+		if cancelled() {
+			return best
+		}
+		if e.mu.TryLock() {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	defer e.mu.Unlock()
+	if cancelled() {
+		return best
+	}
 	e.begin(past, lim)
-	start := time.Now()
+	if lim.Time > 0 {
+		e.deadline = start.Add(lim.Time)
+	}
 	maxDepth := lim.Depth
 	if maxDepth <= 0 {
 		maxDepth = maxPly / 2
 	}
-	best := Result{Move: legal[0], Found: true}
+	var candidates []candidate
 	for depth := 1; depth <= maxDepth; depth++ {
-		score, move, complete := e.searchRoot(root, legal, depth, best.Move)
-		if complete || move != best.Move {
-			best.Move = move
+		if e.expired() {
+			break
 		}
+		score, move, complete := e.searchRoot(root, legal, depth, best.Move)
 		if !complete {
 			break
 		}
+		best.Move = move
 		best.Score, best.Depth = score, depth
+		candidates = nil
+		if policy.chance > 0 && !IsMateScore(score) && len(legal) > 1 {
+			candidates = e.scoreRoot(root, legal, depth)
+			if e.aborted {
+				break
+			}
+		}
 		if len(legal) == 1 || IsMateScore(score) {
 			break
 		}
 		if lim.Time > 0 && time.Since(start) > lim.Time/2 {
 			break
 		}
+	}
+	if len(candidates) > 1 {
+		chosen := chooseCandidate(candidates, policy, seed)
+		best.Move, best.Score = chosen.Move, chosen.Score
 	}
 	best.Nodes = e.nodes
 	return best
@@ -126,6 +167,7 @@ func (e *Engine) Think(root *Position, past []uint64, lim Limits) Result {
 func (e *Engine) begin(past []uint64, lim Limits) {
 	e.path = append(e.path[:0], past...)
 	e.nodes, e.aborted, e.stop = 0, false, lim.Stop
+	e.nodeLimit = lim.Nodes
 	e.deadline = time.Time{}
 	if lim.Time > 0 {
 		e.deadline = time.Now().Add(lim.Time)
@@ -136,8 +178,8 @@ func (e *Engine) begin(past []uint64, lim Limits) {
 	}
 }
 
-// searchRoot searches every legal move, the last iteration's best first. On
-// an abort it still reports a move whose search finished and beat the rest.
+// searchRoot searches every legal move, the last iteration's best first. Its
+// score and move are published only when the whole iteration completes.
 func (e *Engine) searchRoot(root *Position, legal []Move, depth int, prev Move) (int, Move, bool) {
 	moves := e.order(root, legal, prev, 0)
 	alpha, beta := -infinity, infinity
@@ -145,6 +187,9 @@ func (e *Engine) searchRoot(root *Position, legal []Move, depth int, prev Move) 
 	e.path = append(e.path, root.Hash())
 	defer func() { e.path = e.path[:len(e.path)-1] }()
 	for i, mv := range moves {
+		if e.expired() {
+			return alpha, bestMove, false
+		}
 		child := root.Apply(mv)
 		var score int
 		if i == 0 {
@@ -330,11 +375,20 @@ func (e *Engine) quiesce(p *Position, ply, alpha, beta int) int {
 
 // tick counts a node and reports whether the search must stop.
 func (e *Engine) tick() bool {
+	if e.aborted || (e.stop != nil && e.stop.Load()) || (e.nodeLimit > 0 && e.nodes >= e.nodeLimit) {
+		e.aborted = true
+		return true
+	}
+	if e.nodes&63 == 0 && e.expired() {
+		return true
+	}
 	e.nodes++
-	if e.nodes&1023 == 0 {
-		if (e.stop != nil && e.stop.Load()) || (!e.deadline.IsZero() && time.Now().After(e.deadline)) {
-			e.aborted = true
-		}
+	return e.aborted
+}
+
+func (e *Engine) expired() bool {
+	if (e.stop != nil && e.stop.Load()) || (!e.deadline.IsZero() && time.Now().After(e.deadline)) {
+		e.aborted = true
 	}
 	return e.aborted
 }

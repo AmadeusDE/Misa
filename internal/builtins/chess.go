@@ -8,7 +8,7 @@ import (
 	"github.com/AmadeusDE/Misa/internal/chess"
 )
 
-var chessSpec = mustSpec("l(list)f(file):(fen):c(computer):(think)#")
+var chessSpec = mustSpec("l(list)f(file):(fen):c(computer):(think)#(level):")
 
 // chessSides maps --computer to the sides the computer plays (White, Black).
 var chessSides = map[string][2]bool{
@@ -23,7 +23,7 @@ var errChessNoGame = errors.New("no game requested")
 
 // ChessGame sets up a game from chess' arguments: a variant by name (or a
 // variant file with --file), optionally from a --fen position, against the
-// computer (--computer white|black|both|none, thinking --think seconds).
+// computer (--computer white|black|both|none, --level, --think seconds).
 func ChessGame(args []string) (*chess.Game, error) {
 	flags, err := chessSpec.ParseArgs(args)
 	if err != nil {
@@ -51,6 +51,13 @@ func ChessGame(args []string) (*chess.Game, error) {
 		return nil, err
 	}
 	g := chess.New(vs, v)
+	if name, ok := flags.String("level"); ok {
+		level, err := chess.ParseLevel(name)
+		if err != nil {
+			return nil, err
+		}
+		g.SetLevel(level)
+	}
 	if side, ok := flags.String("c"); ok {
 		sides, known := chessSides[side]
 		if !known {
@@ -77,6 +84,10 @@ func ChessGame(args []string) (*chess.Game, error) {
 func runChess(ctx *Context) int {
 	flags, err := chessSpec.ParseArgs(ctx.Args)
 	if err == nil && HandleHelpVersion(ctx, flags, chessSpec) {
+		if flags.HelpRequested {
+			fmt.Fprintln(ctx.Stdout, "\nLevels: "+chess.LevelNames+" (default: normal).")
+			fmt.Fprintln(ctx.Stdout, "--think overrides only the time ceiling (1-3600 seconds); d cycles level during play.")
+		}
 		return 0
 	}
 	if err == nil && flags.Bool("l") {
