@@ -126,7 +126,7 @@ func extractCmdFromTestName(name string) string {
 		"arch", "cat", "chmod", "chown", "cksum", "cmp", "comm",
 		"cp", "cut", "date", "du", "echo", "env", "expand", "expr",
 		"false", "fmt", "fold", "head", "id", "kill", "ln", "ls",
-		"mkdir", "mktemp", "mv", "nice", "nl", "nproc",
+		"mkdir", "mktemp", "mv", "nice", "nl", "nproc", "od",
 		"paste", "proc", "pwd", "rev", "rm", "rmdir", "seq",
 		"sleep", "sort", "split", "stat", "tac", "tail", "tee",
 		"touch", "tr", "true", "tsort", "tty", "uname", "uniq",

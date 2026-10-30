@@ -316,6 +316,43 @@ func matchParen(src string, open int) int {
 
 var identRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
+// resolveByteArray turns the inside of a Rust byte-array literal
+// (&[0x48, 0x65, b'a', 10]) into the bytes it denotes.
+func resolveByteArray(inner string) (string, bool) {
+	inner = strings.TrimSpace(inner)
+	if inner == "" {
+		return "", true
+	}
+	var sb strings.Builder
+	for _, part := range splitTopLevelCommas(inner) {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return "", false
+		}
+		// char literal byte, b'a'
+		if strings.HasPrefix(part, "b'") && strings.HasSuffix(part, "'") && len(part) >= 4 {
+			lit := part[2 : len(part)-1]
+			unescaped := strings.NewReplacer(`\n`, "\n", `\t`, "\t", `\r`, "\r", `\0`, "\x00", `\\`, `\`, `\'`, `'`).Replace(lit)
+			if len(unescaped) != 1 {
+				return "", false
+			}
+			sb.WriteString(unescaped)
+			continue
+		}
+		// numeric literal, possibly with a type suffix (0x42u8)
+		digits := strings.TrimSuffix(strings.TrimSpace(part), "_")
+		for _, suf := range []string{"u8", "u16", "u32", "usize", "i32"} {
+			digits = strings.TrimSuffix(digits, suf)
+		}
+		n, err := strconv.ParseUint(strings.TrimSuffix(digits, "_"), 0, 8)
+		if err != nil {
+			return "", false
+		}
+		sb.WriteByte(byte(n))
+	}
+	return sb.String(), true
+}
+
 // resolveLiteral parses a trimmed Rust expression as a string/int literal,
 // or resolves it against bindings if it is a bare identifier. Returns
 // (value, ok).
@@ -337,6 +374,11 @@ func resolveLiteral(s string, bindings map[string]string) (string, bool) {
 	// Strip leading & (Rust reference)
 	if strings.HasPrefix(s, "&") {
 		return resolveLiteral(s[1:], bindings)
+	}
+
+	// Byte-array literal, e.g. &[0x48, 0x65] or &[b'a', 10] (at.write_bytes).
+	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
+		return resolveByteArray(s[1 : len(s)-1])
 	}
 
 	// Strip common suffix methods: .to_string(), .to_owned(), .clone(), .as_bytes(), .as_str()
