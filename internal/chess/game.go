@@ -17,6 +17,8 @@ const DefaultThinkTime = 3 * time.Second
 type Game struct {
 	variants      []*Variant
 	match         *Match
+	four          *FourMatch
+	variant       *Variant
 	cx, cy        int    // cursor square as file and rank
 	sel           int    // selected square, or -1
 	promo         []Move // promotion choices waiting for an answer
@@ -56,7 +58,7 @@ func New(variants []*Variant, v *Variant) *Game {
 func (g *Game) SetComputer(white, black bool) {
 	g.cancel()
 	g.computer = [2]bool{white, black}
-	g.flipped = white && !black
+	g.flipped = g.four == nil && white && !black
 }
 
 func (g *Game) SetThinkTime(d time.Duration) {
@@ -81,15 +83,31 @@ func (g *Game) SetSeed(seed uint64) {
 // Load replaces the starting position, e.g. one read with ParseFEN.
 func (g *Game) Load(p *Position) {
 	g.cancel()
+	if g.four != nil {
+		return
+	}
 	g.match.Load(p)
 	g.reset()
 }
 
 func (g *Game) newGame(v *Variant) {
 	g.cancel()
-	g.match = NewMatch(v)
-	g.reset()
+	g.variant = v
+	if v.Players == 4 {
+		g.match = nil
+		g.four = NewFourMatch()
+		g.cx, g.cy, g.sel = 6, 12, -1
+		g.promo = nil
+		g.flipped = false
+	} else {
+		g.four = nil
+		g.match = NewMatch(v)
+		g.reset()
+	}
 	g.note = v.Description
+	if g.four != nil {
+		g.note = ""
+	}
 }
 
 func (g *Game) reset() {
@@ -116,6 +134,8 @@ func (g *Game) Update(msg tea.Msg) tea.Cmd {
 		g.click(msg.Mouse())
 	case thoughtMsg:
 		g.thought(msg)
+	case fourThoughtMsg:
+		g.fourThought(msg)
 	}
 	if g.quit {
 		g.cancel()
@@ -125,6 +145,10 @@ func (g *Game) Update(msg tea.Msg) tea.Cmd {
 }
 
 func (g *Game) key(k string) {
+	if g.four != nil {
+		g.fourKey(k)
+		return
+	}
 	if g.promo != nil {
 		g.promotionKey(k)
 		return
@@ -184,6 +208,10 @@ func (g *Game) promotionKey(k string) {
 }
 
 func (g *Game) click(m tea.Mouse) {
+	if g.four != nil {
+		g.fourClick(m)
+		return
+	}
 	l := g.layout()
 	if g.promo != nil {
 		if i := l.promoChoice(g, m.X, m.Y); i >= 0 && m.Button == tea.MouseLeft {
@@ -313,6 +341,9 @@ func (g *Game) engine() *Engine {
 // think starts a search when the computer is to move and none is running.
 // It runs as a command, off the UI goroutine.
 func (g *Game) think() tea.Cmd {
+	if g.four != nil {
+		return g.fourThink()
+	}
 	if g.thinking || g.quit || g.match.Over() || !g.computerToMove() {
 		return nil
 	}
@@ -373,7 +404,7 @@ func scoreText(score int, mover Color) string {
 }
 
 func (g *Game) cycleVariant(step int) {
-	i := slices.Index(g.variants, g.match.Variant())
+	i := slices.Index(g.variants, g.variant)
 	if len(g.variants) == 0 {
 		return
 	}

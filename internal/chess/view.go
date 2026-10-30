@@ -118,6 +118,9 @@ func (g *Game) choiceLabel(mv Move) string {
 }
 
 func (g *Game) View() string {
+	if g.four != nil {
+		return g.fourView()
+	}
 	if g.width <= 0 || g.height <= 0 {
 		return ""
 	}
@@ -369,8 +372,12 @@ func (g *Game) status() string {
 
 func (g *Game) tooSmall(l layout) string {
 	need := fmt.Sprintf("%d×%d", l.boardW, l.rows+chromeLines)
+	v := g.variant
+	if v == nil {
+		v = g.match.Variant()
+	}
 	msg := []string{
-		statusSt.Render(truncate("Terminal too small for "+g.match.Variant().Name+" ("+need+")", g.width)),
+		statusSt.Render(truncate("Terminal too small for "+v.Name+" ("+need+")", g.width)),
 		helpSt.Render(truncate("v change variant  q quit", g.width)),
 	}
 	return strings.Join(msg, "\n")

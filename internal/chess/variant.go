@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "fourplayer.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -43,6 +43,7 @@ type Castle struct{ King, Rook, KingTo, RookTo int }
 type Variant struct {
 	ID, Name, Description string
 	Files, Ranks          int
+	Players               int // 2 for the YAML engine, 4 for the fixed four-player rules
 	Pieces                []*PieceType
 	Castling              []Castle
 	Promotion             []uint8 // piece types a pawn may become
@@ -79,6 +80,7 @@ type variantDef struct {
 	Name          string      `yaml:"name"`
 	Description   string      `yaml:"description"`
 	Extends       string      `yaml:"extends"`
+	Players       *int        `yaml:"players"`
 	Files         int         `yaml:"files"`
 	Ranks         int         `yaml:"ranks"`
 	Pieces        []pieceDef  `yaml:"pieces"`
@@ -251,6 +253,9 @@ func load(srcs []source) ([]*Variant, []error) {
 func merge(parent, child variantDef) variantDef {
 	d := parent
 	d.ID, d.Name, d.Description, d.source = child.ID, child.Name, child.Description, child.source
+	if child.Players != nil {
+		d.Players = child.Players
+	}
 	if child.Files != 0 {
 		d.Files = child.Files
 	}
@@ -290,8 +295,18 @@ func build(d variantDef) (*Variant, error) {
 		Files: d.Files, Ranks: d.Ranks, Setup: d.Setup, Source: d.source,
 		PromotionZone: d.PromotionZone, MoveLimit: d.MoveLimit,
 	}
+	v.Players = 2
+	if d.Players != nil {
+		v.Players = *d.Players
+	}
+	if v.Players != 2 && v.Players != 4 {
+		return nil, fmt.Errorf("players must be 2 or 4, not %d", v.Players)
+	}
 	if v.Name == "" {
 		v.Name = v.ID
+	}
+	if v.Players == 4 {
+		return v, nil
 	}
 	if v.PromotionZone == 0 {
 		v.PromotionZone = 1

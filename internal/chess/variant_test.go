@@ -195,3 +195,27 @@ func TestVariantDimensionBounds(t *testing.T) {
 		}
 	}
 }
+
+func TestFourPlayerVariantRegistration(t *testing.T) {
+	v := builtin(t, "fourplayer")
+	if v.Players != 4 || v.Name != "Four-player Chess" {
+		t.Fatalf("fourplayer: %+v", v)
+	}
+	if got := builtin(t, "chess").Players; got != 2 {
+		t.Fatalf("default players = %d", got)
+	}
+	for _, players := range []string{"0", "1", "3", "5"} {
+		_, err := parseVariants(map[string][]byte{"bad.yaml": []byte("id: bad\nplayers: " + players + "\n")})
+		if err == nil {
+			t.Errorf("players %s accepted", players)
+		}
+	}
+	vs, err := parseVariants(map[string][]byte{"copy.yaml": []byte("id: copy\nextends: fourplayer\n")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	copy, err := Find(vs, "copy")
+	if err != nil || copy.Players != 4 {
+		t.Fatalf("inherited variant: %v, %v", copy, err)
+	}
+}

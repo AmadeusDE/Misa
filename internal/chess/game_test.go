@@ -182,6 +182,10 @@ func TestCycleVariantAndUndo(t *testing.T) {
 		t.Fatalf("V went to %s", g.match.Variant().ID)
 	}
 	keys(g, "V")
+	if g.variant.ID != "fourplayer" || g.four == nil {
+		t.Fatalf("V wrapped to %s, want fourplayer", g.variant.ID)
+	}
+	keys(g, "V")
 	if g.match.Variant().ID != "doublebig" {
 		t.Fatalf("V wrapped to %s", g.match.Variant().ID)
 	}
