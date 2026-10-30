@@ -22,7 +22,7 @@ const (
 	webUA        = "Mozilla/5.0 (compatible; Misa; +https://github.com/AmadeusDE/Misa)"
 )
 
-// webClient serves search and fetch; tests replace it to reach httptest servers.
+// webClient serves search, which may be a local SearXNG; tests replace it and fetchClient to reach httptest servers.
 var webClient = &http.Client{Timeout: 15 * time.Second}
 
 // FetchURL downloads an http(s) page and returns its readable text, capped at about 20 KB.
@@ -31,7 +31,7 @@ func FetchURL(ctx context.Context, raw string) (string, error) {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return "", fmt.Errorf("fetch_url needs an http or https URL, got %q", raw)
 	}
-	body, ctype, err := httpGet(ctx, u.String())
+	body, ctype, err := httpGet(ctx, fetchClient, u.String())
 	if err != nil {
 		return "", err
 	}
@@ -50,14 +50,14 @@ func FetchURL(ctx context.Context, raw string) (string, error) {
 	return capText(text, fetchTextCap), nil
 }
 
-func httpGet(ctx context.Context, rawURL string) ([]byte, string, error) {
+func httpGet(ctx context.Context, client *http.Client, rawURL string) ([]byte, string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, "", err
 	}
 	req.Header.Set("User-Agent", webUA)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/json;q=0.9,text/plain;q=0.8,*/*;q=0.5")
-	resp, err := webClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", scrub(errors.New(strings.TrimSpace(urlError(err))))
 	}

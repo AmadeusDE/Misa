@@ -43,7 +43,7 @@ func WebSearch(ctx context.Context, s Search, query string) ([]SearchResult, err
 }
 
 func searchDuckDuckGo(ctx context.Context, query string) ([]SearchResult, error) {
-	body, _, err := httpGet(ctx, duckduckgoURL+"?q="+url.QueryEscape(query))
+	body, _, err := httpGet(ctx, webClient, duckduckgoURL+"?q="+url.QueryEscape(query))
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func searchSearxng(ctx context.Context, base, query string) ([]SearchResult, err
 		return nil, errors.New("searxng_url is not set in ai.yaml")
 	}
 	base = strings.TrimSuffix(strings.TrimRight(base, "/"), "/search")
-	body, _, err := httpGet(ctx, base+"/search?format=json&q="+url.QueryEscape(query))
+	body, _, err := httpGet(ctx, webClient, base+"/search?format=json&q="+url.QueryEscape(query))
 	if err != nil {
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -74,9 +75,11 @@ func DefaultDir() string {
 	return filepath.Join(base, "misa", "chats")
 }
 
-// NewConversation starts an empty conversation with a time-ordered id.
+// NewConversation starts an empty conversation with a time-ordered id. The
+// random suffix keeps two chats started in the same millisecond apart.
 func NewConversation(now time.Time) *Conversation {
-	return &Conversation{ID: now.UTC().Format("20060102-150405.000"), Created: now, Updated: now}
+	id := fmt.Sprintf("%s-%04x", now.UTC().Format("20060102-150405.000"), rand.Uint32()&0xffff)
+	return &Conversation{ID: id, Created: now, Updated: now}
 }
 
 // TitleFrom is the first non-empty line of text, shortened.

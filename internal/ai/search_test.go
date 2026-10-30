@@ -42,9 +42,9 @@ func useWebServer(t *testing.T, h http.HandlerFunc) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	old, oldClient := duckduckgoURL, webClient
-	webClient = srv.Client()
-	t.Cleanup(func() { duckduckgoURL, webClient = old, oldClient })
+	old, oldClient, oldFetch := duckduckgoURL, webClient, fetchClient
+	webClient, fetchClient = srv.Client(), srv.Client()
+	t.Cleanup(func() { duckduckgoURL, webClient, fetchClient = old, oldClient, oldFetch })
 	return srv
 }
 

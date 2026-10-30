@@ -128,3 +128,14 @@ func TestDefaultDirFollowsXDG(t *testing.T) {
 		t.Errorf("DefaultDir = %s", got)
 	}
 }
+
+func TestNewConversationIDsDifferWithinOneMillisecond(t *testing.T) {
+	now := time.Now()
+	seen := map[string]bool{}
+	for range 50 {
+		seen[NewConversation(now).ID] = true
+	}
+	if len(seen) < 45 {
+		t.Fatalf("only %d distinct ids out of 50 at one instant", len(seen))
+	}
+}

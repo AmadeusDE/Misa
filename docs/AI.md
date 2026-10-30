@@ -136,7 +136,7 @@ search:
 - `off` removes the tools, and `ctrl+g` says so.
 
 `fetch_url` fetches http and https pages only, with a 15 second timeout, strips scripts, styles and markup, and returns
-at most about 20 KB of text. It can reach any address the machine can, including local services; a page the model
-reads can ask it to fetch more, so leave search off when you open pages you do not trust.
+at most about 20 KB of text. It connects to public addresses only: loopback, private, link-local and CGNAT addresses
+are refused after DNS resolution and on redirects, so a page the model reads cannot steer it into local services.
 
 Builds with `-tags nough` leave the AI features out; `aichat` then prints `built without AI support (-tags nough)`.
