@@ -53,20 +53,10 @@ func TestEnvNull(t *testing.T) {
 
 func TestEnvFallbackDoesNotMutateProcess(t *testing.T) {
 	t.Setenv("MISA_ENV_F03", "ambient")
-	Register(Command{Name: "env-f03-probe", Run: func(c *Context) int {
-		if got := os.Getenv("MISA_ENV_F03"); got != "ambient" {
-			t.Errorf("process environment changed: %q", got)
-		}
-		if c.Env == nil || c.Getenv("MISA_ENV_F03") != "local" {
-			t.Errorf("nested environment: %#v", c.Env)
-		}
-		return 0
-	}})
-	defer delete(registry, "env-f03-probe")
 	var out, errout bytes.Buffer
-	c := &Context{Args: []string{"-i", "MISA_ENV_F03=local", "env-f03-probe"}, Stdout: &out, Stderr: &errout}
-	if got := runEnv(c); got != 0 {
-		t.Fatalf("status %d: %s", got, errout.String())
+	c := &Context{Args: []string{"-i", "MISA_ENV_F03=local", "printenv", "MISA_ENV_F03"}, Stdout: &out, Stderr: &errout}
+	if got := runEnv(c); got != 0 || out.String() != "local\n" || os.Getenv("MISA_ENV_F03") != "ambient" {
+		t.Fatalf("status %d output %q stderr %q", got, out.String(), errout.String())
 	}
 }
 
@@ -119,7 +109,7 @@ func TestEnvExecutorLocalResolution(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ name, want string }{
-		{"echo", filepath.Join(dir, "echo")}, {"blocked", "blocked"}, {"./echo", "./echo"}, {"missing", "missing"},
+		{"echo", "echo"}, {"blocked", "blocked"}, {"./echo", "./echo"}, {"missing", "missing"},
 	} {
 		var out, errout bytes.Buffer
 		called := false
@@ -134,5 +124,75 @@ func TestEnvExecutorLocalResolution(t *testing.T) {
 		if got := runEnv(c); got != 0 || !called {
 			t.Errorf("%q: status %d called %v", tc.name, got, called)
 		}
+	}
+}
+
+func TestEnvResolutionPolicy(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"echo", "probe", "malformed"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("not an executable format\n"), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct {
+		name   string
+		env    []string
+		args   []string
+		status int
+		out    string
+	}{
+		{"builtin over cwd", []string{"PATH="}, []string{"echo", "safe"}, 0, "safe\n"},
+		{"unset path", []string{}, []string{"probe"}, 127, ""},
+		{"empty path searches cwd", []string{"PATH="}, []string{"probe"}, 126, ""},
+		{"explicit path is external", []string{}, []string{"./echo", "unsafe"}, 126, ""},
+		{"no enoexec shell", []string{"PATH="}, []string{"malformed"}, 126, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out, errout bytes.Buffer
+			c := &Context{Dir: dir, Env: tc.env, Args: tc.args, Stdout: &out, Stderr: &errout}
+			if got := runEnv(c); got != tc.status || out.String() != tc.out {
+				t.Fatalf("status %d stdout %q stderr %q", got, out.String(), errout.String())
+			}
+		})
+	}
+}
+
+func TestEnvExternalPathSnapshot(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.Symlink(exe, filepath.Join(dir, "f06-probe")); err != nil {
+		t.Fatal(err)
+	}
+	var out, errout bytes.Buffer
+	c := &Context{Dir: dir, Env: []string{"LEAK=bad"}, Args: []string{"-i", "PATH=", "MISA_ENV_F03_CHILD=yes", "f06-probe", "-test.run=^TestEnvFallbackExternalHelper$"}, Stdout: &out, Stderr: &errout}
+	if got := runEnv(c); got != 0 || out.String() != "MISA_ENV_F03_CHILD=yes\nPATH=" {
+		t.Fatalf("status %d stdout %q stderr %q", got, out.String(), errout.String())
+	}
+}
+
+func TestEnvExternalLaunchDiagnostics(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "empty"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		status int
+		stderr string
+	}{
+		{"./empty", 126, "env: './empty': Permission denied\n"},
+		{"missing", 127, "env: 'missing': No such file or directory\n"},
+		{"'-v '", 127, "env: '-v ': No such file or directory\nenv: use -[v]S to pass options in shebang lines\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out, errout bytes.Buffer
+			c := &Context{Dir: dir, Env: []string{}, Args: []string{tc.name}, Stdout: &out, Stderr: &errout}
+			if got := runEnv(c); got != tc.status || errout.String() != tc.stderr {
+				t.Fatalf("status %d stderr %q, want %d %q", got, errout.String(), tc.status, tc.stderr)
+			}
+		})
 	}
 }

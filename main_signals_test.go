@@ -59,12 +59,12 @@ func TestStandaloneSecondSignalAndCleanup(t *testing.T) {
 	}
 }
 func TestStandaloneSignalExemptions(t *testing.T) {
-	for _, name := range []string{"vi", "top", "htop", "btop", "bytop", "bashtop", "tm", "mines", "chess", "battleship", "sshc", "devices", "timeout"} {
+	for _, name := range []string{"vi", "top", "htop", "btop", "bytop", "bashtop", "tm", "mines", "chess", "battleship", "sshc", "devices"} {
 		if builtinSignalBridgeSafe(name) {
 			t.Errorf("%s owns terminal/signals", name)
 		}
 	}
-	for _, name := range []string{"sleep", "cat", "yes", "tail", "cp"} {
+	for _, name := range []string{"sleep", "cat", "yes", "tail", "cp", "timeout"} {
 		if !builtinSignalBridgeSafe(name) {
 			t.Error(name)
 		}

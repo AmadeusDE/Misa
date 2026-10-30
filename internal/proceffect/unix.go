@@ -3,18 +3,19 @@
 package proceffect
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
+	"os/signal"
 	"runtime"
 	"sync/atomic"
 	"syscall"
+	"time"
+
+	"github.com/AmadeusDE/Misa/internal/commandexec"
 )
 
 var inEffectGroup atomic.Bool
@@ -32,7 +33,7 @@ func decode(s string) (Request, error) {
 	e = json.Unmarshal(b, &r)
 	return r, e
 }
-func handle(args []string, dispatch func([]string) int) int {
+func handle(args []string, dispatch func(context.Context, []string) int) int {
 	if e := EnableSelfHelper(); e != nil {
 		fmt.Fprintf(os.Stderr, "process effect: helper unavailable: %v\n", e)
 		return 125
@@ -57,7 +58,28 @@ func handle(args []string, dispatch func([]string) int) int {
 			return 125
 		}
 		inEffectGroup.Store(true)
-		return dispatch(req.Argv)
+		signals := make(chan os.Signal, 2)
+		signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+		defer signal.Stop(signals)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		stopped, joined := make(chan struct{}), make(chan struct{})
+		var received os.Signal
+		go func() {
+			defer close(joined)
+			select {
+			case received = <-signals:
+				cancel()
+			case <-stopped:
+			}
+		}()
+		status := dispatch(ctx, req.Argv)
+		close(stopped)
+		<-joined
+		if received != nil {
+			return 128 + int(received.(syscall.Signal))
+		}
+		return status
 	}
 	runtime.LockOSThread()
 	n, e := niceness()
@@ -86,152 +108,42 @@ func handle(args []string, dispatch func([]string) int) int {
 	return 125
 }
 
+func sharesGroup() bool { return inEffectGroup.Load() }
+
+func start(ctx context.Context, req Request, inv Invocation, opts commandexec.Options) (*commandexec.Process, error) {
+	if len(req.Argv) == 0 {
+		return nil, errors.New("process effect: missing command")
+	}
+	exe, err := registeredHelper()
+	if err != nil {
+		return nil, err
+	}
+	stage := "adjust"
+	if req.DispatchOnly {
+		stage = "dispatch"
+	}
+	// A helper may own nested groups. Give cooperative dispatch time to tear
+	// those down before the outer owner forcibly kills its own group.
+	opts.CancelSignal, opts.CancelGrace = syscall.SIGTERM, 350*time.Millisecond
+	return commandexec.Start(ctx, exe, commandexec.Invocation{
+		Dir: inv.Dir, Env: append([]string{}, inv.Env...), Args: []string{Flag, stage, encode(req)},
+		Stdin: inv.Stdin, Stdout: inv.Stdout, Stderr: inv.Stderr,
+	}, opts)
+}
+
 func run(ctx context.Context, req Request, inv Invocation) int {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if ctx.Err() != nil {
-		return contextStatus(ctx)
+		return commandexec.ContextStatus(ctx.Err())
 	}
-	if len(req.Argv) == 0 {
-		return 125
-	}
-	exe, e := registeredHelper()
-	if e != nil {
+	child, err := Start(ctx, req, inv)
+	if err != nil {
 		if inv.Stderr != nil {
-			fmt.Fprintln(inv.Stderr, ErrUnavailable)
+			fmt.Fprintln(inv.Stderr, err)
 		}
 		return 125
 	}
-	cmd := exec.Command(exe, Flag, "adjust", encode(req))
-	cmd.Dir = inv.Dir
-	cmd.Env = append([]string{}, inv.Env...)
-	nested := inEffectGroup.Load()
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: !nested}
-	// Own the pipes so cancellation closes our ends and output copiers can be
-	// joined; a caller-owned Write already blocked must be unblocked by its owner.
-	var closeAfterStart, closeAfterWait []*os.File
-	var outputDone []<-chan struct{}
-	input := inv.Stdin
-	if input == nil {
-		input = bytes.NewReader(nil)
-	}
-	if f, ok := input.(*os.File); ok {
-		cmd.Stdin = f
-	} else {
-		r, w, err := os.Pipe()
-		if err != nil {
-			return 125
-		}
-		cmd.Stdin = r
-		closeAfterStart = append(closeAfterStart, r)
-		closeAfterWait = append(closeAfterWait, w)
-		go func() { _, _ = io.Copy(w, input); _ = w.Close() }()
-	}
-	makeOutput := func(dst io.Writer) *os.File {
-		if dst == nil {
-			dst = io.Discard
-		}
-		if f, ok := dst.(*os.File); ok {
-			return f
-		}
-		r, w, err := os.Pipe()
-		if err != nil {
-			return nil
-		}
-		closeAfterStart = append(closeAfterStart, w)
-		closeAfterWait = append(closeAfterWait, r)
-		done := make(chan struct{})
-		outputDone = append(outputDone, done)
-		go func() { defer close(done); _, _ = io.Copy(cancelWriter{ctx, dst}, r); _ = r.Close() }()
-		return w
-	}
-	cmd.Stdout = makeOutput(inv.Stdout)
-	cmd.Stderr = makeOutput(inv.Stderr)
-	if cmd.Stdout == nil || cmd.Stderr == nil {
-		for _, f := range append(closeAfterStart, closeAfterWait...) {
-			_ = f.Close()
-		}
-		return 125
-	}
-	e = cmd.Start()
-	for _, f := range closeAfterStart {
-		_ = f.Close()
-	}
-	if e != nil {
-		for _, f := range closeAfterWait {
-			_ = f.Close()
-		}
-		return 125
-	}
-	kill := func() {
-		if nested {
-			_ = cmd.Process.Kill()
-		} else {
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		}
-	}
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
-	select {
-	case e = <-done:
-	case <-ctx.Done():
-		kill()
-		e = <-done
-	}
-	// Preserve output on normal completion. On cancellation close our pipes,
-	// then join output workers so no caller-owned writer is touched after Run
-	// returns. The caller must unblock any Write that is already in progress.
-	for _, d := range outputDone {
-		select {
-		case <-d:
-		case <-ctx.Done():
-			kill()
-			goto drained
-		}
-	}
-drained:
-	for _, f := range closeAfterWait {
-		_ = f.Close()
-	}
-	for _, d := range outputDone {
-		<-d
-	}
-
-	if ctx.Err() != nil {
-		return contextStatus(ctx)
-	}
-	if e == nil {
-		return 0
-	}
-	var ee *exec.ExitError
-	if errors.As(e, &ee) {
-		if ws, ok := ee.Sys().(syscall.WaitStatus); ok {
-			if ws.Signaled() {
-				return 128 + int(ws.Signal())
-			}
-			return ws.ExitStatus()
-		}
-	}
-	return 125
-}
-func contextStatus(ctx context.Context) int {
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return 124
-	}
-	return 130
-}
-
-// Do not begin new writes once cancellation is observed. A Write already in
-// progress remains caller-owned and cannot be forcibly interrupted.
-type cancelWriter struct {
-	ctx context.Context
-	dst io.Writer
-}
-
-func (w cancelWriter) Write(p []byte) (int, error) {
-	if err := w.ctx.Err(); err != nil {
-		return 0, err
-	}
-	return w.dst.Write(p)
+	return child.Wait()
 }

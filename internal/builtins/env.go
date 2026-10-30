@@ -1,12 +1,14 @@
 package builtins
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/AmadeusDE/Misa/internal/commandexec"
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 )
 
 const envSpec = "i(ignore-environment)u(unset):0(null)"
@@ -231,58 +233,38 @@ func runEnv(ctx *Context) int {
 			subCtx.Env = append(subCtx.Env, k+"="+v)
 		}
 		if ctx.Exec != nil {
-			execName := subCmdName
-			// TODO(F06): decide cwd poisoning and resolution policy in the shared launcher.
-			if !strings.ContainsAny(subCmdName, `/\`) {
-				localPath, err := filepath.Abs(filepath.Join(workDir, subCmdName))
-				if err == nil {
-					if info, err := os.Stat(localPath); err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0 {
-						execName = localPath
-					}
-				}
-			}
-			return ctx.Exec(ctx.CancellationContext(), execName, &subCtx)
+			return ctx.Exec(ctx.CancellationContext(), subCmdName, &subCtx)
 		}
 
-		// Keep the legacy local executable preference when no executor is injected.
-		localPath := subCmdName
-		if !filepath.IsAbs(localPath) {
-			localPath = filepath.Join(workDir, localPath)
-		}
-		if info, err := os.Stat(localPath); err == nil && !info.IsDir() {
-			if info.Mode()&0111 == 0 {
-				fmt.Fprintf(ctx.Stderr, "env: '%s': Permission denied\n", subCmdName)
-				return 126
+		if !strings.ContainsAny(subCmdName, `/\`) {
+			if _, ok := Lookup(subCmdName); ok {
+				return proceffect.Run(ctx.CancellationContext(), proceffect.Request{
+					DispatchOnly: true, Argv: append([]string{subCmdName}, subArgs...),
+				}, proceffect.Invocation{Dir: workDir, Env: subCtx.Env, Stdin: ctx.Stdin, Stdout: ctx.Stdout, Stderr: ctx.Stderr})
 			}
-			cmd := exec.CommandContext(ctx.CancellationContext(), localPath, subArgs...)
-			cmd.Dir, cmd.Env = workDir, subCtx.Env
-			cmd.Stdout, cmd.Stderr, cmd.Stdin = ctx.Stdout, ctx.Stderr, ctx.Stdin
-			if err := cmd.Run(); err != nil {
-				if ctx.CancellationContext().Err() != nil {
-					return ExitStatus(ctx.CancellationContext().Err())
-				}
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					return exitErr.ExitCode()
-				}
-				return 1
-			}
-			return 0
 		}
-
-		cmd, ok := Lookup(subCmdName)
-		if !ok {
-			cmd, ok = Lookup(filepath.Base(subCmdName))
+		child, err := commandexec.Start(ctx.CancellationContext(), subCmdName, commandexec.Invocation{
+			Dir: workDir, Env: subCtx.Env, Stdin: ctx.Stdin, Stdout: ctx.Stdout, Stderr: ctx.Stderr,
+			Args: subArgs, Argv0: subCmdName,
+		}, commandexec.Options{})
+		if err == nil {
+			return child.Wait()
 		}
-		if ok {
-			return cmd.Run(&subCtx)
+		if ctx.CancellationContext().Err() != nil {
+			return ExitStatus(ctx.CancellationContext().Err())
 		}
-
-		if strings.HasPrefix(subCmdName, "'-") || (strings.HasPrefix(subCmdName, "'") && strings.Contains(subCmdName, "-")) {
+		status := commandexec.ErrorStatus(err)
+		switch {
+		case status == 127 && strings.HasPrefix(subCmdName, "'") && strings.Contains(subCmdName, "-"):
 			fmt.Fprintf(ctx.Stderr, "env: %s: No such file or directory\nenv: use -[v]S to pass options in shebang lines\n", subCmdName)
-			return 127
+		case status == 127:
+			fmt.Fprintf(ctx.Stderr, "env: '%s': No such file or directory\n", subCmdName)
+		case errors.Is(err, os.ErrPermission):
+			fmt.Fprintf(ctx.Stderr, "env: '%s': Permission denied\n", subCmdName)
+		default:
+			fmt.Fprintf(ctx.Stderr, "env: '%s': %v\n", subCmdName, err)
 		}
-		fmt.Fprintf(ctx.Stderr, "env: '%s': No such file or directory\n", subCmdName)
-		return 127
+		return status
 	}
 
 	var keys []string
