@@ -10,7 +10,8 @@ a set of built-in tools, and it ships as one self-contained binary.
 - Its own terminal emulator, so programs run inside panes
 - Built-in commands (a coreutils subset, `fetch`, `sshc`, a vi, minesweeper, battleship, a [chess
   engine for fairy variants](docs/CHESS.md)), usable on systems with no shell at all (`builtin_mode: inprocess`)
-- Chess includes Double Big Board (`chess doublebig`), a 32×16 variant with two armies per side.
+- Chess includes Double Big Board (`chess doublebig`), a 32×16 variant with two armies per side,
+  and four-player Teams (`chess fourplayer`), a cross-shaped board with a computer partner.
 - Minesweeper controls: `space` open, `f` flag, `n` new game, `1`–`3` select a level, `c` custom game, `q` quit
 - Data-driven package manager menus, a file browser, and tldr/man help
 - `misa --gui`: an optional Wayland window, pure Go and software rendered

@@ -148,7 +148,8 @@ internal/
   chess/                         Data-driven chess for any board size and fairy pieces, vs computer or hotseat:
     betza.go                     Betza funny-notation subset → Components (atoms, riders, m/c/f/b/l/r/s/v/i/n/p/g/q)
     variant.go                   Variant YAML (embedded variants/ + chess/*.yaml next to binary/~/.config/misa),
-                                 `extends:` inheritance, setup in FEN with multi-digit runs, castling, promotion
+                                 `extends:` inheritance, setup in FEN with multi-digit runs, castling, promotion;
+                                 `players: 4` routes to the fixed four-player Teams engine
     position.go                  Move generation (walk per component; a full open circle of a q rider is a pass),
                                  legality (no royal left attacked), castling, en passant on every crossed square,
                                  Apply (keeps royal squares), ParseFEN; captures() for quiescence
@@ -162,6 +163,8 @@ internal/
                                  check extension, repetition vs game history; Limits{Time, Depth, Nodes, Stop}
     difficulty.go                Typed levels (normal default), shallow weak profiles with isolated tables,
                                  seeded full-window root candidate selection; --think changes time only
+    fourmatch.go                 Four-player Teams rules on a fixed 14×14 cross; Red+Yellow vs Blue+Green
+    game_teams.go                Four-player UI and async computer routing
     game.go view.go run.go       procmon.Viewer screen: cursor/mouse, selection hints, promotion prompt, flip,
                                  letters toggle, move list panel; the computer thinks in a tea.Cmd (thoughtMsg,
                                  gen drops abandoned searches); standalone runner
@@ -312,12 +315,13 @@ internal/
   (font, font_size, padding, columns, rows, foreground, background, cursor, palette, opacity, clipboard_write). `misa --gui cmd…` runs
   cmd; a Misa builtin missing from PATH (sshc) runs through the multicall binary. `misa --ssh [sshc opts] dest` is the
   ssh-client launcher. A program exiting non-zero leaves its screen up with a note until a key is pressed.
-- **Chess variants**: Every rule lives in variant YAML; the engine has no orthodox-chess special cases. Pieces are
+- **Chess variants**: Two-player rules live in variant YAML; the engine has no orthodox-chess special cases.
+    Four-player Teams (`players: 4`) instead uses a separate fixed engine; see `docs/CHESS.md` for its draft rules. Pieces are
   Betza strings (`fmWfcFifmW2` pawn, `qN` rose, `mRcpR` cannon); `royal` pieces may never be left attacked (so with
   two kings, mating either wins), `pawn` pieces promote and take/are taken en passant. A pawn's long first step marks
   every crossed square for en passant. Castling entries are White's four squares, mirrored for Black. A file with
   `extends: <id>` inherits unset fields and merges pieces by letter; `castling: []` drops inherited castling. A later
-  file with an existing id replaces it. Built-ins: chess, double (Double Chess 16×12), bigboard (Betza's 16×16).
+  file with an existing id replaces it. Built-ins: chess, double (Double Chess 16×12), bigboard (Betza's 16×16), doublebig, fourplayer.
   Movement is checked by perft (`position_test.go`), so run the chess tests after touching move generation.
   The engine only uses what variants define (values, royal/pawn flags, ranks to promotion), so new pieces need at
   most a `value:`. Search runs off the UI goroutine on immutable Positions; cancel() sets the Stop flag and bumps

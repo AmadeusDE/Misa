@@ -90,3 +90,9 @@ func TestChessGameComputerSide(t *testing.T) {
 		}
 	}
 }
+
+func TestFourPlayerRejectsFEN(t *testing.T) {
+	if _, err := ChessGame([]string{"fourplayer", "--fen", "anything"}); err == nil || !strings.Contains(err.Error(), "--fen is not supported") {
+		t.Fatalf("expected clear four-player FEN error, got %v", err)
+	}
+}

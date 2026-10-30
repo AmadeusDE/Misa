@@ -72,6 +72,9 @@ func ChessGame(args []string) (*chess.Game, error) {
 		g.SetThinkTime(time.Duration(secs) * time.Second)
 	}
 	if fen, ok := flags.String("fen"); ok {
+		if v.Players == 4 {
+			return nil, errors.New("--fen is not supported for four-player chess")
+		}
 		p, err := chess.ParseFEN(v, fen)
 		if err != nil {
 			return nil, fmt.Errorf("--fen: %v", err)
