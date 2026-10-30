@@ -5,10 +5,16 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/AmadeusDE/Misa/internal/builtinexec"
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 	"github.com/AmadeusDE/Misa/testapi"
 )
 
 func main() {
+	_ = proceffect.EnableSelfHelper()
+	if len(os.Args) > 1 && os.Args[1] == proceffect.Flag {
+		os.Exit(builtinexec.ProcessEffect(os.Args[2:]))
+	}
 	name := filepath.Base(os.Args[0])
 	if name == "multicall" {
 		if len(os.Args) < 2 {
