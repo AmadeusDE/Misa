@@ -209,6 +209,35 @@ shell tools. The command is `aichat [-m provider/model] [conversation-id]`, also
 - Put search in `internal/ai/search.go` + `fetch.go` (new files) so PR 3 could reuse it later. Tests against
   `httptest` fixtures only.
 
+As built (2):
+
+- Package `internal/aichat`; `aichat.New(Options)` is the `procmon.Viewer`. Options carry the seams tests use (`Open`,
+  `ModelFor`, `Models`, `Tools`, `Copy`, `Now`, `Dir`); defaults use `internal/ai`. `aichat.Run` is the standalone
+  program (`misa aichat`, `main_aichat.go`, stub `main_nough_aichat.go`). `internal/ui/aichat.go` holds the wiring
+  (`newAIChat`, set by `aichat_ai.go` under `!nough`; nil means not built in), the `aichat` builtin case in
+  `handleBuiltinCmd` and the "AI Chat" main menu entry (absent under `-tags nough`).
+- Keys: enter send, alt+enter/ctrl+j/shift+enter newline, esc stop/cancel edit, up (empty input) edit last, ctrl+r
+  regenerate, ctrl+y copy, ctrl+t thinking, pgup/pgdown scroll, ctrl+n new, ctrl+b sidebar, tab focus, ctrl+o model,
+  ctrl+s system prompt, ctrl+g web, ctrl+q / ctrl+d (empty) quit. Rename and delete are `r` and `d` (then `y`) in the
+  sidebar. None collides with the mux (ctrl+w, alt+1-9, alt+h/j/k/l, alt+arrows); Misa's nested Model consumes
+  ctrl+c to close the pane, so the chat cannot use it inside Misa.
+- Conversations: `$XDG_DATA_HOME/misa/chats/<id>.json` (default `~/.local/share/misa/chats`), id is a timestamp
+  (`20260102-150405.000`), saved atomically after the user message, after each answer and on rename/model/system
+  changes. Only user and assistant text is replayed to the model (thinking, notes and tool turns are kept for display).
+  The sidebar list is read once in `Init`, off the Update goroutine, and kept in memory afterwards.
+- Streaming: `job` (gen.go) runs `ai.RunTools` (at most 6 turns) on its own goroutine; events go over a buffered
+  channel; `job.wait` blocks for one batch and the model re-arms it. Events carry the generation number and a stale
+  one is dropped. The stream re-renders at most every 50 ms through a `tea.Tick`. Thinking is dimmed and collapsed
+  (`ctrl+t` expands all of it).
+- Web search: `ai.WebTools(Search)` returns `web_search` and `fetch_url` (nil when the engine is `off`), in
+  `internal/ai/search.go` and `fetch.go`; both use `golang.org/x/net/html` (now a direct dependency) and the package
+  variable `webClient`/`duckduckgoURL` for tests. The 400-with-"tool" retry is detected on the error text, because
+  `ai` scrubs errors into plain errors. A retry switches web search off for the conversation.
+- Deviations: the model picker only lists providers with a key (or Local) and shows the others' failures as dimmed
+  lines; typing a full `provider/model` is accepted. `fetch_url` does not block loopback or private addresses
+  (documented in AI.md). The sidebar's "new chat" row is always first. The system prompt editor and rename use the
+  same keys as the input (enter saves).
+
 ## 3. AI command help (PR 3)
 
 Gemhelp for Misa, on `internal/ai` instead of the Gemini SDK. Command `aihelp` (a multicall entry and in-process,

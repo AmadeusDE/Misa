@@ -404,6 +404,7 @@ func buildRootItems(dir string, entries []config.Entry) []list.Item {
 		}
 	}
 
+	items = append(items, aiChatItems()...)
 	items = append(items,
 		menuItem{
 			title: "Performance",
@@ -1271,6 +1272,14 @@ func (m *Model) handleBuiltinCmd(input string) (bool, tea.Cmd) {
 	}
 
 	switch fields[0] {
+	case "aichat":
+		m.cmdInput.SetValue("")
+		cmd, err := m.openAIChat(fields[1:])
+		if err != nil {
+			m.shellBuffer = append(m.shellBuffer, "aichat: "+err.Error())
+			m.updateShellView()
+		}
+		return true, cmd
 	case "top":
 		m.enterProcMon(procmon.NewTop())
 		m.cmdInput.SetValue("")
