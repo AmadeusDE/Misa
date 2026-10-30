@@ -43,6 +43,8 @@ func main() {
 		os.Exit(startGUI(os.Args[1:]))
 	case "misa-ssh":
 		os.Exit(startSSH(os.Args[1:]))
+	case "aichat":
+		os.Exit(runAIChat(os.Args[1:]))
 	}
 
 	if name != "misa" {
@@ -63,6 +65,8 @@ func main() {
 			os.Exit(runWeb(os.Args[2:]))
 		case "--web-admin":
 			os.Exit(runWebAdmin(os.Args[2:]))
+		case "aichat":
+			os.Exit(runAIChat(os.Args[2:]))
 		case "--list", "--list-builtins":
 			for _, n := range builtins.Names() {
 				fmt.Println(n)

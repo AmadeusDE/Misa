@@ -79,4 +79,64 @@ search:
   searxng_url: http://localhost:8888
 ```
 
-Builds with `-tags nough` leave the AI features out.
+## Chat
+
+`aichat [-m provider/model] [conversation-id]` is a chat client in the terminal: typed at the prompt it takes the
+pane over, `misa aichat …` runs it on the whole terminal, and the main menu has an "AI Chat" entry. It is not an agent:
+the model has no file or shell tools. `-m` picks the model for this session; without it the conversation's own model is
+used, then `models.chat` / `models.default` of `ai.yaml`, then ugh's `[models] default`. With none of those set the
+header says `no model: run aiconfig`.
+
+The screen has a conversation list on the left (hidden below 72 columns), the transcript, and a multi-line input.
+Answers stream in as markdown; reasoning is shown as a dimmed, collapsed `▸ thinking` line. The header shows the
+model, whether web search is on, and the tokens (and cost, when the provider reports it) of the conversation.
+
+| key | action |
+|---|---|
+| `enter` | send |
+| `alt+enter`, `ctrl+j` | newline |
+| `esc` | stop the answer, cancel editing, leave the list |
+| `up` (empty input) | edit and resend your last message (`esc` cancels) |
+| `ctrl+r` | answer the last message again |
+| `ctrl+y` | copy the last answer (host clipboard, else OSC 52) |
+| `ctrl+t` | show or hide the thinking of every answer |
+| `pgup` / `pgdown`, mouse wheel | scroll the transcript |
+| `ctrl+n` | new conversation (keeps the model and web search choice) |
+| `ctrl+b` | show or hide the conversation list |
+| `tab` | move focus between the input and the list |
+| `ctrl+o` | model picker: models of every provider with a key (or none needed), type to filter, `enter` picks; a typed `provider/model` works too |
+| `ctrl+s` | system prompt of this conversation (`enter` saves, `alt+enter` newline) |
+| `ctrl+g` | web search on or off |
+| `ctrl+q`, `ctrl+d` (empty input) | leave |
+
+In the list: `up`/`down` (or `k`/`j`) move, `enter` opens, `n` starts a new one, `r` renames, `d` deletes (then `y`
+confirms). Clicking a row opens it. `ctrl+w` is Misa's multiplexer prefix and `alt+1-9`, `alt+h/j/k/l` and the alt
+arrows switch panes, so the chat uses none of them. Inside Misa `ctrl+c` closes the pane; `ctrl+q` leaves the chat.
+
+Conversations are JSON files in `~/.local/share/misa/chats/` (`$XDG_DATA_HOME/misa/chats/`), one per conversation:
+title (the first line you wrote, until renamed), system prompt, model, messages, thinking and token totals. Only the
+text of the turns is sent back to the model, not its thinking or tool calls.
+
+### Web search
+
+`ctrl+g` lets the model call two tools, `web_search(query)` and `fetch_url(url)`. Search is off in each new chat. Each
+call appears as one dimmed line (`· searched: …`, `· fetched: …`) above the answer. Up to six model turns are used per
+message. A model that refuses tools (HTTP 400 mentioning tools) gets one retry without them, noted in the transcript,
+and search is switched off for that conversation.
+
+```yaml
+search:
+  engine: duckduckgo        # duckduckgo (default, no key) | searxng | off
+  searxng_url: http://localhost:8888
+```
+
+- `duckduckgo` reads the HTML results page of `html.duckduckgo.com`; no key, but it is a scraped page and DuckDuckGo may
+  rate-limit or change it. 
+- `searxng` queries `<searxng_url>/search?format=json`; the instance must allow the `json` format.
+- `off` removes the tools, and `ctrl+g` says so.
+
+`fetch_url` fetches http and https pages only, with a 15 second timeout, strips scripts, styles and markup, and returns
+at most about 20 KB of text. It connects to public addresses only: loopback, private, link-local and CGNAT addresses
+are refused after DNS resolution and on redirects, so a page the model reads cannot steer it into local services.
+
+Builds with `-tags nough` leave the AI features out; `aichat` then prints `built without AI support (-tags nough)`.

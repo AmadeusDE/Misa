@@ -68,6 +68,7 @@ Dependency direction (enforced by `internal/ugh/deps_test.go`): Misa libraries <
 main.go                          Entry point — starts Bubble Tea program; `--gui`/`misa-gui` opens the Wayland window,
                                  `--ssh`/`misa-ssh` opens it running sshc; `--web`/`--web-admin` serve it in a browser (main_web.go, `-tags noweb` stub); guiCommand resolves builtins not on PATH
 main_gui.go main_nogui.go        runGUI, or its `-tags nogui` stub
+main_aichat.go                   `misa aichat` (`!nough`; main_nough_aichat.go is the stub)
 internal/
   ugh/                           ugh agent harness merged in (agent, tools, llm, perm, policy, session, ughtui, …); cmd/ugh is its CLI
   ughbot/                        ughbot daemon (docs/ughbot/DEPLOY.md); cmd/ughbot is its CLI:
@@ -259,6 +260,7 @@ internal/
                                  recursion); flags over config.yaml `web:`; XDG state/config dirs. internal/ui never imports webui
   ai/                            Misa's way to reach ugh's providers (`!nough` callers only; ugh and builtins never import it):
                                  ai.go (Client: Open/OpenFor/Stream/Complete), tools.go (RunTools: tool loop, calls assembled by Event.Seq),
+                                 search.go fetch.go (web_search over DuckDuckGo HTML or SearXNG JSON, fetch_url: the chat's web tools),
                                  settings.go (ai.yaml: per-feature models, search engine; ModelFor), providers.go (Providers, SaveProvider,
                                  SetKey, SetDefaultModel, Models, Test: edits ugh's config.toml and credential store), tomledit.go (section-scoped
                                  text edits that keep comments and other tables), presets.go. aitest.Isolate points HOME/XDG at temp dirs for tests
@@ -267,6 +269,11 @@ internal/
                                  key), models.go (fetched list, filter, set default/chat/help), defaults.go (default/chat/help models, search
                                  engine, SearXNG URL), tasks.go (Test/Models as tea.Cmds, error scrubbing), table.go (selection + mouse rows),
                                  run.go (standalone). Wired in internal/ui by `aiconfig*.go` (`!nough` real, `nough` stub)
+  aichat/                        `aichat [-m ref] [id]`: chat client as a procmon.Viewer (`!nough` callers only). chat.go (Chat, Options, New/Update),
+                                 conv.go (send/regenerate/edit/stop, persist), gen.go (job: a goroutine runs `ai.RunTools`, events cross a channel,
+                                 `wait` is the tea.Cmd that blocks for the next batch), transcript.go (per-message block cache, glamour, 50 ms stream
+                                 re-render), view.go sidebar.go picker.go keys.go mouse.go, store.go (conversations as JSON in the XDG data dir
+                                 `misa/chats`), models.go (provider model lists, clipboard), run.go (standalone `misa aichat`), args.go
   ughbot/sandbox/                Code-task tool protocol: Serve (`ughbot vm-agent` in the VM), Client (tools.Executor +
                                  worktree.GitFunc), Local (in-process, tests)
   ughbot/vm/                     Throwaway qemu VMs: Prepare (cloud image + NoCloud seed over loopback HTTP, pinned
@@ -317,6 +324,16 @@ internal/
   stale reply is dropped; `Update` never waits on the network. Every error goes through `safeError` (perm.Scrub plus the typed key), so no key is
   shown; the key field is `EchoPassword` and emptied once stored. Mouse: click selects, a second click activates, wheel scrolls (`cursorList`).
   Tests drive key messages under `aitest.Isolate` with httptest providers.
+- **AI chat (`internal/aichat`)**: `aichat [-m ref] [id]` takes the pane over like `mines` (`m.enterProcMon`, via `newAIChat` set in
+  `internal/ui/aichat_ai.go`, `!nough`; nil under `-tags nough`, where the command and the menu entry say it is not built in) and
+  `misa aichat` runs it standalone (`main_aichat.go`). Streaming never blocks Update: `generate` starts a `job` whose goroutine
+  runs `ai.RunTools`; its events cross a channel and come back as `genMsg{gen}` from a re-arming `job.wait` command. Stop and
+  switching bump `gen`, so events of a cancelled generation are dropped, and a goroutine nobody drains for 10 s cancels itself.
+  The streaming answer re-renders through glamour at most every 50 ms (`renderTickMsg`); finished messages are cached per width.
+  Keys avoid the mux: ctrl+w is its prefix and alt+1-9, alt+h/j/k/l and alt+arrows are global, so none are bound (a test sends
+  them), and ctrl+c is intercepted by the nested Model (it closes the pane), hence ctrl+q to leave. Conversations are
+  `$XDG_DATA_HOME/misa/chats/<id>.json`; only turn text goes back to the model. Tests drive `Chat.Update` with a fake
+  `llm.Provider` through `Options.Open` and never use the network or `~/.config`.
 - **Command correction (thefuck)**: `internal/thefuck` package with pattern-based rules. After a failed shell command, `thefuck.Match()` suggests a fix. Shown in output; `ctrl+f` accepts and runs the fix.
 - **Fetch builtin**: `fetch` command renders ASCII art + system info side by side (mfetch-style). Supports `--info`, `--theme`, `--ascii`, `-e` (emotes/nerd font), `--list-info`, `--list-ascii`, `--list-themes` flags. Configured via `fetch.yaml` (info, emotes, theme, color_mode, ascii, max_height); CLI flags override.
 - **SSH client (`sshc`)**: `sshc [-tT] [-F cfg] [-i id] [-l user] [-o Key=Value] [-p port] destination [command]`. Understands HostName, User, Port, IdentityFile, StrictHostKeyChecking and UserKnownHostsFile from ssh_config; everything else (ProxyJump, forwarding, ControlMaster) is ignored. A PTY is requested for a shell, or with `-t`, only when stdin is a terminal. Tests run against an in-process x/crypto server (`client_test.go`).
@@ -403,7 +420,7 @@ Commit trailers for agent-made commits:
 - `internal/companion/NOTICE` — Companion response template attribution (cargo-mommy, fwdekker/mommy).
 - `internal/vi/NOTICE` — Vi editor attribution (toybox, vis).
 - `THIRD_PARTY_NOTICES.md` — Licenses of third-party code, test suites and data.
-- `docs/AI.md` — Misa's AI features: provider setup (shared with ugh) and `ai.yaml`.
+- `docs/AI.md` — Misa's AI features: provider setup (shared with ugh), `ai.yaml`, `aichat` (keys, web search).
 - `docs/MISA_WEB.md` — `misa --web`: Misa in a browser (enroll, binding, security).
 - `docs/UGH.md` — ugh: providers, running, TUI, tools, permissions, subagents, configuration.
 - `docs/ughbot/DEPLOY.md`, `docs/ughbot/WEB.md` — ughbot (experimental): setup, bots, approvals, web UI.
