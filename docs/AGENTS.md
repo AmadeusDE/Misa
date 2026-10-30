@@ -347,6 +347,8 @@ Project rules:
 - Config search order: next to executable → `~/.config/misa/` (never the working directory).
 - Never write to external shell history files (bash, zsh). Read-only imports.
 - Builtins register via `init()` with `Register(Command{...})` and use the `Spec`/`ParseArgs` option parser.
+- Plans stay plans: never open a GitHub issue or a pull request for a plan alone. Keep plans in
+  `docs/plans/` locally until there is actual code to implement, then open the pull request with that code.
 
 ugh (`internal/ugh/*`, `cmd/ugh`):
 
