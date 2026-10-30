@@ -27,9 +27,14 @@ func runSleep(ctx *Context) int {
 		total += d
 	}
 
-	time.Sleep(total)
+	sleepFor(total)
 	return 0
 }
+
+// sleepFor is how the sleep family pauses: a plain time.Sleep, so a pane that
+// closes ends the process rather than the pause. Cooperative cancellation for
+// sleep and usleep is the shared F05 item; see docs/plans/builtins.md.
+func sleepFor(d time.Duration) { time.Sleep(d) }
 
 func parseSleepDuration(s string) (time.Duration, error) {
 	s = strings.TrimSpace(s)

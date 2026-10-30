@@ -30,6 +30,18 @@ Grouped by cause:
 
 When a case starts passing, delete its line.
 
+## Intentional differences from the reference implementations
+
+These are chosen, not unfixed; no upstream test covers them.
+
+- `crc32` prints `CHECKSUM NAME` for every explicit file operand. toybox's `crc32_main` decrements its operand
+  count before printing, so it drops the name when there is exactly one operand; Misa keeps toybox's output for
+  two or more operands and rejects unknown options instead of opening `-H` as a file.
+- `usleep` rejects a non-numeric or negative argument as a usage error (status 1). toybox parses with `atol`,
+  so `usleep abc` silently sleeps 0 microseconds.
+- `usleep` and `sleep` share `sleepFor`: a plain `time.Sleep` with no cancellation of its own (see the F05
+  cancellation item in `## Next`).
+
 ## Next
 
 1. **Safe in-process use.** `builtin_mode: inprocess` runs built-ins on goroutines in one process, so

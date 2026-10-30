@@ -31,7 +31,7 @@ uutils org repos checked that ship no utilities (libraries/docs/trackers): rust-
 
 | Column | Utilities |
 |---|---|
-| Misa | 114 |
+| Misa | 117 |
 | toybox (all) | 349 |
 | toybox: non-pending, default y | 250 |
 | toybox: non-pending, default n | 3 |
@@ -134,10 +134,10 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `command` |  | ✓ pending |  |  |
 | `conspy` |  |  | ✓ |  |
 | `continue` |  | ✓ pending |  |  |
-| `count` |  | ✓ other |  |  |
+| `count` | ✓ | ✓ other |  |  |
 | `cp` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `cpio` |  | ✓ posix | ✓ |  |
-| `crc32` |  | ✓ posix | ✓ |  |
+| `crc32` | ✓ | ✓ posix | ✓ |  |
 | `crond` |  | ✓ pending | ✓ |  |
 | `crontab` |  | ✓ pending | ✓ |  |
 | `cryptpw` |  |  | ✓ |  |
@@ -621,7 +621,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `userdel` |  | ✓ pending |  | ✓ shadow |
 | `usermod` |  |  |  | ✓ shadow |
 | `users` |  |  | ✓ | ✓ coreutils |
-| `usleep` |  | ✓ other | ✓ |  |
+| `usleep` | ✓ | ✓ other | ✓ |  |
 | `uudecode` | ✓ | ✓ posix | ✓ |  |
 | `uuencode` | ✓ | ✓ posix | ✓ |  |
 | `uuidgen` | ✓ | ✓ other | ✓ | ✓ util-linux |
