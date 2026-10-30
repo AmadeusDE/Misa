@@ -64,5 +64,10 @@ an unanalysed legal fallback is labelled instead of showing a fabricated score.
 ## Custom board dimensions
 
 Variants support 1–702 files (labels `a` through `zz`) and 1–99 ranks.
+
 Large boards can be expensive to load and play: reach tables, move generation,
 and search consume more memory and time as the board grows.
+
+## Bundled variants
+
+- **Amazon Chess** (`chess amazon`): 8×8 orthodox chess with queens replaced by Amazons, moving as queen or knight. Castling, en passant, and checkmate/stalemate follow orthodox rules; promotion is to Amazon, rook, bishop, or knight. The Amazon's value (1200 cp) is approximate. This queen-replacement variant follows the published Amazon piece definition at [Chess Variants](https://www.chessvariants.com/diffmove.dir/amazone.html) and [Wikipedia](https://en.wikipedia.org/wiki/Amazon_(chess)).

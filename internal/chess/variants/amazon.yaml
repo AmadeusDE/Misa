@@ -1,0 +1,8 @@
+id: amazon
+name: Amazon Chess
+description: Orthodox chess with each queen replaced by an Amazon (queen or knight).
+extends: chess
+pieces:
+  - {letter: A, name: Amazon, betza: QN, glyph: ♛, value: 1200} # Approximate value; queen plus knight is a rough estimate.
+setup: rnbakbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBAKBNR
+promotion: [A, R, B, N]

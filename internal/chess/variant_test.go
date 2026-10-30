@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -28,6 +29,7 @@ func TestBuiltinVariants(t *testing.T) {
 		{"chess", 8, 8, 6, 2},
 		{"double", 16, 12, 6, 4},
 		{"bigboard", 16, 16, 12, 2},
+		{"amazon", 8, 8, 7, 2},
 	}
 	for _, tt := range tests {
 		v := builtin(t, tt.id)
@@ -193,5 +195,21 @@ func TestVariantDimensionBounds(t *testing.T) {
 		if got := !strings.Contains(err.Error(), "board must be"); got != tt.valid {
 			t.Errorf("%dx%d: %v; dimension validity want %v", tt.files, tt.ranks, err, tt.valid)
 		}
+	}
+}
+
+func TestAmazonMovesAsQueenAndKnight(t *testing.T) {
+	v := builtin(t, "amazon")
+	p := fen(t, v, "4k3/8/8/8/8/8/8/3AK3 w")
+	got := destinations(p, "d1")
+	for _, want := range []string{"b2", "c3", "e3", "f2", "d8", "a1", "a4", "h5"} {
+		if !slices.Contains(got, want) {
+			t.Fatalf("amazon on d1 cannot reach %s: %v", want, got)
+		}
+	}
+	start := NewPosition(v)
+	result := NewEngine(v).Think(start, nil, Limits{Depth: 1})
+	if !result.Found || !slices.Contains(start.Moves(), result.Move) {
+		t.Fatalf("search move %v is not legal", result.Move)
 	}
 }
