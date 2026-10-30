@@ -351,9 +351,8 @@ func (g *Game) draw() (string, []target) {
 	felt := lipgloss.NewStyle().Background(lipgloss.Color(bg)).Foreground(lipgloss.Color("#ffffff"))
 	line := func(s string) string { return felt.Width(g.width).MaxWidth(g.width).MaxHeight(1).Render(s) }
 	titleStyle := lipgloss.NewStyle().Background(lipgloss.Color(title)).Foreground(lipgloss.Color("#ffffff")).Bold(true).Width(g.width).MaxWidth(g.width).MaxHeight(1)
-	lines := []string{titleStyle.Render(" Misa · " + g.title), line(cards.DealID(g.id, g.opts.Seed, g.opts.Rule))}
-	status := strings.Split(lipgloss.NewStyle().Width(g.width).Render(g.table.Status()), "\n")
-	for _, s := range status[:min(len(status), 4)] {
+	lines := []string{titleStyle.Render(" Misa · " + g.title)}
+	for _, s := range g.headerLines() {
 		lines = append(lines, line(s))
 	}
 	var targets []target
@@ -478,6 +477,5 @@ func (g *Game) draw() (string, []target) {
 func (g *Game) helpPage() ([]string, int) {
 	text := cards.DealID(g.id, g.opts.Seed, g.opts.Rule) + "\n" + g.table.Status() + "\nArrows/Tab: focus; Enter/Space: select/place\nEsc: cancel; u/U: undo/redo; h: hint; a: auto\nn: fresh seed; r: identical replay; q: quit\nButtons: N new, R restart, Q quit, U undo, Y redo, H hint, A auto\n\n" + g.table.Help()
 	body := strings.Split(lipgloss.NewStyle().Width(max(1, g.width-2)).Render(text), "\n")
-	status := strings.Split(lipgloss.NewStyle().Width(max(1, g.width)).Render(g.table.Status()), "\n")
-	return body, max(1, g.height-4-min(len(status), 4))
+	return body, max(1, g.height-len(g.headerLines())-3)
 }

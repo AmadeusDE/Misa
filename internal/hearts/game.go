@@ -50,17 +50,23 @@ func (t *table) Piles() []cardui.Pile {
 }
 func (t *table) Status() string {
 	s := t.state
-	phase := fmt.Sprintf("seat %d plays · trick %d/13 · winner %d", s.Turn, s.Tricks+1, s.LastWinner)
+	phase := fmt.Sprintf("Seat %d plays; trick %d/13", s.Turn, s.Tricks+1)
 	if s.Passing {
 		phase = "Pass 3 " + []string{"left", "right", "across", "hold"}[s.Round%4] + fmt.Sprintf(" (%d selected)", len(t.selected))
 	}
 	if s.RoundOver {
-		phase = fmt.Sprintf("Round points %v · select Next", s.LastRound)
+		phase = "Round over: select Next"
 	}
 	if s.Over {
-		phase = fmt.Sprintf("Round points %v · winning seats %v", s.LastRound, s.Winners())
+		phase = fmt.Sprintf("Winning seats: %v", s.Winners())
 	}
-	return fmt.Sprintf("Hand %d · target %d · scores %v\n%s", s.Round+1, s.Target, s.Scores, phase)
+	if s.LastWinner >= 0 {
+		phase += fmt.Sprintf("\nLast trick winner: %d", s.LastWinner)
+	}
+	if s.RoundOver {
+		phase += fmt.Sprintf("\nRound points %v", s.LastRound)
+	}
+	return fmt.Sprintf("%s\nHand %d · target %d · scores %v", phase, s.Round+1, s.Target, s.Scores)
 }
 func (t *table) Act(from, row, to int) bool {
 	if from >= 0 || t.committed || t.state.Over {
