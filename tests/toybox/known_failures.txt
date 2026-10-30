@@ -18,13 +18,6 @@ du/-H_follows_specified_symlinks  # du: block counts depend on the filesystem
 env/why_is_this_allowed  # env: =BLAH (empty variable name) is rejected
 grep/pattern_with_newline  # adapter: $'...' becomes $"...", so the pattern keeps a literal \n
 grep/backref  # adapter: backslashes inside double quotes are dropped
-grep/-hr  # grep: -r waits for the shared walker (U02/U05)
-grep/-r_file  # grep: -r waits for the shared walker (U02/U05)
-grep/-r_dir  # grep: -r waits for the shared walker (U02/U05)
-grep/line181  # grep: -r waits for the shared walker (U02/U05)
-grep/--exclude-dir  # grep: -r waits for the shared walker (U02/U05)
-grep/line199  # grep: -R waits for the shared walker (U02/U05)
-grep/don't_block_on_FIFO  # grep: -r waits for the shared walker (U02/U05)
 sed/getdelim_with_nested_[:blah:]  # adapter: backslashes inside double quotes are dropped
 sed/-z  # adapter: backslashes inside double quotes are dropped
 sed/\n_with_empty_capture  # adapter: backslashes inside double quotes are dropped

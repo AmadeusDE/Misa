@@ -17,6 +17,7 @@ const grepSpec = "e(regexp):f(file):E(extended-regexp)F(fixed-strings)G(basic-re
 	"h(no-filename)H(with-filename)n(line-number)b(byte-offset)o(only-matching)" +
 	"m#(max-count)A#(after-context)B#(before-context)C#(context)" +
 	"z(null-data)Z(null)a(text)r(recursive)R(dereference-recursive)" +
+	"(include):(exclude):(exclude-from):(exclude-dir):" +
 	"(label):(color):?(colour):?(line-buffered)(group-separator):(no-group-separator)"
 
 var grepSpecParsed = mustParseSpec("grep", grepSpec)
@@ -39,6 +40,7 @@ type grepOptions struct {
 	invert, count, filesWith, filesWithout, quiet, noMessages bool
 	withFilename, lineNumber, byteOffset, onlyMatching        bool
 	nullData, nullName, lineBuffered, color, contextSet       bool
+	recursive, dereference, noFilename                        bool
 	maxCount                                                  int64
 	after, before                                             int
 	label                                                     string
@@ -77,31 +79,36 @@ func runGrep(ctx *Context, name string) int {
 		fmt.Fprintf(ctx.Stderr, "grep: %v\n", err)
 		return 2
 	}
-	if len(files) == 0 {
+	filter, err := grepFilters(ctx, flags)
+	if err != nil {
+		fmt.Fprintf(ctx.Stderr, "grep: %v\n", err)
+		return 2
+	}
+	switch {
+	case len(files) > 0:
+	case opts.recursive:
+		files = []string{""}
+	default:
 		files = []string{"-"}
 	}
-	if !flags.Bool("h") && (flags.Bool("H") || len(files) > 1) {
+	if !opts.noFilename && (flags.Bool("H") || len(files) > 1) {
 		opts.withFilename = true
 	}
 	g := newGrepRun(ctx, opts, matcher)
+	g.filter = filter
 	return g.files(files)
 }
 
 func grepParseOptions(flags *ParseResult) (*grepOptions, error) {
-	for _, unsupported := range []struct{ flag, msg string }{
-		{"P", "-P: Perl regular expressions are not supported"},
-		{"r", "-r: recursive search is not supported yet"},
-		{"R", "-R: recursive search is not supported yet"},
-	} {
-		if flags.Bool(unsupported.flag) {
-			return nil, errors.New(unsupported.msg)
-		}
+	if flags.Bool("P") {
+		return nil, errors.New("-P: Perl regular expressions are not supported")
 	}
 	o := &grepOptions{
 		invert: flags.Bool("v"), count: flags.Bool("c"), quiet: flags.Bool("q") || flags.Bool("silent"),
 		filesWith: flags.Bool("l"), filesWithout: flags.Bool("L"), noMessages: flags.Bool("s"),
 		lineNumber: flags.Bool("n"), byteOffset: flags.Bool("b"), onlyMatching: flags.Bool("o"),
 		nullData: flags.Bool("z"), nullName: flags.Bool("Z"), lineBuffered: flags.Bool("line-buffered"),
+		recursive: flags.Bool("r") || flags.Bool("R"), dereference: flags.Bool("R"), noFilename: flags.Bool("h"),
 		maxCount: -1, label: "(standard input)",
 	}
 	if n, ok := flags.Num("m"); ok {
