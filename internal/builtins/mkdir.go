@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 	"golang.org/x/sys/unix"
 )
 
@@ -119,7 +120,11 @@ func mkdirParents(ctx *Context, rawDir, path string, perm os.FileMode, hasMode, 
 			lastRealIdx = i
 		}
 	}
-	parentPerm := (os.FileMode(0777) &^ os.FileMode(currentUmask())) | 0700
+	mask, err := proceffect.Umask()
+	if err != nil {
+		return fmt.Errorf("cannot read umask: %w", err)
+	}
+	parentPerm := (os.FileMode(0777) &^ os.FileMode(mask)) | 0700
 
 	var displayParts []string
 	for idx, c := range components {

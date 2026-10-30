@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 )
 
 func TestMkfifoModes(t *testing.T) {
@@ -88,7 +90,7 @@ func TestMkfifoOmittedWho(t *testing.T) {
 		}
 	}
 	skipWithoutFifos(t)
-	mask, err := mkfifoUmask()
+	mask, err := proceffect.Umask()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,10 +100,10 @@ func TestMkfifoOmittedWho(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0777&^mask {
+	if info.Mode().Perm() != os.FileMode(0777&^mask) {
 		t.Errorf("mode = %03o, mask = %03o", info.Mode().Perm(), mask)
 	}
-	after, err := mkfifoUmask()
+	after, err := proceffect.Umask()
 	if err != nil || after != mask {
 		t.Fatalf("umask changed: %03o -> %03o (%v)", mask, after, err)
 	}

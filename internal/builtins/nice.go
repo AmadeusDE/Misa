@@ -3,12 +3,10 @@ package builtins
 import (
 	"fmt"
 	"math"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
+
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 )
 
 func init() {
@@ -18,7 +16,7 @@ func init() {
 func runNice(ctx *Context) int {
 	args := ctx.Args
 	if len(args) == 0 {
-		prio, err := syscall.Getpriority(syscall.PRIO_PROCESS, 0)
+		prio, err := proceffect.Niceness()
 		if err != nil {
 			fmt.Fprintf(ctx.Stderr, "nice: %v\n", err)
 			return 1
@@ -118,7 +116,7 @@ func runNice(ctx *Context) int {
 			fmt.Fprintln(ctx.Stderr, "nice: a command must be given with an adjustment")
 			return 125
 		}
-		prio, err := syscall.Getpriority(syscall.PRIO_PROCESS, 0)
+		prio, err := proceffect.Niceness()
 		if err != nil {
 			fmt.Fprintf(ctx.Stderr, "nice: %v\n", err)
 			return 1
@@ -127,19 +125,13 @@ func runNice(ctx *Context) int {
 		return 0
 	}
 
-	// TODO(F04): priority is a process/thread effect and needs child isolation.
-	curPrio, err := syscall.Getpriority(syscall.PRIO_PROCESS, 0)
-	if err == nil {
-		newPrio := curPrio + adj
-		if err := syscall.Setpriority(syscall.PRIO_PROCESS, 0, newPrio); err != nil || (adj < 0 && os.Geteuid() != 0) {
-			fmt.Fprintln(ctx.Stderr, "nice: warning: setpriority: Permission denied")
-		}
+	if !proceffect.Available() {
+		fmt.Fprintln(ctx.Stderr, "nice: process isolation unavailable in this host")
+		return 125
 	}
-
-	subCmdName := args[cmdIdx]
-	subArgs := args[cmdIdx+1:]
-
-	return runSubCommand(ctx, subCmdName, subArgs)
+	return proceffect.Run(ctx.CancellationContext(), proceffect.Request{
+		Adjustment: adj, Argv: args[cmdIdx:],
+	}, proceffect.Invocation{Dir: ctx.Dir, Env: ctx.Environ(), Stdin: ctx.Stdin, Stdout: ctx.Stdout, Stderr: ctx.Stderr})
 }
 
 func parseAdj(s string) (int, error) {
@@ -171,53 +163,4 @@ func isDigits(s string) bool {
 		}
 	}
 	return true
-}
-
-func runSubCommand(ctx *Context, subCmdName string, subArgs []string) int {
-	if ctx.Exec != nil {
-		subCtx := *ctx
-		subCtx.Args, subCtx.CmdName = subArgs, subCmdName
-		return ctx.Exec(ctx.CancellationContext(), subCmdName, &subCtx)
-	}
-	localPath := filepath.Join(ctx.Dir, subCmdName)
-	if info, err := os.Stat(localPath); err == nil && !info.IsDir() && info.Mode()&0111 != 0 {
-		cmd := exec.Command(localPath, subArgs...)
-		cmd.Dir = ctx.Dir
-		cmd.Stdout = ctx.Stdout
-		cmd.Stderr = ctx.Stderr
-		cmd.Stdin = ctx.Stdin
-		cmd.Env = ctx.Env
-		if err := cmd.Run(); err != nil {
-			if exitErr, ok := err.(*exec.ExitError); ok {
-				return exitErr.ExitCode()
-			}
-			return 1
-		}
-		return 0
-	}
-
-	cmd, ok := Lookup(subCmdName)
-	if !ok {
-		cmd, ok = Lookup(filepath.Base(subCmdName))
-	}
-	if ok {
-		subCtx := *ctx
-		subCtx.Args, subCtx.CmdName = subArgs, subCmdName
-		return cmd.Run(&subCtx)
-	}
-
-	execCmd := exec.Command(subCmdName, subArgs...)
-	execCmd.Dir = ctx.Dir
-	execCmd.Stdout = ctx.Stdout
-	execCmd.Stderr = ctx.Stderr
-	execCmd.Stdin = ctx.Stdin
-	execCmd.Env = ctx.Env
-	if err := execCmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return exitErr.ExitCode()
-		}
-		fmt.Fprintf(ctx.Stderr, "nice: '%s': %v\n", subCmdName, err)
-		return 127
-	}
-	return 0
 }

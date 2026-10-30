@@ -14,11 +14,16 @@ import (
 	"github.com/AmadeusDE/Misa/internal/builtinexec"
 	"github.com/AmadeusDE/Misa/internal/builtins"
 	"github.com/AmadeusDE/Misa/internal/jobleader"
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 	"github.com/AmadeusDE/Misa/internal/ui"
 	"golang.org/x/term"
 )
 
 func main() {
+	_ = proceffect.EnableSelfHelper()
+	if len(os.Args) > 1 && os.Args[1] == proceffect.Flag {
+		os.Exit(builtinexec.ProcessEffect(os.Args[2:]))
+	}
 	if len(os.Args) > 1 && os.Args[1] == jobleader.Flag {
 		os.Exit(jobleader.Run(os.Args[2:]))
 	}
