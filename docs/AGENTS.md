@@ -138,6 +138,10 @@ internal/
     escape.go resize.go          `~.` disconnect / `~~`; SIGWINCH plus polling (in-process panes get no SIGWINCH)
     prompt.go                    Terminal prompts read byte-wise so typed-ahead input still reaches the remote
   lscore/                        ls formatting engine — colors, icons, git status, sorting
+  posixre/                       POSIX BRE/ERE for the text utilities: leftmost-longest, back-references, GNU escapes
+                                 (opt-in), grep -x/-w/-F modes, C-locale classes. Go's regexp runs patterns it can
+                                 express exactly; the rest use a backtracker (visited set, or a step budget with
+                                 back-references). TestEnginesAgree checks both engines against each other
   mines/                         Minesweeper clone: board.go (rules, first reveal always safe, flood fill, chording),
                                  game.go (keys/mouse, clock), view.go (centred layout + hit test), run.go (standalone).
                                  Game satisfies procmon.Viewer, so typing `mines` in Misa opens it as an in-process screen

@@ -63,6 +63,14 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 - **uutils/util-linux** by the uutils contributors — MIT (`cal`, `mcookie`, `uuidgen`)
   https://github.com/uutils/util-linux
 
+## POSIX Regular Expressions
+
+`internal/posixre` lays out its compiled program and counted repetition the way Go's `regexp/syntax` compiler does,
+so its matcher and Go's regexp pick the same submatches. No code is copied.
+
+- **Go regexp/syntax** by The Go Authors — BSD-3-Clause
+  https://cs.opensource.google/go/go/+/master:src/regexp/syntax/
+
 ## Chess
 
 Original Go implementation; rules and notation referenced from:
