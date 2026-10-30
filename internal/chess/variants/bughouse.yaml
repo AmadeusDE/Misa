@@ -1,0 +1,6 @@
+id: bughouse
+name: Bughouse
+description: Two boards with captured pieces passed to the partner.
+extends: crazyhouse
+boards: 2
+partner_hands: true

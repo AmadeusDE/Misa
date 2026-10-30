@@ -82,6 +82,16 @@ and search consume more memory and time as the board grows.
   the usual initial double step; a dropped rook cannot restore castling rights.
   Rules: [Lichess](https://lichess.org/variant/crazyhouse) and
   [Wikipedia](https://en.wikipedia.org/wiki/Crazyhouse).
+- **Bughouse** (`bughouse`): a partner game with two Crazyhouse-style boards,
+  A and B. Captured pieces transfer to the partner's hand on the other board;
+  a captured promoted piece transfers as a pawn. Each player may drop a piece
+  from their hand onto an empty square on their board, subject to the normal
+  Crazyhouse pawn drop-rank restriction and king-safety rules. Turns are fixed
+  and scheduled A then B (one move on A, then one on B, repeating); the boards
+  are coordinated as one game, not independently clocked games. Computer play
+  searches with fixed hands: a search uses the board position and reserves as
+  they stand when it begins, without modelling captures that might later arrive
+  from the partner board. There are no real-time clocks.
 
 ### Playing with pockets
 
@@ -103,6 +113,13 @@ Dropped pieces count as moved; a `pawn: true` piece dropped on a rank
 containing that side's setup pawns of the same type may use its initial-only
 movement components. Drops are quiet moves, not quiescence captures (check
 evasions still consider all legal drops). The computer values pocket material at 80% of its board value.
+
+Multi-board partner-hand variants use the same drop rules, with captures
+transferring to the partner's hand on the other board. For a general YAML variant,
+set `boards: 2` and `partner_hands: true` (typically extending `crazyhouse`);
+these settings configure two boards and partner capture transfers. Bughouse uses
+fixed A/B scheduling and has no real-time clocks. Computer searches use fixed
+hands and do not predict future partner-board transfers.
 
 Piece definitions support:
 

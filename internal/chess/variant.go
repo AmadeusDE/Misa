@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "crazyhouse.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "crazyhouse.yaml", "bughouse.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -46,6 +46,8 @@ type Variant struct {
 	ID, Name, Description string
 	Files, Ranks          int
 	Drops                 bool
+	PartnerHands          bool
+	Boards                int
 	Pieces                []*PieceType
 	Castling              []Castle
 	Promotion             []uint8 // piece types a pawn may become
@@ -85,6 +87,8 @@ type variantDef struct {
 	Name          string      `yaml:"name"`
 	Description   string      `yaml:"description"`
 	Drops         *bool       `yaml:"drops"`
+	PartnerHands  *bool       `yaml:"partner_hands"`
+	Boards        *int        `yaml:"boards"`
 	Extends       string      `yaml:"extends"`
 	Files         int         `yaml:"files"`
 	Ranks         int         `yaml:"ranks"`
@@ -257,6 +261,12 @@ func load(srcs []source) ([]*Variant, []error) {
 
 func merge(parent, child variantDef) variantDef {
 	d := parent
+	if child.Boards != nil {
+		d.Boards = child.Boards
+	}
+	if child.PartnerHands != nil {
+		d.PartnerHands = child.PartnerHands
+	}
 	if child.Drops != nil {
 		d.Drops = child.Drops
 	}
@@ -302,6 +312,22 @@ func build(d variantDef) (*Variant, error) {
 	}
 	if d.Drops != nil {
 		v.Drops = *d.Drops
+	}
+	if d.PartnerHands != nil {
+		v.PartnerHands = *d.PartnerHands
+	}
+	v.Boards = 1
+	if d.Boards != nil {
+		v.Boards = *d.Boards
+	}
+	if v.Boards < 1 || v.Boards > 2 {
+		return nil, fmt.Errorf("boards must be 1 or 2")
+	}
+	if v.PartnerHands && (v.Boards != 2 || !v.Drops) {
+		return nil, fmt.Errorf("partner_hands requires boards: 2 and drops")
+	}
+	if v.Boards == 2 && !v.PartnerHands {
+		return nil, fmt.Errorf("boards: 2 requires partner_hands")
 	}
 	if v.Name == "" {
 		v.Name = v.ID
