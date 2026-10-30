@@ -128,6 +128,22 @@ comments, other sections and a missing file.
 
 Measure the binary size cost of `internal/ai` in a `-tags nough` build. Report it in the commit message.
 
+As built (1a), additions that keep the signatures above:
+
+- `ai.UghRoots` (ugh's `roots.Roots`, zero = the user's ugh) and `ai.SettingsPath` (empty = Misa config search order)
+  are package variables. Tests use `aitest.Isolate(t)` (`internal/ai/aitest`), which points HOME and the XDG
+  directories at temp dirs and clears every `*_API_KEY`; never write to the real config.
+- `ModelFor` order: `Models[feature]`, `Models["default"]`, ugh `models.default`, else the `aiconfig` error.
+- `ProviderInfo` also has `Local bool` (loopback base URL: no key needed).
+- `RunTools`: `maxSteps` counts model turns (<= 0 means 10). The last turn is sent without tools so the model must
+  answer; any call it still makes is dropped. A failing or unknown tool is reported to the model as `error: ...`.
+- `SetDefaultModel("")` clears `models.default`. `SaveProvider`/`SetDefaultModel`/`RemoveProvider` parse the edited
+  file back and refuse (writing nothing) when `config.toml` defines the entry in a form the text editor cannot
+  change, such as an inline table.
+- ugh changes: `auth.IsNoCredential`, `config.ValidateProvider`, `provider.ModelsIn`/`LookupBase`, no `Authorization`
+  header for an empty key, and a missing key is not an error for a loopback provider. `internal/config` gained
+  `FindFile` and `UserFile`.
+
 ## 1b. Configurator UI (PR 1)
 
 An in-process screen, `aiconfig` command, also reachable from Settings ("AI providers") and the main menu.

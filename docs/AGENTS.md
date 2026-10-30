@@ -257,6 +257,11 @@ internal/
                                  initializer. `build-go.sh`, `version.sh`, `just apk` / `apk-release`
   mweb/                          `misa --web` / `--web-admin`: webui.Server whose terminal runs misa (MISA_WEB_CHILD stops
                                  recursion); flags over config.yaml `web:`; XDG state/config dirs. internal/ui never imports webui
+  ai/                            Misa's way to reach ugh's providers (`!nough` callers only; ugh and builtins never import it):
+                                 ai.go (Client: Open/OpenFor/Stream/Complete), tools.go (RunTools: tool loop, calls assembled by Event.Seq),
+                                 settings.go (ai.yaml: per-feature models, search engine; ModelFor), providers.go (Providers, SaveProvider,
+                                 SetKey, SetDefaultModel, Models, Test: edits ugh's config.toml and credential store), tomledit.go (section-scoped
+                                 text edits that keep comments and other tables), presets.go. aitest.Isolate points HOME/XDG at temp dirs for tests
   ughbot/sandbox/                Code-task tool protocol: Serve (`ughbot vm-agent` in the VM), Client (tools.Executor +
                                  worktree.GitFunc), Local (in-process, tests)
   ughbot/vm/                     Throwaway qemu VMs: Prepare (cloud image + NoCloud seed over loopback HTTP, pinned
@@ -294,6 +299,12 @@ internal/
 - **Pane message routing**: Commands from a nested pane are wrapped with `routeTo(owner, cmd)` so their results (`paneMsg`) update the pane that started them, not the focused one. Bubble Tea's own messages (clipboard, colour queries, quit) pass through unwrapped so the program carries them out.
 - **Keys in v2**: `msg.String()` names space `"space"`, so `case "…"` matches use that; text inputs that build strings from keys take `msg.Text` (see `typedKey` in vi and procmon). Pastes arrive as `tea.PasteMsg` and go to the focused PTY (`sendPaste`, bracketed when asked) or text input.
 - **Embedded agent (ugh)**: typing `ugh [-m … -thinking … -mode … -resume]` takes the pane over with an in-process `ughtui` session (`m.agent`); subcommands and `-p` run the CLI binary. Input goes to the session, its view fills the pane, `/quit` returns to the prompt. A menu `cmd: ugh …` item does the same through `menuCommand` and returns to the menu (`fromMenu`). `Host.Send` fills the session's `agentHost` mailbox, drained by a re-arming command, so mail and command results (`agentMail`/`agentResult`) come back through `routeTo` to the owning pane; messages for an ended session are dropped. Colour replies are broadcast to every session. Session state lives in `agentSession` (agent, mailbox, size, `split`). `ctrl+w a` starts a *split* session: `/quit` closes its pane, while closing the pane detaches the session to the root's `detached` list, where it keeps running and shows in the mux bar; `ctrl+w A` reattaches the latest in a new split. The root routes agent messages by session, not by pane (`agentMsgOf`/`routeAgentMsg`), so they follow a session that moved. Sessions typed into a pane end with it (`closeTerminals`); `Shutdown` also closes detached ones.
+- **AI providers (`internal/ai`)**: ugh already owns providers, keys and models, so Misa reads and writes *its* `config.toml`
+  (`[providers.<name>]`, `[models] default`) and credential store instead of keeping a second copy; `ai.yaml` holds only what is
+  Misa's (`models:` per feature such as chat/help, `search:`). `config.toml` is hand-edited, so it is never re-marshalled:
+  `tomledit.go` replaces or appends one table and the edit is parsed back before the atomic write (a form it cannot edit, such
+  as an inline table, is refused). A provider whose base URL is loopback (ollama, llama.cpp) resolves without a key.
+  Callers outside `internal/ai` are `!nough` files with a `nough` stub. Tests call `aitest.Isolate(t)`; never touch `~/.config`.
 - **Command correction (thefuck)**: `internal/thefuck` package with pattern-based rules. After a failed shell command, `thefuck.Match()` suggests a fix. Shown in output; `ctrl+f` accepts and runs the fix.
 - **Fetch builtin**: `fetch` command renders ASCII art + system info side by side (mfetch-style). Supports `--info`, `--theme`, `--ascii`, `-e` (emotes/nerd font), `--list-info`, `--list-ascii`, `--list-themes` flags. Configured via `fetch.yaml` (info, emotes, theme, color_mode, ascii, max_height); CLI flags override.
 - **SSH client (`sshc`)**: `sshc [-tT] [-F cfg] [-i id] [-l user] [-o Key=Value] [-p port] destination [command]`. Understands HostName, User, Port, IdentityFile, StrictHostKeyChecking and UserKnownHostsFile from ssh_config; everything else (ProxyJump, forwarding, ControlMaster) is ignored. A PTY is requested for a shell, or with `-t`, only when stdin is a terminal. Tests run against an in-process x/crypto server (`client_test.go`).
@@ -380,6 +391,7 @@ Commit trailers for agent-made commits:
 - `internal/companion/NOTICE` — Companion response template attribution (cargo-mommy, fwdekker/mommy).
 - `internal/vi/NOTICE` — Vi editor attribution (toybox, vis).
 - `THIRD_PARTY_NOTICES.md` — Licenses of third-party code, test suites and data.
+- `docs/AI.md` — Misa's AI features: provider setup (shared with ugh) and `ai.yaml`.
 - `docs/MISA_WEB.md` — `misa --web`: Misa in a browser (enroll, binding, security).
 - `docs/UGH.md` — ugh: providers, running, TUI, tools, permissions, subagents, configuration.
 - `docs/ughbot/DEPLOY.md`, `docs/ughbot/WEB.md` — ughbot (experimental): setup, bots, approvals, web UI.
