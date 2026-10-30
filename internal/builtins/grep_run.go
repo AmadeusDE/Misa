@@ -23,6 +23,7 @@ type grepRun struct {
 	ctx        *Context
 	o          *grepOptions
 	m          grepMatcher
+	filter     *grepFilter
 	out        *bufio.Writer
 	delim      byte
 	failed     bool
@@ -60,10 +61,15 @@ func newGrepRun(ctx *Context, o *grepOptions, m grepMatcher) *grepRun {
 
 func (g *grepRun) files(names []string) int {
 	for _, name := range names {
-		if g.stop {
-			break
+		switch {
+		case g.stop:
+		case name == "-":
+			g.file(name)
+		case g.o.recursive:
+			g.walk(name)
+		case !g.filter.skipFile(name, true):
+			g.file(name)
 		}
-		g.file(name)
 	}
 	if err := g.out.Flush(); err != nil && g.writeErr == nil {
 		g.writeErr = err

@@ -116,7 +116,6 @@ func TestGrepErrors(t *testing.T) {
 		{[]string{"a["}, "grep: Unmatched [, [^, [:, [., or [="},
 		{[]string{"-E", "(a"}, `grep: Unmatched ( or \(`},
 		{[]string{}, "Usage: grep"},
-		{[]string{"-r", "a"}, "grep: -r: recursive search is not supported yet"},
 		{[]string{"-P", "a"}, "grep: -P: Perl regular expressions are not supported"},
 		{[]string{"--color=sometimes", "a"}, "grep: invalid argument 'sometimes' for '--color'"},
 		{[]string{"-f", "missing"}, "grep: missing: No such file or directory"},
