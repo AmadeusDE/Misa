@@ -1,0 +1,140 @@
+{
+  "sources": [
+    {
+      "name": "landley/toybox",
+      "url": "https://github.com/landley/toybox",
+      "revision": "6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb",
+      "license": "0BSD",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "mvdan/sh",
+      "url": "https://github.com/mvdan/sh",
+      "revision": "e96ef1dae52c71e86cf87eb594cb4917fa49aaba",
+      "license": "BSD-3-Clause",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse. Research also separately inspected installed module v3.13.1; import revision not yet selected."
+    },
+    {
+      "name": "uutils/acl",
+      "url": "https://github.com/uutils/acl",
+      "revision": "af3feeda769cb55fe37d16f0acf2e77c685eed8d",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "uutils/awk",
+      "url": "https://github.com/uutils/awk",
+      "revision": "",
+      "license": "Apache-2.0 (research metadata)",
+      "status": "excluded",
+      "notes": "Excluded from issue #40 reference set: research reports Apache-2.0 repository metadata; no pinned revision."
+    },
+    {
+      "name": "uutils/bsdutils",
+      "url": "https://github.com/uutils/bsdutils",
+      "revision": "3ba11da4ddf49141b2266cec1f956f79db84d3b3",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "uutils/coreutils",
+      "url": "https://github.com/uutils/coreutils",
+      "revision": "fee61ff5d4f87e0f912a52e639942b5f7ad58663",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "uutils/diffutils",
+      "url": "https://github.com/uutils/diffutils",
+      "revision": "",
+      "license": "Apache-2.0 (research metadata)",
+      "status": "excluded",
+      "notes": "Excluded from issue #40 reference set: research reports Apache-2.0 repository metadata; no pinned revision. Existing Misa attribution says MIT or MIT/Apache-2.0 and records existing use under MIT; this discrepancy needs review, not retroactive relicensing."
+    },
+    {
+      "name": "uutils/findutils",
+      "url": "https://github.com/uutils/findutils",
+      "revision": "d71f3242b0bc3b21bb311f04b23ae62e5f3fed67",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "uutils/grep",
+      "url": "https://github.com/uutils/grep",
+      "revision": "0be8c54f268d66185faaee9d30f8a6f3c55c0a8b",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "uutils/hostname",
+      "url": "https://github.com/uutils/hostname",
+      "revision": "c4de07add34238b1dd577da17d03129b3f0940cf",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "uutils/login",
+      "url": "https://github.com/uutils/login",
+      "revision": "2ac4e1518bd743f45b89e8db146d77feb14da197",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse. Archived."
+    },
+    {
+      "name": "uutils/procps",
+      "url": "https://github.com/uutils/procps",
+      "revision": "e697667b3f758803e38d8ab4c8f912171beca602",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "uutils/red",
+      "url": "https://github.com/uutils/red",
+      "revision": "f18ab518e41e98ab0d2ad72e54a342ddb7b1ca43",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse. Second sed implementation."
+    },
+    {
+      "name": "uutils/sed",
+      "url": "https://github.com/uutils/sed",
+      "revision": "42bffb9d3018a586a889c790bea4be58e249586a",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "uutils/shadow",
+      "url": "https://github.com/uutils/shadow",
+      "revision": "92ac29b0bf382434b145d2a0e557ca92f8ac219f",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "uutils/tar",
+      "url": "https://github.com/uutils/tar",
+      "revision": "dffa9350f78b3bfbc9b4fc70a0f0205a53a937b6",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    },
+    {
+      "name": "uutils/util-linux",
+      "url": "https://github.com/uutils/util-linux",
+      "revision": "413b20967dcf8cd41f095dabf4858d4f02c17401",
+      "license": "MIT",
+      "status": "approved",
+      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse."
+    }
+  ]
+}

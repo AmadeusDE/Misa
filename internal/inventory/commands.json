@@ -1,0 +1,1704 @@
+{
+  "commands": [
+    {
+      "name": "arch",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/arch.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_arch.rs",
+        "internal/builtins/arch_test.go"
+      ]
+    },
+    {
+      "name": "b2sum",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/b2sum.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from uutils coreutils b2sum (MIT).; source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_b2sum.rs",
+        "internal/builtins/b2sum_test.go"
+      ]
+    },
+    {
+      "name": "base32",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/base32.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/base32_test.go",
+        "tests/uutils/testdata/tests/by-util/test_base32.rs",
+        "internal/builtins/base32_test.go"
+      ]
+    },
+    {
+      "name": "base64",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/base64.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/base64_test.go",
+        "tests/toybox/base64.test",
+        "tests/uutils/testdata/tests/by-util/test_base64.rs",
+        "internal/builtins/base64_test.go"
+      ]
+    },
+    {
+      "name": "basename",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/pathutil.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/basename_test.go",
+        "tests/toybox/basename.test",
+        "tests/uutils/testdata/tests/by-util/test_basename.rs"
+      ]
+    },
+    {
+      "name": "basenc",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/basenc.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from uutils coreutils basenc (MIT).; source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_basenc.rs",
+        "internal/builtins/basenc_test.go"
+      ]
+    },
+    {
+      "name": "bashtop",
+      "kind": "alias",
+      "sources": [
+        "internal/builtins/topcmds.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [],
+      "alias_of": "btop"
+    },
+    {
+      "name": "battleship",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/battleship.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "internal/builtins/battleship_test.go"
+      ]
+    },
+    {
+      "name": "btop",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/topcmds.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "bytop",
+      "kind": "alias",
+      "sources": [
+        "internal/builtins/topcmds.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [],
+      "alias_of": "btop"
+    },
+    {
+      "name": "cal",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/cal.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox cal.c (0BSD) and uutils util-linux cal (MIT).; source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_cal.rs",
+        "internal/builtins/cal_test.go"
+      ]
+    },
+    {
+      "name": "cat",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/cat.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/cat_test.go",
+        "tests/toybox/cat.test",
+        "tests/uutils/testdata/tests/by-util/test_cat.rs",
+        "internal/builtins/cat_test.go"
+      ]
+    },
+    {
+      "name": "chess",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/chess.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "internal/builtins/chess_test.go"
+      ]
+    },
+    {
+      "name": "chmod",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/chmod.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/chmod_test.go",
+        "tests/toybox/chmod.test",
+        "tests/uutils/testdata/tests/by-util/test_chmod.rs",
+        "internal/builtins/chmod_test.go"
+      ]
+    },
+    {
+      "name": "chown",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/chown.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/chown_test.go",
+        "tests/uutils/testdata/tests/by-util/test_chown.rs"
+      ]
+    },
+    {
+      "name": "cksum",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/cksum.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/cksum_test.go",
+        "tests/toybox/cksum.test",
+        "tests/uutils/testdata/tests/by-util/test_cksum.rs",
+        "internal/builtins/cksum_test.go"
+      ]
+    },
+    {
+      "name": "cmp",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/cmp.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behavior adapted from uutils/diffutils; see internal/builtins/cmp.go and THIRD_PARTY_NOTICES.md; source revision not established",
+      "tests": [
+        "tests/native/cmp_test.go",
+        "tests/toybox/cmp.test",
+        "internal/builtins/cmp_test.go",
+        "tests/diffutils/cmp"
+      ]
+    },
+    {
+      "name": "comm",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/comm.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/comm_test.go",
+        "tests/toybox/comm.test",
+        "tests/uutils/testdata/tests/by-util/test_comm.rs",
+        "internal/builtins/comm_test.go"
+      ]
+    },
+    {
+      "name": "cp",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/cp.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/cp_test.go",
+        "tests/toybox/cp.test",
+        "tests/uutils/testdata/tests/by-util/test_cp.rs",
+        "internal/builtins/cp_test.go"
+      ]
+    },
+    {
+      "name": "cut",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/cut.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/cut_test.go",
+        "tests/toybox/cut.test",
+        "tests/uutils/testdata/tests/by-util/test_cut.rs",
+        "internal/builtins/cut_test.go"
+      ]
+    },
+    {
+      "name": "date",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/date.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/date_test.go",
+        "tests/toybox/date.test",
+        "tests/uutils/testdata/tests/by-util/test_date.rs",
+        "internal/builtins/date_test.go"
+      ]
+    },
+    {
+      "name": "devices",
+      "kind": "builtin",
+      "sources": [
+        "internal/mweb/devices.go"
+      ],
+      "build": "!noweb",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; exact source provenance not independently established",
+      "tests": []
+    },
+    {
+      "name": "diff",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/diff.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behavior adapted from uutils/diffutils; see internal/builtins/diff.go and THIRD_PARTY_NOTICES.md; source revision not established",
+      "tests": [
+        "tests/diffutils/diff"
+      ]
+    },
+    {
+      "name": "dirname",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/pathutil.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/dirname_test.go",
+        "tests/toybox/dirname.test",
+        "tests/uutils/testdata/tests/by-util/test_dirname.rs"
+      ]
+    },
+    {
+      "name": "du",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/du.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/du_test.go",
+        "tests/toybox/du.test",
+        "tests/uutils/testdata/tests/by-util/test_du.rs",
+        "internal/builtins/du_test.go"
+      ]
+    },
+    {
+      "name": "echo",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/simple.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/echo_test.go",
+        "tests/toybox/echo.test",
+        "tests/uutils/testdata/tests/by-util/test_echo.rs",
+        "internal/builtins/echo_test.go"
+      ]
+    },
+    {
+      "name": "env",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/env.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/env_test.go",
+        "tests/toybox/env.test",
+        "tests/uutils/testdata/tests/by-util/test_env.rs",
+        "internal/builtins/env_test.go"
+      ]
+    },
+    {
+      "name": "expand",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/expand.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/expand_test.go",
+        "tests/toybox/expand.test",
+        "tests/uutils/testdata/tests/by-util/test_expand.rs",
+        "internal/builtins/expand_test.go"
+      ]
+    },
+    {
+      "name": "expr",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/expr.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/expr_test.go",
+        "tests/toybox/expr.test",
+        "tests/uutils/testdata/tests/by-util/test_expr.rs",
+        "internal/builtins/expr_test.go"
+      ]
+    },
+    {
+      "name": "factor",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/factor.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/factor_test.go",
+        "tests/toybox/factor.test",
+        "tests/uutils/testdata/tests/by-util/test_factor.rs",
+        "internal/builtins/factor_test.go"
+      ]
+    },
+    {
+      "name": "false",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/simple.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_false.rs"
+      ]
+    },
+    {
+      "name": "fetch",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/fetch.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "fmt",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/fmt.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/fmt_test.go",
+        "tests/uutils/testdata/tests/by-util/test_fmt.rs"
+      ]
+    },
+    {
+      "name": "fold",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/fold.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/fold_test.go",
+        "tests/toybox/fold.test",
+        "tests/uutils/testdata/tests/by-util/test_fold.rs",
+        "internal/builtins/fold_test.go"
+      ]
+    },
+    {
+      "name": "groups",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/groups.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_groups.rs",
+        "internal/builtins/groups_test.go"
+      ]
+    },
+    {
+      "name": "head",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/head.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/head_test.go",
+        "tests/toybox/head.test",
+        "tests/uutils/testdata/tests/by-util/test_head.rs",
+        "internal/builtins/head_test.go"
+      ]
+    },
+    {
+      "name": "hostid",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/hostid.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from uutils coreutils hostid (MIT).; source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_hostid.rs"
+      ]
+    },
+    {
+      "name": "hostname",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/hostname.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/hostname_test.go",
+        "tests/toybox/hostname.test",
+        "tests/uutils/testdata/tests/by-util/test_hostname.rs",
+        "internal/builtins/hostname_test.go"
+      ]
+    },
+    {
+      "name": "htop",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/topcmds.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "id",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/id.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/id_test.go",
+        "tests/toybox/id.test",
+        "tests/uutils/testdata/tests/by-util/test_id.rs",
+        "internal/builtins/id_test.go"
+      ]
+    },
+    {
+      "name": "kill",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/proc.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/kill_test.go",
+        "tests/uutils/testdata/tests/by-util/test_kill.rs"
+      ]
+    },
+    {
+      "name": "l1",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/ls.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "lc",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/ls.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "link",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/linkcmd.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox link.c (0BSD) and uutils coreutils link (MIT).; source revision not established",
+      "tests": [
+        "tests/toybox/link.test",
+        "tests/uutils/testdata/tests/by-util/test_link.rs",
+        "internal/builtins/link_test.go"
+      ]
+    },
+    {
+      "name": "ln",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/link.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/ln_test.go",
+        "tests/toybox/ln.test",
+        "tests/uutils/testdata/tests/by-util/test_ln.rs"
+      ]
+    },
+    {
+      "name": "logname",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/logname.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_logname.rs",
+        "internal/builtins/logname_test.go"
+      ]
+    },
+    {
+      "name": "ls",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/ls.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/ls_test.go",
+        "tests/uutils/testdata/tests/by-util/test_ls.rs",
+        "internal/builtins/ls_test.go"
+      ]
+    },
+    {
+      "name": "man",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/man.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "mcookie",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/mcookie.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox mcookie.c (0BSD) and uutils util-linux mcookie (MIT).; source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_mcookie.rs"
+      ]
+    },
+    {
+      "name": "md5sum",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/checksum.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/md5sum_test.go",
+        "tests/uutils/testdata/tests/by-util/test_md5sum.rs"
+      ]
+    },
+    {
+      "name": "mines",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/mines.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "internal/builtins/mines_test.go"
+      ]
+    },
+    {
+      "name": "mkdir",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/mkdir.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/mkdir_test.go",
+        "tests/toybox/mkdir.test",
+        "tests/uutils/testdata/tests/by-util/test_mkdir.rs",
+        "internal/builtins/mkdir_test.go"
+      ]
+    },
+    {
+      "name": "mkfifo",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/mkfifo.go"
+      ],
+      "build": "unix",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox mkfifo.c (0BSD) and uutils coreutils mkfifo (MIT).; source revision not established",
+      "tests": [
+        "tests/toybox/mkfifo.test",
+        "tests/uutils/testdata/tests/by-util/test_mkfifo.rs",
+        "internal/builtins/mkfifo_test.go"
+      ]
+    },
+    {
+      "name": "mktemp",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/mktemp.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/mktemp_test.go",
+        "tests/toybox/mktemp.test",
+        "tests/uutils/testdata/tests/by-util/test_mktemp.rs",
+        "internal/builtins/mktemp_test.go"
+      ]
+    },
+    {
+      "name": "mv",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/mv.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/mv_test.go",
+        "tests/toybox/mv.test",
+        "tests/uutils/testdata/tests/by-util/test_mv.rs",
+        "internal/builtins/mv_test.go"
+      ]
+    },
+    {
+      "name": "nice",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/nice.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/nice_test.go",
+        "tests/uutils/testdata/tests/by-util/test_nice.rs"
+      ]
+    },
+    {
+      "name": "nl",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/nl.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/nl_test.go",
+        "tests/toybox/nl.test",
+        "tests/uutils/testdata/tests/by-util/test_nl.rs",
+        "internal/builtins/nl_test.go"
+      ]
+    },
+    {
+      "name": "nproc",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/nproc.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_nproc.rs",
+        "internal/builtins/nproc_test.go"
+      ]
+    },
+    {
+      "name": "numfmt",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/numfmt.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from uutils coreutils numfmt (MIT).; source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_numfmt.rs",
+        "internal/builtins/numfmt_test.go"
+      ]
+    },
+    {
+      "name": "paste",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/paste.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/paste_test.go",
+        "tests/toybox/paste.test",
+        "tests/uutils/testdata/tests/by-util/test_paste.rs",
+        "internal/builtins/paste_test.go"
+      ]
+    },
+    {
+      "name": "pathchk",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/pathchk.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/pathchk_test.go",
+        "tests/uutils/testdata/tests/by-util/test_pathchk.rs",
+        "internal/builtins/pathchk_test.go"
+      ]
+    },
+    {
+      "name": "pgrep",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/proc.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "pkill",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/proc.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "printenv",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/env.go",
+        "internal/builtins/simple.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_printenv.rs"
+      ]
+    },
+    {
+      "name": "printf",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/printf.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/printf_test.go",
+        "tests/toybox/printf.test",
+        "tests/uutils/testdata/tests/by-util/test_printf.rs",
+        "internal/builtins/printf_test.go"
+      ]
+    },
+    {
+      "name": "pwd",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/pwd.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/toybox/pwd.test",
+        "tests/uutils/testdata/tests/by-util/test_pwd.rs",
+        "internal/builtins/pwd_test.go"
+      ]
+    },
+    {
+      "name": "readlink",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/realpath.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/readlink_test.go",
+        "tests/uutils/testdata/tests/by-util/test_readlink.rs"
+      ]
+    },
+    {
+      "name": "realpath",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/realpath.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/realpath_test.go",
+        "tests/uutils/testdata/tests/by-util/test_realpath.rs",
+        "internal/builtins/realpath_test.go"
+      ]
+    },
+    {
+      "name": "rev",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/rev.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/rev_test.go",
+        "tests/toybox/rev.test",
+        "internal/builtins/rev_test.go"
+      ]
+    },
+    {
+      "name": "rm",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/rm.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/rm_test.go",
+        "tests/toybox/rm.test",
+        "tests/uutils/testdata/tests/by-util/test_rm.rs",
+        "internal/builtins/rm_test.go"
+      ]
+    },
+    {
+      "name": "rmdir",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/link.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/rmdir_test.go",
+        "tests/toybox/rmdir.test",
+        "tests/uutils/testdata/tests/by-util/test_rmdir.rs"
+      ]
+    },
+    {
+      "name": "seq",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/seq.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/seq_test.go",
+        "tests/toybox/seq.test",
+        "tests/uutils/testdata/tests/by-util/test_seq.rs",
+        "internal/builtins/seq_test.go"
+      ]
+    },
+    {
+      "name": "sha1sum",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/checksum.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/sha1sum_test.go",
+        "tests/uutils/testdata/tests/by-util/test_sha1sum.rs"
+      ]
+    },
+    {
+      "name": "sha224sum",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/sha224sum.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox md5sum.c (0BSD) and uutils coreutils sha224sum (MIT).; source revision not established",
+      "tests": [
+        "tests/toybox/sha224sum.test",
+        "tests/uutils/testdata/tests/by-util/test_sha224sum.rs",
+        "internal/builtins/sha224sum_test.go"
+      ]
+    },
+    {
+      "name": "sha256sum",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/checksum.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/sha256sum_test.go",
+        "tests/uutils/testdata/tests/by-util/test_sha256sum.rs"
+      ]
+    },
+    {
+      "name": "sha384sum",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/sha384sum.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox md5sum.c (0BSD) and uutils coreutils sha384sum (MIT).; source revision not established",
+      "tests": [
+        "tests/toybox/sha384sum.test",
+        "tests/uutils/testdata/tests/by-util/test_sha384sum.rs",
+        "internal/builtins/sha384sum_test.go"
+      ]
+    },
+    {
+      "name": "sha3sum",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/sha3sum.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox sha3sum.c (0BSD).; source revision not established",
+      "tests": [
+        "tests/toybox/sha3sum.test",
+        "internal/builtins/sha3sum_test.go"
+      ]
+    },
+    {
+      "name": "sha512sum",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/checksum.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/sha512sum_test.go",
+        "tests/uutils/testdata/tests/by-util/test_sha512sum.rs"
+      ]
+    },
+    {
+      "name": "shuf",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/shuf.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox shuf.c (0BSD) and uutils coreutils shuf (MIT).; source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_shuf.rs",
+        "internal/builtins/shuf_test.go"
+      ]
+    },
+    {
+      "name": "sleep",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/sleep.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_sleep.rs",
+        "internal/builtins/sleep_test.go"
+      ]
+    },
+    {
+      "name": "sort",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/sort.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/sort_test.go",
+        "tests/toybox/sort.test",
+        "tests/uutils/testdata/tests/by-util/test_sort.rs",
+        "internal/builtins/sort_test.go"
+      ]
+    },
+    {
+      "name": "split",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/split.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/split_test.go",
+        "tests/uutils/testdata/tests/by-util/test_split.rs",
+        "internal/builtins/split_test.go"
+      ]
+    },
+    {
+      "name": "sshc",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/sshc.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "internal/builtins/sshc_test.go"
+      ]
+    },
+    {
+      "name": "stat",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/stat.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/stat_test.go",
+        "tests/toybox/stat.test",
+        "tests/uutils/testdata/tests/by-util/test_stat.rs",
+        "internal/builtins/stat_test.go"
+      ]
+    },
+    {
+      "name": "strings",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/strings.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/strings_test.go",
+        "tests/toybox/strings.test",
+        "internal/builtins/strings_test.go"
+      ]
+    },
+    {
+      "name": "sum",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/sum.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from uutils coreutils sum (MIT).; source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_sum.rs",
+        "internal/builtins/sum_test.go"
+      ]
+    },
+    {
+      "name": "sync",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/sync.go"
+      ],
+      "build": "linux",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox sync.c (0BSD) and uutils coreutils sync (MIT).; source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_sync.rs",
+        "internal/builtins/sync_test.go"
+      ]
+    },
+    {
+      "name": "tac",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/tac.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/tac_test.go",
+        "tests/toybox/tac.test",
+        "tests/uutils/testdata/tests/by-util/test_tac.rs",
+        "internal/builtins/tac_test.go"
+      ]
+    },
+    {
+      "name": "tail",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/tail.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/tail_test.go",
+        "tests/toybox/tail.test",
+        "tests/uutils/testdata/tests/by-util/test_tail.rs",
+        "internal/builtins/tail_test.go"
+      ]
+    },
+    {
+      "name": "tee",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/tee.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/tee_test.go",
+        "tests/toybox/tee.test",
+        "tests/uutils/testdata/tests/by-util/test_tee.rs",
+        "internal/builtins/tee_test.go"
+      ]
+    },
+    {
+      "name": "timeout",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/timeout.go"
+      ],
+      "build": "unix",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox timeout.c (0BSD) and uutils coreutils timeout (MIT).; source revision not established",
+      "tests": [
+        "tests/toybox/timeout.test",
+        "tests/uutils/testdata/tests/by-util/test_timeout.rs",
+        "internal/builtins/timeout_test.go"
+      ]
+    },
+    {
+      "name": "tldr",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/man.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "tm",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/topcmds.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "top",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/topcmds.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "top-commands",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/topcommands.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": []
+    },
+    {
+      "name": "touch",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/touch.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/touch_test.go",
+        "tests/toybox/touch.test",
+        "tests/uutils/testdata/tests/by-util/test_touch.rs",
+        "internal/builtins/touch_test.go"
+      ]
+    },
+    {
+      "name": "tr",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/tr.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/tr_test.go",
+        "tests/toybox/tr.test",
+        "tests/uutils/testdata/tests/by-util/test_tr.rs",
+        "internal/builtins/tr_test.go"
+      ]
+    },
+    {
+      "name": "tree",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/tree.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/tree_test.go",
+        "internal/builtins/tree_test.go"
+      ]
+    },
+    {
+      "name": "true",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/simple.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/true_test.go",
+        "tests/uutils/testdata/tests/by-util/test_true.rs"
+      ]
+    },
+    {
+      "name": "truncate",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/truncate.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/truncate_test.go",
+        "tests/toybox/truncate.test",
+        "tests/uutils/testdata/tests/by-util/test_truncate.rs",
+        "internal/builtins/truncate_test.go"
+      ]
+    },
+    {
+      "name": "tsort",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/tsort.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/tsort_test.go",
+        "tests/uutils/testdata/tests/by-util/test_tsort.rs",
+        "internal/builtins/tsort_test.go"
+      ]
+    },
+    {
+      "name": "tty",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/tty.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_tty.rs",
+        "internal/builtins/tty_test.go"
+      ]
+    },
+    {
+      "name": "uname",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/sysutil.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/uname_test.go",
+        "tests/uutils/testdata/tests/by-util/test_uname.rs"
+      ]
+    },
+    {
+      "name": "unexpand",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/expand.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_unexpand.rs"
+      ]
+    },
+    {
+      "name": "uniq",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/uniq.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/uniq_test.go",
+        "tests/toybox/uniq.test",
+        "tests/uutils/testdata/tests/by-util/test_uniq.rs",
+        "internal/builtins/uniq_test.go"
+      ]
+    },
+    {
+      "name": "unlink",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/unlink.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox unlink.c (0BSD) and uutils coreutils unlink (MIT).; source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_unlink.rs",
+        "internal/builtins/unlink_test.go"
+      ]
+    },
+    {
+      "name": "uudecode",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/uudecode.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox uudecode.c (0BSD).; source revision not established",
+      "tests": [
+        "tests/toybox/uudecode.test",
+        "internal/builtins/uudecode_test.go"
+      ]
+    },
+    {
+      "name": "uuencode",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/uuencode.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox uuencode.c (0BSD).; source revision not established",
+      "tests": [
+        "tests/toybox/uuencode.test",
+        "internal/builtins/uuencode_test.go"
+      ]
+    },
+    {
+      "name": "uuidgen",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/uuidgen.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox uuidgen.c (0BSD) and uutils util-linux uuidgen (MIT).; source revision not established",
+      "tests": [
+        "tests/toybox/uuidgen.test",
+        "tests/uutils/testdata/tests/by-util/test_uuidgen.rs"
+      ]
+    },
+    {
+      "name": "vi",
+      "kind": "builtin",
+      "sources": [
+        "internal/vi/editor.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Inspired by Toybox vi and vis; see internal/vi/NOTICE; source revision not established",
+      "tests": []
+    },
+    {
+      "name": "wc",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/wc.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/wc_test.go",
+        "tests/toybox/wc.test",
+        "tests/uutils/testdata/tests/by-util/test_wc.rs",
+        "internal/builtins/wc_test.go"
+      ]
+    },
+    {
+      "name": "which",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/sysutil.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/native/which_test.go"
+      ]
+    },
+    {
+      "name": "whoami",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/whoami.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_whoami.rs",
+        "internal/builtins/whoami_test.go"
+      ]
+    },
+    {
+      "name": "xxd",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/xxd.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox xxd.c (0BSD).; source revision not established",
+      "tests": [
+        "tests/toybox/xxd.test",
+        "internal/builtins/xxd_test.go"
+      ]
+    },
+    {
+      "name": "yes",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/simple.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation; see docs/CREDITS.md and internal/builtins/NOTICE; exact per-command source revision not established",
+      "tests": [
+        "tests/uutils/testdata/tests/by-util/test_yes.rs"
+      ]
+    }
+  ],
+  "ui_only": [
+    {
+      "name": "alias",
+      "sources": [
+        "internal/ui/app.go"
+      ]
+    },
+    {
+      "name": "bg",
+      "sources": [
+        "internal/ui/jobs.go"
+      ]
+    },
+    {
+      "name": "cd",
+      "sources": [
+        "internal/ui/app.go",
+        "internal/ui/mux.go"
+      ]
+    },
+    {
+      "name": "clear",
+      "sources": [
+        "internal/ui/app.go",
+        "internal/ui/mux.go",
+        "internal/ui/fullshell.go"
+      ]
+    },
+    {
+      "name": "exit",
+      "sources": [
+        "internal/ui/app.go",
+        "internal/ui/mux.go",
+        "internal/ui/fullshell.go"
+      ]
+    },
+    {
+      "name": "fg",
+      "sources": [
+        "internal/ui/jobs.go"
+      ]
+    },
+    {
+      "name": "jobs",
+      "sources": [
+        "internal/ui/jobs.go"
+      ]
+    },
+    {
+      "name": "unalias",
+      "sources": [
+        "internal/ui/app.go"
+      ]
+    }
+  ]
+}
