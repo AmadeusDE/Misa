@@ -25,6 +25,7 @@ type Game struct {
 	level          Level
 	board          *Board
 	cx, cy         int
+	vx, vy         int // first visible cell of a board larger than the screen
 	width, height  int
 	started, ended time.Time
 	gen            int
@@ -46,12 +47,45 @@ func (g *Game) newGame(level Level) {
 	g.level = level
 	g.board = NewBoard(level.W, level.H, level.Mines, g.rng)
 	g.cx, g.cy = level.W/2, level.H/2
+	g.vx, g.vy = 0, 0
+	g.scrollToCursor()
 	g.started, g.ended = time.Time{}, time.Time{}
 	g.gen++
 }
 
-func (g *Game) Init() tea.Cmd      { return nil }
-func (g *Game) Resize(w, h int)    { g.width, g.height = w, h }
+func (g *Game) Init() tea.Cmd { return nil }
+
+func (g *Game) Resize(w, h int) {
+	g.width, g.height = w, h
+	g.scrollToCursor()
+}
+
+// scrollToCursor moves the viewport the least it can so the cursor stays on
+// screen, and keeps it inside the board.
+func (g *Game) scrollToCursor() {
+	l := boardLayout(g.board.Width(), g.board.Height(), g.width, g.height)
+	if l.cols <= 0 || l.rows <= 0 {
+		// No room for even one cell yet (the game starts before the first
+		// WindowSizeMsg): nothing to scroll.
+		g.vx, g.vy = 0, 0
+		return
+	}
+	x0, y0 := l.clampOrigin(g.vx, g.vy)
+	if g.cx < x0 {
+		x0 = g.cx
+	}
+	if g.cx >= x0+l.cols {
+		x0 = g.cx - l.cols + 1
+	}
+	if g.cy < y0 {
+		y0 = g.cy
+	}
+	if g.cy >= y0+l.rows {
+		y0 = g.cy - l.rows + 1
+	}
+	g.vx, g.vy = l.clampOrigin(x0, y0)
+}
+
 func (g *Game) IsQuit() bool       { return g.quit }
 func (g *Game) Board() *Board      { return g.board }
 func (g *Game) Cursor() (x, y int) { return g.cx, g.cy }
@@ -63,9 +97,11 @@ func (g *Game) Update(msg tea.Msg) tea.Cmd {
 	case tea.KeyPressMsg:
 		return g.key(msg.String())
 	case tea.MouseClickMsg:
-		if g.setup == nil {
-			return g.click(msg.Mouse())
+		if g.setup != nil {
+			g.setupClick(msg.Mouse())
+			return nil
 		}
+		return g.click(msg.Mouse())
 	case tickMsg:
 		if g.setup == nil && msg.gen == g.gen && g.board.State() == Playing {
 			return g.tick()
@@ -82,8 +118,13 @@ func (g *Game) key(k string) tea.Cmd {
 	case "c":
 		w := max(MinWidth, min(MaxWidth, g.level.W))
 		h := max(MinHeight, min(MaxHeight, g.level.H))
-		mines := max(MinMines, min(min(MaxMines, w*h-1), g.level.Mines))
-		g.setup = &customSetup{level: Level{Name: "Custom", W: w, H: h, Mines: mines}, paused: g.now()}
+		// Start from the current level's mine density.
+		pct := DensityPercent(w, h, g.level.Mines)
+		g.setup = &customSetup{
+			level:   Level{Name: "Custom", W: w, H: h, Mines: PercentMines(w, h, pct)},
+			percent: pct,
+			paused:  g.now(),
+		}
 		g.gen++
 	case "q", "esc", "ctrl+c":
 		g.quit = true
@@ -115,12 +156,15 @@ func (g *Game) click(m tea.Mouse) tea.Cmd {
 	case target != hitCell:
 	case m.Button == tea.MouseLeft:
 		g.cx, g.cy = x, y
+		g.scrollToCursor()
 		return g.open(x, y)
 	case m.Button == tea.MouseRight:
 		g.cx, g.cy = x, y
+		g.scrollToCursor()
 		return g.act(func() { g.board.ToggleFlag(x, y) })
 	case m.Button == tea.MouseMiddle:
 		g.cx, g.cy = x, y
+		g.scrollToCursor()
 		return g.act(func() { g.board.Chord(x, y) })
 	}
 	return nil
@@ -129,6 +173,7 @@ func (g *Game) click(m tea.Mouse) tea.Cmd {
 func (g *Game) move(dx, dy int) {
 	g.cx = max(0, min(g.cx+dx, g.board.Width()-1))
 	g.cy = max(0, min(g.cy+dy, g.board.Height()-1))
+	g.scrollToCursor()
 }
 
 // open reveals a hidden cell, or chords a revealed number.

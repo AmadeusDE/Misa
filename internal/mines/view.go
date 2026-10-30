@@ -11,6 +11,11 @@ const (
 	faceWidth   = 4
 	chromeLines = 5 // header, two border rows, status, help
 	help        = "space open  f flag  n new  1-3 level  c custom  q quit"
+	// A board larger than the terminal scrolls. The viewport needs at least
+	// this many cells in each direction (or the whole board, when the board is
+	// smaller than that) to be worth drawing.
+	minViewCols = 3
+	minViewRows = 3
 )
 
 var (
@@ -39,36 +44,58 @@ const (
 )
 
 // layout places the board centred on screen: a header row with the counters
-// and face, the bordered board, then the status and help lines.
+// and face, the bordered board, then the status and help lines. When the board
+// is larger than the terminal only a viewport of it is drawn: cols × rows cells
+// starting at x0, y0, which follows the cursor.
 type layout struct {
 	left, top, cw int
 	pad           int // trailing column so two-wide cells sit centred in the border
-	boardW        int
-	cols, rows    int
-	fits          bool
+	boardW        int // drawn width, border included
+	cols, rows    int // cells in the viewport
+	x0, y0        int // first drawn cell
+	totalCols     int
+	totalRows     int
+	fits          bool // the whole board is on screen
+	viable        bool // the terminal can show a usable viewport
 }
 
 func (g *Game) layout() layout {
-	return boardLayout(g.board.Width(), g.board.Height(), g.width, g.height)
+	l := boardLayout(g.board.Width(), g.board.Height(), g.width, g.height)
+	l.x0, l.y0 = l.clampOrigin(g.vx, g.vy)
+	return l
 }
 
+// fullW and fullH are the size the whole board would need on screen.
+func (l layout) fullW() int { return l.totalCols*l.cw + l.pad + 2 }
+func (l layout) fullH() int { return l.totalRows + chromeLines }
+
+// scrolls reports whether the board is larger than the terminal.
+func (l layout) scrolls() bool { return l.viable && !l.fits }
+
 func boardLayout(cols, rows, width, height int) layout {
-	l := layout{cw: 3, cols: cols, rows: rows}
-	if l.cols*3+2 > width {
+	l := layout{cw: 3, totalCols: cols, totalRows: rows}
+	if cols*3+2 > width {
 		l.cw, l.pad = 2, 1
 	}
+	l.cols = min(cols, max(0, (width-2-l.pad)/l.cw))
+	l.rows = min(rows, max(0, height-chromeLines))
+	l.viable = l.cols >= min(minViewCols, cols) && l.rows >= min(minViewRows, rows)
+	l.fits = l.cols == cols && l.rows == rows
 	l.boardW = l.cols*l.cw + l.pad + 2
-	boardHeight := l.rows + chromeLines
-	l.fits = l.boardW <= width && boardHeight <= height
 	l.left = max(0, (width-l.boardW)/2)
-	l.top = max(0, (height-boardHeight)/2)
+	l.top = max(0, (height-(l.rows+chromeLines))/2)
 	return l
+}
+
+// clampOrigin keeps the viewport's first cell inside the board.
+func (l layout) clampOrigin(x0, y0 int) (int, int) {
+	return max(0, min(x0, l.totalCols-l.cols)), max(0, min(y0, l.totalRows-l.rows))
 }
 
 func (l layout) faceX() int { return l.left + (l.boardW-faceWidth)/2 }
 
 func (l layout) hit(x, y int) (hitTarget, int, int) {
-	if !l.fits {
+	if !l.viable {
 		return hitNone, 0, 0
 	}
 	if y == l.top && x >= l.faceX() && x < l.faceX()+faceWidth {
@@ -78,7 +105,7 @@ func (l layout) hit(x, y int) (hitTarget, int, int) {
 	if col < 0 || row < 0 || col >= l.cols*l.cw || row >= l.rows {
 		return hitNone, 0, 0
 	}
-	return hitCell, col / l.cw, row
+	return hitCell, l.x0 + col/l.cw, l.y0 + row
 }
 
 func (g *Game) View() string {
@@ -89,7 +116,7 @@ func (g *Game) View() string {
 		return g.customView()
 	}
 	l := g.layout()
-	if !l.fits {
+	if !l.viable {
 		return g.tooSmall(l)
 	}
 	pad := strings.Repeat(" ", l.left)
@@ -98,7 +125,7 @@ func (g *Game) View() string {
 	for _, row := range strings.Split(g.grid(l), "\n") {
 		lines = append(lines, pad+row)
 	}
-	lines = append(lines, g.centre(statusSt.Render(g.status())), g.centre(helpSt.Render(truncate(help, g.width))))
+	lines = append(lines, g.centre(statusSt.Render(truncate(g.status(), g.width))), g.centre(helpSt.Render(truncate(help, g.width))))
 	for len(lines) < g.height {
 		lines = append(lines, "")
 	}
@@ -114,20 +141,21 @@ func (g *Game) header(l layout) string {
 	return left + strings.Repeat(" ", max(0, gapL)) + face + strings.Repeat(" ", max(0, gapR)) + right
 }
 
+// grid draws the viewport only, so a huge board costs no more than a small one.
 func (g *Game) grid(l layout) string {
 	b := g.board
-	rows := make([]string, b.Height())
+	rows := make([]string, 0, l.rows)
 	var sb strings.Builder
-	for y := range b.Height() {
+	for y := l.y0; y < l.y0+l.rows; y++ {
 		sb.Reset()
-		for x := range b.Width() {
+		for x := l.x0; x < l.x0+l.cols; x++ {
 			glyph, st := g.cell(x, y)
 			if x == g.cx && y == g.cy && b.State() == Playing {
 				st = cursorSt
 			}
 			sb.WriteString(st.Render(cellText(glyph, l.cw)))
 		}
-		rows[y] = sb.String() + strings.Repeat(" ", l.pad)
+		rows = append(rows, sb.String()+strings.Repeat(" ", l.pad))
 	}
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -172,11 +200,17 @@ func (g *Game) status() string {
 	case Lost:
 		return "Boom. n to try again"
 	}
-	return fmt.Sprintf("%s  %d×%d  %d mines", g.level.Name, g.level.W, g.level.H, g.board.Mines())
+	s := fmt.Sprintf("%s  %d×%d  %d mines", g.level.Name, g.level.W, g.level.H, g.board.Mines())
+	// With a scrolling viewport the status line also says which cells are shown.
+	if l := g.layout(); l.scrolls() {
+		s += fmt.Sprintf("  cols %d-%d/%d  rows %d-%d/%d",
+			l.x0+1, l.x0+l.cols, l.totalCols, l.y0+1, l.y0+l.rows, l.totalRows)
+	}
+	return s
 }
 
 func (g *Game) tooSmall(l layout) string {
-	need := fmt.Sprintf("%d×%d", l.boardW, l.rows+chromeLines)
+	need := fmt.Sprintf("%d×%d", l.fullW(), l.fullH())
 	msg := []string{
 		statusSt.Render(truncate("Terminal too small for "+g.level.Name+" ("+need+")", g.width)),
 		helpSt.Render(truncate("1-3 change level  c custom  q quit", g.width)),

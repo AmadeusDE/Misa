@@ -123,7 +123,7 @@ internal/
     man.go install.go util.go    Misc helpers
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
-    mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game
+    mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines/--percent) for the game
     chess.go                     `chess [variant] [-f file.yaml] [--fen pos] [-c white|black|both|none] [--level name] [--think s] [-l]`
                                  — ChessGame builds the game (computer plays Black by default)
     battleship.go                `battleship [-r|--random]` — -r picks a random fleet instead of interactive
@@ -139,8 +139,12 @@ internal/
     prompt.go                    Terminal prompts read byte-wise so typed-ahead input still reaches the remote
   lscore/                        ls formatting engine — colors, icons, git status, sorting
   mines/                         Minesweeper clone: board.go (rules, first reveal always safe, flood fill, chording),
-                                 game.go (keys/mouse, clock), view.go (centred layout + hit test), run.go (standalone).
-                                 Game satisfies procmon.Viewer, so typing `mines` in Misa opens it as an in-process screen
+                                 game.go (keys/mouse, clock), view.go (centred layout, hit test, and a viewport that
+                                 scrolls a board larger than the terminal and draws only the visible cells),
+                                 custom.go (custom setup screen: width, height and mines percent with ±1/±10/±100
+                                 keys and clickable buttons), limits.go (limits and percent helpers), run.go
+                                 (standalone). Game satisfies procmon.Viewer, so typing `mines` in Misa opens it as an
+                                 in-process screen
   battleship/                    Battleship on a standard 10×10 grid (fleet 5-4-3-3-2): board.go (rules, placement,
                                  shots), ai.go (hunt/target), game.go view.go run.go (interactive placement, then
                                  alternating shots; satisfies procmon.Viewer, so typing `battleship` in Misa opens it
