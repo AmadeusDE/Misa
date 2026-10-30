@@ -27,6 +27,8 @@ type Game struct {
 	quit          bool
 
 	computer  [2]bool // which sides the computer plays
+	level     Level
+	seed      uint64
 	thinkTime time.Duration
 	engines   map[*Variant]*Engine
 	thinking  bool
@@ -43,7 +45,7 @@ type thoughtMsg struct {
 // New starts a game of v, the computer playing Black; variants are the ones
 // v cycles through.
 func New(variants []*Variant, v *Variant) *Game {
-	g := &Game{variants: variants, thinkTime: DefaultThinkTime, engines: map[*Variant]*Engine{}}
+	g := &Game{variants: variants, seed: uint64(time.Now().UnixNano()), engines: map[*Variant]*Engine{}}
 	g.SetComputer(false, true)
 	g.newGame(v)
 	return g
@@ -57,7 +59,24 @@ func (g *Game) SetComputer(white, black bool) {
 	g.flipped = white && !black
 }
 
-func (g *Game) SetThinkTime(d time.Duration) { g.thinkTime = d }
+func (g *Game) SetThinkTime(d time.Duration) {
+	g.cancel()
+	g.thinkTime = d
+}
+
+func (g *Game) Level() Level { return g.level }
+
+// SetLevel cancels obsolete work. The next Init or Update starts the new
+// search, just as for SetComputer. Hotseat retains the selected level.
+func (g *Game) SetLevel(level Level) {
+	g.cancel()
+	g.level = level
+}
+
+func (g *Game) SetSeed(seed uint64) {
+	g.cancel()
+	g.seed = seed
+}
 
 // Load replaces the starting position, e.g. one read with ParseFEN.
 func (g *Game) Load(p *Position) {
@@ -134,6 +153,9 @@ func (g *Game) key(k string) {
 		g.undo()
 	case "c":
 		g.cycleComputer()
+	case "d":
+		g.SetLevel(g.level.next())
+		g.note = "Computer level: " + g.level.String()
 	case "f":
 		g.flipped = !g.flipped
 	case "t":
@@ -298,9 +320,12 @@ func (g *Game) think() tea.Cmd {
 	g.gen++
 	g.stop = &atomic.Bool{}
 	gen, stop, engine := g.gen, g.stop, g.engine()
-	root, past, limit := g.match.Position(), g.match.Hashes(), g.thinkTime
+	root, past := g.match.Position(), g.match.Hashes()
+	level, seed := g.level, g.seed^root.Hash()^uint64(len(g.match.Played()))
+	limits := level.Limits(g.thinkTime)
+	limits.Stop = stop
 	return func() tea.Msg {
-		return thoughtMsg{gen: gen, result: engine.Think(root, past, Limits{Time: limit, Stop: stop})}
+		return thoughtMsg{gen: gen, result: engine.ThinkLevel(root, past, level, limits, seed)}
 	}
 }
 
@@ -324,6 +349,10 @@ func (g *Game) thought(msg thoughtMsg) {
 	}
 	mover := g.match.Turn()
 	g.play(r.Move)
+	if r.Depth == 0 {
+		g.note = "Computer played " + g.match.Notation()[len(g.match.Notation())-1] + " · search stopped before analysis"
+		return
+	}
 	g.note = fmt.Sprintf("Computer played %s · depth %d · %s", g.match.Notation()[len(g.match.Notation())-1], r.Depth, scoreText(r.Score, mover))
 }
 

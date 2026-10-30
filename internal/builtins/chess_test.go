@@ -3,7 +3,10 @@ package builtins
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/AmadeusDE/Misa/internal/chess"
 )
 
 func TestChessGame(t *testing.T) {
@@ -25,6 +28,36 @@ func TestChessGame(t *testing.T) {
 			t.Errorf("%v: variant %s, want %s", tt.args, got, tt.id)
 		}
 	}
+}
+
+func TestChessDifficulty(t *testing.T) {
+	for _, name := range []string{"beginner", "easy", "normal", "hard", "expert"} {
+		g, err := ChessGame([]string{"--level", name, "--think", "5", "-c", "none"})
+		if err != nil || g.Level().String() != name {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	g, err := ChessGame(nil)
+	if err != nil || g.Level() != chess.Normal {
+		t.Fatal("default level changed")
+	}
+	_, err = ChessGame([]string{"--level", "impossible"})
+	if err == nil || !strings.Contains(err.Error(), chess.LevelNames) {
+		t.Fatalf("missing accepted names: %v", err)
+	}
+	for _, args := range [][]string{{"--level", "easy", "--think", "3601"}, {"--level", "hard", "-c", "red"}, {"--level"}} {
+		if _, err := ChessGame(args); err == nil {
+			t.Fatalf("accepted %v", args)
+		}
+	}
+}
+
+func TestChessDifficultyHelp(t *testing.T) {
+	r := runBuiltin(t, "chess", "--help")
+	assertExitCode(t, r, 0)
+	assertStdoutContains(t, r, "--level=VALUE")
+	assertStdoutContains(t, r, chess.LevelNames)
+	assertStdoutContains(t, r, "default: normal")
 }
 
 func TestChessGameFromFile(t *testing.T) {

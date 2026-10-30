@@ -11,7 +11,7 @@ import (
 const (
 	chromeLines = 6 // header, two border rows, file letters, status, help
 	panelWidth  = 26
-	help        = "space select/move  u undo  c computer  f flip  t letters  v variant  n new  q quit"
+	help        = "space select/move  u undo  c computer  d level  f flip  t letters  v variant  n new  q quit"
 )
 
 var (
@@ -149,6 +149,7 @@ func (g *Game) View() string {
 
 func (g *Game) header() string {
 	m := g.match
+	name := m.Variant().Name + " · " + g.level.String()
 	st, winner := m.Status()
 	switch st {
 	case Playing:
@@ -159,11 +160,11 @@ func (g *Game) header() string {
 		if g.thinking {
 			turn += " · thinking…"
 		}
-		return m.Variant().Name + " · " + turn
+		return name + " · " + turn
 	case Checkmate:
-		return m.Variant().Name + " · checkmate, " + winner.String() + " wins"
+		return name + " · checkmate, " + winner.String() + " wins"
 	}
-	return m.Variant().Name + " · " + st.String()
+	return name + " · " + st.String()
 }
 
 // board renders the bordered squares with rank numbers to the left and file

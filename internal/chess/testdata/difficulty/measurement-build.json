@@ -1,0 +1,15 @@
+{
+  "parent": "c7ed5251333b05a3e0782c2d530151ff0360c5b5",
+  "go": "go version go1.27.1-X:nodwarf5 linux/amd64",
+  "hardware": "AMD Ryzen 5 1600 Six-Core Processor, 6 cores / 12 threads; Linux amd64; concurrent verification workloads; latency is illustrative, not an idle benchmark",
+  "files_sha256": {
+    "internal/chess/search.go": "779e939e196e6a619b35b5c6d806f5104f1257d16d075ba6eba2e16e095279f0",
+    "internal/chess/difficulty.go": "b9146dad24f907fee36e5487286b6b4b8fe60d0980e3e87a99bea4848b2edd4d",
+    "internal/chess/eval.go": "ec71fb138b2d41717c355e8eeea02f5ee840fcb935033c801544fbd511769e10",
+    "internal/chess/position.go": "2cec165e945f7c14b7dd0c6f2e012821bfc01817fcccda299fff1ba1452a7b8b",
+    "internal/chess/variant.go": "25c23a2eaf52a718ed98ffb48edf2d9006b7aaf2d07ff61c6ac16d850a8ef812",
+    "internal/chess/variants/chess.yaml": "d4e83ada7bc1aabfc7b8e27a5e62c2bfb3e0553748f52bfe3fe30f6ccc8993bf"
+  },
+  "binary_sha256": "e8d6e55c1ced2d89ef397f4e263da84871295cd00d1fb4ce6574988b2b7375d3",
+  "baseline_binary_sha256": "bfe3b81a33623ad03dd418ac381062ab3dbfcdd184cc036d88a8d59e24cec149"
+}

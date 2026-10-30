@@ -321,3 +321,74 @@ func TestRosePassByClickingItAgain(t *testing.T) {
 		t.Errorf("notation = %v", got)
 	}
 }
+
+func TestLevelChangeDropsQueuedSearch(t *testing.T) {
+	g := vsComputer(t, "chess")
+	g.SetComputer(true, false)
+	old := g.Init()
+	stop, generation := g.stop, g.gen
+	next := press(g, "d")
+	if !stop.Load() || g.gen <= generation || g.Level() != Hard || next == nil {
+		t.Fatal("difficulty change did not replace search")
+	}
+	// Run the newer command first: cancelled, queued work must not monopolize
+	// the cached engine or apply its obsolete move when eventually scheduled.
+	runThought(t, g, next)
+	g.Update(old())
+	if len(g.match.Played()) != 1 {
+		t.Fatal("stale result changed the board")
+	}
+	if !strings.Contains(g.header(), "hard") {
+		t.Fatal("level not visible")
+	}
+}
+
+func TestLevelPreservedAndSettingsCaptured(t *testing.T) {
+	g := newGame(t, "chess", 100, 30)
+	g.SetLevel(Beginner)
+	keys(g, "n", "v", "c", "c", "c", "c")
+	if g.Level() != Beginner {
+		t.Fatal("level lost across game, variant or hotseat changes")
+	}
+	g.SetComputer(true, false)
+	cmd := g.Init()
+	// Mutate without cancellation to detect accidental closure reads; the
+	// public setters cancel instead, and are covered separately.
+	g.level, g.thinkTime = Expert, time.Minute
+	msg := cmd().(thoughtMsg)
+	if msg.result.Depth > 1 || msg.result.Nodes > Beginner.Limits(0).Nodes {
+		t.Fatalf("command read mutable settings: %+v", msg.result)
+	}
+	g.cancel()
+}
+
+func TestLevelChangeCancelsRunningSearch(t *testing.T) {
+	g := vsComputer(t, "bigboard")
+	g.SetComputer(true, false)
+	g.SetThinkTime(time.Minute)
+	cmd := g.Init()
+	done := make(chan tea.Msg, 1)
+	go func() { done <- cmd() }()
+	g.SetLevel(Beginner)
+	next := g.Init()
+	if next == nil {
+		t.Fatal("replacement search not scheduled")
+	}
+	replacement := make(chan tea.Msg, 1)
+	go func() { replacement <- next() }()
+	select {
+	case msg := <-replacement:
+		g.Update(msg)
+	case <-time.After(3 * time.Second):
+		t.Fatal("replacement blocked behind abandoned search")
+	}
+	select {
+	case msg := <-done:
+		g.Update(msg)
+	case <-time.After(3 * time.Second):
+		t.Fatal("abandoned goroutine did not exit")
+	}
+	if len(g.match.Played()) != 1 {
+		t.Fatal("abandoned move applied")
+	}
+}
