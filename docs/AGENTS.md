@@ -282,7 +282,7 @@ internal/
 - **Config search order**: next to executable → `~/.config/misa/`. Same for companion, mux, fetch and gui configs. Never the working directory: a cloned repo must not be able to supply `autorun:` or aliases.
 - **Config `*bool` pattern**: `BoolDefault()`/`BoolPtr()` helpers for settings that default to true.
 - **Configurable colors**: All colors configurable via `colors:` (info items) and `ui:` (prompt, divider, ghost, etc.) in config.yaml. Defaults are gruvbox.
-- **Builtins**: Registered via `init()` with `Register(Command{...})`. Each uses the `Spec`/`ParseArgs` option parser. Context provides Dir, Args, Width, Height, Stdout/Stderr/Stdin.
+- **Builtins**: Registered via `init()` with `Register(Command{...})`. Each uses the `Spec`/`ParseArgs` option parser. Context provides Dir, Args, Width, Height, Stdout/Stderr/Stdin. When adding or changing a builtin, update `internal/inventory/commands.json`, regenerate the human documentation with `go run ./internal/inventory/gen`, and verify the inventory reflects the registry.
 - **History format**: Zsh-style (`: timestamp:0;command`). Import from bash/zsh is read-only — never writes to external history files. Entries without timestamps (bash imports) sort to the front.
 - **Companion setup**: Moods, pronouns, call terms, prefixes, items/parts, emotes, kemonos, modifiers. Thirsty unlocks NSFW `{part}` (original mommy: milk, cock, cum, mouth); otherwise `{part}` uses SFW items. Modifiers can add combo lines when other modifiers are also selected. Texts load from embedded yaml under `internal/companion/data/`.
 - **Root view**: `Model.View()` returns a `tea.View` (alt screen, `MouseModeAllMotion`) only for the root; panes compose through `render() string`.

@@ -1,5 +1,7 @@
 # Test coverage report: toybox + uutils utilities missing from Misa
 
+> Historical snapshot: conclusions about which commands are missing are superseded by the generated [`command-inventory.md`](command-inventory.md). Use that inventory for current command presence; retain this report only for its test-coverage analysis.
+
 Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (toybox 6a0c0ef, uutils repos at the commits listed there). BusyBox excluded.
 
 ## Method

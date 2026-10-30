@@ -1,5 +1,7 @@
 # Utility comparison: Misa vs toybox vs BusyBox vs uutils
 
+> Historical snapshot: conclusions about which commands are missing are superseded by the generated command inventory at `internal/inventory/commands.json` (regenerate with `go run ./internal/inventory/gen`). Use that inventory for current command presence.
+
 Generated 2026-10-15 from real sources (not memory) by parsing each project's registry/applet declarations.
 
 ## Sources
