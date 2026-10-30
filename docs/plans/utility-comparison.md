@@ -31,7 +31,7 @@ uutils org repos checked that ship no utilities (libraries/docs/trackers): rust-
 
 | Column | Utilities |
 |---|---|
-| Misa | 114 |
+| Misa | 115 |
 | toybox (all) | 349 |
 | toybox: non-pending, default y | 250 |
 | toybox: non-pending, default n | 3 |
@@ -429,7 +429,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `popmaildir` |  |  | ✓ |  |
 | `poweroff` |  | ✓ other | ✓ |  |
 | `powertop` |  |  | ✓ |  |
-| `pr` |  |  |  | ✓ coreutils |
+| `pr` | ✓ |  |  | ✓ coreutils |
 | `printenv` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `printf` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `prlimit` |  | ✓ posix |  |  |
@@ -651,4 +651,4 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `yes` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `zcat` |  | ✓ lsb | ✓ |  |
 | `zcip` |  |  | ✓ |  |
-| **Total** | **114** | **349** (250 default, 96 pending) | **445** | **190** |
+| **Total** | **115** | **349** (250 default, 96 pending) | **445** | **190** |
