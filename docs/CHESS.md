@@ -48,6 +48,7 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
 
 ## Bundled variants
 
+- **Chess** (`chess`): orthodox chess.
 - **Amazon Chess** (`chess amazon`): 8×8 orthodox chess with queens replaced by Amazons, moving as queen or knight. Castling, en passant, and checkmate/stalemate follow orthodox rules; promotion is to Amazon, rook, bishop, or knight. The Amazon's value (1200 cp) is approximate. This queen-replacement variant follows the published Amazon piece definition at [Chess Variants](https://www.chessvariants.com/diffmove.dir/amazone.html) and [Wikipedia](https://en.wikipedia.org/wiki/Amazon_(chess)).
 
 - **No-castling Chess** (`chess nocastling`): orthodox chess with castling disabled.
@@ -60,6 +61,13 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
   and the 50-move rule applies. Rules:
   [Wikipedia](https://en.wikipedia.org/wiki/Capablanca_chess),
   [Chess Variants](https://www.chessvariants.com/large.dir/capablanca.html).
+
+- **Berolina Chess** (`berolina`): otherwise orthodox rules, but pawns move
+  diagonally without capturing and capture straight ahead. Their initial
+  double-step is diagonal, and en passant is captured straight ahead on the
+  square they pass. Rules:
+  [Wikipedia](https://en.wikipedia.org/wiki/Berolina_chess),
+  [Chess Variants](https://www.chessvariants.com/dif-pawn.dir/berolina.html).
 - Double Chess (`double`): 16×12.
 - Betza's Big Board (`bigboard`): 16×16.
 - Double Big Board (`doublebig`): 32×16.

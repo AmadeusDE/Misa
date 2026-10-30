@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
