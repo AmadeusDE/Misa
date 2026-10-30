@@ -54,7 +54,7 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 - **toybox** by Rob Landley et al. — 0BSD
   https://github.com/landley/toybox
 
-- **uutils/coreutils** by the uutils contributors — MIT
+- **uutils/coreutils** by the uutils contributors — MIT (`numfmt`, `od`)
   https://github.com/uutils/coreutils
 
 - **uutils/diffutils** by the uutils contributors — MIT / Apache-2.0

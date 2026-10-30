@@ -31,7 +31,7 @@ uutils org repos checked that ship no utilities (libraries/docs/trackers): rust-
 
 | Column | Utilities |
 |---|---|
-| Misa | 114 |
+| Misa | 115 |
 | toybox (all) | 349 |
 | toybox: non-pending, default y | 250 |
 | toybox: non-pending, default n | 3 |
@@ -407,7 +407,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `ntpd` |  |  | ✓ |  |
 | `nuke` |  |  | ✓ |  |
 | `numfmt` | ✓ |  |  | ✓ coreutils |
-| `od` |  | ✓ posix | ✓ | ✓ coreutils |
+| `od` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `oneit` |  | ✓ other |  |  |
 | `openvt` |  | ✓ other | ✓ |  |
 | `parse` |  |  | ✓ |  |

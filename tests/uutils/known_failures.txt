@@ -13,6 +13,15 @@ nl/test_negative_line_increment_1_L1  # nl: negative -i is rejected
 numfmt/test_locale_fr_output_L1689  # numfmt: no locale support (the test needs fr_FR)
 numfmt/test_locale_fr_input_comma_L1700  # numfmt: no locale support (the test needs fr_FR)
 numfmt/test_locale_fr_rejects_period_L1711  # numfmt: no locale support (the test needs fr_FR)
+od/test_od_strings_option_1_L1288  # od: -S/--strings (extract printable strings) is not implemented
+od/test_od_strings_option_2_L1295  # od: -S/--strings (extract printable strings) is not implemented
+od/test_od_strings_option_3_L1302  # od: -S/--strings (extract printable strings) is not implemented
+od/test_od_strings_option_4_L1309  # od: -S/--strings (extract printable strings) is not implemented
+od/test_od_strings_option_5_L1319  # od: -S/--strings (extract printable strings) is not implemented
+od/test_od_strings_option_6_L1325  # od: -S/--strings (extract printable strings) is not implemented
+od/test_od_strings_option_7_L1333  # od: -S/--strings (extract printable strings) is not implemented
+od/test_od_strings_option_L1280  # od: -S/--strings (extract printable strings) is not implemented
+od/test_traditional_decimal_dot_offset_L1095  # od: the obsolete [+]offset operand form (od -c +5) is not implemented
 rmdir/test_rmdir_nonempty_directory_no_parents_0_L68  # rmdir: error message wording differs
 rmdir/test_rmdir_nonempty_directory_with_parents_0_L82  # rmdir: error message wording differs
 seq/test_equalize_widths_corner_cases_L1124  # seq -w with a hex operand: GNU's padding quirk isn't reproduced

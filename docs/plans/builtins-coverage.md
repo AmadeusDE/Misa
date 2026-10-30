@@ -283,7 +283,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `nologin` | other | – | util-linux:2 | 2 | – | uutils: Rust, 2/2 simple new_ucmd! cases parseable by tests/uutils adapter | 24 | 92 | light |
 | `nsenter` | other | – | – | – | – | no tests | 166 | – | light |
 | `numfmt` | – | – | coreutils:196 | 174 | network, tty | uutils: Rust, 174/196 simple new_ucmd! cases parseable by tests/uutils adapter | – | 3233 | heavy |
-| `od` | posix | – | coreutils:83 | 62 | tty | uutils: Rust, 62/83 simple new_ucmd! cases parseable by tests/uutils adapter | 294 | 4261 | medium |
 | `oneit` | other | – | – | – | – | no tests | 135 | – | light |
 | `openvt` | other | – | – | – | – | no tests | 115 | – | light |
 | `partprobe` | other | – | – | – | – | no tests | 30 | – | light |
