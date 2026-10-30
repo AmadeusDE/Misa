@@ -65,12 +65,7 @@ func (m *Model) showTldr(command string) tea.Cmd {
 		m.status = fmt.Sprintf("tldr: %v", err)
 		return nil
 	}
-	rendered := help.RenderMarkdown(content)
-	rendered += "\n\n" + settingHelpStyle.Render("  esc: back  scroll: up/down")
-	m.helpView.SetContent(rendered)
-	m.screen = screenHelp
-	m.resize()
-	m.helpView.GotoTop()
+	m.showHelpPage(command, content)
 	return nil
 }
 
@@ -85,16 +80,17 @@ func (m *Model) showMan(command string) tea.Cmd {
 		m.status = fmt.Sprintf("man: %v", err)
 		return nil
 	}
-	rendered := help.RenderMarkdown(content)
-	rendered += "\n\n" + settingHelpStyle.Render("  esc: back  scroll: up/down")
-	m.helpView.SetContent(rendered)
-	m.screen = screenHelp
-	m.resize()
-	m.helpView.GotoTop()
+	m.showHelpPage(command, content)
 	return nil
 }
 
 func (m *Model) updateHelp(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.helpAsk.prompting {
+		switch msg.(type) {
+		case tea.KeyPressMsg, tea.PasteMsg:
+			return m.updateHelpPrompt(msg)
+		}
+	}
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
@@ -102,6 +98,8 @@ func (m *Model) updateHelp(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screen = screenMenu
 			m.resize()
 			return m, nil
+		case "a":
+			return m, m.startHelpAsk()
 		}
 	}
 	var cmd tea.Cmd

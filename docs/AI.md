@@ -74,9 +74,46 @@ models:
   default: openrouter/xiaomi/mimo-v2.6-pro   # every feature without its own entry
   chat: ollama/llama3.2
   help: opencode-go/mimo-v2.6-pro
+  help_fallback: ollama/llama3.2             # tried when help keeps failing with 429/5xx
 search:
   engine: duckduckgo        # duckduckgo (no key) | searxng | off
   searxng_url: http://localhost:8888
 ```
+
+## aihelp: command help
+
+Ask about a command, or about anything on the command line, and get a short answer in Markdown. The model can
+read the local man page and TLDR page of a command and search the Arch Wiki, so it answers from the documentation
+of what you have installed. It uses the model chosen for `help` in `ai.yaml` (else your default); run `aiconfig`
+to pick one. Without one, `aihelp` says so and stops.
+
+```sh
+aihelp ls                         # describe a command
+aihelp ls how do I sort by size   # a question about a command
+aihelp how do I unpack a .tar.zst # a free question (the first word is not a command)
+aihelp --model ollama/llama3.2 -n tar how to list contents
+aihelp --raw rsync trailing slash # print the Markdown as is
+aihelp --fix "git psuh" 1         # print one corrected command
+aihelp --clear-cache
+```
+
+- On a terminal the answer is rendered (headings, code blocks) as it arrives, block by block; piped it is plain
+  Markdown. `--raw` forces plain output.
+- Answers are cached under `~/.cache/misa/aihelp/` (one file per sha256 of the model and the question). `-n` / `--no-cache`
+  skips the lookup and refreshes the entry.
+- A 429 or 5xx from the provider is retried with a growing delay (2 s, 4 s). If the model still fails, the model
+  named by `models.help_fallback` in `ai.yaml` is tried.
+- `--fix "<command>" [exit status]` prints the corrected command on stdout and the explanation on stderr, so
+  `fixed=$(aihelp --fix "$cmd" $?)` works. Pipe the command's error output in on stdin to include it.
+- The Arch Wiki tool needs the network; man and tldr pages are local (tldr pages download once).
+
+Two places in Misa use the same helper:
+
+- **Command correction.** When a command fails and no built-in rule knows the fix, the prompt shows
+  `no known fix  [ctrl+f: ask AI]`. `ctrl+f` asks the model about that command and its output. The answer appears as the
+  usual `fix → …` line (with the explanation underneath), and `ctrl+f` again runs it. Nothing is sent until you press it,
+  and the hint only shows when a help model is chosen.
+- **Help viewer.** In the TLDR and man page viewer, `a` opens a prompt: ask about the page you are reading. The question
+  and the answer are added under the page; `esc` cancels the prompt.
 
 Builds with `-tags nough` leave the AI features out.

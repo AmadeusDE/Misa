@@ -19,12 +19,13 @@ func depsOf(t *testing.T, pattern string) []string {
 
 func TestDependencyDirection(t *testing.T) {
 	forbidden := map[string][]string{
-		module + "internal/ugh/...":   {"internal/ughbot", "internal/ui", "internal/webui", "internal/ai"},
+		module + "internal/ugh/...":   {"internal/ughbot", "internal/ui", "internal/webui", "internal/ai", "internal/aihelp"},
 		module + "internal/term":      {"internal/ugh/", "internal/ughbot", "internal/ui"},
 		module + "internal/sshclient": {"internal/ugh/", "internal/ughbot", "internal/ui"},
 		module + "internal/builtins":  {"internal/ugh/", "internal/ughbot", "internal/ai"},
 		module + "internal/ai":        {"internal/ui", "internal/ughbot", "internal/webui", "internal/builtins"},
 		module + "internal/aiconfig":  {"internal/ui", "internal/ughbot", "internal/webui", "internal/builtins"},
+		module + "internal/aihelp":    {"internal/ui", "internal/ughbot", "internal/webui"},
 		module + "internal/webui":     {"internal/ui", "internal/gui", "internal/ugh", "internal/ughbot"},
 		module + "internal/termkeys":  {"internal/ui", "internal/gui", "internal/ugh", "internal/ughbot"},
 		module + "internal/lscore":    {"internal/ugh/", "internal/ughbot"},
@@ -48,6 +49,20 @@ func TestMisaDoesNotLinkTheBotStore(t *testing.T) {
 				if strings.HasPrefix(dep, b) {
 					t.Errorf("%s must not depend on %s", pattern, dep)
 				}
+			}
+		}
+	}
+}
+
+func TestNoughBuildLeavesTheAIOut(t *testing.T) {
+	out, err := exec.Command("go", "list", "-deps", "-tags", "nough", "-test=false", module[:len(module)-1]).Output()
+	if err != nil {
+		t.Fatalf("go list -tags nough: %v", err)
+	}
+	for _, dep := range strings.Fields(string(out)) {
+		for _, b := range []string{"internal/ai", "internal/aihelp"} {
+			if dep == module+b || strings.HasPrefix(dep, module+b+"/") {
+				t.Errorf("a -tags nough build must not depend on %s", dep)
 			}
 		}
 	}
