@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -117,5 +118,52 @@ func TestDevicesBuiltinRegisteredAndRunsCLISubcommands(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := cmd.Run(&builtins.Context{Args: []string{"list"}, Stdout: &out, Stderr: &errb}); code != 0 {
 		t.Fatalf("devices list = %d: %s", code, errb.String())
+	}
+}
+
+func TestDevicesInvocationEnvironmentIsolation(t *testing.T) {
+	root := t.TempDir()
+	process := filepath.Join(root, "process")
+	t.Setenv("HOME", process)
+	t.Setenv("XDG_STATE_HOME", filepath.Join(process, "state"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(process, "config"))
+	configBase := func(home, xdg string) string {
+		switch runtime.GOOS {
+		case "darwin", "ios":
+			return filepath.Join(home, "Library", "Application Support", "misa")
+		case "windows":
+			return "."
+		case "plan9":
+			return filepath.Join(home, "lib", "misa")
+		default:
+			if xdg != "" {
+				return filepath.Join(xdg, "misa")
+			}
+			return filepath.Join(home, ".config", "misa")
+		}
+	}
+	for _, tc := range []struct {
+		name          string
+		env           []string
+		state, config string
+	}{
+		{"xdg", []string{"HOME=" + filepath.Join(root, "home"), "XDG_STATE_HOME=" + filepath.Join(root, "state"), "XDG_CONFIG_HOME=" + filepath.Join(root, "config")}, filepath.Join(root, "state", "misa", "webui"), configBase(filepath.Join(root, "home"), filepath.Join(root, "config"))},
+		{"home", []string{"HOME=" + filepath.Join(root, "home2")}, filepath.Join(root, "home2", ".local", "state", "misa", "webui"), configBase(filepath.Join(root, "home2"), "")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out, errb bytes.Buffer
+			code := builtins.Run(nil, "devices", &builtins.Context{Args: []string{"list"}, Env: tc.env, Stdout: &out, Stderr: &errb})
+			if code != 0 {
+				t.Fatalf("exit %d: %s", code, &errb)
+			}
+			for _, dir := range []string{tc.state, tc.config} {
+				if _, err := os.Stat(dir); err != nil {
+					t.Errorf("%s: %v", dir, err)
+				}
+			}
+		})
+	}
+	if _, err := os.Stat(process); !os.IsNotExist(err) {
+		t.Fatalf("process environment used: %v", err)
 	}
 }

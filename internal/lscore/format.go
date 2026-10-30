@@ -12,6 +12,8 @@ import (
 )
 
 type FormatOpts struct {
+	LSColors        string // invocation-specific LS_COLORS
+	colors          *colorState
 	Long            bool
 	OnePerLine      bool
 	Grid            bool
@@ -42,7 +44,8 @@ type FormatOpts struct {
 }
 
 func Format(w io.Writer, files []*FileInfo, opts FormatOpts, width int) {
-	resetColorState()
+	m, fold := parseLSColors(opts.LSColors)
+	opts.colors = &colorState{extColors: m, extFold: fold}
 
 	if opts.ShowTotal && (opts.Long || opts.ShowBlocks) {
 		printTotal(w, files)
