@@ -1,0 +1,13 @@
+id: capablanca
+name: Capablanca Chess
+description: Capablanca chess on a 10×8 board.
+extends: chess
+files: 10
+pieces:
+  - {letter: A, name: Archbishop, betza: BN, value: 875}
+  - {letter: C, name: Chancellor, betza: RN, value: 900}
+setup: rnabqkbcnr/pppppppppp/10/10/10/10/PPPPPPPPPP/RNABQKBCNR
+castling:
+  - {king: f1, rook: j1, king_to: i1, rook_to: h1}
+  - {king: f1, rook: a1, king_to: c1, rook_to: d1}
+promotion: [Q, C, A, R, B, N]

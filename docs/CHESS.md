@@ -54,6 +54,16 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
   It is based on the AlphaZero rule-change variant described by Tomašev et al.,
   [Assessing Game Balance with AlphaZero](https://arxiv.org/abs/2009.04374) (2020).
 
+- **Capablanca Chess** (`capablanca`): 10×8, with Archbishop (bishop + knight)
+  and Chancellor (rook + knight). Kings castle three squares; pawns move as in
+  chess and promote to Q, C, A, R, B, or N. Checkmate wins, stalemate draws,
+  and the 50-move rule applies. Rules:
+  [Wikipedia](https://en.wikipedia.org/wiki/Capablanca_chess),
+  [Chess Variants](https://www.chessvariants.com/large.dir/capablanca.html).
+- Double Chess (`double`): 16×12.
+- Betza's Big Board (`bigboard`): 16×16.
+- Double Big Board (`doublebig`): 32×16.
+
 ## During play
 
 - Arrows or `h/j/k/l`: move the cursor; space/enter or click: select/move.
