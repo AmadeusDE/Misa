@@ -1,6 +1,7 @@
 package builtinexec
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -13,7 +14,7 @@ import (
 // ProcessEffect handles the private process-effect protocol in a re-executed child.
 // args must exclude the private flag.
 func ProcessEffect(args []string) int {
-	return proceffect.Handle(args, func(argv []string) int {
+	return proceffect.HandleContext(args, func(ctx context.Context, argv []string) int {
 		if len(argv) == 0 {
 			return proceffect.Exec(argv)
 		}
@@ -32,6 +33,6 @@ func ProcessEffect(args []string) int {
 			Env: os.Environ(), Exec: For(name),
 			StdinTTY: term.IsTerminal(int(os.Stdin.Fd())), StdoutTTY: term.IsTerminal(int(os.Stdout.Fd())), StderrTTY: term.IsTerminal(int(os.Stderr.Fd())),
 		}
-		return builtins.Run(nil, name, inv)
+		return builtins.Run(ctx, name, inv)
 	})
 }

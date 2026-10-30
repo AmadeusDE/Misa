@@ -252,7 +252,7 @@ func TestEnvExternalExactEnvironmentAndDir(t *testing.T) {
 	}
 }
 
-func TestEnvLocalExecutablePrecedesBuiltin(t *testing.T) {
+func TestEnvBuiltinPrecedesLocalExecutable(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("unix executable permissions")
 	}
@@ -267,7 +267,7 @@ func TestEnvLocalExecutablePrecedesBuiltin(t *testing.T) {
 	var out, stderr bytes.Buffer
 	inv := &builtins.Context{Dir: t.TempDir(), Args: []string{"-C", dir, "-i", "BUILTINEXEC_HELPER=argv0", "echo", "-test.run=TestHelperProcess"}, Stdout: &out, Stderr: &stderr}
 	got := Run(context.Background(), "env", inv)
-	if got != 0 || out.String() != "echo" {
+	if got != 0 || out.String() != "-test.run=TestHelperProcess\n" {
 		t.Fatalf("status %d output %q stderr %q", got, out.String(), stderr.String())
 	}
 }

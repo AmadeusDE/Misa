@@ -17,9 +17,9 @@ func TestMain(m *testing.M) {
 	}
 	_ = proceffect.EnableSelfHelper()
 	if len(os.Args) > 1 && os.Args[1] == proceffect.Flag {
-		os.Exit(proceffect.Handle(os.Args[2:], func(argv []string) int {
+		os.Exit(proceffect.HandleContext(os.Args[2:], func(ctx context.Context, argv []string) int {
 			if _, ok := Lookup(argv[0]); ok {
-				return Run(context.Background(), argv[0], &Context{Args: argv[1:], Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr})
+				return Run(ctx, argv[0], &Context{Args: argv[1:], Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr})
 			}
 			return proceffect.Exec(argv)
 		}))

@@ -10,9 +10,11 @@ import (
 
 // Terminal-owning commands retain their own signal handling. Job suspension is
 // separate: this bridge never subscribes to SIGTSTP/SIGTTIN/SIGTTOU.
+// TODO(F07): carry the received signal as a cancellation cause so timeout can
+// forward it with a grace period rather than cancellation killing its group.
 func builtinSignalBridgeSafe(name string) bool {
 	switch name {
-	case "vi", "top", "htop", "btop", "bytop", "bashtop", "tm", "mines", "chess", "battleship", "sshc", "devices", "timeout":
+	case "vi", "top", "htop", "btop", "bytop", "bashtop", "tm", "mines", "chess", "battleship", "sshc", "devices":
 		return false
 	}
 	return true
