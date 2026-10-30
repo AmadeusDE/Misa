@@ -2,6 +2,7 @@ package builtins
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"strconv"
@@ -27,23 +28,35 @@ type sedRun struct {
 	quitting bool
 	exitCode int
 	fatal    error
+
+	hold      []byte
+	replaced  bool
+	appends   []sedAppend
+	lineWidth int64
+	files     *sedFiles
 }
 
 var errSedNoPrevious = errors.New("no previous regular expression")
 
 func newSedRun(ctx *Context, cmds []*sedCmd, files []string) *sedRun {
 	return &sedRun{
-		ctx:   ctx,
-		cmds:  cmds,
-		in:    &sedInput{ctx: ctx, names: files, delim: '\n'},
-		out:   &sedOutput{w: bufio.NewWriter(ctx.Stdout), delim: '\n'},
-		delim: '\n',
+		ctx:       ctx,
+		cmds:      cmds,
+		in:        &sedInput{ctx: ctx, names: files, delim: '\n'},
+		out:       &sedOutput{w: bufio.NewWriter(ctx.Stdout), delim: '\n'},
+		delim:     '\n',
+		lineWidth: 70,
 	}
 }
 
 func (r *sedRun) run() int {
 	r.in.delim = r.delim
 	r.in.separate = r.separate
+	if r.files, r.fatal = openSedFiles(r.ctx, r.cmds, r.out); r.fatal != nil {
+		fmt.Fprintf(r.ctx.Stderr, "sed: %v\n", r.fatal)
+		return 4
+	}
+	defer r.files.close()
 	r.in.fill(true)
 	for !r.quitting && r.fatal == nil {
 		rec, nl, ok := r.in.read()
@@ -56,6 +69,7 @@ func (r *sedRun) run() int {
 		r.in.restarted = false
 		r.ps, r.psNL = append(r.ps[:0], rec...), nl
 		r.lineNo++
+		r.replaced = false
 		r.cycle()
 		if r.out.unbuffered {
 			r.out.w.Flush()
@@ -63,6 +77,9 @@ func (r *sedRun) run() int {
 	}
 	if err := r.out.w.Flush(); err != nil && r.out.err == nil {
 		r.out.err = err
+	}
+	if err := r.files.flush(); err != nil && r.fatal == nil {
+		r.fatal = err
 	}
 	switch {
 	case r.fatal != nil:
@@ -79,9 +96,30 @@ func (r *sedRun) run() int {
 	return 0
 }
 
-// cycle runs the script once over the pattern space.
+type sedAction uint8
+
+const (
+	sedEndCycle sedAction = iota // autoprint unless -n
+	sedDeleted                   // d, c: no autoprint
+	sedRestart                   // D: run again on what is left, without reading
+)
+
+// cycle runs the script over the pattern space, then prints it and the
+// text queued by a, r and R.
 func (r *sedRun) cycle() {
-	autoprint := !r.quiet
+	for {
+		action := r.execute()
+		if action == sedEndCycle && !r.quiet {
+			r.out.record(r.ps, r.psNL)
+		}
+		r.flushAppends()
+		if action != sedRestart || r.quitting || r.fatal != nil {
+			return
+		}
+	}
+}
+
+func (r *sedRun) execute() sedAction {
 	for pc := 0; pc < len(r.cmds) && r.fatal == nil; {
 		c := r.cmds[pc]
 		if r.selects(c) == c.negate {
@@ -94,27 +132,127 @@ func (r *sedRun) cycle() {
 		}
 		pc++
 		switch c.name {
-		case 'p':
-			r.out.record(r.ps, r.psNL)
+		case 'b':
+			pc = c.jump
+		case 't', 'T':
+			if r.replaced == (c.name == 't') {
+				pc = c.jump
+			}
+			r.replaced = false
 		case 'd':
-			return
+			return sedDeleted
+		case 'D':
+			i := bytes.IndexByte(r.ps, r.delim)
+			if i < 0 {
+				return sedDeleted
+			}
+			r.ps = append(r.ps[:0], r.ps[i+1:]...)
+			return sedRestart
+		case 'c':
+			if c.a2.kind == sedNoAddr || !c.active || c.negate {
+				r.out.text(c.text)
+			}
+			return sedDeleted
+		case 'n':
+			if !r.in.hasNext && !r.in.more() {
+				r.quitting = true
+				return sedEndCycle
+			}
+			if !r.quiet {
+				r.out.record(r.ps, r.psNL)
+			}
+			r.flushAppends()
+			r.readLine(false)
+		case 'N':
+			if !r.in.hasNext && !r.in.more() {
+				r.quitting = true
+				return sedEndCycle
+			}
+			r.flushAppends()
+			r.readLine(true)
 		case 'q', 'Q':
 			if c.n >= 0 {
 				r.exitCode = int(c.n)
 			}
 			r.quitting = true
 			if c.name == 'Q' {
-				return
+				return sedDeleted
 			}
-			pc = len(r.cmds)
-		case '=':
-			r.out.text(strconv.FormatInt(r.lineNo, 10) + "\n")
+			return sedEndCycle
 		case 's':
 			r.substitute(c)
+		default:
+			r.simple(c)
 		}
 	}
-	if autoprint {
+	return sedEndCycle
+}
+
+// readLine replaces the pattern space with the next record, or appends it
+// after a delimiter for N.
+func (r *sedRun) readLine(join bool) {
+	rec, nl, _ := r.in.read()
+	if r.in.restarted && r.separate {
+		r.lineNo = 0
+	}
+	r.in.restarted = false
+	if join {
+		r.ps = append(append(r.ps, r.delim), rec...)
+	} else {
+		r.ps = append(r.ps[:0], rec...)
+	}
+	r.psNL = nl
+	r.lineNo++
+	r.replaced = false
+}
+
+// simple runs the commands that only touch the buffers or the output.
+func (r *sedRun) simple(c *sedCmd) {
+	switch c.name {
+	case 'p':
 		r.out.record(r.ps, r.psNL)
+	case 'P':
+		first, _, _ := bytes.Cut(r.ps, []byte{r.delim})
+		r.out.record(first, true)
+	case '=':
+		r.out.text(strconv.FormatInt(r.lineNo, 10) + "\n")
+	case 'a':
+		r.appends = append(r.appends, sedAppend{text: c.text})
+	case 'i':
+		r.out.text(c.text)
+	case 'r':
+		r.appends = append(r.appends, sedAppend{file: c.file})
+	case 'R':
+		if line, ok := r.readFileLine(c.file); ok {
+			r.appends = append(r.appends, sedAppend{text: line})
+		}
+	case 'w':
+		r.writeFile(c.file, r.ps)
+	case 'W':
+		first, _, _ := bytes.Cut(r.ps, []byte{r.delim})
+		r.writeFile(c.file, first)
+	case 'g':
+		r.ps = append(r.ps[:0], r.hold...)
+	case 'G':
+		r.ps = append(append(r.ps, r.delim), r.hold...)
+	case 'h':
+		r.hold = append(r.hold[:0], r.ps...)
+	case 'H':
+		r.hold = append(append(r.hold, r.delim), r.ps...)
+	case 'x':
+		r.ps, r.hold = r.hold, r.ps
+	case 'z':
+		r.ps = r.ps[:0]
+	case 'y':
+		r.ps = sedTransliterate(r.ps, c.from, c.to)
+	case 'l':
+		width := c.n
+		if width < 0 {
+			width = r.lineWidth
+		}
+		r.out.text(sedList(r.ps, int(width), r.delim) + string(r.delim))
+	case 'F':
+		r.out.text(r.in.name + "\n")
 	}
 }
 
@@ -238,8 +376,12 @@ func (r *sedRun) substitute(c *sedCmd) {
 		last = loc[1]
 	}
 	r.ps = append(out, r.ps[last:]...)
+	r.replaced = true
 	if c.print {
 		r.out.record(r.ps, r.psNL)
+	}
+	if c.wfile != "" {
+		r.writeFile(c.wfile, r.ps)
 	}
 }
 

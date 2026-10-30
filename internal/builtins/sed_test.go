@@ -1,6 +1,10 @@
 package builtins
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestSedScripts(t *testing.T) {
 	tests := []struct {
@@ -113,5 +117,97 @@ func TestSedErrors(t *testing.T) {
 		r := runBuiltinStdin(t, "sed", "a\n", tt.args...)
 		assertExitCode(t, r, 1)
 		assertStderrContains(t, r, tt.want)
+	}
+}
+
+func TestSedCommands(t *testing.T) {
+	tests := []struct {
+		name  string
+		stdin string
+		args  []string
+		want  string
+	}{
+		{"append", "a\nb\n", []string{"1a x"}, "a\nx\nb\n"},
+		{"append backslash form", "a\n", []string{"a\\\nx\\\ny"}, "a\nx\ny\n"},
+		{"append same-line backslash", "a\n", []string{`a\tx`}, "a\ntx\n"},
+		{"append escapes", "a\n", []string{`a x\ty\nz`}, "a\nx\ty\nz\n"},
+		{"insert", "a\nb\n", []string{"2i x"}, "a\nx\nb\n"},
+		{"change", "a\nb\n", []string{"1c x"}, "x\nb\n"},
+		{"change range prints once", "1\n2\n3\n4\n", []string{"2,3c x"}, "1\nx\n4\n"},
+		{"change negated", "1\n2\n", []string{"1!c x"}, "1\nx\n"},
+		{"append after missing newline", "a", []string{"a x"}, "a\nx\n"},
+		{"empty append adds missing newline", "a", []string{"a\\"}, "a\n"},
+		{"next", "1\n2\n3\n", []string{"-n", "n;p"}, "2\n"},
+		{"next prints", "1\n2\n3\n4\n", []string{"n;d"}, "1\n3\n"},
+		{"next at end keeps autoprint", "1\n2\n3\n", []string{"n;d"}, "1\n3\n"},
+		{"join", "1\n2\n3\n", []string{"N;s/\\n/+/"}, "1+2\n3\n"},
+		{"join at end prints", "1\n2\n3\n", []string{"$!N;s/\\n/+/"}, "1+2\n3\n"},
+		{"join all", "1\n2\n3\n", []string{":a;N;$!ba;s/\\n/,/g"}, "1,2,3\n"},
+		{"delete first line restarts", "1\n2\n3\n", []string{"-n", "$!N;P;D"}, "1\n2\n3\n"},
+		{"print first line", "1\n2\n", []string{"-n", "N;P"}, "1\n"},
+		{"hold and get", "1\n2\n", []string{"-n", "1h;2{g;p}"}, "1\n"},
+		{"reverse lines", "1\n2\n3\n", []string{"-n", "1!G;h;$p"}, "3\n2\n1\n"},
+		{"exchange", "1\n2\n", []string{"x"}, "\n1\n"},
+		{"append hold", "1\n2\n", []string{"-n", "H;${x;p}"}, "\n1\n2\n"},
+		{"zap", "abc\n", []string{"z;s/^$/empty/"}, "empty\n"},
+		{"branch to label", "a\nb\n", []string{"-n", "/a/bx;p;:x"}, "b\n"},
+		{"branch to end", "a\nb\n", []string{"/a/b;s/./X/"}, "a\nX\n"},
+		{"test branch", "aa\nb\n", []string{":x;s/a/c/;tx"}, "cc\nb\n"},
+		{"test resets per line", "a\nb\n", []string{"-n", "s/a/A/;ty;p;d;:y;s/$/!/p"}, "A!\nb\n"},
+		{"test not", "a\nb\n", []string{"s/a/A/;Tz;s/$/!/;:z"}, "A!\nb\n"},
+		{"transliterate", "hello\n", []string{"y/elo/ELO/"}, "hELLO\n"},
+		{"transliterate utf8", "aé\n", []string{"y/aé/éa/"}, "éa\n"},
+		{"transliterate newline", "a\nb\n", []string{"N;y/\\n/ /"}, "a b\n"},
+		{"list", "a\tb\x01é\\\n", []string{"-n", "l"}, "a\\tb\\001\\303\\251\\\\$\n"},
+		{"list wraps", "abcdefghij\n", []string{"-n", "l 5"}, "abcd\\\nefgh\\\nij$\n"},
+		{"list no wrap", "abcdefghij\n", []string{"-n", "l 0"}, "abcdefghij$\n"},
+		{"list option width", "abcdefghij\n", []string{"-l", "5", "-n", "l"}, "abcd\\\nefgh\\\nij$\n"},
+		{"filename", "a\n", []string{"F"}, "-\na\n"},
+		{"quit flushes append", "a\nb\n", []string{"a x\nq"}, "a\nx\n"},
+		{"write stdout", "a\n", []string{"w /dev/stdout"}, "a\na\n"},
+		{"substitute write stdout", "a\nb\n", []string{"-n", "s/a/x/w /dev/stdout"}, "x\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := runBuiltinStdin(t, "sed", tt.stdin, tt.args...)
+			assertExitCode(t, r, 0)
+			assertStdout(t, r, tt.want)
+		})
+	}
+}
+
+func TestSedFileCommands(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "in", "1\n2\n3\n")
+	writeFile(t, dir, "extra", "x\ny\n")
+	tests := []struct {
+		name string
+		args []string
+		want string
+		file string
+		body string
+	}{
+		{"read file", []string{"2r extra", "in"}, "1\n2\nx\ny\n3\n", "", ""},
+		{"read missing file", []string{"2r nope", "in"}, "1\n2\n3\n", "", ""},
+		{"read lines", []string{"R extra", "in"}, "1\nx\n2\ny\n3\n", "", ""},
+		{"write", []string{"-n", "2w out", "in"}, "", "out", "2\n"},
+		{"write shared handle", []string{"-n", "-e", "1w out", "-e", "3w out", "in"}, "", "out", "1\n3\n"},
+		{"write created even unused", []string{"-n", "9w out", "in"}, "", "out", ""},
+		{"write first line", []string{"-n", "N;W out", "in"}, "", "out", "1\n"},
+		{"substitute write", []string{"-n", "s/2/two/w out", "in"}, "", "out", "two\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := runBuiltinIn(t, dir, "sed", tt.args...)
+			assertExitCode(t, r, 0)
+			assertStdout(t, r, tt.want)
+			if tt.file != "" {
+				data, err := os.ReadFile(filepath.Join(dir, tt.file))
+				if err != nil || string(data) != tt.body {
+					t.Errorf("%s = %q, %v; want %q", tt.file, data, err, tt.body)
+				}
+				os.Remove(filepath.Join(dir, tt.file))
+			}
+		})
 	}
 }
