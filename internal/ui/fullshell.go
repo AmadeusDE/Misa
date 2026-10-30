@@ -184,7 +184,7 @@ func (m *Model) updateFullShell(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+f":
 			if m.thefuckFix != "" {
 				fix := m.thefuckFix
-				m.thefuckFix = ""
+				m.clearFix()
 				m.shell.lastCmd = fix
 				m.shellBuffer = append(m.shellBuffer, m.renderPrompt()+fix)
 				if handled, cmd := m.handleBuiltinCmd(fix); handled {
@@ -195,6 +195,10 @@ func (m *Model) updateFullShell(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cmdInput.SetValue("")
 				m.updateFullShellVP()
 				return m, m.execShellCmd(fix)
+			}
+			if cmd := m.askAIFix(); cmd != nil {
+				m.updateFullShellVP()
+				return m, cmd
 			}
 			return m, nil
 
@@ -261,7 +265,7 @@ func (m *Model) updateFullShell(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.shell.addHistory(val)
 			m.shell.resetHistory()
 			m.shell.suggestion = ""
-			m.thefuckFix = ""
+			m.clearFix()
 			m.shellBuffer = append(m.shellBuffer, m.renderPrompt()+val)
 
 			expanded := m.expandAlias(val)

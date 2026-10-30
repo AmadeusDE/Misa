@@ -45,6 +45,11 @@
 - **thefuck** by Vladimir Iakovlev — MIT
   https://github.com/nvbn/thefuck
 
+## AI Command Help
+
+- **Gemhelp** (`internal/aihelp`: system prompts, Arch Wiki client, response cache, `--fix` mode) by the Misa author — OSL-3.0
+  https://github.com/AmadeusDE/Gemhelp
+
 ## Coreutils Reference
 
 Builtins are Go implementations written to pass these projects' test suites. Some follow upstream source closely

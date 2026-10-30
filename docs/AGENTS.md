@@ -267,6 +267,11 @@ internal/
                                  key), models.go (fetched list, filter, set default/chat/help), defaults.go (default/chat/help models, search
                                  engine, SearXNG URL), tasks.go (Test/Models as tea.Cmds, error scrubbing), table.go (selection + mouse rows),
                                  run.go (standalone). Wired in internal/ui by `aiconfig*.go` (`!nough` real, `nough` stub)
+  aihelp/                        AI command help (Gemhelp port, `!nough` callers only): helper.go (Helper.Ask/Fix: model chain, 429/5xx
+                                 backoff, `help_fallback`), tools.go (man_page/tldr_page from internal/help, arch_wiki), wiki.go (MediaWiki
+                                 client), cache.go (sha256(model+query) under the user cache dir, misa/aihelp), fix.go (`--fix` prompt and
+                                 ParseFix), render.go (glamour blocks while streaming on a TTY, plain otherwise), cli.go (the `aihelp` command).
+                                 register/ (`!nough`) calls builtins.Register; `main_aihelp.go` imports it and `main_noaihelp.go` (`nough`) registers a stub
   ughbot/sandbox/                Code-task tool protocol: Serve (`ughbot vm-agent` in the VM), Client (tools.Executor +
                                  worktree.GitFunc), Local (in-process, tests)
   ughbot/vm/                     Throwaway qemu VMs: Prepare (cloud image + NoCloud seed over loopback HTTP, pinned
@@ -317,7 +322,8 @@ internal/
   stale reply is dropped; `Update` never waits on the network. Every error goes through `safeError` (perm.Scrub plus the typed key), so no key is
   shown; the key field is `EchoPassword` and emptied once stored. Mouse: click selects, a second click activates, wheel scrolls (`cursorList`).
   Tests drive key messages under `aitest.Isolate` with httptest providers.
-- **Command correction (thefuck)**: `internal/thefuck` package with pattern-based rules. After a failed shell command, `thefuck.Match()` suggests a fix. Shown in output; `ctrl+f` accepts and runs the fix.
+- **Command correction (thefuck)**: `internal/thefuck` package with pattern-based rules. After a failed shell command, `thefuck.Match()` suggests a fix. Shown in output; `ctrl+f` accepts and runs the fix. When no rule matches and a help model resolves (`aihelp.Available`), the output says `[ctrl+f: ask AI]` and `ctrl+f` asks the model in a `tea.Cmd` (`aiFixMsg`, back through `routeTo`); the answer becomes the usual pending fix. Never automatic. `internal/ui/aifix.go` holds the logic, `ai_ugh.go` (`!nough`) sets its hooks.
+- **AI command help (`internal/aihelp`)**: `aihelp [--model ref] [-n] [--raw] <command> [question…]`, `aihelp --fix "<cmd>" [exit]` and the help viewer's `a` (Ask AI about the open TLDR/man page, `internal/ui/helpask.go`) all go through `aihelp.Helper` on the `help` model (ai.yaml `models.help`, else the default). It registers as a builtin from `internal/aihelp/register` (imported by `main_aihelp.go`, `!nough`); `builtins` never imports it, and a `nough` build's stub prints "built without AI support". Failures with 429/5xx are retried with doubling backoff while nothing was shown, then `models.help_fallback` is tried. Tests use a fake `llm.Provider` and `httptest`; the wiki base URL and the sleep are injectable.
 - **Fetch builtin**: `fetch` command renders ASCII art + system info side by side (mfetch-style). Supports `--info`, `--theme`, `--ascii`, `-e` (emotes/nerd font), `--list-info`, `--list-ascii`, `--list-themes` flags. Configured via `fetch.yaml` (info, emotes, theme, color_mode, ascii, max_height); CLI flags override.
 - **SSH client (`sshc`)**: `sshc [-tT] [-F cfg] [-i id] [-l user] [-o Key=Value] [-p port] destination [command]`. Understands HostName, User, Port, IdentityFile, StrictHostKeyChecking and UserKnownHostsFile from ssh_config; everything else (ProxyJump, forwarding, ControlMaster) is ignored. A PTY is requested for a shell, or with `-t`, only when stdin is a terminal. Tests run against an in-process x/crypto server (`client_test.go`).
 - **Wayland window (`misa --gui`)**: A separate frontend process, not a Bubble Tea renderer: it starts the misa binary

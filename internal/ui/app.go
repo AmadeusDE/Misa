@@ -28,7 +28,6 @@ import (
 	"github.com/AmadeusDE/Misa/internal/procmon"
 	"github.com/AmadeusDE/Misa/internal/sysinfo"
 	"github.com/AmadeusDE/Misa/internal/term"
-	"github.com/AmadeusDE/Misa/internal/thefuck"
 	"github.com/AmadeusDE/Misa/internal/vi"
 )
 
@@ -90,6 +89,8 @@ type Model struct {
 	inputMode     bool
 	lastExitCode  int
 	thefuckFix    string
+	aiFix         aiFixState
+	helpAsk       helpAskState
 
 	viEditor     *vi.Editor
 	editorReturn screen
@@ -809,15 +810,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.shellBuffer = append(m.shellBuffer, ps.Render(line))
 				}
 			}
-			m.thefuckFix = ""
-			if msg.exitCode != 0 && m.shell.lastCmd != "" {
-				output := strings.Join(termLines, "\n")
-				if fix := thefuck.Match(m.shell.lastCmd, output, msg.exitCode); fix != "" {
-					m.thefuckFix = fix
-					fixStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#fabd2f")).Bold(true)
-					m.shellBuffer = append(m.shellBuffer, fixStyle.Render("fix → ")+fix+fixStyle.Render("  [ctrl+f]"))
-				}
-			}
+			m.offerFix(strings.Join(termLines, "\n"), msg.exitCode)
 			if m.screen == screenShell {
 				m.updateFullShellVP()
 			} else {
@@ -852,14 +845,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.shellBuffer = append(m.shellBuffer, ps.Render(line))
 			}
 		}
-		m.thefuckFix = ""
-		if msg.exitCode != 0 && m.shell.lastCmd != "" {
-			if fix := thefuck.Match(m.shell.lastCmd, output, msg.exitCode); fix != "" {
-				m.thefuckFix = fix
-				fixStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#fabd2f")).Bold(true)
-				m.shellBuffer = append(m.shellBuffer, fixStyle.Render("fix → ")+fix+fixStyle.Render("  [ctrl+f]"))
-			}
-		}
+		m.offerFix(output, msg.exitCode)
 		m.shell.lastOutput = output
 		m.updateShellView()
 		if m.screen == screenShell {
@@ -870,6 +856,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tldrReady:
 		m.status = ""
 		return m, m.enterTldrMenu()
+
+	case aiFixMsg:
+		m.receiveAIFix(msg)
+		return m, nil
+
+	case helpAnswerMsg:
+		m.receiveHelpAnswer(msg)
+		return m, nil
 
 	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" && m.screen != screenEditor && m.terminal == nil && m.session == nil {
@@ -961,7 +955,7 @@ func (m *Model) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.shell.addHistory(val)
 				m.shell.resetHistory()
 				m.shell.suggestion = ""
-				m.thefuckFix = ""
+				m.clearFix()
 				m.shellBuffer = append(m.shellBuffer, m.renderPrompt()+val)
 				expanded := m.expandAlias(val)
 				m.shell.lastCmd = expanded
@@ -1020,7 +1014,7 @@ func (m *Model) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+f":
 			if m.thefuckFix != "" {
 				fix := m.thefuckFix
-				m.thefuckFix = ""
+				m.clearFix()
 				m.shell.lastCmd = fix
 				m.shellBuffer = append(m.shellBuffer, m.renderPrompt()+fix)
 				if handled, cmd := m.handleBuiltinCmd(fix); handled {
@@ -1030,6 +1024,10 @@ func (m *Model) updateMenu(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.cmdInput.SetValue("")
 				return m, m.execShellCmd(fix)
+			}
+			if cmd := m.askAIFix(); cmd != nil {
+				m.updateShellView()
+				return m, cmd
 			}
 			return m, nil
 		case "ctrl+v":
@@ -1372,7 +1370,7 @@ func (m *Model) resize() {
 		return
 	case screenHelp:
 		m.helpView.SetWidth(pw)
-		m.helpView.SetHeight(ph - 2)
+		m.helpView.SetHeight(ph - 2 - m.helpPromptRows())
 		return
 	case screenPicker:
 		if m.picker != nil {
@@ -1474,7 +1472,7 @@ func (m *Model) renderPrimaryContent() string {
 	case screenAbout:
 		return m.aboutView.View()
 	case screenHelp:
-		return m.helpView.View()
+		return m.helpView.View() + m.helpPromptView()
 	case screenPicker:
 		return m.pickerContent()
 	case screenOnboarding:

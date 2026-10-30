@@ -227,3 +227,27 @@ registered from a `!nough` package that `main` imports, never from `internal/bui
   `Settings.Models["help_fallback"]` if set.
 - Help screen integration: in the TLDR/man viewer (`internal/ui/helpscreen.go`), an "Ask AI" action (`a`) on the
   current page opens a prompt and shows the answer in the viewer.
+
+As built (3):
+
+- `internal/aihelp`: `Helper` (`Ask`, `Fix`) runs `ai.Client.RunTools` over `Helper.Models` (the help model, then
+  `help_fallback`). A 429/5xx, or a message saying so, is retried twice (2 s, then 4 s) only while nothing has been shown;
+  any other error goes straight to the fallback. `Available()` is `ai.ModelFor("help") == nil` and gates every offer.
+  Tools are `man_page(name, section?)`, `tldr_page(name)`, `arch_wiki(query)` (search, then the best page plus the other
+  titles; output clipped to 24 KiB). Section lookup needed `help.FindManPageIn`, added in its own file.
+- The command is a plain builtin registered by `internal/aihelp/register` (`!nough`), imported by `main_aihelp.go`;
+  `main_noaihelp.go` (`nough`) registers a stub that prints "built without AI support (-tags nough)". Flags use the
+  builtins parser with `^`, so everything after the first operand is the question. The first word is the command only when
+  it is a builtin, on PATH or has a man page; otherwise the whole line is the question.
+- Streaming on a terminal renders each Markdown block with glamour as soon as it is complete (blank line outside a code
+  fence), so text appears paragraph by paragraph; piped or `--raw` output is the raw stream. A remark the model makes
+  before a tool call is separated from the answer, and the cache and `--fix` use only the last assistant turn.
+  `-n` skips the cache read but still refreshes the entry. Fixes are never cached.
+- ctrl+f: `Model.offerFix` replaces the duplicated thefuck blocks; with no rule match and `aihelp.Available()` it only
+  prints `[ctrl+f: ask AI]`. The ask runs in a `tea.Cmd` (`aiFixMsg`, delivered through `routeTo` to the owning pane); an answer
+  for a command that is no longer the last one is dropped. The hooks (`aiFixer`, `aiFixReady`, `aiAsker`) are set from
+  `internal/ui/ai_ugh.go` (`!nough`); in a `nough` build they stay nil, so nothing is offered and `a` in the viewer says so.
+- Help viewer: `a` opens a one-line prompt under the page; Enter sends the question with the page text as context (cached like any answer, keyed on
+  the whole prompt), `esc` cancels. The answer is rendered with `help.RenderMarkdown`, not streamed.
+- `deps_test.go` also forbids `aihelp` importing `ui`/`ughbot`/`webui` and checks that a `-tags nough` build of `main`
+  links neither `internal/ai` nor `internal/aihelp`.
