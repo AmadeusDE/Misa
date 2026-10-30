@@ -10,6 +10,7 @@ a set of built-in tools, and it ships as one self-contained binary.
 - Its own terminal emulator, so programs run inside panes
 - Built-in commands (a coreutils subset, `fetch`, `sshc`, a vi, minesweeper, battleship, a [chess
   engine for fairy variants](docs/CHESS.md)), usable on systems with no shell at all (`builtin_mode: inprocess`)
+- Minesweeper controls: `space` open, `f` flag, `n` new game, `1`–`3` select a level, `c` custom game, `q` quit
 - Data-driven package manager menus, a file browser, and tldr/man help
 - `misa --gui`: an optional Wayland window, pure Go and software rendered
 - `misa --web`: Misa in a browser over a small authenticated web terminal

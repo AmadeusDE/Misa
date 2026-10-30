@@ -13,6 +13,8 @@ func TestMinesLevel(t *testing.T) {
 		{[]string{"--expert"}, "Expert", 30, 16, 99},
 		{[]string{"--width", "20", "--height=10", "-m", "30"}, "Custom", 20, 10, 30},
 		{[]string{"-e", "--mines", "120"}, "Custom", 30, 16, 120},
+		{[]string{"--width", "2", "--height", "2", "--mines", "9999"}, "Custom", 2, 2, 9999},
+		{[]string{"--width", "99", "--height", "99", "--mines", "1"}, "Custom", 99, 99, 1},
 	}
 	for _, tt := range tests {
 		l, err := MinesLevel(tt.args)
@@ -26,7 +28,7 @@ func TestMinesLevel(t *testing.T) {
 }
 
 func TestMinesLevelRejectsBadSize(t *testing.T) {
-	for _, args := range [][]string{{"--width", "1"}, {"--height", "500"}, {"-m", "0"}, {"-x"}, {"--help"}} {
+	for _, args := range [][]string{{"--width", "1"}, {"--width", "100"}, {"--height", "1"}, {"--height", "500"}, {"-m", "0"}, {"-m", "10000"}, {"--width", "4294967298"}, {"-x"}, {"--help"}} {
 		if _, err := MinesLevel(args); err == nil {
 			t.Errorf("%v: no error", args)
 		}

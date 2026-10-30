@@ -34,17 +34,19 @@ func MinesLevel(args []string) (mines.Level, error) {
 	}
 	custom := false
 	for _, opt := range []struct {
-		key, long string
-		dst       *int
-		min, max  int
-	}{{"width", "width", &level.W, 2, 99}, {"height", "height", &level.H, 2, 99}, {"m", "mines", &level.Mines, 1, 9999}} {
+		key string
+		dst *int
+	}{{"width", &level.W}, {"height", &level.H}, {"m", &level.Mines}} {
 		if n, ok := flags.Num(opt.key); ok {
-			if int(n) < opt.min || int(n) > opt.max {
-				return mines.Level{}, fmt.Errorf("--%s must be %d-%d", opt.long, opt.min, opt.max)
-			}
 			*opt.dst = int(n)
+			if int64(*opt.dst) != n {
+				*opt.dst = -1 // Ensure out-of-range int64 values fail validation on 32-bit systems.
+			}
 			custom = true
 		}
+	}
+	if err := mines.ValidateLevel(level); err != nil {
+		return mines.Level{}, err
 	}
 	if custom {
 		level.Name = "Custom"
@@ -53,8 +55,15 @@ func MinesLevel(args []string) (mines.Level, error) {
 }
 
 func runMines(ctx *Context) int {
-	if flags, err := minesSpec.ParseArgs(ctx.Args); err == nil && HandleHelpVersion(ctx, flags, minesSpec) {
-		return 0
+	if flags, err := minesSpec.ParseArgs(ctx.Args); err == nil {
+		if flags.HelpRequested {
+			fmt.Fprint(ctx.Stdout, minesSpec.GenerateUsage(ctx.CmdName))
+			fmt.Fprintln(ctx.Stdout, "Controls: space open, f flag, n new, 1-3 level, c custom, q quit")
+			return 0
+		}
+		if HandleHelpVersion(ctx, flags, minesSpec) {
+			return 0
+		}
 	}
 	level, err := MinesLevel(ctx.Args)
 	if err != nil {
