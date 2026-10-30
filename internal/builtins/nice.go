@@ -127,6 +127,7 @@ func runNice(ctx *Context) int {
 		return 0
 	}
 
+	// TODO(F04): priority is a process/thread effect and needs child isolation.
 	curPrio, err := syscall.Getpriority(syscall.PRIO_PROCESS, 0)
 	if err == nil {
 		newPrio := curPrio + adj
@@ -173,6 +174,11 @@ func isDigits(s string) bool {
 }
 
 func runSubCommand(ctx *Context, subCmdName string, subArgs []string) int {
+	if ctx.Exec != nil {
+		subCtx := *ctx
+		subCtx.Args, subCtx.CmdName = subArgs, subCmdName
+		return ctx.Exec(ctx.CancellationContext(), subCmdName, &subCtx)
+	}
 	localPath := filepath.Join(ctx.Dir, subCmdName)
 	if info, err := os.Stat(localPath); err == nil && !info.IsDir() && info.Mode()&0111 != 0 {
 		cmd := exec.Command(localPath, subArgs...)
@@ -195,18 +201,9 @@ func runSubCommand(ctx *Context, subCmdName string, subArgs []string) int {
 		cmd, ok = Lookup(filepath.Base(subCmdName))
 	}
 	if ok {
-		subCtx := &Context{
-			Dir:     ctx.Dir,
-			Args:    subArgs,
-			CmdName: subCmdName,
-			Width:   ctx.Width,
-			Height:  ctx.Height,
-			Stdout:  ctx.Stdout,
-			Stderr:  ctx.Stderr,
-			Stdin:   ctx.Stdin,
-			Env:     ctx.Env,
-		}
-		return cmd.Run(subCtx)
+		subCtx := *ctx
+		subCtx.Args, subCtx.CmdName = subArgs, subCmdName
+		return cmd.Run(&subCtx)
 	}
 
 	execCmd := exec.Command(subCmdName, subArgs...)

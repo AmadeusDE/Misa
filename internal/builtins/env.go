@@ -29,7 +29,7 @@ func runEnv(ctx *Context) int {
 	unsetMap := make(map[string]bool)
 	var envAssignments []string
 
-	args := ctx.Args
+	args := append([]string(nil), ctx.Args...)
 	cmdIdx := len(args)
 	workDir := ctx.Dir
 	options := true
@@ -124,10 +124,7 @@ func runEnv(ctx *Context) int {
 			// Construct current envMap for variable expansion in -S
 			currentEnvMap := make(map[string]string)
 			if !ignoreEnv {
-				sourceEnv := ctx.Env
-				if len(sourceEnv) == 0 {
-					sourceEnv = os.Environ()
-				}
+				sourceEnv := ctx.Environ()
 				for _, e := range sourceEnv {
 					if eqIdx := strings.IndexByte(e, '='); eqIdx >= 0 {
 						key := e[:eqIdx]
@@ -183,10 +180,7 @@ func runEnv(ctx *Context) int {
 
 	envMap := make(map[string]string)
 	if !ignoreEnv {
-		sourceEnv := ctx.Env
-		if len(sourceEnv) == 0 {
-			sourceEnv = os.Environ()
-		}
+		sourceEnv := ctx.Environ()
 		for _, e := range sourceEnv {
 			eqIdx := strings.IndexByte(e, '=')
 			if eqIdx >= 0 {
@@ -230,6 +224,16 @@ func runEnv(ctx *Context) int {
 		subCmdName := args[cmdIdx]
 		subArgs := args[cmdIdx+1:]
 
+		if ctx.Exec != nil {
+			subCtx := *ctx
+			subCtx.Dir, subCtx.Args, subCtx.CmdName = workDir, subArgs, subCmdName
+			subCtx.Env = make([]string, 0, len(envMap))
+			for k, v := range envMap {
+				subCtx.Env = append(subCtx.Env, k+"="+v)
+			}
+			return ctx.Exec(ctx.CancellationContext(), subCmdName, &subCtx)
+		}
+
 		localPath := filepath.Join(workDir, subCmdName)
 		if info, err := os.Stat(localPath); err == nil && !info.IsDir() && info.Mode()&0111 == 0 {
 			fmt.Fprintf(ctx.Stderr, "env: '%s': Permission denied\n", subCmdName)
@@ -259,6 +263,8 @@ func runEnv(ctx *Context) int {
 			cmd, ok = Lookup(filepath.Base(subCmdName))
 		}
 		if ok {
+			// TODO(F03): remove this process environment mutation after nested builtins
+			// stop reading the process environment directly.
 			oldEnv := os.Environ()
 			os.Clearenv()
 			for k, v := range envMap {
@@ -281,18 +287,9 @@ func runEnv(ctx *Context) int {
 				subEnvList = append(subEnvList, k+"="+v)
 			}
 
-			subCtx := &Context{
-				Dir:     workDir,
-				Args:    subArgs,
-				CmdName: subCmdName,
-				Width:   ctx.Width,
-				Height:  ctx.Height,
-				Stdout:  ctx.Stdout,
-				Stderr:  ctx.Stderr,
-				Stdin:   ctx.Stdin,
-				Env:     subEnvList,
-			}
-			return cmd.Run(subCtx)
+			subCtx := *ctx
+			subCtx.Dir, subCtx.Args, subCtx.CmdName, subCtx.Env = workDir, subArgs, subCmdName, subEnvList
+			return cmd.Run(&subCtx)
 		}
 		if strings.HasPrefix(subCmdName, "'-") || (strings.HasPrefix(subCmdName, "'") && strings.Contains(subCmdName, "-")) {
 			fmt.Fprintf(ctx.Stderr, "env: %s: No such file or directory\nenv: use -[v]S to pass options in shebang lines\n", subCmdName)

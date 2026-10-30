@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/AmadeusDE/Misa/internal/builtinexec"
 	"github.com/AmadeusDE/Misa/internal/builtins"
 )
 
@@ -20,7 +21,16 @@ func Lookup(name string) (Command, bool) {
 	if !ok {
 		return Command{}, false
 	}
-	return Command{Name: cmd.Name, Run: cmd.Run}, true
+	return Command{Name: cmd.Name, Run: func(inv *Context) int {
+		var normalized Context
+		if inv != nil {
+			normalized = *inv
+		}
+		if normalized.Exec == nil {
+			normalized.Exec = builtinexec.For(name)
+		}
+		return builtins.Run(nil, name, &normalized)
+	}}, true
 }
 
 func Names() []string {
