@@ -31,7 +31,7 @@ uutils org repos checked that ship no utilities (libraries/docs/trackers): rust-
 
 | Column | Utilities |
 |---|---|
-| Misa | 115 |
+| Misa | 117 |
 | toybox (all) | 349 |
 | toybox: non-pending, default y | 250 |
 | toybox: non-pending, default n | 3 |
@@ -255,11 +255,11 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `gunzip` |  | ✓ lsb | ✓ |  |
 | `gzip` |  | ✓ lsb (default n) | ✓ |  |
 | `halt` |  | ✓ other | ✓ |  |
-| `hd` |  | ✓ other | ✓ |  |
+| `hd` | ✓ | ✓ other | ✓ |  |
 | `hdparm` |  |  | ✓ |  |
 | `head` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `help` |  | ✓ other |  |  |
-| `hexdump` |  | ✓ pending | ✓ | ✓ util-linux |
+| `hexdump` | ✓ | ✓ pending | ✓ | ✓ util-linux |
 | `hexedit` |  | ✓ other | ✓ |  |
 | `host` |  | ✓ net |  |  |
 | `hostid` | ✓ |  | ✓ | ✓ coreutils |

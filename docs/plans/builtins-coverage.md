@@ -199,7 +199,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `halt` | other | – | – | – | – | no tests | 46 | – | light |
 | `hd` | other | – | – | – | – | no tests | 62 | – | light |
 | `help` | other | – | – | – | – | no tests | 89 | – | light |
-| `hexdump` | pending | 14 | util-linux:22 | 16 | kernel/fs | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 16/22 simple new_ucmd! cases parseable by tests/uutils adapter | 146 | 475 | light |
 | `hexedit` | other | – | – | – | – | no tests | 370 | – | medium |
 | `host` | net | – | – | – | – | no tests | 201 | – | heavy |
 | `hostid` | – | – | coreutils:3 | 3 | – | uutils: Rust, 3/3 simple new_ucmd! cases parseable by tests/uutils adapter | – | 87 | light |
