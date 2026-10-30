@@ -19,10 +19,12 @@ func depsOf(t *testing.T, pattern string) []string {
 
 func TestDependencyDirection(t *testing.T) {
 	forbidden := map[string][]string{
-		module + "internal/ugh/...":   {"internal/ughbot", "internal/ui", "internal/webui"},
+		module + "internal/ugh/...":   {"internal/ughbot", "internal/ui", "internal/webui", "internal/ai"},
 		module + "internal/term":      {"internal/ugh/", "internal/ughbot", "internal/ui"},
 		module + "internal/sshclient": {"internal/ugh/", "internal/ughbot", "internal/ui"},
-		module + "internal/builtins":  {"internal/ugh/", "internal/ughbot"},
+		module + "internal/builtins":  {"internal/ugh/", "internal/ughbot", "internal/ai"},
+		module + "internal/ai":        {"internal/ui", "internal/ughbot", "internal/webui", "internal/builtins"},
+		module + "internal/aiconfig":  {"internal/ui", "internal/ughbot", "internal/webui", "internal/builtins"},
 		module + "internal/webui":     {"internal/ui", "internal/gui", "internal/ugh", "internal/ughbot"},
 		module + "internal/termkeys":  {"internal/ui", "internal/gui", "internal/ugh", "internal/ughbot"},
 		module + "internal/lscore":    {"internal/ugh/", "internal/ughbot"},

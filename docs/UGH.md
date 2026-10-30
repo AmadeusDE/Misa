@@ -135,6 +135,11 @@ no_thinking = ["some-model-"]   # model id prefixes that reject `reasoning`
 usage = "none"                  # opencode | openrouter | none
 ```
 
+A provider whose `base_url` is on this machine (`localhost`, `127.0.0.1`, `::1`: Ollama, LM Studio,
+llama.cpp) works without a key; ugh sends no `Authorization` header when none is stored. Misa edits
+`[providers.<name>]` and `[models] default` in this file for you (see [AI.md](AI.md)), touching only those
+tables and keeping your comments.
+
 ### OpenRouter flex
 
 Gemini on OpenRouter has opt-in flex endpoints: half the standard price, best effort. ugh tries

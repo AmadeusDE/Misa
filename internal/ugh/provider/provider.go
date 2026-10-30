@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/AmadeusDE/Misa/internal/ugh/roots"
 	"github.com/AmadeusDE/Misa/internal/ugh/session"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,7 +119,24 @@ func specKey(r roots.Roots, s Spec) (string, error) {
 	if s.Console {
 		return consoleKey(r)
 	}
-	return apiKey(r, s.Name)
+	key, err := apiKey(r, s.Name)
+	if err != nil && auth.IsNoCredential(err) && isLoopback(s.BaseURL) {
+		return "", nil // a local server (ollama, llama.cpp) needs no key
+	}
+	return key, err
+}
+
+// isLoopback reports whether a base URL points at this machine.
+func isLoopback(baseURL string) bool {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return false
+	}
+	switch u.Hostname() {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	}
+	return false
 }
 
 // apiKey resolves a static key (env first, then store) and registers it with

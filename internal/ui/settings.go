@@ -424,6 +424,16 @@ func settingDefs() []settingDef {
 			},
 		},
 		{
+			key:   "ai_providers",
+			label: "AI providers",
+			kind:  settingPicker,
+			get:   func(ss *settingsState) string { return "" },
+			set:   func(ss *settingsState, v string) {},
+			onPick: func(m *Model) {
+				m.enterAIConfig()
+			},
+		},
+		{
 			key:   "setup_wizard",
 			label: "Run Setup Wizard",
 			kind:  settingPicker,

@@ -58,7 +58,7 @@ func ListModels(ctx context.Context) ([]Model, map[string]error) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			out[i].ms, out[i].err = fetchModels(ctx, s)
+			out[i].ms, out[i].err = fetchModels(ctx, roots.Roots{}, s)
 		}()
 	}
 	wg.Wait()
@@ -79,8 +79,25 @@ func ListModels(ctx context.Context) ([]Model, map[string]error) {
 	return all, errs
 }
 
-func fetchModels(ctx context.Context, spec Spec) ([]Model, error) {
-	key, err := specKey(roots.Roots{}, spec)
+// ModelsIn queries one provider's /models endpoint for the instance owning r.
+// Unlike ListModels it uses no cache and reports the provider's own error.
+func ModelsIn(ctx context.Context, r roots.Roots, name string) ([]Model, error) {
+	if name == "codex" {
+		out := make([]Model, len(codexModels))
+		for i, id := range codexModels {
+			out[i] = Model{Provider: "codex", ID: id}
+		}
+		return out, nil
+	}
+	spec, ok := LookupIn(r, name)
+	if !ok {
+		return nil, fmt.Errorf("provider %q is not wired", name)
+	}
+	return fetchModels(ctx, r, spec)
+}
+
+func fetchModels(ctx context.Context, r roots.Roots, spec Spec) ([]Model, error) {
+	key, err := specKey(r, spec)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +110,9 @@ func fetchModels(ctx context.Context, spec Spec) ([]Model, error) {
 	for k, v := range spec.Headers {
 		req.Header.Set(k, v)
 	}
-	req.Header.Set("Authorization", "Bearer "+key)
+	if key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -317,7 +336,7 @@ func accessEvaluator(r roots.Roots) policy.AccessEvaluator {
 			}
 			account = cred.AccountID
 		} else {
-			if _, err := auth.Resolve(prov, os.LookupEnv, store); err != nil {
+			if _, err := auth.Resolve(prov, os.LookupEnv, store); err != nil && !(auth.IsNoCredential(err) && isLoopback(LookupBase(r, prov))) {
 				return policy.AccessNoCredential, err.Error()
 			}
 		}
