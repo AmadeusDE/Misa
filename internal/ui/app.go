@@ -523,6 +523,13 @@ func buildRootItems(dir string, entries []config.Entry) []list.Item {
 			},
 		},
 		menuItem{
+			title: "AI providers",
+			desc:  "Providers, keys and models for Misa's AI features",
+			action: func(m *Model) tea.Cmd {
+				return m.enterAIConfig()
+			},
+		},
+		menuItem{
 			title: "System Information",
 			desc:  "Additional system information",
 			action: func(m *Model) tea.Cmd {
@@ -1288,6 +1295,8 @@ func (m *Model) handleBuiltinCmd(input string) (bool, tea.Cmd) {
 		m.enterProcMon(mines.New(level))
 		m.cmdInput.SetValue("")
 		return true, m.procViewer.Init()
+	case "aiconfig":
+		return m.aiConfigCommand()
 	case "chess":
 		game, err := builtins.ChessGame(fields[1:])
 		if err != nil {

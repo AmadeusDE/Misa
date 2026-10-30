@@ -163,6 +163,28 @@ only gains the wiring.
 
 Tests drive the model with key messages against a temp ugh root and temp misa config dir.
 
+As built (1b):
+
+- `internal/aiconfig`: `New()` returns the `*Model` (a `procmon.Viewer`), `Run()` is the standalone program. Screens are
+  modes of one model: providers, presets, form, key, confirm, models, defaults, help. See `docs/AI.md` for the keys.
+- Wiring: `internal/ui/aiconfig.go` holds the `newAIConfig` hook and `enterAIConfig`; `aiconfig_ugh.go` (`!nough`) sets the
+  hook and registers the `aiconfig` multicall; `aiconfig_nough.go` registers a stub that prints "built without AI support
+  (-tags nough)". The multicall is registered from `internal/ui`, not `internal/builtins`, because builtins may not import
+  `internal/ai`. Entries: prompt command, main menu "AI providers", Settings "AI providers" (returns to Settings on quit).
+- The defaults panel is its own screen (`D`); the list header shows the effective default/chat/help models and search engine.
+- Only `custom` providers are edited or deleted (`enter`, `d`). Built-ins take a key (`k`) and models (`m`); codex and Console
+  logins are explained, not edited. The edit form fixes the name and keeps fields it has no input for (`session_header`, `usage`).
+- Headers are typed as `Name: value; Name2: value2`, so a value cannot contain `;`.
+- `t` tests with the first of ugh's default, the chat or the help model that belongs to the provider, else the first model
+  the provider lists. `Test`/`Models` run as `tea.Cmd`s; a generation counter drops stale replies.
+- The key never reaches the screen: the field is masked, `safeError` scrubs errors (`perm.Scrub` plus the typed key), and
+  the typed text is cleared once stored or cancelled.
+- Mouse: click selects, a second click on the selected row activates (edit, pick preset, set default model, edit value), the
+  wheel scrolls lists, a click in the form focuses a field.
+- Tests: `internal/aiconfig/*_test.go` (keys, forms, httptest providers, mouse, size fitting) and
+  `internal/ui/aiconfig_test.go` (wiring, with the hook swapped). `internal/ugh/deps_test.go` also forbids
+  `internal/aiconfig` from importing the UI or builtins.
+
 ## 2. AI chat (PR 2)
 
 A chat client like Open WebUI or the ChatGPT/Claude apps, in the terminal. It is not an agent harness: no file or

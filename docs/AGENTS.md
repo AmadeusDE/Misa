@@ -262,6 +262,11 @@ internal/
                                  settings.go (ai.yaml: per-feature models, search engine; ModelFor), providers.go (Providers, SaveProvider,
                                  SetKey, SetDefaultModel, Models, Test: edits ugh's config.toml and credential store), tomledit.go (section-scoped
                                  text edits that keep comments and other tables), presets.go. aitest.Isolate points HOME/XDG at temp dirs for tests
+  aiconfig/                      The provider configurator (`aiconfig`), a procmon.Viewer over internal/ai: model.go (modes, dispatch, frame),
+                                 providers.go (list, key status, test/delete), addform.go (preset picker, provider form), keyprompt.go (masked
+                                 key), models.go (fetched list, filter, set default/chat/help), defaults.go (default/chat/help models, search
+                                 engine, SearXNG URL), tasks.go (Test/Models as tea.Cmds, error scrubbing), table.go (selection + mouse rows),
+                                 run.go (standalone). Wired in internal/ui by `aiconfig*.go` (`!nough` real, `nough` stub)
   ughbot/sandbox/                Code-task tool protocol: Serve (`ughbot vm-agent` in the VM), Client (tools.Executor +
                                  worktree.GitFunc), Local (in-process, tests)
   ughbot/vm/                     Throwaway qemu VMs: Prepare (cloud image + NoCloud seed over loopback HTTP, pinned
@@ -305,6 +310,13 @@ internal/
   `tomledit.go` replaces or appends one table and the edit is parsed back before the atomic write (a form it cannot edit, such
   as an inline table, is refused). A provider whose base URL is loopback (ollama, llama.cpp) resolves without a key.
   Callers outside `internal/ai` are `!nough` files with a `nough` stub. Tests call `aitest.Isolate(t)`; never touch `~/.config`.
+- **AI configurator (`internal/aiconfig`)**: a `procmon.Viewer` like `mines`, opened by typing `aiconfig`, the main menu entry "AI providers" or the
+  Settings entry of the same name (`enterAIConfig`; the viewer comes from the `newAIConfig` hook, set only in `!nough` builds, and `misa aiconfig`
+  is a multicall registered from `internal/ui/aiconfig_ugh.go` because `internal/builtins` must not import `internal/ai`). One `Model`, a `mode`
+  per screen (providers, presets, form, key, confirm, models, defaults, help). `Test` and `Models` run as `tea.Cmd`s tagged with a generation so a
+  stale reply is dropped; `Update` never waits on the network. Every error goes through `safeError` (perm.Scrub plus the typed key), so no key is
+  shown; the key field is `EchoPassword` and emptied once stored. Mouse: click selects, a second click activates, wheel scrolls (`cursorList`).
+  Tests drive key messages under `aitest.Isolate` with httptest providers.
 - **Command correction (thefuck)**: `internal/thefuck` package with pattern-based rules. After a failed shell command, `thefuck.Match()` suggests a fix. Shown in output; `ctrl+f` accepts and runs the fix.
 - **Fetch builtin**: `fetch` command renders ASCII art + system info side by side (mfetch-style). Supports `--info`, `--theme`, `--ascii`, `-e` (emotes/nerd font), `--list-info`, `--list-ascii`, `--list-themes` flags. Configured via `fetch.yaml` (info, emotes, theme, color_mode, ascii, max_height); CLI flags override.
 - **SSH client (`sshc`)**: `sshc [-tT] [-F cfg] [-i id] [-l user] [-o Key=Value] [-p port] destination [command]`. Understands HostName, User, Port, IdentityFile, StrictHostKeyChecking and UserKnownHostsFile from ssh_config; everything else (ProxyJump, forwarding, ControlMaster) is ignored. A PTY is requested for a shell, or with `-t`, only when stdin is a terminal. Tests run against an in-process x/crypto server (`client_test.go`).

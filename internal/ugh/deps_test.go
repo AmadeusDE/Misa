@@ -24,6 +24,7 @@ func TestDependencyDirection(t *testing.T) {
 		module + "internal/sshclient": {"internal/ugh/", "internal/ughbot", "internal/ui"},
 		module + "internal/builtins":  {"internal/ugh/", "internal/ughbot", "internal/ai"},
 		module + "internal/ai":        {"internal/ui", "internal/ughbot", "internal/webui", "internal/builtins"},
+		module + "internal/aiconfig":  {"internal/ui", "internal/ughbot", "internal/webui", "internal/builtins"},
 		module + "internal/webui":     {"internal/ui", "internal/gui", "internal/ugh", "internal/ughbot"},
 		module + "internal/termkeys":  {"internal/ui", "internal/gui", "internal/ugh", "internal/ughbot"},
 		module + "internal/lscore":    {"internal/ugh/", "internal/ughbot"},
