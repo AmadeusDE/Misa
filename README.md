@@ -8,8 +8,8 @@ a set of built-in tools, and it ships as one self-contained binary.
   and command correction
 - A multiplexer: split panes, tags, a status bar, copy mode, mouse support
 - Its own terminal emulator, so programs run inside panes
-- Built-in commands (a coreutils subset, `fetch`, `sshc`, a vi, minesweeper, a chess engine for fairy
-  variants), usable on systems with no shell at all (`builtin_mode: inprocess`)
+- Built-in commands (a coreutils subset, `fetch`, `sshc`, a vi, minesweeper, battleship, a chess
+  engine for fairy variants), usable on systems with no shell at all (`builtin_mode: inprocess`)
 - Data-driven package manager menus, a file browser, and tldr/man help
 - `misa --gui`: an optional Wayland window, pure Go and software rendered
 - `misa --web`: Misa in a browser over a small authenticated web terminal
