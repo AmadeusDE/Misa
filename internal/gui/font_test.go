@@ -4,10 +4,11 @@ import (
 	"image"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	"golang.org/x/image/font/gofont/gomono"
+
+	"github.com/AmadeusDE/Misa/internal/chess"
 )
 
 func embeddedFonts(t testing.TB) *fontSet {
@@ -112,33 +113,29 @@ func TestChessGlyphsWithoutFontconfig(t *testing.T) {
 }
 
 // TestVariantGlyphsRender checks every glyph a builtin chess variant uses
-// renders with only the embedded fonts.
+// renders with only the embedded fonts. The variants come from the chess
+// package's embedded files, so this also runs on a device.
 func TestVariantGlyphsRender(t *testing.T) {
 	fs := embeddedFonts(t)
-	files, err := filepath.Glob("../chess/variants/*.yaml")
-	if err != nil || len(files) == 0 {
-		t.Fatalf("no variant files: %v", err)
+	vs, errs := chess.Builtins()
+	if len(errs) > 0 || len(vs) == 0 {
+		t.Fatalf("builtin variants: %v", errs)
 	}
-	re := regexp.MustCompile(`glyph:\s*["']?([^,}"'\s]+)`)
 	seen := map[rune]bool{}
-	for _, f := range files {
-		data, err := os.ReadFile(f)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, m := range re.FindAllStringSubmatch(string(data), -1) {
-			for _, r := range m[1] {
+	for _, v := range vs {
+		for _, p := range v.Pieces {
+			for _, r := range p.Glyph {
 				if seen[r] {
 					continue
 				}
 				seen[r] = true
 				if g := fs.glyph(r, styleRegular, 1); g == nil {
-					t.Errorf("%s: glyph %c (U+%04X) does not render", filepath.Base(f), r, r)
+					t.Errorf("%s: %s glyph %c (U+%04X) does not render", v.Name, p.Name, r, r)
 				}
 			}
 		}
 	}
 	if len(seen) == 0 {
-		t.Fatal("no glyphs found in the variant files")
+		t.Fatal("no glyphs found in the builtin variants")
 	}
 }
