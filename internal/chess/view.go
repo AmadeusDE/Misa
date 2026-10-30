@@ -54,7 +54,7 @@ type layout struct {
 func (g *Game) layout() layout {
 	v := g.match.Variant()
 	l := layout{cw: 3, cols: v.Files, rows: v.Ranks, labelW: len(strconv.Itoa(v.Ranks)) + 1}
-	if l.labelW+l.cols*3+2 > g.width {
+	if l.cols <= 26 && l.labelW+l.cols*3+2 > g.width {
 		l.cw, l.pad = 2, 1
 	}
 	l.boardW = l.labelW + l.cols*l.cw + l.pad + 2
@@ -206,13 +206,13 @@ func (g *Game) board(l layout) string {
 	files.WriteString(strings.Repeat(" ", l.labelW+1))
 	for col := range l.cols {
 		x, _ := g.boardXY(col, 0)
-		cell := string(rune('a' + x))
-		if l.cw == 3 {
-			cell = " " + cell + " "
-		} else {
-			cell = " " + cell
+		cell := fileName(x)
+		// Right-align the label around the same cell as the piece glyph.
+		left := l.cw - len(cell)
+		if len(cell) == 1 && l.cw == 3 {
+			left--
 		}
-		files.WriteString(cell)
+		files.WriteString(strings.Repeat(" ", left) + cell + strings.Repeat(" ", l.cw-left-len(cell)))
 	}
 	lines = append(lines, labelSt.Render(files.String()))
 	return strings.Join(lines, "\n")
