@@ -366,6 +366,11 @@ When adding code derived from external sources:
 - Add an entry to `docs/CREDITS.md`.
 - For substantial derivations, add or update a `NOTICE` file in the package directory.
 
+Commit trailers for agent-made commits:
+- Add `Co-authored-by: Cursor <cursoragent@cursor.com>` to commits made through Grok Bot/Cursor.
+- Add `Co-Authored-By: DeepSeek V4.1 Flash 1017 <noreply@deepseek.com>` only when DeepSeek actually worked on that
+  commit. Never add it to commits written by other models or agents, or by hand.
+
 ## Docs
 
 - `docs/GUIDELINES.md` — Coding guidelines (self-documenting code, TDD, small modules, brevity vs performance).
