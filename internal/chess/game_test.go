@@ -177,9 +177,17 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	if g.match.Variant().ID != "double" {
 		t.Fatalf("v went to %s", g.match.Variant().ID)
 	}
-	keys(g, "V", "V")
+	keys(g, "V")
+	if g.match.Variant().ID != "chess" {
+		t.Fatalf("V went to %s", g.match.Variant().ID)
+	}
+	keys(g, "V")
+	if g.match.Variant().ID != "doublebig" {
+		t.Fatalf("V wrapped to %s", g.match.Variant().ID)
+	}
+	keys(g, "V")
 	if g.match.Variant().ID != "bigboard" {
-		t.Fatalf("V V went to %s", g.match.Variant().ID)
+		t.Fatalf("V went to %s", g.match.Variant().ID)
 	}
 	clickSquare(t, g, "f1", tea.MouseLeft)
 	clickSquare(t, g, "d6", tea.MouseLeft)

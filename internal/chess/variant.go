@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -299,8 +299,10 @@ func build(d variantDef) (*Variant, error) {
 	if v.MoveLimit == 0 {
 		v.MoveLimit = 50
 	}
-	if v.Files < 1 || v.Files > 26 || v.Ranks < 1 || v.Ranks > 99 {
-		return nil, fmt.Errorf("board must be 1-26 files by 1-99 ranks, not %d×%d", v.Files, v.Ranks)
+	// Two-letter file labels end at zz (702); large boards also incur substantial
+	// reach-table, move generation, and search costs, so keep dimensions bounded.
+	if v.Files < 1 || v.Files > 702 || v.Ranks < 1 || v.Ranks > 99 {
+		return nil, fmt.Errorf("board must be 1-702 files by 1-99 ranks, not %d×%d", v.Files, v.Ranks)
 	}
 	if len(d.Pieces) == 0 || len(d.Pieces) > 255 {
 		return nil, fmt.Errorf("needs 1-255 piece types")
@@ -434,22 +436,9 @@ func (v *Variant) Square(x, y int) int { return y*v.Files + x }
 
 func (v *Variant) OnBoard(x, y int) bool { return x >= 0 && y >= 0 && x < v.Files && y < v.Ranks }
 
-func (v *Variant) SquareName(sq int) string {
-	x, y := v.XY(sq)
-	return string(rune('a'+x)) + strconv.Itoa(y+1)
-}
+func (v *Variant) SquareName(sq int) string { return formatSquare(v, sq) }
 
-func (v *Variant) ParseSquare(s string) (int, error) {
-	if len(s) < 2 || s[0] < 'a' || s[0] > 'z' {
-		return 0, fmt.Errorf("bad square %q", s)
-	}
-	rank, err := strconv.Atoi(s[1:])
-	x, y := int(s[0]-'a'), rank-1
-	if err != nil || !v.OnBoard(x, y) {
-		return 0, fmt.Errorf("square %q is not on the %d×%d board", s, v.Files, v.Ranks)
-	}
-	return v.Square(x, y), nil
-}
+func (v *Variant) ParseSquare(s string) (int, error) { return parseSquare(v, s) }
 
 // orient maps one of White's squares to the given side: Black's mirror image.
 func (v *Variant) orient(sq int, c Color) int {

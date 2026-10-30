@@ -60,3 +60,9 @@ applying obsolete results. The chosen level survives new games, variant
 changes, and hotseat, but is not persisted after quitting. Analysis after a
 computer move reports that move's score, including deliberate alternatives;
 an unanalysed legal fallback is labelled instead of showing a fabricated score.
+
+## Custom board dimensions
+
+Variants support 1–702 files (labels `a` through `zz`) and 1–99 ranks.
+Large boards can be expensive to load and play: reach tables, move generation,
+and search consume more memory and time as the board grows.

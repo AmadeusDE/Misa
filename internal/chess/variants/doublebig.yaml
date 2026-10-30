@@ -1,0 +1,12 @@
+id: doublebig
+name: Double Big Board
+description: Two Big Board armies per side on a 32×16 board; each king castles within its own half.
+extends: bigboard
+files: 32
+ranks: 16
+setup: rndwboaqkcjbwdnrrndwboaqkcjbwdnr/pppppppppppppppppppppppppppppppp/32/32/32/32/32/32/32/32/32/32/32/32/PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP/RNDWBOAQKCJBWDNRRNDWBOAQKCJBWDNR
+castling:
+  - {king: i1, rook: p1, king_to: o1, rook_to: n1}
+  - {king: i1, rook: a1, king_to: c1, rook_to: d1}
+  - {king: y1, rook: af1, king_to: ae1, rook_to: ad1}
+  - {king: y1, rook: q1, king_to: s1, rook_to: t1}
