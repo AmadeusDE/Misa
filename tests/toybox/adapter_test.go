@@ -787,7 +787,7 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, setupLog []setupEven
 	parsedArgs := splitShellArgs(args)
 
 	pathCmds := map[string]bool{
-		"basename": true, "dirname": true, "realpath": true, "readlink": true,
+		"basename": true, "dirname": true, "realpath": true, "readlink": true, "sed": true,
 	}
 	if !pathCmds[cmdName] {
 		for _, a := range parsedArgs {

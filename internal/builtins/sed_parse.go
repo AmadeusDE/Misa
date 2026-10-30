@@ -439,15 +439,20 @@ func (p *sedParser) filename() string {
 }
 
 // text reads a/i/c text: either "a text" on one line (GNU) or "a\" with the
-// text on following lines. A backslash keeps the next character, and one
-// at the end of a line continues the text on the next line.
+// text on following lines ("a\text" also works). In the text, \a \f \n \r
+// \t \v are control characters, a backslash keeps any other character, and
+// one at the end of a line continues the text on the next line.
 func (p *sedParser) text() string {
 	p.skipSpace()
-	if p.pos+1 < len(p.src) && p.src[p.pos] == '\\' && p.src[p.pos+1] == '\n' {
-		p.pos += 2
-	} else if p.pos+1 == len(p.src) && p.src[p.pos] == '\\' {
+	if p.pos+1 == len(p.src) && p.src[p.pos] == '\\' {
 		p.pos++
 		return ""
+	}
+	if !p.eof() && p.peek() == '\\' {
+		p.pos++
+		if !p.eof() && p.peek() == '\n' {
+			p.pos++
+		}
 	}
 	var b strings.Builder
 	for !p.eof() {
@@ -459,6 +464,9 @@ func (p *sedParser) text() string {
 		if c == '\\' && !p.eof() {
 			c = p.peek()
 			p.pos++
+			if i := strings.IndexByte("afnrtv", c); i >= 0 {
+				c = "\a\f\n\r\t\v"[i]
+			}
 		}
 		b.WriteByte(c)
 	}

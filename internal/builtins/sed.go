@@ -18,8 +18,9 @@ func init() {
 	Register(Command{Name: "sed", Run: runSed})
 }
 
-// sedPending names commands that parse but do not run yet (roadmap U11).
-const sedPending = "aicDgGhHnNPxzFlLrRwWybtT:"
+// sedUnsupported names commands that parse but have no implementation:
+// GNU's deprecated L (fmt).
+const sedUnsupported = "L"
 
 type sedPiece struct {
 	label string
@@ -53,7 +54,7 @@ func runSed(ctx *Context) int {
 	ere := flags.Bool("E") || flags.Bool("r")
 	cmds, quiet, err := parseSedScript(src, ere, !flags.Bool("posix"))
 	if err == nil {
-		err = sedCheckPending(cmds)
+		err = sedCheckUnsupported(cmds)
 	}
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr, "sed: %s\n", sedLocate(err, src, pieces))
@@ -66,6 +67,9 @@ func runSed(ctx *Context) int {
 	r.quiet = quiet || flags.Bool("n")
 	r.separate = flags.Bool("s")
 	r.out.unbuffered = flags.Bool("u")
+	if n, ok := flags.Num("l"); ok {
+		r.lineWidth = n
+	}
 	if flags.Bool("z") {
 		r.delim, r.out.delim = 0, 0
 	}
@@ -136,13 +140,10 @@ func sedLocate(err error, src string, pieces []sedPiece) string {
 	return fmt.Sprintf("%s, char %d: %s", piece.label, min(se.pos, len(src))-piece.start+1, se.msg)
 }
 
-func sedCheckPending(cmds []*sedCmd) error {
+func sedCheckUnsupported(cmds []*sedCmd) error {
 	for _, c := range cmds {
-		if strings.IndexByte(sedPending, c.name) >= 0 {
-			return &sedScriptError{pos: c.pos, msg: fmt.Sprintf("`%c' command is not supported yet", c.name)}
-		}
-		if c.wfile != "" {
-			return &sedScriptError{pos: c.pos, msg: "the `w' option to `s' is not supported yet"}
+		if strings.IndexByte(sedUnsupported, c.name) >= 0 {
+			return &sedScriptError{pos: c.pos, msg: fmt.Sprintf("`%c' command is not supported", c.name)}
 		}
 	}
 	return nil
@@ -275,3 +276,13 @@ func (in *sedInput) read() ([]byte, bool, bool) {
 }
 
 func (in *sedInput) last() bool { return !in.hasNext }
+
+// more reports whether a later file still has records, for n and N at the
+// end of a file read with -s.
+func (in *sedInput) more() bool {
+	in.fill(true)
+	if in.hasNext {
+		in.restarted = true
+	}
+	return in.hasNext
+}
