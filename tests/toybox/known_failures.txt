@@ -25,3 +25,36 @@ grep/line181  # grep: -r waits for the shared walker (U02/U05)
 grep/--exclude-dir  # grep: -r waits for the shared walker (U02/U05)
 grep/line199  # grep: -R waits for the shared walker (U02/U05)
 grep/don't_block_on_FIFO  # grep: -r waits for the shared walker (U02/U05)
+sed/getdelim_with_nested_[:blah:]  # adapter: backslashes inside double quotes are dropped
+sed/prodigaler_newline  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/b_loop  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/b_skip  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/b_end  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/c_range  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/c_{range}  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/c_multiple_continuation  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/multiline_continuations  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/D_further_processing_depends_on_whether_line_is_blank  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/N_flushes_pending_a_and_advances_match_counter  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/delete_regex_range_start_line_after_trigger  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/interleave_-e_and_-f  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/line133  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/line134  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/line135  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/line137  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/trailing_a\_(for_debian)  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/bonus_backslashes  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/end_b_with_}  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/-z  # adapter: backslashes inside double quotes are dropped
+sed/-z_N  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/-z_N_noeol  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/-z_S  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/-z_D  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/-z_G  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/-z_H  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/\n_with_empty_capture  # adapter: backslashes inside double quotes are dropped
+sed/w_doesn't_blank  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/s_l_ignores_posix  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/s_l_loses_missing_newline  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/s_-z_l  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
+sed/s_-z_l_missing_newline  # sed: a/i/c, branches, hold space, n/N/D/P, l and w arrive in U11
