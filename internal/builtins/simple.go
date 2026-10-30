@@ -2,7 +2,6 @@ package builtins
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -50,7 +49,7 @@ func runFalse(ctx *Context) int {
 }
 
 func runEcho(ctx *Context) int {
-	posix := os.Getenv("POSIXLY_CORRECT") != ""
+	posix := ctx.Getenv("POSIXLY_CORRECT") != ""
 
 	noNewline := false
 	escape := posix // POSIX mode: escapes on by default
@@ -172,10 +171,7 @@ func runPrintenv(ctx *Context) int {
 		terminator = "\x00"
 	}
 
-	envList := ctx.Env
-	if len(envList) == 0 {
-		envList = os.Environ()
-	}
+	envList := ctx.Environ()
 
 	envMap := make(map[string]string)
 	var orderedList []string

@@ -62,6 +62,13 @@ func runDate(ctx *Context) int {
 		return 0
 	}
 
+	// -u applies to interpretation of unzoned input as well as output.
+	if flags.Bool("u") {
+		local := *ctx
+		local.Env = append([]string{"TZ=UTC"}, ctx.Environ()...)
+		ctx = &local
+	}
+
 	if flags.Bool("resolution") {
 		if _, hasD := flags.String("d"); hasD {
 			fmt.Fprintln(ctx.Stderr, "date: the options to specify dates for printing are mutually exclusive")
@@ -119,7 +126,7 @@ func runDate(ctx *Context) int {
 			if flags.Bool("u") {
 				t = t.UTC()
 			} else {
-				t = t.In(getLocation(ctx, t))
+				t = t.In(dateLocation(ctx, t))
 			}
 			formatAndPrintDate(ctx, flags, t)
 		}
@@ -186,10 +193,10 @@ func runDate(ctx *Context) int {
 		}
 	}
 
-	if flags.Bool("u") {
+	if flags.Bool("u") || flags.Bool("resolution") {
 		now = now.UTC()
 	} else {
-		now = now.In(getLocation(ctx, now))
+		now = now.In(dateLocation(ctx, now))
 	}
 
 	return formatAndPrintDate(ctx, flags, now)
@@ -341,8 +348,8 @@ func parseDateStr(ctx *Context, s string) (time.Time, bool) {
 	s = strings.TrimSpace(b.String())
 
 	if s == "" || s == "-" {
-		today := time.Now()
-		loc := getLocation(ctx, today)
+		loc := dateLocation(ctx, time.Now())
+		today := time.Now().In(loc)
 		return time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, loc), true
 	}
 
@@ -350,7 +357,7 @@ func parseDateStr(ctx *Context, s string) (time.Time, bool) {
 	if len(s) >= 1 && len(s) <= 3 {
 		ch := strings.ToUpper(s)[0]
 		if ch == 'J' {
-			return time.Now(), true
+			return time.Now().In(dateLocation(ctx, time.Now())), true
 		}
 		if offset, ok := militaryTZOffsets[ch]; ok {
 			hour := 0
@@ -386,7 +393,7 @@ func parseDateStr(ctx *Context, s string) (time.Time, bool) {
 		if f, err := strconv.ParseFloat(s[1:], 64); err == nil {
 			sec := int64(math.Floor(f))
 			nsec := int64((f - math.Floor(f)) * 1e9)
-			return time.Unix(sec, nsec), true
+			return time.Unix(sec, nsec).In(dateLocation(ctx, time.Unix(sec, nsec))), true
 		}
 	}
 
@@ -405,7 +412,7 @@ func parseDateStr(ctx *Context, s string) (time.Time, bool) {
 
 	normalized := strings.Join(strings.Fields(sNorm), " ")
 
-	loc := getLocation(ctx, time.Now())
+	loc := dateLocation(ctx, time.Now())
 
 	if len(normalized) >= 10 {
 		idx := strings.IndexByte(normalized, '-')
@@ -959,195 +966,4 @@ func strftimeFormat(t time.Time, format string) (string, bool) {
 		out.WriteString(rawVal)
 	}
 	return out.String(), true
-}
-
-func getLocation(ctx *Context, now time.Time) *time.Location {
-	tz, ok := lookupEnv(ctx, "TZ")
-	if ok && (tz == "" || tz == "UTC" || tz == "GMT") {
-		return time.UTC
-	}
-	if loc, ok := parsePosixTZ(tz, now); ok {
-		return loc
-	}
-	if loc, err := time.LoadLocation(tz); err == nil {
-		return loc
-	}
-	return time.Local
-}
-
-func parsePosixTZ(tz string, now time.Time) (*time.Location, bool) {
-	i := 0
-	readName := func() string {
-		start := i
-		if i < len(tz) && tz[i] == '<' {
-			i++
-			start = i
-			for i < len(tz) && tz[i] != '>' {
-				i++
-			}
-			name := tz[start:i]
-			if i < len(tz) && tz[i] == '>' {
-				i++
-			}
-			return name
-		}
-		for i < len(tz) && ((tz[i] >= 'A' && tz[i] <= 'Z') || (tz[i] >= 'a' && tz[i] <= 'z')) {
-			i++
-		}
-		return tz[start:i]
-	}
-
-	readOffset := func() (int, bool) {
-		if i >= len(tz) {
-			return 0, false
-		}
-		sign := 1
-		if tz[i] == '+' {
-			sign = -1
-			i++
-		} else if tz[i] == '-' {
-			sign = 1
-			i++
-		}
-		start := i
-		for i < len(tz) && tz[i] >= '0' && tz[i] <= '9' {
-			i++
-		}
-		if start == i {
-			return 0, false
-		}
-		h, _ := strconv.Atoi(tz[start:i])
-		m, s := 0, 0
-		if i < len(tz) && tz[i] == ':' {
-			i++
-			start = i
-			for i < len(tz) && tz[i] >= '0' && tz[i] <= '9' {
-				i++
-			}
-			m, _ = strconv.Atoi(tz[start:i])
-			if i < len(tz) && tz[i] == ':' {
-				i++
-				start = i
-				for i < len(tz) && tz[i] >= '0' && tz[i] <= '9' {
-					i++
-				}
-				s, _ = strconv.Atoi(tz[start:i])
-			}
-		}
-		return sign * (h*3600 + m*60 + s), true
-	}
-
-	stdName := readName()
-	if stdName == "" {
-		return nil, false
-	}
-	stdOffset, hasStdOffset := readOffset()
-	if !hasStdOffset {
-		stdOffset = 0
-	}
-
-	dstName := readName()
-	if dstName == "" {
-		if stdOffset == 0 && (stdName == "UTC" || stdName == "GMT" || stdName == "Z") {
-			return time.UTC, true
-		}
-		zoneName := stdName
-		if stdName == "UTC" || stdName == "GMT" {
-			zoneName = "UTC"
-		}
-		return time.FixedZone(zoneName, stdOffset), true
-	}
-
-	dstOffset, hasDstOffset := readOffset()
-	if !hasDstOffset {
-		dstOffset = stdOffset + 3600
-	}
-
-	if i >= len(tz) || tz[i] != ',' {
-		return time.FixedZone(stdName, stdOffset), true
-	}
-	i++
-
-	parseRule := func() (month, week, day, timeSec int, ok bool) {
-		if i >= len(tz) || tz[i] != 'M' {
-			return 0, 0, 0, 0, false
-		}
-		i++
-		start := i
-		for i < len(tz) && tz[i] >= '0' && tz[i] <= '9' {
-			i++
-		}
-		month, _ = strconv.Atoi(tz[start:i])
-		if i >= len(tz) || tz[i] != '.' {
-			return 0, 0, 0, 0, false
-		}
-		i++
-		start = i
-		for i < len(tz) && tz[i] >= '0' && tz[i] <= '9' {
-			i++
-		}
-		week, _ = strconv.Atoi(tz[start:i])
-		if i >= len(tz) || tz[i] != '.' {
-			return 0, 0, 0, 0, false
-		}
-		i++
-		start = i
-		for i < len(tz) && tz[i] >= '0' && tz[i] <= '9' {
-			i++
-		}
-		day, _ = strconv.Atoi(tz[start:i])
-		timeSec = 2 * 3600
-		if i < len(tz) && tz[i] == '/' {
-			i++
-			tOffset, ok := readOffset()
-			if ok {
-				if tOffset < 0 {
-					timeSec = -tOffset
-				} else {
-					timeSec = tOffset
-				}
-			}
-		}
-		return month, week, day, timeSec, true
-	}
-
-	sm, sw, sd, stime, ok1 := parseRule()
-	if !ok1 || i >= len(tz) || tz[i] != ',' {
-		return time.FixedZone(stdName, stdOffset), true
-	}
-	i++
-	em, ew, ed, etime, ok2 := parseRule()
-	if !ok2 {
-		return time.FixedZone(stdName, stdOffset), true
-	}
-
-	utcNow := now.UTC()
-	Y := utcNow.Year()
-
-	getRuleTime := func(m, w, d, tSec, offset int) time.Time {
-		t := time.Date(Y, time.Month(m), 1, 0, 0, 0, 0, time.UTC)
-		for int(t.Weekday()) != d {
-			t = t.AddDate(0, 0, 1)
-		}
-		t = t.AddDate(0, 0, (w-1)*7)
-		if t.Month() != time.Month(m) {
-			t = t.AddDate(0, 0, -7)
-		}
-		return t.Add(time.Duration(tSec-offset) * time.Second)
-	}
-
-	dstStart := getRuleTime(sm, sw, sd, stime, stdOffset)
-	dstEnd := getRuleTime(em, ew, ed, etime, dstOffset)
-
-	isDST := false
-	if !dstStart.After(dstEnd) {
-		isDST = !utcNow.Before(dstStart) && utcNow.Before(dstEnd)
-	} else {
-		isDST = !utcNow.Before(dstStart) || utcNow.Before(dstEnd)
-	}
-
-	if isDST {
-		return time.FixedZone(dstName, dstOffset), true
-	}
-	return time.FixedZone(stdName, stdOffset), true
 }

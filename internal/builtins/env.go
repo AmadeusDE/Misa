@@ -224,32 +224,43 @@ func runEnv(ctx *Context) int {
 		subCmdName := args[cmdIdx]
 		subArgs := args[cmdIdx+1:]
 
+		subCtx := *ctx
+		subCtx.Dir, subCtx.Args, subCtx.CmdName = workDir, subArgs, subCmdName
+		subCtx.Env = make([]string, 0, len(envMap))
+		for k, v := range envMap {
+			subCtx.Env = append(subCtx.Env, k+"="+v)
+		}
 		if ctx.Exec != nil {
-			subCtx := *ctx
-			subCtx.Dir, subCtx.Args, subCtx.CmdName = workDir, subArgs, subCmdName
-			subCtx.Env = make([]string, 0, len(envMap))
-			for k, v := range envMap {
-				subCtx.Env = append(subCtx.Env, k+"="+v)
+			execName := subCmdName
+			// TODO(F06): decide cwd poisoning and resolution policy in the shared launcher.
+			if !strings.ContainsAny(subCmdName, `/\`) {
+				localPath, err := filepath.Abs(filepath.Join(workDir, subCmdName))
+				if err == nil {
+					if info, err := os.Stat(localPath); err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0 {
+						execName = localPath
+					}
+				}
 			}
-			return ctx.Exec(ctx.CancellationContext(), subCmdName, &subCtx)
+			return ctx.Exec(ctx.CancellationContext(), execName, &subCtx)
 		}
 
-		localPath := filepath.Join(workDir, subCmdName)
-		if info, err := os.Stat(localPath); err == nil && !info.IsDir() && info.Mode()&0111 == 0 {
-			fmt.Fprintf(ctx.Stderr, "env: '%s': Permission denied\n", subCmdName)
-			return 126
-		} else if err == nil && !info.IsDir() {
-			cmd := exec.Command(localPath, subArgs...)
-			cmd.Dir = workDir
-			cmd.Stdout = ctx.Stdout
-			cmd.Stderr = ctx.Stderr
-			cmd.Stdin = ctx.Stdin
-			envList := make([]string, 0, len(envMap))
-			for k, v := range envMap {
-				envList = append(envList, k+"="+v)
+		// Keep the legacy local executable preference when no executor is injected.
+		localPath := subCmdName
+		if !filepath.IsAbs(localPath) {
+			localPath = filepath.Join(workDir, localPath)
+		}
+		if info, err := os.Stat(localPath); err == nil && !info.IsDir() {
+			if info.Mode()&0111 == 0 {
+				fmt.Fprintf(ctx.Stderr, "env: '%s': Permission denied\n", subCmdName)
+				return 126
 			}
-			cmd.Env = envList
+			cmd := exec.CommandContext(ctx.CancellationContext(), localPath, subArgs...)
+			cmd.Dir, cmd.Env = workDir, subCtx.Env
+			cmd.Stdout, cmd.Stderr, cmd.Stdin = ctx.Stdout, ctx.Stderr, ctx.Stdin
 			if err := cmd.Run(); err != nil {
+				if ctx.CancellationContext().Err() != nil {
+					return ExitStatus(ctx.CancellationContext().Err())
+				}
 				if exitErr, ok := err.(*exec.ExitError); ok {
 					return exitErr.ExitCode()
 				}
@@ -263,34 +274,9 @@ func runEnv(ctx *Context) int {
 			cmd, ok = Lookup(filepath.Base(subCmdName))
 		}
 		if ok {
-			// TODO(F03): remove this process environment mutation after nested builtins
-			// stop reading the process environment directly.
-			oldEnv := os.Environ()
-			os.Clearenv()
-			for k, v := range envMap {
-				if !strings.HasPrefix(k, "=") {
-					os.Setenv(k, v)
-				}
-			}
-			defer func() {
-				os.Clearenv()
-				for _, e := range oldEnv {
-					parts := strings.SplitN(e, "=", 2)
-					if len(parts) == 2 {
-						os.Setenv(parts[0], parts[1])
-					}
-				}
-			}()
-
-			subEnvList := make([]string, 0, len(envMap))
-			for k, v := range envMap {
-				subEnvList = append(subEnvList, k+"="+v)
-			}
-
-			subCtx := *ctx
-			subCtx.Dir, subCtx.Args, subCtx.CmdName, subCtx.Env = workDir, subArgs, subCmdName, subEnvList
 			return cmd.Run(&subCtx)
 		}
+
 		if strings.HasPrefix(subCmdName, "'-") || (strings.HasPrefix(subCmdName, "'") && strings.Contains(subCmdName, "-")) {
 			fmt.Fprintf(ctx.Stderr, "env: %s: No such file or directory\nenv: use -[v]S to pass options in shebang lines\n", subCmdName)
 			return 127

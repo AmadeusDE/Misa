@@ -15,10 +15,6 @@ import (
 
 // For selects the default nested executor for a builtin.
 func For(name string) builtins.Executor {
-	if name == "env" {
-		// TODO(F03): legacy process env bridge until getenv migration.
-		return nil
-	}
 	return Run
 }
 
@@ -60,6 +56,9 @@ func Run(ctx context.Context, name string, inv *builtins.Context) int {
 	}
 	cmd := exec.CommandContext(ctx, path, local.Args...)
 	cmd.Args[0] = name
+	if local.CmdName != "" {
+		cmd.Args[0] = local.CmdName
+	}
 	cmd.Dir, cmd.Env = local.Dir, local.Env
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = local.Stdin, local.Stdout, local.Stderr
 	err = cmd.Run()

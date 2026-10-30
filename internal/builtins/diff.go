@@ -24,12 +24,7 @@ func diffRun(ctx *Context) int {
 	opts.commandFlags = diffCommandFlags(ctx.Args)
 	locale := ""
 	for _, key := range []string{"LANG", "LC_TIME", "LC_ALL"} {
-		value := os.Getenv(key)
-		for _, entry := range ctx.Env {
-			if strings.HasPrefix(entry, key+"=") {
-				value = strings.TrimPrefix(entry, key+"=")
-			}
-		}
+		value := ctx.Getenv(key)
 		if value != "" {
 			locale = value
 		}
@@ -128,7 +123,7 @@ func diffCompare(ctx *Context, a, b string, o diffOptions, nested bool, seen map
 	if ai == nil && a != "-" && !nested {
 		headerBI = nil
 	}
-	headers := [2]string{diffOptionHeader(a, ai, o), diffOptionHeader(b, headerBI, o)}
+	headers := [2]string{diffOptionHeader(ctx, a, ai, o), diffOptionHeader(ctx, b, headerBI, o)}
 	for i, label := range o.labels {
 		headers[i] = label
 	}
@@ -228,7 +223,7 @@ func diffHeader(name string, info os.FileInfo) string {
 	return name + "\t" + stamp.Format("2006-01-02 15:04:05.000000000 -0700")
 }
 
-func diffOptionHeader(name string, info os.FileInfo, o diffOptions) string {
+func diffOptionHeader(ctx *Context, name string, info os.FileInfo, o diffOptions) string {
 	stamp := time.Unix(0, 0)
 	if info != nil {
 		stamp = info.ModTime()
@@ -236,6 +231,7 @@ func diffOptionHeader(name string, info os.FileInfo, o diffOptions) string {
 		stamp = time.Now()
 	}
 
+	stamp = stamp.In(ctx.Location())
 	if o.style == "context" && o.contextPOSIXHeaders {
 		return name + "\t" + stamp.Format("Mon Jan _2 15:04:05 2006")
 	}
