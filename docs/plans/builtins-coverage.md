@@ -2,6 +2,10 @@
 
 Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (toybox 6a0c0ef, uutils repos at the commits listed there). BusyBox excluded.
 
+## Implemented since this inventory
+
+`tar` has native U32–U33 coverage (create/list and extraction). Native tests and adapted upstream cases cover implemented behavior; the adapted upstream suite is not a claim that the full Toybox or uutils suite passes. Historical totals below remain unchanged.
+
 ## Method
 
 - Candidates: every utility in toybox (any category) or any uutils repo that is not in `misa --list`. toybox sh builtins declared in toys/pending/sh.c (cd, export, set, …; 28 names) are excluded since they belong to Misa's shell, not its builtin registry.

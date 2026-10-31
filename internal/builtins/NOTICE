@@ -2,4 +2,5 @@ Several builtins here follow uutils (coreutils, diffutils, util-linux; MIT) or t
 each file names its source in its header. License texts: ../../THIRD_PARTY_NOTICES.md
 
 Tar builtin: original Go implementation informed by Toybox `toys/posix/tar.c` and `tests/tar.test`,
-commit `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb` (0BSD). No uutils code was consulted.
+commit `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb` (0BSD). Extraction behavior extends the behavioral
+reference; no code is copied.

@@ -60,9 +60,6 @@ tar/character_special  # U33: extraction/compression or associated fixtures not 
 tar/block_special  # U33: extraction/compression or associated fixtures not supported by this adapter
 tar/ownership  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
 tar/symlink_out_of_cwd  # U33: extraction/compression or associated fixtures not supported by this adapter
-tar/extract_dir/file_from_tar  # U33: extraction/compression or associated fixtures not supported by this adapter
-tar/extract_dir/file_from_tgz_(autodetect)  # U33: extraction/compression or associated fixtures not supported by this adapter
-tar/cat_tgz_|_extract_dir/file_(autodetect)  # U33: extraction/compression or associated fixtures not supported by this adapter
 tar/extract_dir/file_from_tbz2_(autodetect)  # U33: extraction/compression or associated fixtures not supported by this adapter
 tar/cat_tbz_|_extract_dir/file_(autodetect)  # U33: extraction/compression or associated fixtures not supported by this adapter
 tar/autodetect_falls_back_to_gzip_-d_when_no_zcat  # U33: extraction/compression or associated fixtures not supported by this adapter

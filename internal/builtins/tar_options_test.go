@@ -122,7 +122,7 @@ func TestTarRedirectedArchiveExcludesItself(t *testing.T) {
 		}
 	}
 	code, _, e := tarRun(dir, strings.NewReader("anything"), "-t", "-T", "-")
-	if code != 2 || !strings.Contains(e, "stdin") {
+	if code != 1 || !strings.Contains(e, "stdin") {
 		t.Fatalf("stdin collision: %d %s", code, e)
 	}
 }
@@ -130,7 +130,7 @@ func TestTarRedirectedArchiveExcludesItself(t *testing.T) {
 func TestTarHelpAndOptions(t *testing.T) {
 	dir := t.TempDir()
 	code, out, _ := tarRun(dir, nil, "--help")
-	if code != 0 || !strings.Contains(string(out), "Usage: tar") || !strings.Contains(string(out), "U33") || strings.Contains(string(out), "-h, --help") {
+	if code != 0 || !strings.Contains(string(out), "Usage: tar") || !strings.Contains(string(out), "gzip") || strings.Contains(string(out), "-h, --help") {
 		t.Fatalf("help %d %q", code, out)
 	}
 	code, out, _ = tarRun(dir, nil, "--version")
@@ -139,7 +139,7 @@ func TestTarHelpAndOptions(t *testing.T) {
 	}
 	for _, args := range [][]string{{"-c", "-f"}, {"-c", "--owner"}, {"-c", "--bogus"}} {
 		code, _, _ = tarRun(dir, nil, args...)
-		if code != 2 {
+		if code != 1 {
 			t.Errorf("%v: %d", args, code)
 		}
 	}

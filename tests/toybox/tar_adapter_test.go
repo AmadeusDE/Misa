@@ -53,7 +53,7 @@ func TestToyboxTarSuite(t *testing.T) {
 					if os.Getenv("MISA_KNOWN_FAILURES") == "" {
 						t.Skip("known failure: " + reason)
 					}
-					if name != "./file bug" {
+					if name != "./file bug" && name != "extract dir/file from tar" && name != "extract dir/file from tgz (autodetect)" && name != "cat tgz | extract dir/file (autodetect)" {
 						t.Skip("adapter cannot execute this case even with MISA_KNOWN_FAILURES: " + reason)
 					}
 				}
@@ -64,6 +64,12 @@ func TestToyboxTarSuite(t *testing.T) {
 					tarLinks(t, 1)
 				case "links2":
 					tarLinks(t, 13)
+				case "extract dir/file from tar":
+					toyboxExtractDir(t, false, false)
+				case "extract dir/file from tgz (autodetect)":
+					toyboxExtractDir(t, true, false)
+				case "cat tgz | extract dir/file (autodetect)":
+					toyboxExtractDir(t, true, true)
 				case "./file bug":
 					tarDotFile(t)
 				default:

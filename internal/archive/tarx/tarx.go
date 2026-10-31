@@ -1,4 +1,4 @@
-// Package tarx provides streaming tar creation and reading.
+// Package tarx provides streaming tar creation, reading, and contained extraction.
 // Its baseline behavior was informed by Toybox tar.c and tar.test
 // (Toybox contributors, 0BSD); see NOTICE.
 package tarx

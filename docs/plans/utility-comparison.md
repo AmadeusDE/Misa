@@ -2,6 +2,9 @@
 
 Generated 2026-10-15 from real sources (not memory) by parsing each project's registry/applet declarations.
 
+Misa's `tar` includes U32 create/list and U33 extraction/gzip support; this does not imply full
+upstream parity. Historical totals are unchanged.
+
 ## Sources
 
 | Project | Source | Revision | How utilities were listed |

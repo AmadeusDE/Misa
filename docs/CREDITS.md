@@ -165,4 +165,5 @@ Original Go implementation; rules and notation referenced from:
   and [tests/tar.test](https://github.com/landley/toybox/blob/6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb/tests/tar.test),
   commit `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb`. The test script is copied unchanged in
   `tests/toybox/tar.test`; its dedicated Go adapter explicitly identifies adapted cases and unsupported
-  fixtures. No uutils code was consulted.
+  fixtures. U33 extraction behavior extends tar.c as a behavioral reference; no code is copied. No uutils
+  code was consulted.
