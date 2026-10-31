@@ -45,7 +45,8 @@ func (p *Position) extinct(c Color) bool {
 // blocked lines can change as the king leaves its starting square.
 func (p *Position) castlePathAttacked(king int, path []int) bool {
 	if p.V.Explosion == nil {
-		return p.anyAttacked(path, p.Turn.Other())
+		// The royal travels the path, so royal-only attacks count too.
+		return p.attacked(path, p.Turn.Other(), true)
 	}
 	for _, sq := range path {
 		q := p.clone()

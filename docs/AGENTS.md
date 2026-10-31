@@ -374,7 +374,12 @@ internal/
   or `"*"` expands to all types, while `extinction: []` clears inheritance. Extinguishing the opponent wins
   even while in check (the `ExtinctionWin` status, decisive for Match.Decisive and a mate score for the
   search), but losing any own royal is illegal; adjudicate checks extinction before goals, check limits, mate
-  and stalemate. Unspecified fields are inherited. See `docs/CHESS.md` for rules.
+  and stalemate. Three per-piece YAML mechanisms carry Xiangqi (9×10 Chinese chess on the points):
+  `zone` confines destinations to a region that mirrors with the side, `move_zones` replaces a piece's
+  movement by the origin square it stands on (soldiers gaining sideways moves across the river), and
+  `royal_attack` gives an extra move set that only threatens enemy royals, which is the flying general.
+  `stalemate: win` makes stalemate a loss for the stalemated side there, and a perpetual check is a
+  draw by the repetition rule. Unspecified fields are inherited. See `docs/CHESS.md` for rules.
   Movement is checked by perft (`position_test.go`), so run the chess tests after touching move generation.
   The engine only uses what variants define (values, royal/pawn flags, ranks to promotion), so new pieces need at
   most a `value:`. Search runs off the UI goroutine on immutable Positions; cancel() sets the Stop flag and bumps

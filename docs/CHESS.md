@@ -7,6 +7,7 @@ person. By default the computer plays Black at **normal** level.
 chess --level beginner
 chess --level hard --think 5
 chess double --level easy
+chess xiangqi
 chess --computer both --level expert
 chess --computer none
 chess --list
@@ -187,10 +188,78 @@ either, since a lone king can still reach the eighth rank.
   Rules: [Lichess](https://lichess.org/variant/crazyhouse),
   [Wikipedia](https://en.wikipedia.org/wiki/Crazyhouse).
 
+- **Xiangqi** (`xiangqi`): Chinese chess on a 9×10 board, played on the
+  intersections, with generals and advisors confined to the palace, elephants
+  that may not cross the river, cannons capturing over exactly one piece,
+  soldiers that gain sideways moves across the river, the flying-general rule,
+  stalemate counting as a loss for the stalemated side, and perpetual check
+  drawn by repetition (see [Xiangqi](#xiangqi)).
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
 earlier variant replaces it.
+
+### Xiangqi
+
+Run `chess xiangqi`. The 9×10 board represents the intersections of a Chinese
+chess board as squares; the river lies between ranks 5 and 6. White's home is
+at rank 1 and Black's at rank 10. Pieces use letters rather than Unicode
+Xiangqi glyphs: those glyphs generally occupy two terminal cells, while the
+engine requires one-cell glyphs.
+
+- **K, general:** one orthogonal step, confined to its own palace (files d–f,
+  its own ranks 1–3). The generals may not face each other on an open file:
+  the flying-general attack makes that position illegal.
+- **A, advisor:** one diagonal step, confined to its own palace.
+- **B, elephant:** two diagonal steps, blocked if the intervening point is
+  occupied; it stays on its own half (own ranks 1–5).
+- **N, horse:** a knight move blocked when its orthogonal first step (the leg)
+  is occupied.
+- **R, chariot:** moves and captures like a rook.
+- **C, cannon:** moves like a rook without capturing; captures along a rank or
+  file by jumping exactly one intervening piece (`mRcpR`).
+- **P, soldier:** moves and captures one step forward; after crossing the river
+  it can also move sideways, but never backwards. It does not promote.
+
+There is no castling, en passant, or initial double step. Checkmate wins, and
+a player with no legal move loses even if not in check (stalemate wins for
+the opponent). Perpetual-check and perpetual-chase adjudication is out of
+scope: the engine instead draws on the third occurrence of a position. It also
+retains its normal move-limit draw (50 moves per side without a capture or pawn
+move) and draw when only royal pieces remain. See [Wikipedia: Xiangqi](https://en.wikipedia.org/wiki/Xiangqi)
+and [The Chess Variant Pages: Xiangqi](https://www.chessvariants.com/xiangqi.html).
+
+**Xiangqi known gaps (follow-up):** under AXF/WXF rules the side that gives
+perpetual check, or perpetual chase, loses the game (the exact rules differ
+between rulesets and versions). Misa has no such adjudication, so such a
+repetition is scored as an ordinary draw by repetition, like any other. The
+engine can therefore repeat a position it ought to avoid, and it can treat a
+repeating attack as a safe draw rather than a lost game. The current behaviour
+is pinned by `TestXiangqiPerpetualCheckIsDrawForNow` in
+`internal/chess/xiangqi_test.go`, so implementing adjudication has to be a
+deliberate change that updates that test.
+
+The variant assigns material values R=900, C=450, N=400, B=200, A=200 and
+P=100; crossing the river does not add a soldier value bonus.
+
+### Variant YAML mechanisms
+
+These general per-piece fields express Xiangqi without extra piece types or
+special UI notation:
+
+- `zone: [d1, e1, ...]` restricts allowed destinations. Coordinates are given
+  from White's perspective; Black mirrors ranks.
+- `move_zones: [{zone: [...], betza: fWsW}]` replaces a piece's movement when
+  its origin is in the zone. The piece keeps its identity; this is not a
+  promotion and requires no promotion choice.
+- `royal_attack: vR` adds attacks only against enemy royals, ignoring the
+  piece's confinement. These attacks use the shared check and legality rules.
+
+Zones list board squares, must be nonempty, and cannot repeat a square.
+A piece's movement zones must not overlap; outside them its normal `betza`
+applies. Omit `zone` for unrestricted destinations. Confinement limits landing
+squares, not the intervening path; pieces still obey their usual blockers.
 
 ## During play
 

@@ -25,7 +25,11 @@ a set of built-in tools, and it ships as one self-contained binary.
   captures are compulsory and a side that loses all its pieces, or cannot move, wins, and Atomic
   (`chess atomic`): captures explode, destroying adjacent non-pawns, and blowing up the enemy king
   wins, and Crazyhouse (`chess crazyhouse`): captured pieces change sides and join the captor's
-  pocket, from where they can be dropped back onto the board instead of moving.
+  pocket, from where they can be dropped back onto the board instead of moving, and Xiangqi
+  (`chess xiangqi`): Chinese chess on a 9×10 board played on the points, with generals and advisors
+  confined to the palace, elephants that may not cross the river, cannons that capture over exactly one
+  piece, soldiers that gain sideways moves across the river, the flying-general rule, stalemate counting
+  as a loss for the stalemated side, and perpetual check drawn by repetition.
 - Minesweeper controls: `space` open, `f` flag, `n` new game, `1`–`3` select a level, `c` custom game, `q` quit
 - Data-driven package manager menus, a file browser, and tldr/man help
 - `misa --gui`: an optional Wayland window, pure Go and software rendered

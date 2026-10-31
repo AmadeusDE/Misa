@@ -188,6 +188,11 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	if got := g.match.Variant().ID; got != "crazyhouse" {
 		t.Fatalf("picker selected %s, want crazyhouse", got)
 	}
+	// Xiangqi is in the same picker too, again found by filtering on its name.
+	keys(g, "v", "x", "i", "a", "n", "g", "enter")
+	if got := g.match.Variant().ID; got != "xiangqi" {
+		t.Fatalf("picker selected %s, want xiangqi", got)
+	}
 	// Racing Kings is another entry in the same picker, found by typing its
 	// name; nothing cycles through the list any more.
 	keys(g, "v", "r", "a", "c", "i", "n", "g", "enter")
@@ -214,7 +219,6 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	keys(g, "v", "b", "i", "g", "b", "o", "a", "r", "d", "enter")
 	if got := g.match.Variant().ID; got != "bigboard" {
 		t.Fatalf("picker selected %s, want bigboard", got)
-
 	}
 	clickSquare(t, g, "f1", tea.MouseLeft)
 	clickSquare(t, g, "d6", tea.MouseLeft)
