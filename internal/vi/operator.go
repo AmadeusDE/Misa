@@ -32,14 +32,18 @@ func (e *Editor) operatorRange(m motionResult) (fromR, fromC, toR, toC int, line
 }
 
 // wordOperatorDest permits an endpoint just past EOF, unlike cursor motion.
-func (e *Editor) wordOperatorDest(count int) motionResult {
+func (e *Editor) wordOperatorDest(count int, big bool) motionResult {
 	row, col := e.row, e.col
 	for n := 0; n < count; n++ {
 		startRow := row
 		runes := e.lineRunes(row)
 		hadWord := col < len(runes) && !unicode.IsSpace(runes[col])
 		if col < len(runes) {
-			if isWordChar(runes[col]) {
+			if big && !unicode.IsSpace(runes[col]) {
+				for col < len(runes) && !unicode.IsSpace(runes[col]) {
+					col++
+				}
+			} else if isWordChar(runes[col]) {
 				for col < len(runes) && isWordChar(runes[col]) {
 					col++
 				}
@@ -84,10 +88,10 @@ func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGive
 	if !ok {
 		return
 	}
-	if key == "w" {
+	if key == "w" || key == "W" {
 		runes := e.lineRunes(e.row)
 		if op == 'c' && e.col < len(runes) && !unicode.IsSpace(runes[e.col]) {
-			atEnd := e.col+1 == len(runes) || (isWordChar(runes[e.col]) && !isWordChar(runes[e.col+1])) || (isPunct(runes[e.col]) && !isPunct(runes[e.col+1]))
+			atEnd := e.col+1 == len(runes) || (key == "W" && unicode.IsSpace(runes[e.col+1])) || (key == "w" && ((isWordChar(runes[e.col]) && !isWordChar(runes[e.col+1])) || (isPunct(runes[e.col]) && !isPunct(runes[e.col+1]))))
 			if atEnd && count == 1 {
 				m = motionResult{e.row, e.col, rangeInclusive}
 			} else {
@@ -95,10 +99,14 @@ func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGive
 				if atEnd {
 					endCount--
 				}
-				m, _ = e.motionDest("e", endCount, countGiven)
+				endKey := "e"
+				if key == "W" {
+					endKey = "E"
+				}
+				m, _ = e.motionDest(endKey, endCount, countGiven)
 			}
 		} else {
-			m = e.wordOperatorDest(e.motionLimit(count))
+			m = e.wordOperatorDest(e.motionLimit(count), key == "W")
 		}
 	}
 	if key == "l" || key == "right" {

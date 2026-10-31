@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05/H01
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -75,6 +75,7 @@ without quitting Misa and preserves its register.
 | T01: substitute confirmation (done) | `substitute_confirm_test.go`, `substitute_confirm_replay_test.go`, `substitute_confirm_edges_test.go`, `substitute_entry_test.go`, `internal/ui/editor_substitute_regression_test.go` | Public-event fixtures for decisions, ranges, global matches, Unicode, cursor/highlight/prompt, counts, undo/redo, no-op history, dot/register preservation, macro playback, and standalone/mux resize and return. |
 | F09: bounded viewport and display cells (done) | `internal/vi/layout_test.go`, `display_f09_test.go`, `internal/ui/editor_display_regression_test.go` | One line-to-cells layout (`layout.go`) behind rendering, cursor, Visual/confirm highlights and `j`/`k`; scope below. |
 | G01: Vim pattern subset (done) | `internal/vi/vipat/*_test.go`, `pattern_g01_replay_test.go`, `pattern_entry_g01_test.go`, `substitute_line_test.go`, `internal/ui/editor_pattern_regression_test.go` | One parser/matcher (`vipat`) behind `/`, `?`, `n`/`N`, operator searches, `:s` (including `c`), `:g` and `:v`; scope below. |
+| H01: WORD motions | `word_h01_replay_test.go` | `W`/`B`/`E` move by whitespace-delimited WORDs; operator forms use the same motion path, including `dW`/`cW`/`dE`. Counts and line-boundary behavior are covered. |
 
 ### F08 input and paste contract
 
@@ -348,8 +349,7 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
 
 ## Deferred and skipped expectations
 
-- **F03:** The range and motion coverage above is partial, not general Vim operator compatibility.
-  WORD motions `W`/`E`, `cW`/`dE` are not implemented (H01); `gu`/`gU`/`g~` are not existing
+- **F03:** The range and motion coverage above is partial, not general Vim operator compatibility. `gu`/`gU`/`g~` are not existing
   normal operators here (G06). Sentence-motion/operator coverage remains limited; F04 motions are
   covered above.
 - **F09:** `wrap`, `list`/`listchars`, `number`, `tabstop`, `sidescroll`/`sidescrolloff` and `ambiwidth`
