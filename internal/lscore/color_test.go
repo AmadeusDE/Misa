@@ -41,12 +41,10 @@ func TestParseLSColorsExtensionFold(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			m, fold := parseLSColors(c.lsc)
-			savedM, savedFold := extColors, extFold
-			extColors, extFold = m, fold
-			defer func() { extColors, extFold = savedM, savedFold }()
+			state := &colorState{extColors: m, extFold: fold}
 
 			for ext, want := range c.queries {
-				got := lookupExtColor(ext)
+				got := state.lookupExtColor(ext)
 				if got != want {
 					t.Errorf("lookupExtColor(%q) = %q, want %q", ext, got, want)
 				}
@@ -56,44 +54,40 @@ func TestParseLSColorsExtensionFold(t *testing.T) {
 }
 
 func TestFileColorMultiHardLinkPrecedence(t *testing.T) {
-	savedM, savedFold := extColors, extFold
-	extColors, extFold = parseLSColors("mh=44;37:*.png=01;35:ex=01;32")
-	defer func() { extColors, extFold = savedM, savedFold }()
+	m, fold := parseLSColors("mh=44;37:*.png=01;35:ex=01;32")
+	state := &colorState{extColors: m, extFold: fold}
 
 	notHardLinked := &FileInfo{Name: "file.png", Nlink: 1}
-	if got := fileColor(notHardLinked); got != "01;35" {
+	if got := state.fileColor(notHardLinked); got != "01;35" {
 		t.Errorf("non-hardlinked png = %q, want extension color", got)
 	}
 
 	hardLinked := &FileInfo{Name: "file.png", Nlink: 2}
-	if got := fileColor(hardLinked); got != "44;37" {
+	if got := state.fileColor(hardLinked); got != "44;37" {
 		t.Errorf("hardlinked png = %q, want mh color to take precedence", got)
 	}
 
 	executableHardLinked := &FileInfo{Name: "file.png", Nlink: 2, Mode: 0111}
-	if got := fileColor(executableHardLinked); got != "01;32" {
+	if got := state.fileColor(executableHardLinked); got != "01;32" {
 		t.Errorf("executable hardlinked png = %q, want ex color to take precedence", got)
 	}
 }
 
 func TestFileColorMultiHardLinkDisabledFallsBackToExtension(t *testing.T) {
-	savedM, savedFold := extColors, extFold
-	extColors, extFold = parseLSColors("mh=00:*.png=01;35")
-	defer func() { extColors, extFold = savedM, savedFold }()
+	m, fold := parseLSColors("mh=00:*.png=01;35")
+	state := &colorState{extColors: m, extFold: fold}
 
 	hardLinked := &FileInfo{Name: "file.png", Nlink: 2}
-	if got := fileColor(hardLinked); got != "01;35" {
+	if got := state.fileColor(hardLinked); got != "01;35" {
 		t.Errorf("mh=00 should fall back to extension color, got %q", got)
 	}
 }
 
 func TestColorNameLeadingResetOnlyOnce(t *testing.T) {
-	savedM, savedFold := extColors, extFold
-	extColors, extFold = parseLSColors("*.jpg=01;35")
-	defer func() { extColors, extFold = savedM, savedFold }()
+	m, fold := parseLSColors("*.jpg=01;35")
+	state := &colorState{extColors: m, extFold: fold}
 
-	resetColorState()
-	opts := FormatOpts{}
+	opts := FormatOpts{colors: state}
 
 	first := ColorName(&FileInfo{Name: "a.jpg"}, opts, "a.jpg")
 	if want := "\033[0m\033[01;35ma.jpg\033[0m"; first != want {
@@ -107,7 +101,6 @@ func TestColorNameLeadingResetOnlyOnce(t *testing.T) {
 }
 
 func TestColorNameNoColorPassthrough(t *testing.T) {
-	resetColorState()
 	got := ColorName(&FileInfo{Name: "a.jpg", Mode: 0111}, FormatOpts{NoColor: true}, "a.jpg")
 	if got != "a.jpg" {
 		t.Errorf("NoColor should pass through unchanged, got %q", got)
