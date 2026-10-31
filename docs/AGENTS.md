@@ -113,6 +113,9 @@ internal/
     items.go                     menuItem and fileItem types
   builtins/                      Shell built-in commands (coreutils subset + top-commands)
     find*.go                    `find` argv expression parser/evaluator; uses shared `walk` and `posixre`
+    locate*.go updatedb.go       `locate`/`updatedb` — Misa's own versioned, NUL-safe database (locate_db.go,
+                                 front coded, CRC trailer), prune paths, atomic replace, lookup-time access(2)
+                                 checks; design and differences in docs/plans/locate.md
     registry.go                  Command registry — Register/Lookup/Names
     args.go                      POSIX/GNU option parser with compact spec strings
     topcommands.go               History analytics — ranked command frequency across shells
