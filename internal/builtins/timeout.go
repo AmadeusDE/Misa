@@ -1,5 +1,3 @@
-//go:build unix
-
 // Behaviour adapted from toybox timeout.c (0BSD) and uutils coreutils timeout (MIT).
 package builtins
 
@@ -49,6 +47,10 @@ func runTimeout(ctx *Context) int {
 			fmt.Fprintf(ctx.Stderr, "timeout: '%s': invalid signal\n", value)
 			return 125
 		}
+	}
+	if !signalSupported(sig) {
+		fmt.Fprintf(ctx.Stderr, "timeout: signal '%s' is not supported on this platform: %s\n", timeoutSignalName(sig), platformSignalNote)
+		return 125
 	}
 	var killAfter time.Duration
 	if value, ok := opts.ExplicitString("k"); ok {
@@ -113,14 +115,7 @@ func runTimeout(ctx *Context) int {
 			if opts.Bool("v") {
 				fmt.Fprintf(childCtx.Stderr, "timeout: sending signal %s to command '%s'\n", timeoutSignalName(sig), args[0])
 			}
-			pid := cmd.Process.Pid
-			if !opts.Bool("f") {
-				pid = -pid
-			}
-			_ = syscall.Kill(pid, sig)
-			if sig != syscall.SIGKILL && sig != syscall.SIGCONT {
-				_ = syscall.Kill(pid, syscall.SIGCONT)
-			}
+			timeoutDeliver(cmd, sig, opts.Bool("f"))
 			alarm = nil
 			if killAfter > 0 && sig != syscall.SIGKILL {
 				sig = syscall.SIGKILL
@@ -153,31 +148,20 @@ func timeoutStart(ctx *Context, path string, args []string) (*exec.Cmd, error) {
 	start := func(path string, argv []string) (*exec.Cmd, error) {
 		cmd := &exec.Cmd{Path: path, Args: argv, Dir: ctx.Dir, Env: ctx.Env,
 			Stdin: ctx.Stdin, Stdout: ctx.Stdout, Stderr: ctx.Stderr,
-			SysProcAttr: &syscall.SysProcAttr{Setpgid: true}, WaitDelay: 100 * time.Millisecond}
+			SysProcAttr: timeoutProcAttr(), WaitDelay: 100 * time.Millisecond}
 		err := cmd.Start()
 		return cmd, err
 	}
 	cmd, err := start(path, args)
-	if errors.Is(err, syscall.ENOEXEC) {
-		sh := timeoutShell()
+	if sh := timeoutShell(); sh != "" && errors.Is(err, syscall.ENOEXEC) {
 		argv := append([]string{sh, path}, args[1:]...)
 		return start(sh, argv)
 	}
 	return cmd, err
 }
 
-func timeoutShell() string {
-	for _, sh := range []string{"/bin/sh", "/usr/bin/sh", "/system/bin/sh"} {
-		info, err := os.Stat(sh)
-		if err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
-			return sh
-		}
-	}
-	return "/bin/sh"
-}
-
 func timeoutLookPath(ctx *Context, name string) (string, error) {
-	if strings.ContainsRune(name, '/') {
+	if hasPathSeparator(name) {
 		return filepath.Abs(resolvePath(ctx, name))
 	}
 	if name == "" {
@@ -186,26 +170,28 @@ func timeoutLookPath(ctx *Context, name string) (string, error) {
 	path, ok := lookupEnv(ctx, "PATH")
 	if !ok {
 		// /system/bin is Android's toybox directory. Missing entries are skipped.
-		path = "/bin:/usr/bin:/system/bin"
+		path = timeoutDefaultPath
 	}
 	var denied error
 	for _, dir := range strings.Split(path, string(os.PathListSeparator)) {
-		candidate, err := filepath.Abs(resolvePath(ctx, filepath.Join(dir, name)))
-		if err != nil {
-			return "", err
-		}
-		info, err := os.Stat(candidate)
-		if err != nil {
-			if errors.Is(err, os.ErrPermission) {
-				denied = err
+		for _, file := range executableNames(ctx, name) {
+			candidate, err := filepath.Abs(resolvePath(ctx, filepath.Join(dir, file)))
+			if err != nil {
+				return "", err
 			}
-			continue
+			info, err := os.Stat(candidate)
+			if err != nil {
+				if errors.Is(err, os.ErrPermission) {
+					denied = err
+				}
+				continue
+			}
+			if info.IsDir() || !isExecutableMode(info) {
+				denied = os.ErrPermission
+				continue
+			}
+			return candidate, nil
 		}
-		if info.IsDir() || info.Mode()&0111 == 0 {
-			denied = os.ErrPermission
-			continue
-		}
-		return candidate, nil
 	}
 	if denied != nil {
 		return "", denied

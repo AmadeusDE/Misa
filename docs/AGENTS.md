@@ -39,10 +39,10 @@ ANDROID_NDK_HOME=... ANDROID_HOME=... just apk-release
 # CGO_ENABLED=0 go vet ./... is arm64 only. android/amd64 cannot load test
 # binaries without the external linker, so that arch typechecks libraries
 # with go build. The arm64 vet covers the pure-Go android files.
-# Windows (in progress, #108). Package loading only until F04: the reduced build does not
-# compile yet. platformset_test.go pins the Windows package set and runs in `go test ./...`.
-GOOS=windows GOARCH=amd64 go list -tags 'nough noweb' -deps . >/dev/null
-GOOS=windows GOARCH=arm64 go list -tags 'nough noweb' -deps . >/dev/null
+# Windows (in progress, #108). The reduced build (no ugh, no --web) compiles for both arches; the terminal
+# returns term.ErrUnsupported until ConPTY (plan P02). platformset_test.go pins the package set.
+GOOS=windows GOARCH=amd64 go build -tags 'nough noweb' -o /dev/null .
+GOOS=windows GOARCH=arm64 go build -tags 'nough noweb' -o /dev/null .
 ```
 
 Single binary, no external build tools needed except the Android NDK for `GOOS=android`
@@ -118,7 +118,11 @@ internal/
   builtins/                      Shell built-in commands (coreutils subset + top-commands)
     registry.go                  Command registry — Register/Lookup/Names
     fsmeta*.go support*.go       File metadata (fsMeta, Missing fields print `?`) and the per-platform support record
-                                 (`windowsLimits`): unsupported operations fail with their reason, never silently
+                                 (`windowsLimits`): unsupported operations fail with their reason, never silently.
+                                 Process builtins split per platform: util_*.go (signal table, process list),
+                                 proc_*.go (kill: Windows delivers only 0/TERM/KILL via TerminateProcess), nice_*.go
+                                 (Windows: priority class of the child only), timeout_*.go, sync_windows.go
+                                 (FlushFileBuffers), uname_*.go (RtlGetVersion, GetNativeSystemInfo)
     args.go                      POSIX/GNU option parser with compact spec strings
     topcommands.go               History analytics — ranked command frequency across shells
     simple.go                    echo, true, false, yes, printenv

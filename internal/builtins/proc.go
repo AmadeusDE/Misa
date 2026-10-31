@@ -21,41 +21,6 @@ var (
 	pkillSpecParsed *Spec
 )
 
-var sigNumberMap = map[int]string{
-	0:  "EXIT",
-	1:  "HUP",
-	2:  "INT",
-	3:  "QUIT",
-	4:  "ILL",
-	5:  "TRAP",
-	6:  "ABRT",
-	7:  "BUS",
-	8:  "FPE",
-	9:  "KILL",
-	10: "USR1",
-	11: "SEGV",
-	12: "USR2",
-	13: "PIPE",
-	14: "ALRM",
-	15: "TERM",
-	16: "STKFLT",
-	17: "CHLD",
-	18: "CONT",
-	19: "STOP",
-	20: "TSTP",
-	21: "TTIN",
-	22: "TTOU",
-	23: "URG",
-	24: "XCPU",
-	25: "XFSZ",
-	26: "VTALRM",
-	27: "PROF",
-	28: "WINCH",
-	29: "IO",
-	30: "PWR",
-	31: "SYS",
-}
-
 func init() {
 	var err error
 	killSpecParsed, err = ParseSpec(killSpec)
@@ -132,54 +97,21 @@ func runKill(ctx *Context) int {
 	}
 
 	if flags.Bool("t") {
-		for i := 0; i <= 31; i++ {
-			if name, ok := sigNumberMap[i]; ok {
-				fmt.Fprintf(ctx.Stdout, "%2d %s\n", i, name)
-			}
-		}
-		for i := 34; i <= 64; i++ {
-			if i == 34 {
-				fmt.Fprintf(ctx.Stdout, "%2d RTMIN\n", i)
-			} else if i == 64 {
-				fmt.Fprintf(ctx.Stdout, "%2d RTMAX\n", i)
-			} else {
-				fmt.Fprintf(ctx.Stdout, "%2d RTMIN+%d\n", i, i-34)
-			}
-		}
+		printSignalTable(ctx.Stdout)
 		return 0
 	}
 
 	if flags.Bool("l") {
 		if len(flags.Operands) == 0 {
-			all := []string{
-				"EXIT", "HUP", "INT", "QUIT", "ILL", "TRAP", "ABRT", "BUS",
-				"FPE", "KILL", "USR1", "SEGV", "USR2", "PIPE", "ALRM", "TERM",
-				"STKFLT", "CHLD", "CONT", "STOP", "TSTP", "TTIN", "TTOU", "URG",
-				"XCPU", "XFSZ", "VTALRM", "PROF", "WINCH", "IO", "PWR", "SYS",
-				"RTMIN", "RTMAX",
-			}
+			all := listedSignals()
 			fmt.Fprintln(ctx.Stdout, strings.Join(all, " "))
 			return 0
 		}
 		exitCode := 0
 		for _, op := range flags.Operands {
 			if n, err := strconv.Atoi(op); err == nil {
-				modN := n
-				if n >= 128 {
-					if n%128 == 0 {
-						if (n/128)%2 == 1 && n != 128 {
-							modN = -1
-						} else {
-							modN = 0
-						}
-					} else {
-						modN = n % 128
-					}
-				}
-				if name, ok := sigNumberMap[modN]; ok {
+				if name, ok := signalNumberName(normalizeExitStatus(n)); ok {
 					fmt.Fprintln(ctx.Stdout, name)
-				} else if modN >= 32 && modN <= 64 {
-					fmt.Fprintln(ctx.Stdout, modN)
 				} else {
 					fmt.Fprintf(ctx.Stderr, "kill: '%s': invalid signal\n", op)
 					exitCode = 1
@@ -209,6 +141,11 @@ func runKill(ctx *Context) int {
 		return 1
 	}
 
+	if !signalSupported(sig) {
+		fmt.Fprintf(ctx.Stderr, "kill: signal %s is not supported on this platform: %s\n", sigStr, platformSignalNote)
+		return 1
+	}
+
 	if len(flags.Operands) == 0 {
 		fmt.Fprintln(ctx.Stderr, "kill: no process ID specified")
 		return 1
@@ -227,8 +164,8 @@ func runKill(ctx *Context) int {
 			exitCode = 1
 			continue
 		}
-		if err := syscall.Kill(pid, sig); err != nil {
-			fmt.Fprintf(ctx.Stderr, "kill: (%s) - No such process\n", pidStr)
+		if err := sendSignal(pid, sig); err != nil {
+			fmt.Fprintf(ctx.Stderr, "kill: (%s) - %s\n", pidStr, killFailure(err))
 			exitCode = 1
 		}
 	}
@@ -272,6 +209,9 @@ func matchProcs(pattern string, exact, invert bool) ([]procInfo, error) {
 }
 
 func runPgrep(ctx *Context) int {
+	if status, refused := refuseUnsupported(ctx, "pgrep"); refused {
+		return status
+	}
 	flags, err := pgrepSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "pgrep:", err)
@@ -314,7 +254,25 @@ func runPgrep(ctx *Context) int {
 	return 0
 }
 
+// normalizeExitStatus maps a shell exit status (128+signal) back to the signal
+// number, as kill -l does; -1 has no signal.
+func normalizeExitStatus(n int) int {
+	if n < 128 {
+		return n
+	}
+	if n%128 != 0 {
+		return n % 128
+	}
+	if (n/128)%2 == 1 && n != 128 {
+		return -1
+	}
+	return 0
+}
+
 func runPkill(ctx *Context) int {
+	if status, refused := refuseUnsupported(ctx, "pkill"); refused {
+		return status
+	}
 	flags, err := pkillSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "pkill:", err)
@@ -330,6 +288,10 @@ func runPkill(ctx *Context) int {
 		s, found := parseSignalArg(sigName)
 		if !found {
 			fmt.Fprintf(ctx.Stderr, "pkill: unknown signal %q\n", sigName)
+			return 1
+		}
+		if !signalSupported(s) {
+			fmt.Fprintf(ctx.Stderr, "pkill: signal %s is not supported on this platform: %s\n", sigName, platformSignalNote)
 			return 1
 		}
 		sig = s
@@ -353,7 +315,7 @@ func runPkill(ctx *Context) int {
 
 	exitCode := 0
 	for _, p := range matched {
-		if err := syscall.Kill(p.pid, sig); err != nil {
+		if err := sendSignal(p.pid, sig); err != nil {
 			fmt.Fprintf(ctx.Stderr, "pkill: (%d) %v\n", p.pid, err)
 			exitCode = 1
 		}

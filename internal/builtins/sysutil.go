@@ -5,9 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unsafe"
-
-	"golang.org/x/sys/unix"
 )
 
 const (
@@ -91,13 +88,8 @@ func isExecutable(p string) bool {
 	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0
 }
 
-func utsFieldPtr(ptr unsafe.Pointer, maxLen int) string {
-	b := unsafe.Slice((*byte)(ptr), maxLen)
-	n := 0
-	for n < len(b) && b[n] != 0 {
-		n++
-	}
-	return string(b[:n])
+type unameInfo struct {
+	sysname, nodename, release, version, machine, osName string
 }
 
 func runUname(ctx *Context) int {
@@ -116,17 +108,12 @@ func runUname(ctx *Context) int {
 		return 0
 	}
 
-	var uts unix.Utsname
-	if err := unix.Uname(&uts); err != nil {
+	u, err := readUname()
+	if err != nil {
 		fmt.Fprintf(ctx.Stderr, "uname: %v\n", err)
 		return 1
 	}
-
-	sysname := utsFieldPtr(unsafe.Pointer(&uts.Sysname[0]), len(uts.Sysname))
-	nodename := utsFieldPtr(unsafe.Pointer(&uts.Nodename[0]), len(uts.Nodename))
-	release := utsFieldPtr(unsafe.Pointer(&uts.Release[0]), len(uts.Release))
-	version := utsFieldPtr(unsafe.Pointer(&uts.Version[0]), len(uts.Version))
-	machine := utsFieldPtr(unsafe.Pointer(&uts.Machine[0]), len(uts.Machine))
+	sysname, nodename, release, version, machine, osName := u.sysname, u.nodename, u.release, u.version, u.machine, u.osName
 
 	if flags.Bool("all-labeled") || flags.Bool("A") {
 		fmt.Fprintf(ctx.Stdout, "Kernel name: %s\n", sysname)
@@ -134,7 +121,7 @@ func runUname(ctx *Context) int {
 		fmt.Fprintf(ctx.Stdout, "Kernel release: %s\n", release)
 		fmt.Fprintf(ctx.Stdout, "Kernel version: %s\n", version)
 		fmt.Fprintf(ctx.Stdout, "Machine: %s\n", machine)
-		fmt.Fprintf(ctx.Stdout, "Operating system: %s\n", "GNU/Linux")
+		fmt.Fprintf(ctx.Stdout, "Operating system: %s\n", osName)
 		return 0
 	}
 
@@ -143,7 +130,7 @@ func runUname(ctx *Context) int {
 
 	if all || !any {
 		if all {
-			fmt.Fprintln(ctx.Stdout, strings.Join([]string{sysname, nodename, release, version, machine, "GNU/Linux"}, " "))
+			fmt.Fprintln(ctx.Stdout, strings.Join([]string{sysname, nodename, release, version, machine, osName}, " "))
 		} else {
 			fmt.Fprintln(ctx.Stdout, sysname)
 		}
@@ -173,7 +160,7 @@ func runUname(ctx *Context) int {
 		parts = append(parts, machine)
 	}
 	if flags.Bool("o") {
-		parts = append(parts, "GNU/Linux")
+		parts = append(parts, osName)
 	}
 	fmt.Fprintln(ctx.Stdout, strings.Join(parts, " "))
 	return 0

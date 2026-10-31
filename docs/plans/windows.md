@@ -646,3 +646,42 @@ windows/amd64 and windows/arm64, where the transport is honestly unavailable. Un
   Close idempotent with one tree kill, no job control); `boundary_unix_test.go` pins resize to the program's tty,
   Close twice, grandchild kill, input order. Existing tests keep covering fast-exit output order, stopped/continue,
   session kill and StartFunc.
+
+## F04 delivered (#108)
+
+Builtin process and I/O portability, and the reduced root build. `GOOS=windows GOARCH=amd64|arm64 go build -tags
+'nough noweb' .` now succeeds and `go vet` of builtins, term, lscore and jobleader passes for Windows. M0 status: the
+reduced application compiles; it cannot run a terminal yet, because `term` returns `ErrUnsupported` until P02
+(ConPTY). Unix behaviour (Android, BSD, macOS) is unchanged; the Unix code moved into `unix`-tagged files.
+
+- `util.go` is portable only; `util_unix.go` has the signal names and `/proc` list, `util_windows.go` the Windows
+  signal names (what Go's syscall package defines) and a process list that returns `errProcListUnsupported`.
+- `kill`: `proc_unix.go` / `proc_windows.go` hold the signal table, `kill -l`/`-t`, delivery and error text. Windows
+  opens the process with `PROCESS_TERMINATE` and calls `TerminateProcess` (exit code 128+signal) for KILL and TERM;
+  TERM is not graceful. Signal 0 checks the process is alive. Every other signal, and negative pids, fail with the
+  reason. `kill -l` lists `EXIT KILL TERM` there.
+- `pgrep`/`pkill`: registered, unsupported on Windows (exit 1 with the reason) until the process monitor (I04).
+- `nice`: no nice values on Windows. The adjustment is added to the current value (read from the priority class)
+  and mapped to a class for the new process through its creation flags (`nice_class.go`: 15+ Idle, 1-14 Below
+  normal, 0 Normal, -1..-9 Above normal, -10 and below High; never Real-time). Misa's own priority is not changed.
+  A Misa builtin runs in the shell process, so it keeps its priority and `nice` warns. Unix still lowers the priority
+  of the process that runs `nice` (a multicall builtin is its own process); that is unchanged.
+- `timeout` now builds on Windows: PATHEXT lookup, no process group, and at the deadline `Process.Kill`. Only 0, TERM
+  and KILL are accepted (others exit 125 with the reason); children of the command are not ended until job objects
+  (P03).
+- `sync`: Windows flushes named files with `FlushFileBuffers`; no operands and `--file-system` are unsupported.
+- `uname` and `arch`: `RtlGetVersion` for release/version, `GetNativeSystemInfo` for the machine (`unknown` for an
+  architecture it does not know). The sysname is `Windows_NT`.
+- `umask`: there is no `umask` builtin in the repo (only `currentUmask` for `chmod`/`mkdir`, which is 0 off Unix), so
+  nothing was added; a future builtin must fail on Windows with a reason.
+- Support table additions (`windowsLimits`): kill, timeout, timeout -s, nice (partial); pgrep, pkill, sync with no
+  operands, sync --file-system (unsupported); sync --data, which (partial).
+- Tests: `process_portability_test.go` (priority class mapping and round trip, machine names, exit-status
+  normalisation, the table against the registry and `--help`), `process_unix_test.go`, `process_windows_test.go`
+  (kill/timeout/nice child-only/sync/uname; run on Windows CI). The reduced build's closure is checked by
+  `platformset_test.go` plus the cross build and vet commands above; no subprocess type-check test was added.
+- Coordination with #40 (`builtins.Run`, proceffect, launcher): this change is mechanical platform splitting, and
+  `niceRequest`/`timeoutDeliver` are the two places that will want the execution capability's cancellation and
+  priority hooks once those land.
+- Known gaps: `which` and the local-executable lookup in `nice` do not expand PATHEXT; terminal sessions fail until
+  P02; `procmon` lists processes only from I04.
