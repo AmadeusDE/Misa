@@ -644,7 +644,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `who` |  | ✓ posix | ✓ | ✓ coreutils |
 | `whoami` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `whois` |  |  | ✓ |  |
-| `xargs` |  | ✓ posix | ✓ | ✓ findutils |
+| `xargs` | ✓ | ✓ posix | ✓ | ✓ findutils |
 | `xxd` | ✓ | ✓ other | ✓ |  |
 | `xz` |  |  | ✓ |  |
 | `xzcat` |  | ✓ pending | ✓ |  |
