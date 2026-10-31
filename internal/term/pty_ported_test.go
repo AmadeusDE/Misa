@@ -128,7 +128,7 @@ func waitExited(t *testing.T, tm *Terminal) {
 
 func TestExitIsReportedOnlyAfterFinalOutputProcessed(t *testing.T) {
 	tm := New(5, 40)
-	if err := tm.StartArgv("", testBin(t, "sh"), "-c", "printf FINAL_OUTPUT; exit 7"); err != nil {
+	if err := tm.StartArgv("", helperArgv(t, "status", "FINAL_OUTPUT", "7")...); err != nil {
 		t.Fatal(err)
 	}
 	defer tm.Close()
@@ -144,7 +144,7 @@ func TestExitIsReportedOnlyAfterFinalOutputProcessed(t *testing.T) {
 
 func TestStartArgvIsArgvNotShell(t *testing.T) {
 	tm := New(3, 40)
-	if err := tm.StartArgv("", testBin(t, "echo"), "hello  $HOME;world"); err != nil {
+	if err := tm.StartArgv("", helperArgv(t, "echo", "hello  $HOME;world")...); err != nil {
 		t.Fatal(err)
 	}
 	defer tm.Close()
@@ -157,7 +157,7 @@ func TestStartArgvIsArgvNotShell(t *testing.T) {
 
 func TestReaderNotifiesAfterOutput(t *testing.T) {
 	tm := New(3, 40)
-	if err := tm.StartArgv("", testBin(t, "sh"), "-c", "printf hi"); err != nil {
+	if err := tm.StartArgv("", helperArgv(t, "echo", "hi")...); err != nil {
 		t.Fatal(err)
 	}
 	defer tm.Close()

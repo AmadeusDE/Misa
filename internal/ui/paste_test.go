@@ -18,7 +18,7 @@ func fullShellModel(t *testing.T) *Model {
 
 func TestPasteReachesRunningProgram(t *testing.T) {
 	m := fullShellModel(t)
-	cmd := m.execArgv("sh", "-c", "read x; echo got $x")
+	cmd := m.execArgv(helperArgv(t, "readline")...)
 	m.Update(tea.PasteMsg{Content: "hi\r"})
 	pumpUntil(t, m, cmd, "exit", func() bool { return m.terminal == nil && bufferHas(m, "got hi") })
 }
