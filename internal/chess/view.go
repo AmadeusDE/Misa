@@ -209,11 +209,17 @@ func (g *Game) header() string {
 		if g.thinking {
 			turn += " · thinking…"
 		}
+		if limit := m.Variant().CheckLimit; limit > 0 {
+			turn += fmt.Sprintf(" · checks left: White %d, Black %d",
+				limit-m.Position().Checks[White], limit-m.Position().Checks[Black])
+		}
 		return name + " · " + turn
 	case Checkmate:
 		return name + " · checkmate, " + winner.String() + " wins"
 	case GoalWin:
 		return name + " · goal reached, " + winner.String() + " wins"
+	case CheckWin:
+		return name + " · check limit reached, " + winner.String() + " wins"
 	case Stalemate:
 		if m.Decisive() {
 			return name + " · stalemate, " + winner.String() + " wins"

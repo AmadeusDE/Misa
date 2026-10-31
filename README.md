@@ -16,9 +16,9 @@ a set of built-in tools, and it ships as one self-contained binary.
   and capture straight ahead), Stalemate-wins Chess (`chess stalematewins`, delivering stalemate wins),
   Self-capture Chess (`chess selfcapture`, orthodox chess plus captures of your own non-royal pieces,
   after the self-capture rule set in [arXiv:2009.04374](https://arxiv.org/abs/2009.04374)), King of the
-  Hill (`chess kingofthehill`, a king reaching one of the four centre squares wins at once), and Grand
+  Hill (`chess kingofthehill`, a king reaching one of the four centre squares wins at once), Grand
   Chess (`chess grand`), Christian Freeling's 10×10 game with marshals, cardinals and captured-only
-  promotion.
+  promotion, and Three-Check (`chess threecheck`, giving check three times wins).
 - Minesweeper controls: `space` open, `f` flag, `n` new game, `1`–`3` select a level, `c` custom game, `q` quit
 - Data-driven package manager menus, a file browser, and tldr/man help
 - `misa --gui`: an optional Wayland window, pure Go and software rendered

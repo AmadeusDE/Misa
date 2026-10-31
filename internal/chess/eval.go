@@ -16,6 +16,7 @@ const (
 	pawnRaceMid  = 35 // the same for a centre-file pawn in the middlegame; flank pawns get none
 	undeveloped  = 15 // a light piece still on its home rank, middlegame
 	lightPiece   = 600
+	checkGiven   = 60 // per check already given, in a variant with a check limit
 )
 
 // estimateValues prices pieces the variant file leaves without a value from
@@ -154,6 +155,11 @@ func (e *evaluator) evaluate(p *Position) int {
 			}
 		}
 		score[pc.Color] += s
+	}
+	if v.CheckLimit > 0 {
+		for c := range score {
+			score[c] += checkGiven * p.Checks[c]
+		}
 	}
 	return score[p.Turn] - score[p.Turn.Other()] + tempo
 }
