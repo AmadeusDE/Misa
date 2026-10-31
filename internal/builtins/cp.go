@@ -934,11 +934,26 @@ func copyOneFile(src, dst string, srcInfo os.FileInfo, preserve preserveAttrs, f
 		return bpath, nil
 	}
 
-	sf, err := os.Open(src)
+	// Backing up a file onto itself: renaming it away while it is read would
+	// fail on Windows, so the backup is a copy and the file stays put.
+	if backupActive {
+		if di, derr := os.Lstat(dst); derr == nil && os.SameFile(srcInfo, di) {
+			if bp := computeBackupPath(strings.TrimRight(dst, "/"), suffix, control); bp != "" {
+				if err := copyRegularData(src, bp, displaySrc, displayDst, false); err != nil {
+					return "", err
+				}
+				applyCopiedAttrs(bp, srcInfo, preserve)
+				return bp, nil
+			}
+		}
+	}
+
+	// An unreadable source must fail before dst is backed up or removed.
+	probe, err := os.Open(src)
 	if err != nil {
 		return "", fmt.Errorf("cannot open '%s' for reading: %s", displaySrc, strings.ToLower(fmtOsErr(err)))
 	}
-	defer sf.Close()
+	probe.Close()
 
 	bpath := ""
 	if backupActive {
@@ -950,22 +965,38 @@ func copyOneFile(src, dst string, srcInfo os.FileInfo, preserve preserveAttrs, f
 	} else if force {
 		_ = os.Remove(dst)
 	}
+	if err := copyRegularData(src, dst, displaySrc, displayDst, force && !backupActive); err != nil {
+		return bpath, err
+	}
+	applyCopiedAttrs(dst, srcInfo, preserve)
+	return bpath, nil
+}
+
+// copyRegularData streams src into a new dst and closes both before it
+// returns, so the caller can rename, chmod or remove either file at once
+// (Windows refuses to rename or delete a file that is still open).
+func copyRegularData(src, dst, displaySrc, displayDst string, retryCreate bool) error {
+	sf, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("cannot open '%s' for reading: %s", displaySrc, strings.ToLower(fmtOsErr(err)))
+	}
+	defer sf.Close()
 	df, err := os.Create(dst)
-	if err != nil && force && !backupActive {
+	if err != nil && retryCreate {
 		_ = os.Remove(dst)
 		df, err = os.Create(dst)
 	}
 	if err != nil {
-		return bpath, fmt.Errorf("cannot create regular file '%s': %s", displayDst, fmtOsErr(err))
+		return fmt.Errorf("cannot create regular file '%s': %s", displayDst, fmtOsErr(err))
 	}
-	defer df.Close()
-
 	if _, err := io.Copy(df, sf); err != nil {
-		return bpath, fmt.Errorf("error writing '%s': %s", displayDst, fmtOsErr(err))
+		df.Close()
+		return fmt.Errorf("error writing '%s': %s", displayDst, fmtOsErr(err))
 	}
-
-	applyCopiedAttrs(dst, srcInfo, preserve)
-	return bpath, nil
+	if err := df.Close(); err != nil {
+		return fmt.Errorf("error writing '%s': %s", displayDst, fmtOsErr(err))
+	}
+	return nil
 }
 
 func copyDirRecursive(src, dst string, preserve preserveAttrs, noDeref, deref, interactive bool, ctx *Context, scanner *bufio.Scanner, backupActive bool, suffix, control string) error {
