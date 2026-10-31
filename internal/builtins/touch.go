@@ -120,7 +120,6 @@ func runTouch(ctx *Context) int {
 		if name == "-" && noDereference {
 			continue
 		}
-		var info os.FileInfo
 		path := resolvePath(ctx, name)
 		if name != "-" {
 			statFn := os.Stat
@@ -128,7 +127,7 @@ func runTouch(ctx *Context) int {
 				statFn = os.Lstat
 			}
 			var statErr error
-			info, statErr = statFn(path)
+			_, statErr = statFn(path)
 			if os.IsNotExist(statErr) {
 				if noCreate {
 					continue
@@ -146,7 +145,7 @@ func runTouch(ctx *Context) int {
 				}
 				f.Close()
 
-				info, statErr = statFn(path)
+				_, statErr = statFn(path)
 				if statErr != nil {
 					fmt.Fprintf(ctx.Stderr, "touch: cannot touch '%s': %s\n", name, fmtOsErr(statErr))
 					exitCode = 1
@@ -159,17 +158,13 @@ func runTouch(ctx *Context) int {
 			}
 		}
 
-		atime := stamp
-		mtime := stamp
-		if info != nil {
-			if onlyAccess && !onlyModify {
-				mtime = info.ModTime()
-			} else if onlyModify && !onlyAccess {
-				atime = info.ModTime()
-			}
+		sel := touchTimes{
+			stamp:     stamp,
+			haveStamp: haveStamp,
+			atime:     onlyAccess || !onlyModify,
+			mtime:     onlyModify || !onlyAccess,
 		}
-
-		if err := touchChtimes(ctx, name, path, atime, mtime, noDereference, haveStamp); err != nil {
+		if err := touchChtimes(name, path, sel, noDereference); err != nil {
 			fmt.Fprintf(ctx.Stderr, "touch: setting times of '%s': %s\n", name, fmtOsErr(err))
 			exitCode = 1
 		}
@@ -214,19 +209,28 @@ func parseObsolescentDate(s string) (time.Time, error) {
 	return time.ParseInLocation("200601021504", fmt.Sprintf("%d%s", cc+yy, mmddhhmm), time.Local)
 }
 
-func touchChtimes(ctx *Context, name, path string, atime, mtime time.Time, noFollow bool, specifyTimes bool) error {
-	var ts []unix.Timespec
-	if specifyTimes {
-		ts = []unix.Timespec{
-			unix.NsecToTimespec(atime.UnixNano()),
-			unix.NsecToTimespec(mtime.UnixNano()),
-		}
-	} else {
-		ts = []unix.Timespec{
-			{Sec: 0, Nsec: utimeNow},
-			{Sec: 0, Nsec: utimeNow},
-		}
+// touchTimes selects which timestamps touch sets and to what; an unselected
+// timestamp is left untouched (UTIME_OMIT).
+type touchTimes struct {
+	stamp        time.Time
+	haveStamp    bool
+	atime, mtime bool
+}
+
+func (s touchTimes) spec(selected bool) unix.Timespec {
+	switch {
+	case !selected:
+		return unix.Timespec{Nsec: utimeOmit}
+	case s.haveStamp:
+		return unix.NsecToTimespec(s.stamp.UnixNano())
+	default:
+		return unix.Timespec{Nsec: utimeNow}
 	}
+}
+
+func touchChtimes(name, path string, sel touchTimes, noFollow bool) error {
+	ts := []unix.Timespec{sel.spec(sel.atime), sel.spec(sel.mtime)}
+	specifyTimes := sel.haveStamp
 
 	if name == "-" {
 		return unix.UtimesNanoAt(1, "", ts, 0)
