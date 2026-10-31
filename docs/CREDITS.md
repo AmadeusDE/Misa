@@ -55,9 +55,15 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
   https://github.com/landley/toybox
   The `ps` built-in follows `toys/posix/ps.c` at commit 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb (option set,
   field table, the default/`-f`/`-l` layouts, stat parsing and TTY naming).
+  `uptime` follows `toys/other/uptime.c` at the same commit (option letters, the default line and the `-s` boot
+  time format). `vmstat` follows `toys/other/vmstat.c` (column set, header lines, widths and width
+  compensation), with two deliberate fixes noted in the file header. `free` keeps toybox's option letters
+  (`toys/other/free.c`) but uses the modern layout from uutils/procps.
 
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils
+  `uptime -p` follows the pretty formatter in `src/uucore/src/lib/features/uptime/mod.rs` at commit
+  fee61ff5d4f87e0f912a52e639942b5f7ad58663.
 
 - **uutils/diffutils** by the uutils contributors — MIT / Apache-2.0
   https://github.com/uutils/diffutils
@@ -65,9 +71,11 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 - **uutils/util-linux** by the uutils contributors — MIT (`cal`, `mcookie`, `uuidgen`)
   https://github.com/uutils/util-linux
 
-- **uutils/procps** by the uutils contributors — MIT (`ps` header and column names, selection behaviour)
+- **uutils/procps** by the uutils contributors — MIT (`ps`, `free` and `vmstat` behaviour)
   https://github.com/uutils/procps
-  Follows `tests/by-util/test_ps.rs` and `src/uu/ps` at commit e697667b3f758803e38d8ab4c8f912171beca602.
+  Follows `tests/by-util/test_ps.rs` and `src/uu/ps` at commit e697667b3f758803e38d8ab4c8f912171beca602,
+  plus `src/uu/free/src/free.rs` (layout, `-b -k -m -g -h --si -t -w -s -c`, the human-readable rounding rules
+  and the cases in its unit test) and `src/uu/vmstat`'s `-a`/`-S` columns at that commit.
 
 ## Chess
 

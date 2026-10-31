@@ -38,10 +38,7 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | 9 | `pidof` | 17 | 5 | 12 (12) | 45 | – |
 | 10 | `mkfifo` | 15 | 5 | 16 (10) | 40 | kernel/fs |
 | 11 | `pmap` | 14 | – | 21 (14) | 103 | – |
-| 12 | `vmstat` | 14 | – | 14 (14) | 155 | – |
 | 13 | `sync` | 13 | – | 17 (13) | 23 | – |
-| 14 | `uptime` | 13 | 2 | 16 (11) | 79 | – |
-| 15 | `free` | 12 | – | 12 (12) | 58 | – |
 | 16 | `cal` | 12 | – | 12 (12) | 144 | – |
 | 17 | `gzip` | 11 | 11 | – | 179 | – |
 | 18 | `dmesg` | 11 | – | 17 (11) | 187 | – |
@@ -162,7 +159,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `file` | posix | 25 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 549 | – | medium |
 | `find` | posix | 58 | findutils:87 | 0 | kernel/fs, network, root, tty | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 0/87 simple new_ucmd! cases parseable by tests/uutils adapter | 730 | – | heavy |
 | `flock` | other | – | – | – | – | no tests | 39 | – | light |
-| `free` | other | – | procps:12 | 12 | – | uutils: Rust, 12/12 simple new_ucmd! cases parseable by tests/uutils adapter | 58 | 641 | light |
 | `freeramdisk` | other | – | – | – | – | no tests | 23 | – | light |
 | `fsck` | pending | – | – | – | – | no tests | 434 | – | medium |
 | `fsfreeze` | other | – | util-linux:5 | 5 | – | uutils: Rust, 5/5 simple new_ucmd! cases parseable by tests/uutils adapter | 30 | 86 | light |
@@ -372,7 +368,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `unlink` | posix | – | coreutils:7 | 2 | – | uutils: Rust, 2/7 simple new_ucmd! cases parseable by tests/uutils adapter | 24 | 50 | light |
 | `unshare` | other | – | – | – | – | no tests | 166 | – | light |
 | `updatedb` | – | – | findutils:27 | 0 | – | uutils: Rust, 0/27 simple new_ucmd! cases parseable by tests/uutils adapter | – | – | medium |
-| `uptime` | other | 2 | coreutils:16 | 11 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 11/16 simple new_ucmd! cases parseable by tests/uutils adapter | 79 | 394 | light |
 | `useradd` | pending | 14 | shadow:34 | 0 | root | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 0/34 simple new_ucmd! cases parseable by tests/uutils adapter | 159 | 2462 | medium |
 | `userdel` | pending | – | shadow:16 | 0 | root | uutils: Rust, 0/16 simple new_ucmd! cases parseable by tests/uutils adapter | 114 | 621 | medium |
 | `usermod` | – | – | shadow:25 | 0 | root | uutils: Rust, 0/25 simple new_ucmd! cases parseable by tests/uutils adapter | – | 793 | heavy |
@@ -385,7 +380,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `vdir` | – | – | coreutils:12 | 6 | tty | uutils: Rust, 6/12 simple new_ucmd! cases parseable by tests/uutils adapter | – | 43 | light |
 | `vigr` | – | – | shadow:– | – | – | no tests | – | 49 | light |
 | `vipw` | – | – | shadow:13 | 0 | root | uutils: Rust, 0/13 simple new_ucmd! cases parseable by tests/uutils adapter | – | 586 | heavy |
-| `vmstat` | other | – | procps:14 | 14 | – | uutils: Rust, 14/14 simple new_ucmd! cases parseable by tests/uutils adapter | 155 | 1219 | light |
 | `w` | other | – | procps:5 | 5 | – | uutils: Rust, 5/5 simple new_ucmd! cases parseable by tests/uutils adapter | 33 | 504 | light |
 | `watch` | other | – | procps:6 | 6 | – | uutils: Rust, 6/6 simple new_ucmd! cases parseable by tests/uutils adapter | 186 | 268 | light |
 | `watchdog` | other | – | – | – | – | no tests | 51 | – | light |

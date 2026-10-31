@@ -1,11 +1,13 @@
-// Package proc reads process snapshots for the ps family of utilities.
+// Package proc reads process and system snapshots for the process and memory
+// utilities (ps, free, uptime, vmstat).
 //
 // The Linux/Android backend parses a procfs tree: the real /proc, or a
 // recorded fixture root handed to New. Other platforms report ErrUnsupported
 // instead of inventing data. Data that a platform or the process's permissions
 // cannot supply stays at its zero value — an unreadable /proc/PID/cmdline
-// leaves Argv nil, an unreadable exe link leaves Exe empty — and a process
-// that disappears while the snapshot runs is skipped without an error.
+// leaves Argv nil, an unreadable exe link leaves Exe empty, an absent
+// /proc/meminfo line leaves its Known flag false — and a process that
+// disappears while the snapshot runs is skipped without an error.
 package proc
 
 import (
@@ -15,7 +17,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
-	"time"
 )
 
 // ClockTicks is USER_HZ. /proc reports CPU and start times in 1/100 s ticks
@@ -182,11 +183,19 @@ func (r *Reader) Dir(pid int) string {
 	return filepath.Join(r.root, strconv.Itoa(pid))
 }
 
-// Uptime reads the time since boot from <root>/uptime.
-func (r *Reader) Uptime() (time.Duration, error) {
-	data, err := os.ReadFile(filepath.Join(r.root, "uptime"))
-	if err != nil {
-		return 0, err
-	}
-	return ParseUptime(data)
+// atoi, atou and atou32 read the procfs number formats: a missing or
+// unparsable field becomes zero, which is how the kernel reports absent values.
+func atoi(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
+}
+
+func atou(s string) uint64 {
+	n, _ := strconv.ParseUint(s, 10, 64)
+	return n
+}
+
+func atou32(s string) uint32 {
+	n, _ := strconv.ParseUint(s, 10, 32)
+	return uint32(n)
 }

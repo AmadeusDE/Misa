@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 func (r *Reader) checkSupported() error { return nil }
@@ -152,17 +153,51 @@ func TTYName(dev int) string {
 	return strconv.Itoa(major) + ":" + strconv.Itoa(minor)
 }
 
-func atoi(s string) int {
-	n, _ := strconv.Atoi(s)
-	return n
+// The remaining readers each read one procfs file from the reader's root, so a
+// fixture tree exercises them exactly like the process snapshot. A platform
+// without a backend returns ErrUnsupported instead (see proc_other.go).
+
+// Uptime reads the time since boot from <root>/uptime.
+func (r *Reader) Uptime() (time.Duration, error) {
+	data, err := os.ReadFile(filepath.Join(r.root, "uptime"))
+	if err != nil {
+		return 0, err
+	}
+	return ParseUptime(data)
 }
 
-func atou(s string) uint64 {
-	n, _ := strconv.ParseUint(s, 10, 64)
-	return n
+// Meminfo reads <root>/meminfo.
+func (r *Reader) Meminfo() (Meminfo, error) {
+	data, err := os.ReadFile(filepath.Join(r.root, "meminfo"))
+	if err != nil {
+		return Meminfo{}, err
+	}
+	return ParseMeminfo(data)
 }
 
-func atou32(s string) uint32 {
-	n, _ := strconv.ParseUint(s, 10, 32)
-	return uint32(n)
+// Loadavg reads <root>/loadavg.
+func (r *Reader) Loadavg() (Loadavg, error) {
+	data, err := os.ReadFile(filepath.Join(r.root, "loadavg"))
+	if err != nil {
+		return Loadavg{}, err
+	}
+	return ParseLoadavg(data)
+}
+
+// Stat reads <root>/stat.
+func (r *Reader) Stat() (Stat, error) {
+	data, err := os.ReadFile(filepath.Join(r.root, "stat"))
+	if err != nil {
+		return Stat{}, err
+	}
+	return ParseStat(data)
+}
+
+// Vmstat reads <root>/vmstat.
+func (r *Reader) Vmstat() (Vmstat, error) {
+	data, err := os.ReadFile(filepath.Join(r.root, "vmstat"))
+	if err != nil {
+		return Vmstat{}, err
+	}
+	return ParseVmstat(data)
 }

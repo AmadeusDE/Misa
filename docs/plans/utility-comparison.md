@@ -214,7 +214,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `flock` |  | ✓ other | ✓ |  |
 | `fmt` | ✓ | ✓ other |  | ✓ coreutils |
 | `fold` | ✓ | ✓ posix | ✓ | ✓ coreutils |
-| `free` |  | ✓ other | ✓ | ✓ procps |
+| `free` | ✓ | ✓ other | ✓ | ✓ procps |
 | `freeramdisk` |  | ✓ other | ✓ |  |
 | `fsck` |  | ✓ pending | ✓ |  |
 | `fsck.minix` |  |  | ✓ |  |
@@ -616,7 +616,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `unxz` |  |  | ✓ |  |
 | `unzip` |  |  | ✓ |  |
 | `updatedb` |  |  |  | ✓ findutils |
-| `uptime` |  | ✓ other | ✓ | ✓ coreutils |
+| `uptime` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `useradd` |  | ✓ pending |  | ✓ shadow |
 | `userdel` |  | ✓ pending |  | ✓ shadow |
 | `usermod` |  |  |  | ✓ shadow |
@@ -631,7 +631,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `vigr` |  |  |  | ✓ shadow |
 | `vipw` |  |  |  | ✓ shadow |
 | `vlock` |  |  | ✓ |  |
-| `vmstat` |  | ✓ other | ✓ | ✓ procps |
+| `vmstat` | ✓ | ✓ other | ✓ | ✓ procps |
 | `volname` |  |  | ✓ |  |
 | `w` |  | ✓ other | ✓ | ✓ procps |
 | `wait` |  | ✓ pending |  |  |

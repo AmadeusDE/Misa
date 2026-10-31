@@ -47,3 +47,8 @@ wc/test_total_auto_L572  # wc: column widths differ from uutils for single files
 wc/test_total_auto_1_L576  # wc: column widths differ from uutils for single files and totals
 wc/test_total_never_L620  # wc: column widths differ from uutils for single files and totals
 wc/test_args_override_1_L847  # wc: column widths differ from uutils for single files and totals
+uptime/test_uptime_for_file_without_utmpx_records_0_L61  # uptime: no utmp/user-count reader and no FILE operand (out of scope)
+uptime/test_uptime_with_non_existent_file_L105  # uptime: no FILE operand, so boot time always comes from procfs
+uptime/test_uptime_with_extra_argument_L285  # uptime: operands are rejected, message wording differs
+uptime/test_uptime_with_dir_0_L309  # uptime: no FILE operand, so boot time always comes from procfs
+uptime/test_uptime_check_users_openbsd_L319  # uptime: user count from utmp is deliberately omitted

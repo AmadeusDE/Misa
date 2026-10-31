@@ -124,6 +124,11 @@ internal/
                                  -o FIELDS[:width][=title] -p -u -U -g -G -t -k/--sort -w). Unsupported options
                                  (-M -n -O -P -s -T -Z, thread listing) fail as unknown options instead of
                                  pretending to work
+    free.go uptime.go vmstat.go  `free`, `uptime`, `vmstat` — memory, load average and virtual memory statistics
+                                 from internal/proc, with interval/count sampling (injectable sleeper, honours
+                                 cancellation), units/human-readable output and unavailable counters printed as
+                                 "-" or omitted. Unsupported options (free -l -v -L --kilo…, vmstat -w -t -y -s -d
+                                 -D -p -f -m) fail as unknown options; other platforms report unsupported
     man.go install.go util.go    Misc helpers
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
@@ -141,11 +146,12 @@ internal/
                                  keyboard-interactive, password
     escape.go resize.go          `~.` disconnect / `~~`; SIGWINCH plus polling (in-process panes get no SIGWINCH)
     prompt.go                    Terminal prompts read byte-wise so typed-ahead input still reaches the remote
-  proc/                         Process snapshots for `ps`: /proc/<pid> parsing (stat, status, cmdline, exe, the
-                                 raw dev_t TTY and its name) from a configurable proc root so tests can use
-                                 fixtures. Disappearing processes are skipped and denied fields come back empty
-                                 (never an error). proc_linux.go covers Linux and Android; elsewhere (BSD, macOS)
-                                 ErrUnsupported until a sysctl backend exists
+  proc/                         Process and system snapshots: /proc/<pid> parsing (stat, status, cmdline, exe,
+                                 the raw dev_t TTY and its name) plus /proc/{meminfo,loadavg,stat,vmstat,uptime}
+                                 readers, all from a configurable proc root so tests can use fixtures.
+                                 Disappearing processes are skipped, denied or absent fields come back empty with a
+                                 Known flag (never an error, never an invented zero). proc_linux.go covers Linux and
+                                 Android; elsewhere (BSD, macOS) ErrUnsupported until a sysctl backend exists
   lscore/                        ls formatting engine — colors, icons, git status, sorting
   mines/                         Minesweeper clone: board.go (rules, first reveal always safe, flood fill, chording),
                                  game.go (keys/mouse, clock), view.go (centred layout + hit test), run.go (standalone).
