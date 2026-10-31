@@ -18,9 +18,11 @@ a set of built-in tools, and it ships as one self-contained binary.
   after the self-capture rule set in [arXiv:2009.04374](https://arxiv.org/abs/2009.04374)), King of the
   Hill (`chess kingofthehill`, a king reaching one of the four centre squares wins at once), Grand
   Chess (`chess grand`), Christian Freeling's 10×10 game with marshals, cardinals and captured-only
-  promotion, Three-Check (`chess threecheck`, giving check three times wins), and Racing Kings
+  promotion, Three-Check (`chess threecheck`, giving check three times wins), Racing Kings
   (`chess racingkings`), V. R. Parton's 1961 race: no pawns or castling, no checks allowed, and the
-  first king onto the eighth rank wins; Black answering there draws.
+  first king onto the eighth rank wins; Black answering there draws, and Antichess
+  (`chess antichess`): captures are compulsory and a side that loses all its pieces, or cannot move,
+  wins.
 - Minesweeper controls: `space` open, `f` flag, `n` new game, `1`–`3` select a level, `c` custom game, `q` quit
 - Data-driven package manager menus, a file browser, and tldr/man help
 - `misa --gui`: an optional Wayland window, pure Go and software rendered

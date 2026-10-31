@@ -148,14 +148,21 @@ internal/
   chess/                         Data-driven chess for any board size and fairy pieces, vs computer or hotseat:
     betza.go                     Betza funny-notation subset → Components (atoms, riders, m/c/f/b/l/r/s/v/i/n/p/g/q)
     variant.go                   Variant YAML (embedded variants/ + chess/*.yaml next to binary/~/.config/misa),
-                                 `extends:` inheritance, setup in FEN with multi-digit runs, castling, promotion
+                                 `extends:` inheritance, setup in FEN with multi-digit runs, castling, promotion,
+                                 self-capture, goals, check limits, forced captures (antichess); builtinFiles lists
+                                 the embedded variants in menu order
     position.go                  Move generation (walk per component; a full open circle of a q rider is a pass),
                                  legality (no royal left attacked), castling, en passant on every crossed square,
                                  Apply (keeps royal squares), ParseFEN; captures() for quiescence
     attack.go                    anyAttacked, pre-filtered by per-type reach tables (offsets a piece could ever hit)
     zobrist.go                   Position.Hash: pieces, moved flags that matter, side, en passant
-    match.go                     Match: history/undo, long algebraic notation, checkmate/stalemate/repetition/
-                                 move-limit/bare-royals endings, Hashes for the search
+    match.go                     Match: history/undo, long algebraic notation, repetition/move-limit/bare-royals
+                                 endings, Hashes for the search
+    terminal.go                  adjudicate(p, hasMoves) -> (outcome, bool), the single game-end function:
+                                 goal arrival and check limit (CheckWin) first, then checkmate, then the
+                                 variant's stalemate rule (draw, or a win for either side); outcome.score is
+                                 the search's mate score, Match.Decisive its winner
+    picker.go                    v/V searchable variant picker (filter by name or id, empty filter: j/k)
     eval.go                      Piece values (YAML `value`, else estimated from empty-board mobility) and a
                                  variant-agnostic evaluation: material, centre, pawn race, royal shelter/edge
     search.go                    Engine: iterative deepening PVS, TT, quiescence, null move, LMR, killers/history,
@@ -325,10 +332,13 @@ internal/
   YAML lets a side capture its own non-royal pieces with normal capture moves; Tomašev et al., arXiv:2009.04374),
   kingofthehill (chess plus `goal: [d4, d5, e4, e5]`: a royal arriving on one of those absolute, unmirrored
   squares wins), grand (Freeling's 10×10 with marshal `RN` and cardinal `BN`, no castling), threecheck
-  (chess plus `check_limit: 3`: the third check given wins at once, the checkmating one included), and
+  (chess plus `check_limit: 3`: the third check given wins at once, the checkmating one included),
   racingkings (Racing Kings: 8×8 with no pawns or castling, both armies on ranks 1-2; `no_checks` makes a
   move that leaves the enemy royal attacked illegal so mate never happens, `goal` is the whole eighth rank,
-  and `goal_reply_draw` makes White's arrival pending until Black cannot answer on a goal square, which draws).
+  and `goal_reply_draw` makes White's arrival pending until Black cannot answer on a goal square, which
+  draws), and antichess (Antichess: `forced_capture: true` makes a legal capture compulsory, `material:
+  inverse` reverses material preference, the king is non-royal so it can be captured, and `stalemate: loss`
+  makes the side that cannot move — including one that lost every piece — the winner).
   `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
   and the search both honour it. `promotion_optional: true` lets a pawn stay a pawn inside `promotion_zone` (but
   not on the last rank, where promotion is forced); `promotion_captured_only: true` restricts the choices to

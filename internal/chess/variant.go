@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -56,6 +56,8 @@ type Variant struct {
 	Goal                  []int // absolute squares whose arrival by a royal wins
 	NoChecks              bool  // a move that leaves the other side's royals attacked is illegal
 	GoalReplyDraw         bool  // the first side's goal arrival is drawn when the other can arrive in reply
+	ForcedCapture         bool  // a legal capture may not be declined
+	InverseMaterial       bool  // the evaluation prefers having fewer, less valuable pieces
 	Setup                 string
 	Source                string
 
@@ -117,6 +119,8 @@ type variantDef struct {
 	Goal                  []string      `yaml:"goal"`
 	NoChecks              *bool         `yaml:"no_checks"`
 	GoalReplyDraw         *bool         `yaml:"goal_reply_draw"`
+	ForcedCapture         *bool         `yaml:"forced_capture"`
+	Material              string        `yaml:"material"`
 
 	source string
 }
@@ -326,6 +330,12 @@ func merge(parent, child variantDef) variantDef {
 	if child.GoalReplyDraw != nil {
 		d.GoalReplyDraw = child.GoalReplyDraw
 	}
+	if child.ForcedCapture != nil {
+		d.ForcedCapture = child.ForcedCapture
+	}
+	if child.Material != "" {
+		d.Material = child.Material
+	}
 	d.Pieces = slices.Clone(parent.Pieces)
 	for _, p := range child.Pieces {
 		i := slices.IndexFunc(d.Pieces, func(q pieceDef) bool { return strings.EqualFold(q.Letter, p.Letter) })
@@ -347,6 +357,16 @@ func build(d variantDef) (*Variant, error) {
 		SelfCapture:           d.SelfCapture != nil && *d.SelfCapture,
 		PromotionOptional:     d.PromotionOptional != nil && *d.PromotionOptional,
 		PromotionCapturedOnly: d.PromotionCapturedOnly != nil && *d.PromotionCapturedOnly,
+	}
+	if d.ForcedCapture != nil {
+		v.ForcedCapture = *d.ForcedCapture
+	}
+	switch d.Material {
+	case "", "normal":
+	case "inverse":
+		v.InverseMaterial = true
+	default:
+		return nil, fmt.Errorf("material must be normal or inverse")
 	}
 	if v.Name == "" {
 		v.Name = v.ID

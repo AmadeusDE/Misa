@@ -154,6 +154,9 @@ func (e *evaluator) evaluate(p *Position) int {
 				s -= undeveloped * phase / 256
 			}
 		}
+		if v.InverseMaterial && !t.Royal {
+			s -= 2 * t.Value
+		}
 		score[pc.Color] += s
 	}
 	if v.CheckLimit > 0 {

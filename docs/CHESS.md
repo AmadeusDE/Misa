@@ -23,11 +23,16 @@ The bundled `stalematewins` variant (Stalemate-wins Chess) uses the
 and is not in check loses, so the player who delivered stalemate wins. See
 Tomašev, Paquet, Hassabis and Kramnik, [*Assessing Game Balance with AlphaZero:
 Exploring Alternative Rule Sets in Chess*](https://arxiv.org/abs/2009.04374)
-(2020).
+(2020). The bundled `antichess` variant goes the other way: captures are
+compulsory, a side with no legal move wins, material preference is reversed,
+and the king is non-royal, so it can be captured and promotion may produce one.
 
 Custom variant YAML can set `stalemate` to `draw`, `win`, or `loss`. The default
 when the field is omitted is `draw` (orthodox chess); `win` means the side
 delivering stalemate wins, and `loss` means the side delivering it loses.
+`forced_capture: true` requires a capture whenever one is legal, and
+`material: inverse` makes the evaluation prefer having fewer, less valuable
+pieces; both are described under [Variant files](#variant-files).
 
 | Level | Default time ceiling | Depth cap | Node cap | Root selection |
 | --- | ---: | ---: | ---: | --- |
@@ -143,6 +148,15 @@ Because checking is illegal, no move in Racing Kings can ever be mate:
 stalemate, repetition and the move limit are what end a race that no king wins.
 The bare-kings material rule does not apply while a variant has goal squares
 either, since a lone king can still reach the eighth rank.
+
+- **Antichess** (`antichess`): orthodox chess except that a capture is
+  compulsory whenever one is legal, and a side with no legal move at all wins,
+  so a player wins by being stalemated or by losing every piece. The king is a
+  non-royal piece that can be captured, and pawns may promote to it, so
+  checkmate plays no part. Material preference is reversed (`material:
+  inverse`), and the computer sheds pieces instead of hoarding them. See
+  [Variant files](#variant-files) for the `forced_capture`, `material` and
+  `stalemate` keys.
 
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
@@ -274,6 +288,34 @@ goal: [a8, b8, c8, d8, e8, f8, g8, h8]  # the eighth rank, both colours
 no_checks: true
 goal_reply_draw: true
 ```
+
+`forced_capture: true` makes every legal capture compulsory: the move list
+holds only captures whenever one exists, en passant and capture-promotions
+included, and a capture that would leave the mover's own royal in check does
+not restrict the quiet moves. It defaults to `false` and is inherited through
+`extends` like the other flags. `material:` decides how the evaluation weighs
+material: `normal` (the default) prefers more and more valuable pieces, and
+`inverse` prefers fewer, so the engine seeks to give its own pieces away. Both
+keys are what makes antichess play like antichess:
+
+```yaml
+id: antichess
+name: Antichess
+extends: chess
+pieces:
+  - {letter: K, name: King, betza: K, royal: false, value: 300, glyph: ♚}
+castling: []
+promotion: [Q, R, B, N, K]
+forced_capture: true
+material: inverse
+stalemate: loss
+```
+
+Dropping `royal` from the king leaves a variant with no royal piece at all.
+Nothing can then be in check or mate, the bare-kings material draw does not
+apply, and every ending comes from `stalemate:`, which antichess sets to `loss`:
+the side that cannot move wins, whether it lost its last piece or is
+simply stuck.
 
 ## Custom board dimensions
 
