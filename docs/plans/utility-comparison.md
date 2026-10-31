@@ -576,7 +576,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `tree` | ✓ |  | ✓ |  |
 | `true` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `truncate` | ✓ | ✓ other | ✓ | ✓ coreutils |
-| `ts` |  | ✓ other | ✓ |  |
+| `ts` | ✓ | ✓ other | ✓ |  |
 | `tsort` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `tty` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `ttysize` |  |  | ✓ |  |
@@ -651,4 +651,4 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `yes` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `zcat` |  | ✓ lsb | ✓ |  |
 | `zcip` |  |  | ✓ |  |
-| **Total** | **114** | **349** (250 default, 96 pending) | **445** | **190** |
+| **Total** | **115** | **349** (250 default, 96 pending) | **445** | **190** |
