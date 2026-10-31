@@ -76,7 +76,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | 47 | `setpgid` | 4 | – | 5 (4) | – | – |
 | 48 | `users` | 4 | – | 5 (4) | – | – |
 | 49 | `fallocate` | 3 | 3 | – | 33 | – |
-| 50 | `getopt` | 3 | 3 | – | 112 | – |
 | 51 | `hostid` | 3 | – | 3 (3) | – | – |
 | 52 | `mesg` | 3 | – | 3 (3) | – | tty |
 | 53 | `nologin` | 2 | – | 2 (2) | 24 | – |
@@ -170,11 +169,9 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `fsync` | other | – | – | – | – | no tests | 32 | – | light |
 | `ftpget` | net | – | – | – | – | no tests | 202 | – | heavy |
 | `ftpput` | net | – | – | – | – | no tests | 202 | – | heavy |
-| `getconf` | posix | – | – | – | – | no tests | 250 | – | medium |
 | `getenforce` | android | – | – | – | – | no tests | 29 | – | medium |
 | `getfacl` | – | – | acl:5 | 2 | – | uutils: Rust, 2/5 simple new_ucmd! cases parseable by tests/uutils adapter | – | 228 | light |
 | `getfattr` | pending | 5 | – | – | kernel/fs | toybox: shell .test (runs in tests/toybox adapter) | 98 | – | light |
-| `getopt` | other | 3 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 112 | – | light |
 | `getty` | pending | – | – | – | – | no tests | 259 | – | medium |
 | `gitcheckout` | pending | – | – | – | – | no tests | 656 | – | heavy |
 | `gitclone` | pending | – | – | – | – | no tests | 656 | – | heavy |

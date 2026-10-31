@@ -217,6 +217,21 @@ func parseTestFile(path string) (testSuite, error) {
 			}
 		}
 
+		// getopt.test wraps its cases in "function test_getopt() { testcmd "$1"
+		// "$1" "$2\n" }", so each call is a testcmd case with the same text for
+		// the name and the arguments.
+		if suite.cmdName == "getopt" && strings.HasPrefix(line, "test_getopt ") {
+			if fields, err := extractQuotedFields(line[len("test_getopt "):]); err == nil && len(fields) >= 2 {
+				suite.cases = append(suite.cases, testCase{
+					name:     fields[0],
+					args:     expandVars(fields[0], suite.vars),
+					expected: unescapeTestStr(expandVars(fields[1], suite.vars) + "\\n"),
+					line:     lineNum,
+				})
+			}
+			continue
+		}
+
 		if strings.Contains(line, "=") && !strings.HasPrefix(line, "testing") && !strings.HasPrefix(line, "testcmd") {
 			l := line
 			for len(l) > 0 {
@@ -696,7 +711,9 @@ func splitShellArgs(s string) []string {
 		} else if s[i] == '"' {
 			i++
 			for i < len(s) && s[i] != '"' {
-				if s[i] == '\\' && i+1 < len(s) {
+				// Inside double quotes a backslash only escapes $, `, " and \
+				// (and a newline); before anything else it stays literal.
+				if s[i] == '\\' && i+1 < len(s) && strings.IndexByte("$`\"\\", s[i+1]) >= 0 {
 					i++
 				}
 				arg.WriteByte(s[i])

@@ -121,6 +121,8 @@ internal/
     chmod.go chown.go link.go    Permissions and links
     tail.go proc.go sysutil.go   System utilities
     man.go install.go util.go    Misc helpers
+    getopt.go getconf.go         `getopt` — external-style option parser, shell-quoted output for `eval set --`;
+                                 `getconf` — sysconf/pathconf/confstr and <limits.h> values (see docs/plans/getconf.md)
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
     mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game
@@ -423,6 +425,6 @@ Commit trailers for agent-made commits:
 - `docs/UGH.md` — ugh: providers, running, TUI, tools, permissions, subagents, configuration.
 - `docs/ughbot/DEPLOY.md`, `docs/ughbot/WEB.md` — ughbot (experimental): setup, bots, approvals, web UI.
 - `docs/plans/` — Plans for upcoming work: `terminal.md`, `web.md`, `ugh-confinement.md`, `ughbot.md`,
-  `builtins.md` (with `utility-comparison.md` and `builtins-coverage.md`), `windows.md`, `android.md`,
-  `pkg-frontend.md`.
+  `builtins.md` (with `utility-comparison.md` and `builtins-coverage.md`), `getconf.md` (which `getconf`
+  values are measured, compiled or undefined per platform), `windows.md`, `android.md`, `pkg-frontend.md`.
 - `SECURITY.md`, `CONTRIBUTING.md` — Reporting vulnerabilities; how changes are made here.
