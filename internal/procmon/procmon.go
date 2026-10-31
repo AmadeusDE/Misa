@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -469,11 +468,10 @@ func enrichDiskMounts(ioDisks []DiskStat) []DiskStat {
 		if seen[devName] {
 			continue
 		}
-		var stat syscall.Statfs_t
-		if syscall.Statfs(mount, &stat) != nil {
+		total, free, err := diskSpace(mount)
+		if err != nil {
 			continue
 		}
-		total, free := getDiskSpace(&stat)
 		if total == 0 {
 			continue
 		}

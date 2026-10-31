@@ -3,7 +3,6 @@ package procmon
 import (
 	"fmt"
 	"strings"
-	"syscall"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -19,48 +18,6 @@ const (
 	htopSearch
 	htopFilter
 )
-
-type signalEntry struct {
-	num  int
-	name string
-	sig  syscall.Signal
-}
-
-var htopSignals = []signalEntry{
-	{0, "Cancel", 0},
-	{1, "SIGHUP", syscall.SIGHUP},
-	{2, "SIGINT", syscall.SIGINT},
-	{3, "SIGQUIT", syscall.SIGQUIT},
-	{4, "SIGILL", syscall.SIGILL},
-	{5, "SIGTRAP", syscall.SIGTRAP},
-	{6, "SIGABRT", syscall.SIGABRT},
-	{6, "SIGIOT", syscall.SIGABRT},
-	{7, "SIGBUS", syscall.SIGBUS},
-	{8, "SIGFPE", syscall.SIGFPE},
-	{9, "SIGKILL", syscall.SIGKILL},
-	{10, "SIGUSR1", syscall.SIGUSR1},
-	{11, "SIGSEGV", syscall.SIGSEGV},
-	{12, "SIGUSR2", syscall.SIGUSR2},
-	{13, "SIGPIPE", syscall.SIGPIPE},
-	{14, "SIGALRM", syscall.SIGALRM},
-	{15, "SIGTERM", syscall.SIGTERM},
-	{16, "SIGSTKFLT", syscall.Signal(16)},
-	{17, "SIGCHLD", syscall.SIGCHLD},
-	{18, "SIGCONT", syscall.SIGCONT},
-	{19, "SIGSTOP", syscall.SIGSTOP},
-	{20, "SIGTSTP", syscall.SIGTSTP},
-	{21, "SIGTTIN", syscall.SIGTTIN},
-	{22, "SIGTTOU", syscall.SIGTTOU},
-	{23, "SIGURG", syscall.SIGURG},
-	{24, "SIGXCPU", syscall.SIGXCPU},
-	{25, "SIGXFSZ", syscall.SIGXFSZ},
-	{26, "SIGVTALRM", syscall.Signal(26)},
-	{27, "SIGPROF", syscall.SIGPROF},
-	{28, "SIGWINCH", syscall.SIGWINCH},
-	{29, "SIGIO", syscall.SIGIO},
-	{30, "SIGPWR", syscall.Signal(30)},
-	{31, "SIGSYS", syscall.SIGSYS},
-}
 
 var (
 	sBarUser   = lipgloss.NewStyle().Foreground(lipgloss.Color("#b8bb26"))
@@ -115,7 +72,7 @@ type HtopViewer struct {
 }
 
 func NewHtop() *HtopViewer {
-	h := &HtopViewer{sortField: SortCPU, killIdx: 16}
+	h := &HtopViewer{sortField: SortCPU, killIdx: platformActions.defaultSignal()}
 	h.prev = TakeFullSnapshot()
 	time.Sleep(300 * time.Millisecond)
 	h.cur = TakeFullSnapshot()
@@ -202,7 +159,7 @@ func (h *HtopViewer) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		h.adjustNice(1)
 	case "f9", "k":
 		h.mode = htopKill
-		h.killIdx = 16
+		h.killIdx = platformActions.defaultSignal()
 		h.killScroll = 0
 	case "P":
 		h.sortField = SortCPU
@@ -242,7 +199,7 @@ func (h *HtopViewer) handleKillKey(key string) tea.Cmd {
 			h.killIdx--
 		}
 	case "down", "j":
-		if h.killIdx < len(htopSignals)-1 {
+		if h.killIdx < len(platformActions.Signals)-1 {
 			h.killIdx++
 		}
 	case "pgup":
@@ -252,8 +209,8 @@ func (h *HtopViewer) handleKillKey(key string) tea.Cmd {
 		}
 	case "pgdown":
 		h.killIdx += 10
-		if h.killIdx >= len(htopSignals) {
-			h.killIdx = len(htopSignals) - 1
+		if h.killIdx >= len(platformActions.Signals) {
+			h.killIdx = len(platformActions.Signals) - 1
 		}
 	case "enter":
 		h.sendSignal()
@@ -321,14 +278,14 @@ func (h *HtopViewer) sendSignal() {
 	if h.selectedIdx < 0 || h.selectedIdx >= len(procs) {
 		return
 	}
-	sig := htopSignals[h.killIdx]
+	sig := platformActions.Signals[h.killIdx]
 	if sig.sig == 0 {
 		h.statusMsg = "Cancelled"
 		h.statusTimer = 2
 		return
 	}
 	pid := procs[h.selectedIdx].PID
-	err := syscall.Kill(pid, sig.sig)
+	err := platformActions.Send(pid, sig)
 	if err != nil {
 		h.statusMsg = fmt.Sprintf("Kill %d with %s: %v", pid, sig.name, err)
 	} else {
@@ -350,7 +307,7 @@ func (h *HtopViewer) adjustNice(delta int) {
 	if newNice > 19 {
 		newNice = 19
 	}
-	err := syscall.Setpriority(syscall.PRIO_PROCESS, p.PID, newNice)
+	err := platformActions.Renice(p.PID, newNice)
 	if err != nil {
 		h.statusMsg = fmt.Sprintf("renice PID %d: %v", p.PID, err)
 	} else {
@@ -786,12 +743,12 @@ func (h *HtopViewer) killView() []string {
 	}
 
 	end := h.killScroll + rows
-	if end > len(htopSignals) {
-		end = len(htopSignals)
+	if end > len(platformActions.Signals) {
+		end = len(platformActions.Signals)
 	}
 
 	for i := h.killScroll; i < end; i++ {
-		sig := htopSignals[i]
+		sig := platformActions.Signals[i]
 		row := fmt.Sprintf(" %2d %-12s", sig.num, sig.name)
 
 		if i == h.killIdx {

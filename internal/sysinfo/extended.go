@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 type ExtendedInfo struct {
@@ -702,9 +701,7 @@ func getStorage() string {
 
 		totalSize := blocks * 1024
 		if mountPoint, ok := mounts[name]; ok {
-			var stat syscall.Statfs_t
-			if err := syscall.Statfs(mountPoint, &stat); err == nil {
-				total, free := getMountSpace(&stat)
+			if total, free, err := mountSpace(mountPoint); err == nil {
 				used := total - free
 				pct := 0.0
 				if total > 0 {

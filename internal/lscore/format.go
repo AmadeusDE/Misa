@@ -85,20 +85,12 @@ func printTotal(w io.Writer, files []*FileInfo) {
 func entryPrefix(fi *FileInfo, opts FormatOpts) string {
 	var b strings.Builder
 	if opts.Inode {
-		if opts.Dereference && fi.LinkBroken {
-			b.WriteString("? ")
-		} else {
-			b.WriteString(strconv.FormatUint(fi.Inode, 10))
-			b.WriteByte(' ')
-		}
+		b.WriteString(inodeCell(fi, opts))
+		b.WriteByte(' ')
 	}
 	if opts.ShowBlocks {
-		if opts.Dereference && fi.LinkBroken {
-			b.WriteString("? ")
-		} else {
-			b.WriteString(strconv.FormatInt(fi.Blocks/2, 10))
-			b.WriteByte(' ')
-		}
+		b.WriteString(blocksCell(fi, opts))
+		b.WriteByte(' ')
 	}
 	return b.String()
 }
@@ -539,15 +531,15 @@ func FormatModeString(mode os.FileMode) string {
 }
 
 func inodeCell(fi *FileInfo, opts FormatOpts) string {
-	if opts.Dereference && fi.LinkBroken {
-		return "?"
+	if opts.Dereference && fi.LinkBroken || fi.lacks(FieldInode) {
+		return unavailable
 	}
 	return strconv.FormatUint(fi.Inode, 10)
 }
 
 func blocksCell(fi *FileInfo, opts FormatOpts) string {
-	if opts.Dereference && fi.LinkBroken {
-		return "?"
+	if opts.Dereference && fi.LinkBroken || fi.lacks(FieldBlocks) {
+		return unavailable
 	}
 	return strconv.FormatInt(fi.Blocks/2, 10)
 }
@@ -561,19 +553,18 @@ func fileRow(fi *FileInfo, opts FormatOpts) []string {
 		cols = append(cols, blocksCell(fi, opts))
 	}
 	cols = append(cols, FormatModeString(fi.Mode))
-	cols = append(cols, strconv.FormatUint(fi.Nlink, 10))
+	cols = append(cols, nlinkCell(fi))
 	if opts.NumericUID {
-		cols = append(cols, strconv.FormatUint(uint64(fi.UID), 10))
-		cols = append(cols, strconv.FormatUint(uint64(fi.GID), 10))
+		cols = append(cols, uidCell(fi), gidCell(fi))
 	} else {
 		// -o: omit group, show owner
 		// -g: omit owner, show group
 		// -og: omit both
 		if !opts.HideGroup {
-			cols = append(cols, fi.Owner)
+			cols = append(cols, ownerCell(fi))
 		}
 		if !opts.HideOwner {
-			cols = append(cols, fi.Group)
+			cols = append(cols, groupCell(fi))
 		}
 	}
 	if opts.HumanSize {
@@ -603,19 +594,18 @@ func fileRowPlain(fi *FileInfo, opts FormatOpts) []string {
 		cols = append(cols, blocksCell(fi, opts))
 	}
 	cols = append(cols, FormatModeString(fi.Mode))
-	cols = append(cols, strconv.FormatUint(fi.Nlink, 10))
+	cols = append(cols, nlinkCell(fi))
 	if opts.NumericUID {
-		cols = append(cols, strconv.FormatUint(uint64(fi.UID), 10))
-		cols = append(cols, strconv.FormatUint(uint64(fi.GID), 10))
+		cols = append(cols, uidCell(fi), gidCell(fi))
 	} else {
 		// -o: omit group, show owner
 		// -g: omit owner, show group
 		// -og: omit both
 		if !opts.HideGroup {
-			cols = append(cols, fi.Owner)
+			cols = append(cols, ownerCell(fi))
 		}
 		if !opts.HideOwner {
-			cols = append(cols, fi.Group)
+			cols = append(cols, groupCell(fi))
 		}
 	}
 	if opts.HumanSize {
