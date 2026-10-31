@@ -79,12 +79,23 @@ Standalone timeout now participates in the F05 signal bridge. SIGINT/SIGTERM can
 
 The unused legacy `internal/launcher.Command`, `Run`, and host-shell `UserShell` fallback are removed; its UI completion message remains. No dependency, registry, utility-help list or new builtin is added. The launcher is pure Go and supports Unix/Android CGO=0; non-Unix process launching is an explicit unsupported stub, and the broader builtins package remains non-Windows-portable at baseline.
 
+## U07 — find action execution
+
+`find -exec` and `-execdir` pass argv without a shell through the F06 `Context.Exec`
+capability and builtin-first launcher. With nil `Exec`, the F06 helper dispatches builtins
+and `commandexec` launches external commands. `-execdir` passes `./name` and an invocation-local
+`Dir`, never changing the process cwd. For external bare-name lookup it rejects empty or
+relative PATH entries; builtins are resolved first and explicit external paths are independent
+of PATH. The action uses invocation-local environment and streams, adds no dependency, and
+does not mutate parent runtime state. See `builtins.md` for batching, deletion and traversal
+security boundaries.
+
 ## Boundaries and follow-up
 
 The `xargs` U08 wrapper uses builtin-first invocation through the shared launcher, with these deliberately bounded semantics: empty stdin runs once unless `-r` is given; executions are serial; child stdin is empty; command arguments are passed directly (never through a shell); and the default argument budget is 128 KiB minus the environment size. `-p` and `-o` are unsupported, and `-P` accepts only `1`. The integer executor cannot distinguish a child exiting 126, 127 or 128+ from a launch failure or signal; a future structured launcher result should resolve this ambiguity. This is not full xargs parity.
 
 - **S15/S17:** Adopt the child-effect request in the persistent shell worker and job/pipeline supervisor. Shell creation-mask state, mutation, redirections and resource/credential operations are not implemented by F04; S15 owns `umask`/`ulimit`.
 - **F05 limitations:** Opening a named FIFO or other blocking filesystem metadata/open operations may block before a cancellable stream exists. Recursive diff checks cancellation on each comparison, but not while iterating a directory itself; finite CPU-bound sort/diff/fmt work and a single large formatting operation are not comprehensively interruptible. Do not classify these commands as universally safe in-process solely because their stream paths cooperate. Future worker/capability isolation (S05) remains necessary.
-- **F07/U44:** The explicitly requested `sort` external compressor path remains unchanged: migrating that two-way streaming subprocess API is outside this env/nice/timeout slice. Future wrappers (`find -exec` U07, U29) can consume the neutral launcher; shell ENOEXEC fallback remains S12. No TODO(F06) markers remain in migrated wrapper code.
+- **F07/U44:** The explicitly requested `sort` external compressor path remains unchanged: migrating that two-way streaming subprocess API is outside this env/nice/timeout slice. Future wrappers (`find -exec` U07, `xargs` U08, U29) can consume the neutral launcher; shell ENOEXEC fallback remains S12. No TODO(F06) markers remain in migrated wrapper code.
 
 - **Vi follow-up:** The registered `vi` builtin passes the invocation environment to its shell commands, but the terminal still uses process streams. Shell working directories depend on the edited filename (or process cwd), not consistently on the invocation directory. Cancellation is not propagated. These need a separate design without changing the UI frontend inadvertently.
