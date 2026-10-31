@@ -94,10 +94,11 @@ type Editor struct {
 	opCount      int
 	opCountGiven bool
 
-	lastRepeat  func(e *Editor)
-	insertBuf   strings.Builder
-	insertEntry string
-	insertCount int
+	lastRepeat   func(e *Editor)
+	insertBuf    strings.Builder
+	insertEntry  string
+	insertCount  int
+	replaceCount int
 
 	searchPat string
 	searchDir int
@@ -908,7 +909,7 @@ func (e *Editor) searchForward(pat string) bool {
 	}
 	line := e.currentLine()
 	runes := e.lineRunes(e.row)
-	startByte := len(string(runes[:e.col+1]))
+	startByte := len(string(runes[:min(e.col+1, len(runes))]))
 	if startByte < len(line) {
 		if idx := e.indexOf(line[startByte:], pat); idx >= 0 {
 			e.col = byteToRuneIdx(line, startByte+idx)
@@ -1037,6 +1038,9 @@ func (e *Editor) matchBracket() bool {
 
 func (e *Editor) findChar(ch rune, cmd byte, count int) bool {
 	runes := e.lineRunes(e.row)
+	if count > len(runes) {
+		return false
+	}
 	col := e.col
 	for i := 0; i < count; i++ {
 		switch cmd {
@@ -1184,7 +1188,7 @@ func (e *Editor) handleInsert(msg tea.KeyPressMsg) tea.Cmd {
 		text := e.insertBuf.String()
 		e.insertBuf.Reset()
 		entry := e.insertEntry
-		cnt := e.insertCount
+		cnt := min(e.insertCount, maxContentRepeats)
 		if cnt > 1 {
 			for i := 1; i < cnt; i++ {
 				e.replayInsert(entry, text)
@@ -1390,34 +1394,6 @@ func (e *Editor) replayReplace(text string) {
 	e.clampCursor()
 }
 
-func (e *Editor) handleReplaceChar(msg tea.KeyPressMsg) tea.Cmd {
-	key := typedKey(msg)
-	if key == "esc" || key == "ctrl+[" {
-		e.mode = ModeNormal
-		return nil
-	}
-	runes := []rune(key)
-	if len(runes) == 1 {
-		ch := runes[0]
-		lr := e.lineRunes(e.row)
-		if e.col < len(lr) {
-			e.saveUndo()
-			lr[e.col] = ch
-			e.setLine(e.row, string(lr))
-			e.lastRepeat = func(ed *Editor) {
-				r := ed.lineRunes(ed.row)
-				if ed.col < len(r) {
-					ed.saveUndo()
-					r[ed.col] = ch
-					ed.setLine(ed.row, string(r))
-				}
-			}
-		}
-	}
-	e.mode = ModeNormal
-	return nil
-}
-
 // --- Command Mode ---
 
 func (e *Editor) handleCommand(msg tea.KeyPressMsg) tea.Cmd {
@@ -1494,6 +1470,10 @@ type motionResult struct {
 }
 
 func (e *Editor) motionDest(key string, count int, countGiven bool) (motionResult, bool) {
+	switch key {
+	case "w", "b", "e", "{", "}", "(", ")":
+		count = e.motionLimit(count)
+	}
 	switch key {
 	case "h", "left":
 		c := e.col - count
