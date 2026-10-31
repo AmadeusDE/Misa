@@ -248,8 +248,9 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 	}
 
 	// A null move can invent or hide an immediate explosion threat, and it is
-	// no shortcut where captures are compulsory or the side has no royal left.
-	if e.v.Explosion == nil && allowNull && !e.v.ForcedCapture && !e.v.InverseMaterial && len(p.royalSq[p.Turn]) > 0 && !inCheck && depth >= 3 && beta < mateScore-maxPly && e.hasPieces(p) {
+	// no shortcut where captures are compulsory, material is inverted, the side
+	// has no royal left, or a pocket can change the position without a move.
+	if allowNull && e.v.Explosion == nil && !e.v.ForcedCapture && !e.v.InverseMaterial && !e.v.Drops && len(p.royalSq[p.Turn]) > 0 && !inCheck && depth >= 3 && beta < mateScore-maxPly && e.hasPieces(p) {
 		r := 2
 		if depth >= 6 {
 			r = 3
@@ -420,9 +421,10 @@ func (e *Engine) expired() bool {
 }
 
 // repeated reports whether the position already occurred since the last
-// capture or pawn move, in the game or the line searched.
+// irreversible move, in the game or the line searched. In drop variants even
+// captures and pawn moves can be reversed through pockets, so scan all history.
 func (e *Engine) repeated(hash uint64, clock int) bool {
-	for i := len(e.path) - 1; i >= 0 && i >= len(e.path)-clock; i-- {
+	for i := len(e.path) - 1; i >= 0 && (e.v.Drops || i >= len(e.path)-clock); i-- {
 		if e.path[i] == hash {
 			return true
 		}
@@ -431,6 +433,11 @@ func (e *Engine) repeated(hash uint64, clock int) bool {
 }
 
 func (e *Engine) hasPieces(p *Position) bool {
+	for typ, count := range p.Hands[p.Turn] {
+		if typ > 0 && count > 0 && !e.v.Pieces[typ-1].Royal && !e.v.Pieces[typ-1].Pawn {
+			return true
+		}
+	}
 	for _, pc := range p.Board {
 		if pc.Type != 0 && pc.Color == p.Turn {
 			if t := e.v.Pieces[pc.Type-1]; !t.Royal && !t.Pawn {
@@ -462,7 +469,7 @@ func (e *Engine) order(p *Position, moves []Move, first Move, ply int) []Move {
 		case mv == first:
 			s = 1 << 30
 		case mv.Take >= 0 || mv.Promote != 0:
-			s = 1<<24 + 16*e.victimValue(p, mv) - e.v.Pieces[p.Board[mv.From].Type-1].Value/16
+			s = 1<<24 + 16*e.victimValue(p, mv) - e.v.Pieces[e.movingType(p, mv)-1].Value/16
 			if mv.Promote != 0 {
 				s += e.v.Pieces[mv.Promote-1].Value
 			}
@@ -487,8 +494,17 @@ func (e *Engine) victimValue(p *Position, mv Move) int {
 		return 0
 	}
 	if e.v.Explosion == nil {
-		value := e.v.Pieces[p.Board[mv.Take].Type-1].Value
-		if p.Board[mv.Take].Color == p.Turn { // a self-capture loses material
+		victim := p.Board[mv.Take]
+		value := e.v.Pieces[victim.Type-1].Value
+		if e.v.Drops {
+			// The taken piece joins the mover's pocket, at pocket value.
+			typ := victim.Type
+			if victim.Promoted != 0 {
+				typ = victim.Promoted
+			}
+			value += pocketValue(e.v.Pieces[typ-1].Value)
+		}
+		if victim.Color == p.Turn { // a self-capture loses material
 			return -value
 		}
 		return value
@@ -506,6 +522,13 @@ func (e *Engine) victimValue(p *Position, mv Move) int {
 			(max(abs(sx-x), abs(sy-y)) <= e.v.Explosion.Radius && !slices.Contains(e.v.Explosion.Immune, pc.Type))
 		if removed {
 			v := e.v.Pieces[pc.Type-1].Value
+			if sq == mv.Take && e.v.Drops {
+				typ := pc.Type
+				if pc.Promoted != 0 {
+					typ = pc.Promoted
+				}
+				v += pocketValue(e.v.Pieces[typ-1].Value)
+			}
 			if pc.Color == p.Turn {
 				value -= v
 			} else {
@@ -521,8 +544,16 @@ func (e *Engine) victimValue(p *Position, mv Move) int {
 	return value
 }
 
+// movingType is the piece type a move moves or drops, for the ordering tables.
+func (e *Engine) movingType(p *Position, mv Move) uint8 {
+	if mv.Drop != 0 {
+		return mv.Drop
+	}
+	return p.Board[mv.From].Type
+}
+
 func (e *Engine) historyIndex(p *Position, mv Move) int {
-	return mv.To*(len(e.v.Pieces)+1) + int(p.Board[mv.From].Type)
+	return mv.To*(len(e.v.Pieces)+1) + int(e.movingType(p, mv))
 }
 
 func (e *Engine) isKiller(mv Move, ply int) bool {

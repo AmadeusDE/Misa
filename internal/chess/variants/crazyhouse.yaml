@@ -1,0 +1,11 @@
+id: crazyhouse
+name: Crazyhouse
+description: Captured pieces change sides and can be dropped back onto the board.
+extends: chess
+drops: true
+pieces:
+  - {letter: Q, name: Queen, betza: Q, glyph: ♛, value: 900, demote: P}
+  - {letter: R, name: Rook, betza: R, glyph: ♜, value: 500, demote: P}
+  - {letter: B, name: Bishop, betza: B, glyph: ♝, value: 330, demote: P}
+  - {letter: N, name: Knight, betza: N, glyph: ♞, value: 310, demote: P}
+  - {letter: P, name: Pawn, betza: fmWfcFifmW2, pawn: true, glyph: ♟, value: 100, drop_forbid_ranks: [1, 8]}

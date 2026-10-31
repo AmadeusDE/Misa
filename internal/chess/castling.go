@@ -1,7 +1,6 @@
 package chess
 
 import (
-	"fmt"
 	"strings"
 	"unicode"
 )
@@ -96,76 +95,4 @@ func (p *Position) updateCastleRights(m Move) {
 			}
 		}
 	}
-}
-
-// FEN serializes the board, side, castling rights, en passant, halfmove clock
-// and, for a variant that counts them, the checks each side has given.
-// FEN cannot encode arbitrary fairy-piece moved flags or multiple en-passant squares.
-func (p *Position) FEN() string {
-	var b strings.Builder
-	for y := p.V.Ranks - 1; y >= 0; y-- {
-		if y != p.V.Ranks-1 {
-			b.WriteByte('/')
-		}
-		empty := 0
-		for x := 0; x < p.V.Files; x++ {
-			pc := p.Board[p.V.Square(x, y)]
-			if pc.Type == 0 {
-				empty++
-				continue
-			}
-			if empty > 0 {
-				fmt.Fprint(&b, empty)
-				empty = 0
-			}
-			ch := rune(p.V.Pieces[pc.Type-1].Letter)
-			if pc.Color == Black {
-				ch = unicode.ToLower(ch)
-			}
-			b.WriteRune(ch)
-		}
-		if empty > 0 {
-			fmt.Fprint(&b, empty)
-		}
-	}
-	if p.Turn == White {
-		b.WriteString(" w ")
-	} else {
-		b.WriteString(" b ")
-	}
-	n := 0
-	for color := White; color <= Black; color++ {
-		for _, r := range p.castling[color] {
-			if !r.active {
-				continue
-			}
-			c := r.castle
-			ch := 'Q'
-			if c.Rook%p.V.Files > c.King%p.V.Files {
-				ch = 'K'
-			}
-			if c.RookSide != "" {
-				ch = rune('A' + c.Rook%p.V.Files)
-			}
-			if color == Black {
-				ch = unicode.ToLower(ch)
-			}
-			b.WriteRune(ch)
-			n++
-		}
-	}
-	if n == 0 {
-		b.WriteByte('-')
-	}
-	b.WriteByte(' ')
-	if len(p.EP) > 0 && p.EPPawn >= 0 {
-		b.WriteString(p.V.SquareName(p.EP[0]))
-	} else {
-		b.WriteByte('-')
-	}
-	fmt.Fprintf(&b, " %d 1", p.Clock)
-	if p.V.CheckLimit > 0 {
-		fmt.Fprintf(&b, " +%d+%d", p.Checks[White], p.Checks[Black])
-	}
-	return b.String()
 }

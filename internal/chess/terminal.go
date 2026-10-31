@@ -129,7 +129,7 @@ func (p *Position) goalOutcome() (outcome, bool) {
 // of its royals on a goal square.
 func (p *Position) canReachGoal() bool {
 	for _, m := range p.Moves() {
-		if p.V.Type(p.Board[m.From]).Royal && slices.Contains(p.V.Goal, m.To) {
+		if m.Drop == 0 && p.V.Type(p.Board[m.From]).Royal && slices.Contains(p.V.Goal, m.To) {
 			return true
 		}
 	}

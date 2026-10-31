@@ -40,8 +40,9 @@ func newZobrist(v *Variant) zobrist {
 
 // Hash identifies the position for repetition and the search's table: the
 // pieces, the side to move, en passant chances, the checks each side has given
-// when the variant counts them, and the moved flags that can still matter
-// (castling, first-move-only moves).
+// when the variant counts them, the moved flags that can still matter
+// (castling, first-move-only moves), and - for a drop variant - the pockets and
+// the promotions a captured piece would revert through.
 func (p *Position) Hash() uint64 {
 	v := p.V
 	z := &v.zobrist
@@ -72,6 +73,20 @@ func (p *Position) Hash() uint64 {
 			}
 		}
 	}
+	if v.Drops {
+		for sq, pc := range p.Board {
+			if pc.Type != 0 && pc.Promoted != 0 {
+				h ^= hashDropKey(uint64(sq)<<8 | uint64(pc.Promoted) | 1<<63)
+			}
+		}
+		for color, hand := range p.Hands {
+			for typ, count := range hand {
+				if typ > 0 && count > 0 {
+					h ^= hashDropKey(uint64(count) ^ uint64(typ)<<48 ^ uint64(color)<<56)
+				}
+			}
+		}
+	}
 	if p.Turn == Black {
 		h ^= z.black
 	}
@@ -89,4 +104,13 @@ func (p *Position) Hash() uint64 {
 
 func (p *Position) dynamicCastling() bool {
 	return slices.ContainsFunc(p.V.Castling, func(c Castle) bool { return c.RookSide != "" })
+}
+
+// hashDropKey mixes arbitrary hand counts without a fixed-size key table.
+// SplitMix64 is enough here: keys are mixed into the position hash, not stored.
+func hashDropKey(x uint64) uint64 {
+	x += 0x9e3779b97f4a7c15
+	x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9
+	x = (x ^ (x >> 27)) * 0x94d049bb133111eb
+	return x ^ (x >> 31)
 }
