@@ -128,17 +128,17 @@ func subtractPreserve(base, minus preserveAttrs) preserveAttrs {
 
 // Backup control styles, resolved from --backup[=CONTROL] / -b / VERSION_CONTROL.
 
-func backupSuffix(flags *ParseResult) string {
+func backupSuffix(ctx *Context, flags *ParseResult) string {
 	if s, ok := flags.String("suffix"); ok && s != "" {
 		return s
 	}
-	if s := os.Getenv("SIMPLE_BACKUP_SUFFIX"); s != "" {
+	if s := ctx.Getenv("SIMPLE_BACKUP_SUFFIX"); s != "" {
 		return s
 	}
 	return "~"
 }
 
-func backupControl(flags *ParseResult) (control string, given bool, err error) {
+func backupControl(ctx *Context, flags *ParseResult) (control string, given bool, err error) {
 	longVal, longGiven := flags.String("backup")
 	given = flags.Bool("b") || longGiven
 	if !given {
@@ -146,7 +146,7 @@ func backupControl(flags *ParseResult) (control string, given bool, err error) {
 	}
 	val := longVal
 	if val == "" {
-		val = os.Getenv("VERSION_CONTROL")
+		val = ctx.Getenv("VERSION_CONTROL")
 		if val == "" {
 			val = "existing"
 		}
@@ -345,13 +345,13 @@ func runCp(ctx *Context) int {
 		}
 	}
 
-	backupCtl, backupGiven, backupErr := backupControl(flags)
+	backupCtl, backupGiven, backupErr := backupControl(ctx, flags)
 	if backupErr != nil {
 		fmt.Fprintf(ctx.Stderr, "cp: %s\n", backupErr)
 		return 1
 	}
 	backupActive := backupGiven && backupCtl != "none"
-	suffix := backupSuffix(flags)
+	suffix := backupSuffix(ctx, flags)
 
 	if backupActive && (updateMode == "none" || updateMode == "none-fail") {
 		fmt.Fprintln(ctx.Stderr, "cp: --backup is mutually exclusive with -n or --update=none-fail")

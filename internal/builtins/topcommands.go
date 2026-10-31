@@ -38,8 +38,8 @@ func runTopCommands(ctx *Context) int {
 	onlyMisa := flags.Bool("m")
 	all := flags.Bool("a") || (!onlyBash && !onlyZsh && !onlyMisa)
 
-	home, err := os.UserHomeDir()
-	if err != nil {
+	home := ctx.Getenv("HOME")
+	if home == "" {
 		fmt.Fprintln(ctx.Stderr, "top-commands: cannot determine home directory")
 		return 1
 	}

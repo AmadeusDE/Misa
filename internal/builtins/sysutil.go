@@ -64,7 +64,7 @@ func runWhich(ctx *Context) int {
 				found = true
 			}
 		} else {
-			pathEnv := os.Getenv("PATH")
+			pathEnv := ctx.Getenv("PATH")
 			for _, dir := range filepath.SplitList(pathEnv) {
 				if dir == "" {
 					dir = "."

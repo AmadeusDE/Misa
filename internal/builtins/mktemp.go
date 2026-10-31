@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -54,7 +55,7 @@ func runMktemp(ctx *Context) int {
 		tmpDirVal = resolvePath(ctx, pVal)
 	} else if hasTd && tdVal != "" {
 		tmpDirVal = resolvePath(ctx, tdVal)
-	} else if env, ok := lookupEnv(ctx, "TMPDIR"); ok {
+	} else if env, ok := ctx.LookupEnv("TMPDIR"); ok {
 		if env == "" {
 			if !quiet {
 				fmt.Fprintln(ctx.Stderr, "mktemp: empty directory in TMPDIR")
@@ -63,7 +64,10 @@ func runMktemp(ctx *Context) int {
 		}
 		tmpDirVal = resolvePath(ctx, env)
 	} else {
-		tmpDirVal = os.TempDir()
+		tmpDirVal = "/tmp"
+		if runtime.GOOS == "android" {
+			tmpDirVal = "/data/local/tmp"
+		}
 	}
 
 	template := "tmp.XXXXXXXXXX"
@@ -152,16 +156,7 @@ func runMktemp(ctx *Context) int {
 }
 
 func lookupEnv(ctx *Context, key string) (string, bool) {
-	if ctx.Env != nil {
-		prefix := key + "="
-		for _, e := range ctx.Env {
-			if strings.HasPrefix(e, prefix) {
-				return e[len(prefix):], true
-			}
-		}
-		return "", false
-	}
-	return os.LookupEnv(key)
+	return ctx.LookupEnv(key)
 }
 
 func mktempGenerate(dir, prefix string, xCount int, suffix string, isDir, dryRun bool) (string, error) {

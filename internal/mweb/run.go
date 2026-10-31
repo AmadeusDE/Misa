@@ -21,6 +21,7 @@ const title = "misa"
 
 // Run serves the web UI until interrupted; args are the flags after --web.
 func Run(args []string, stderr io.Writer) int {
+	// Run is a process-level CLI entrypoint, not a builtin invocation.
 	if os.Getenv(ChildEnv) != "" {
 		fmt.Fprintln(stderr, "misa: --web refused inside a web terminal")
 		return 1
@@ -75,13 +76,17 @@ func mount(srv *webui.Server, argv []string) {
 }
 
 func openStore() (*webui.FileStore, error) {
-	if err := securePrivateDir(ConfigDir()); err != nil {
+	return openStoreAt(StateDir(), ConfigDir())
+}
+
+func openStoreAt(stateDir, configDir string) (*webui.FileStore, error) {
+	if err := securePrivateDir(configDir); err != nil {
 		return nil, err
 	}
-	if err := securePrivateDir(StateDir()); err != nil {
+	if err := securePrivateDir(stateDir); err != nil {
 		return nil, err
 	}
-	return webui.NewFileStore(StateDir())
+	return webui.NewFileStore(stateDir)
 }
 
 func totpConfigured(store webui.DeviceStore) bool {
