@@ -3,14 +3,10 @@ package term
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 	"unicode/utf8"
-
-	"github.com/creack/pty"
 )
 
 type ColorKind byte
@@ -118,21 +114,19 @@ type Terminal struct {
 	synced      bool
 	syncGen     uint64 // bumped per frame, so a stale timeout does nothing
 
-	ptm        *os.File
-	cmd        *exec.Cmd
-	sid        int      // the PTY's session, checked at start (0: unknown)
-	fnDone     chan int // exit code of a StartFunc session
-	fnAbort    atomic.Bool
-	procStatus chan int // exit status of a StartArgv process
-	stopped    atomic.Bool
-	input      inputQueue
-	frameMu    sync.Mutex
-	nextFrame  time.Time
-	exitCode   atomic.Int64
-	done       atomic.Bool
-	waitOnce   sync.Once
-	exited     chan struct{}
-	dirty      chan struct{}
+	conn      conn     // the program's terminal, nil until a Start call
+	proc      proc     // the started process, nil for StartFunc sessions
+	fnDone    chan int // exit code of a StartFunc session
+	fnAbort   atomic.Bool
+	stopped   atomic.Bool
+	input     inputQueue
+	frameMu   sync.Mutex
+	nextFrame time.Time
+	exitCode  atomic.Int64
+	done      atomic.Bool
+	waitOnce  sync.Once
+	exited    chan struct{}
+	dirty     chan struct{}
 }
 
 const (
@@ -185,41 +179,35 @@ func (t *Terminal) StartArgv(dir string, argv ...string) error {
 	if len(argv) == 0 {
 		return fmt.Errorf("empty command")
 	}
-	cmd := exec.Command(argv[0], argv[1:]...)
-	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
-
-	f, err := pty.StartWithSize(cmd, &pty.Winsize{
-		Rows: uint16(t.Rows),
-		Cols: uint16(t.Cols),
+	c, p, err := startProcess(startSpec{
+		Argv: argv,
+		Dir:  dir,
+		Env:  append(os.Environ(), "TERM=xterm-256color"),
+		Rows: t.Rows,
+		Cols: t.Cols,
+		OnStop: func() {
+			t.stopped.Store(true)
+			t.markDirty()
+		},
 	})
 	if err != nil {
 		return err
 	}
-	t.cmd = cmd
-	if t.ptm, err = pollable(f); err != nil {
-		t.ptm = f
-	}
-	t.sid = t.session()
-	t.procStatus = make(chan int, 1)
-	go t.waitProcess(cmd.Process.Pid)
+	t.conn, t.proc = c, p
 	return nil
 }
 
 // StartFunc runs fn as the session's program on a goroutine of this process.
 // fn gets the PTY's terminal side as stdin/stdout, so it sees a real tty.
 // Interrupt abandons it: the session ends at once with status 130 while fn
-// finishes in the background with its terminal gone.
+// finishes in the background with its terminal gone. Platforms without PTYs
+// return ErrUnsupported; callers run the builtin as a multicall process.
 func (t *Terminal) StartFunc(fn func(tty *os.File) int) error {
-	ptm, tty, err := pty.Open()
+	c, tty, err := openFuncTTY(t.Rows, t.Cols)
 	if err != nil {
 		return err
 	}
-	pty.Setsize(ptm, &pty.Winsize{Rows: uint16(t.Rows), Cols: uint16(t.Cols)})
-	if t.ptm, err = pollable(ptm); err != nil {
-		tty.Close()
-		return err
-	}
+	t.conn = c
 	t.fnDone = make(chan int, 1)
 	go func() {
 		t.fnDone <- fn(tty)
@@ -246,11 +234,11 @@ func (t *Terminal) Interrupt() bool {
 // child. Dirty is signalled (coalesced) after screen-changing output and once
 // more when the child has exited and its final output has been applied.
 func (t *Terminal) StartReader() {
-	ptm := t.ptm
+	c := t.conn
 	go func() {
 		buf := make([]byte, 32*1024)
 		for {
-			n, err := ptm.Read(buf)
+			n, err := c.Read(buf)
 			if n > 0 && t.processChunk(buf[:n]) {
 				t.markDirty()
 			}
@@ -304,27 +292,11 @@ func (t *Terminal) reap() {
 			t.finish(code)
 			return
 		}
-		if t.cmd == nil {
+		if t.proc == nil {
 			return
 		}
-		t.finish(<-t.procStatus)
+		t.finish(<-t.proc.Status())
 	})
-}
-
-// ExitStatus is a process's status the way a shell reports it: 128+signal for
-// a process killed by a signal.
-func ExitStatus(err error) int {
-	ee, ok := err.(*exec.ExitError)
-	switch {
-	case err == nil:
-		return 0
-	case !ok:
-		return 1
-	}
-	if ws, ok := ee.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
-		return 128 + int(ws.Signal())
-	}
-	return ee.ExitCode()
 }
 
 func (t *Terminal) InAltScreen() bool {
@@ -335,7 +307,7 @@ func (t *Terminal) InAltScreen() bool {
 
 // SendBytes queues data for the program's stdin without waiting for it.
 func (t *Terminal) SendBytes(data []byte) {
-	if t.ptm != nil {
+	if t.conn != nil {
 		t.enqueue(data)
 	}
 }
@@ -366,8 +338,8 @@ func (t *Terminal) Resize(rows, cols int) {
 	t.curRow, t.curCol = t.clampPos(t.curRow, t.curCol)
 	t.saved.row, t.saved.col = t.clampPos(t.saved.row, t.saved.col)
 	t.mu.Unlock()
-	if t.ptm != nil {
-		setWinsize(t.ptm, rows, cols)
+	if t.conn != nil {
+		t.conn.Resize(rows, cols)
 	}
 }
 
@@ -419,11 +391,11 @@ func copyGrid(dst, src [][]Cell, dr, dc, sr, sc int) {
 }
 
 func (t *Terminal) Close() {
-	if t.cmd != nil && t.cmd.Process != nil {
-		t.killSession()
+	if t.proc != nil {
+		t.proc.Kill()
 	}
-	if t.ptm != nil {
-		t.ptm.Close()
+	if t.conn != nil {
+		t.conn.Close()
 	}
 	t.reap()
 }

@@ -73,7 +73,7 @@ func TestQueuedRepliesAreBounded(t *testing.T) {
 	defer r.Close()
 	defer w.Close()
 	tm := New(4, 10)
-	tm.ptm = w // nobody reads r: the pipe fills and the writer blocks
+	tm.conn = writeConn{w} // nobody reads r: the pipe fills and the writer blocks
 	query := []byte(strings.Repeat("\x1b[6n", 1000))
 	for i := 0; i < 2000; i++ {
 		tm.ProcessOutput(query)
