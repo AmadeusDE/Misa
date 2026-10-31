@@ -18,11 +18,15 @@ type Process struct {
 	cmd    *exec.Cmd
 	owned  bool
 	done   chan struct{}
-	status int
+	result Result
 }
 
 func (p *Process) Done() <-chan struct{} { return p.done }
-func (p *Process) Wait() int             { <-p.done; return p.status }
+func (p *Process) Wait() int             { return p.WaitResult().Status }
+
+// WaitResult waits for the process and returns its status and termination cause.
+// Like Wait, it may be called repeatedly or concurrently.
+func (p *Process) WaitResult() Result { <-p.done; return p.result }
 func (p *Process) Signal(sig os.Signal, group bool) error {
 	select {
 	case <-p.done:
@@ -239,10 +243,15 @@ func Start(ctx context.Context, name string, inv Invocation, opt Options) (*Proc
 		for _, d := range outputs {
 			<-d
 		}
+		if state := cmd.ProcessState; state != nil {
+			if status, ok := state.Sys().(syscall.WaitStatus); ok {
+				p.result.Signaled = status.Signaled()
+			}
+		}
 		if ctx.Err() != nil {
-			p.status = ContextStatus(ctx.Err())
+			p.result.Status = ContextStatus(ctx.Err())
 		} else {
-			p.status = ExitStatus(e)
+			p.result.Status = ExitStatus(e)
 		}
 	}()
 	return p, nil

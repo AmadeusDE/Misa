@@ -6,9 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/AmadeusDE/Misa/internal/commandexec"
-	"github.com/AmadeusDE/Misa/internal/proceffect"
 )
 
 func init() { Register(Command{Name: "xargs", Run: runXargs}) }
@@ -18,11 +15,11 @@ type xargsOptions struct {
 	eof, replace, input             string
 	info                            string
 	replacing, noEmpty, trace, exit bool
-	n, lines, size                  int
+	n, lines, size, procs           int
 }
 
 func parseXargs(args []string) (xargsOptions, []string, error) {
-	var o xargsOptions
+	o := xargsOptions{procs: 1}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "--" {
@@ -97,10 +94,7 @@ func parseXargs(args []string) (xargsOptions, []string, error) {
 					o.input = v
 				case 'n', 'L', 's', 'P':
 					n, err := strconv.Atoi(v)
-					if c == 'P' && (err != nil || n != 1) {
-						return o, nil, fmt.Errorf("-P %s is unsupported (parallel execution is deferred to U09)", v)
-					}
-					if err != nil || n <= 0 {
+					if err != nil || n < 0 || (n == 0 && c != 'P') {
 						return o, nil, fmt.Errorf("invalid value for -%c: %s", c, v)
 					}
 					switch c {
@@ -115,8 +109,9 @@ func parseXargs(args []string) (xargsOptions, []string, error) {
 					case 's':
 						o.size = n
 					case 'P':
-						if n != 1 {
-							return o, nil, fmt.Errorf("parallel execution is unsupported")
+						o.procs = n
+						if n == 0 {
+							o.procs = 256
 						}
 					}
 				}
@@ -175,6 +170,7 @@ func runXargs(ctx *Context) int {
 	}
 	if o.info == "help" {
 		fmt.Fprintln(ctx.Stdout, "Usage: xargs [OPTION]... [COMMAND [INITIAL-ARGS]...]")
+		fmt.Fprintln(ctx.Stdout, "  -P N  Run at most N commands concurrently (default 1; 0 uses a cap of 256)")
 		return 0
 	}
 	if o.info == "version" {
@@ -196,7 +192,7 @@ func runXargs(ctx *Context) int {
 		base += len(a) + 1
 	}
 	if base > budget {
-		fmt.Fprintln(ctx.Stderr, "xargs: command line too long")
+		fmt.Fprintln(ctx.Stderr, "xargs: argument list too long")
 		return 1
 	}
 	r := ctx.Stdin
@@ -209,13 +205,14 @@ func runXargs(ctx *Context) int {
 		defer f.Close()
 		r = f
 	}
-	tokenizer := newXargsTokenizer(ctx.CancellationContext(), ContextReader(ctx.CancellationContext(), r), o.delim, o.eof, o.replacing)
+	scheduler := newXargsScheduler(ctx, argv[0], o.procs)
+	defer scheduler.close()
+	tokenizer := newXargsTokenizer(scheduler.inputCtx, ContextReader(scheduler.inputCtx, r), o.delim, o.eof, o.replacing)
 	var pending *xargsToken
 	done, ran := false, false
-	result := 0
 	for {
-		if ctx.CancellationContext().Err() != nil {
-			return ExitStatus(ctx.CancellationContext().Err())
+		if !scheduler.ready() {
+			return scheduler.finish(0)
 		}
 		childArgs := append([]string(nil), argv[1:]...)
 		size, count, lineCount, lastLine := base, 0, 0, -1
@@ -233,10 +230,13 @@ func runXargs(ctx *Context) int {
 				}
 				if err != nil {
 					if ctx.CancellationContext().Err() != nil {
-						return ExitStatus(ctx.CancellationContext().Err())
+						return scheduler.finish(0)
 					}
-					fmt.Fprintln(ctx.Stderr, "xargs:", err)
-					return 1
+					if scheduler.inputCtx.Err() != nil {
+						return scheduler.finish(0)
+					}
+					fmt.Fprintln(scheduler.stderr, "xargs:", err)
+					return scheduler.finish(1)
 				}
 			}
 			if o.lines > 0 && count > 0 && tok.line != lastLine && lineCount >= o.lines {
@@ -252,8 +252,8 @@ func runXargs(ctx *Context) int {
 					size += len(a) + 1
 				}
 				if size > budget {
-					fmt.Fprintln(ctx.Stderr, "xargs: command line too long")
-					return 1
+					fmt.Fprintln(scheduler.stderr, "xargs: command line too long")
+					return scheduler.finish(1)
 				}
 				count++
 				break
@@ -261,8 +261,8 @@ func runXargs(ctx *Context) int {
 			next := len(tok.text) + 1
 			if size+next > budget {
 				if count == 0 || o.exit {
-					fmt.Fprintln(ctx.Stderr, "xargs: argument list too long")
-					return 1
+					fmt.Fprintln(scheduler.stderr, "xargs: argument list too long")
+					return scheduler.finish(1)
 				}
 				pending = &tok
 				break
@@ -281,15 +281,6 @@ func runXargs(ctx *Context) int {
 		if count == 0 && (ran || o.noEmpty) {
 			break
 		}
-		if o.trace {
-			// Like Toybox, -t prints each word followed by a space.
-			var line strings.Builder
-			for _, w := range append([]string{argv[0]}, childArgs...) {
-				line.WriteString(w)
-				line.WriteByte(' ')
-			}
-			fmt.Fprintln(ctx.Stderr, line.String())
-		}
 		sub := *ctx
 		sub.Args, sub.CmdName = childArgs, argv[0]
 		if o.input == "" {
@@ -297,43 +288,11 @@ func runXargs(ctx *Context) int {
 			// the input comes from the file, so they inherit stdin.
 			sub.Stdin, sub.StdinTTY = strings.NewReader(""), false
 		}
-		status := xargsExec(ctx, argv[0], &sub)
+		scheduler.launch(&sub, o.trace)
 		ran = true
-		if ctx.CancellationContext().Err() != nil {
-			return ExitStatus(ctx.CancellationContext().Err())
-		}
-		switch {
-		case status == 0:
-		case status == 255:
-			fmt.Fprintf(ctx.Stderr, "xargs: %s: exited with status 255; aborting\n", argv[0])
-			return 124
-		case status == 126 || status == 127:
-			return status
-		case status >= 128:
-			return 125
-		default:
-			result = 123
-		}
 		if done {
 			break
 		}
 	}
-	return result
-}
-
-func xargsExec(ctx *Context, name string, sub *Context) int {
-	if ctx.Exec != nil {
-		return ctx.Exec(ctx.CancellationContext(), name, sub)
-	}
-	if !strings.ContainsAny(name, `/\`) {
-		if _, ok := Lookup(name); ok {
-			return proceffect.Run(ctx.CancellationContext(), proceffect.Request{DispatchOnly: true, Argv: append([]string{name}, sub.Args...)}, proceffect.Invocation{Dir: sub.Dir, Env: sub.Env, Stdin: sub.Stdin, Stdout: sub.Stdout, Stderr: sub.Stderr})
-		}
-	}
-	p, err := commandexec.Start(ctx.CancellationContext(), name, commandexec.Invocation{Dir: sub.Dir, Env: sub.Env, Stdin: sub.Stdin, Stdout: sub.Stdout, Stderr: sub.Stderr, Args: sub.Args, Argv0: name}, commandexec.Options{})
-	if err != nil {
-		fmt.Fprintln(ctx.Stderr, "xargs:", err)
-		return commandexec.ErrorStatus(err)
-	}
-	return p.Wait()
+	return scheduler.finish(0)
 }

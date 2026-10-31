@@ -7,6 +7,7 @@ from their own repositories and carry their own licenses (see `go.mod` and `docs
 | Project | Used in | License |
 |---|---|---|
 | [uutils/coreutils](https://github.com/uutils/coreutils) | The Rust test suite and fixtures under `tests/uutils/testdata/` (copied); behaviour of several builtins in `internal/builtins/` (headers say "adapted from uutils coreutils"). | MIT |
+| [uutils/findutils](https://github.com/uutils/findutils) | `find` execution and deletion action semantics (`internal/builtins/`), pinned at d71f3242b0bc3b21bb311f04b23ae62e5f3fed67. | MIT |
 | [uutils/diffutils](https://github.com/uutils/diffutils) | Tests ported in `tests/diffutils/`; `internal/builtins/cmp*.go` and `diff*.go` follow its source. | MIT |
 | [uutils/util-linux](https://github.com/uutils/util-linux) | Behaviour of `cal`, `mcookie`, `uuidgen` in `internal/builtins/`. | MIT |
 | [toybox](https://github.com/landley/toybox) | Test files under `tests/toybox/` (copied); the vi command set (`internal/vi`); behaviour of several builtins. | 0BSD |
@@ -22,6 +23,36 @@ from their own repositories and carry their own licenses (see `go.mod` and `docs
 | [libxkbcommon (xkbcommon-keysyms.h, from X11 keysymdef.h)](https://github.com/xkbcommon/libxkbcommon) | Keysym names and Unicode mappings in `internal/xkb/keysyms.txt`. | MIT/X11 |
 | [Wayland (wayland.xml)](https://gitlab.freedesktop.org/wayland/wayland) | Opcodes and message layouts in `internal/wayland` and `internal/gui` follow the protocol XML. | MIT |
 | [gobox pkg/args](https://github.com/mveety/gobox) | The option parser in `internal/builtins/args.go`. | 0BSD |
+
+---
+
+## uutils/findutils
+
+https://github.com/uutils/findutils
+
+License: MIT. `src/find/matchers/exec.rs`: Copyright 2017 Google Inc.;
+`src/find/matchers/delete.rs`: copyright Arcterus <arcterus@mail.com>.
+
+```
+Copyright (c) Google Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
 
 ---
 

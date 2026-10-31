@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"sort"
+	"time"
 )
 
 // Context is an invocation's state; Run supplies defaults without changing it.
@@ -16,7 +17,10 @@ type Context struct {
 	Stdout  io.Writer
 	Stderr  io.Writer
 	Stdin   io.Reader
-	Env     []string // nil inherits; a non-nil empty slice is deliberately empty.
+
+	// Optional invocation-local services. Nil preserves existing callers.
+	Clock func() time.Time
+	Env   []string // nil inherits; a non-nil empty slice is deliberately empty.
 
 	Ctx                            context.Context
 	StdinTTY, StdoutTTY, StderrTTY bool

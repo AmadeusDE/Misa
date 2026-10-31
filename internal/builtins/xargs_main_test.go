@@ -69,7 +69,6 @@ func TestXargsLimitsAndUnsupported(t *testing.T) {
 		{[]string{"-s", "9", "-x", "c"}, "aa bb cc", nil, 1},
 		{[]string{"-p"}, "x", nil, 1},
 		{[]string{"-o"}, "x", nil, 1},
-		{[]string{"-P2"}, "x", nil, 1},
 	} {
 		t.Run(strings.Join(tc.args, "/"), func(t *testing.T) {
 			var got [][]string
