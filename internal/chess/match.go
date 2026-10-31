@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"math/rand/v2"
 	"strings"
 )
 
@@ -36,8 +37,13 @@ type Match struct {
 }
 
 func NewMatch(v *Variant) *Match {
+	return NewMatchWithRand(v, nil)
+}
+
+// NewMatchWithRand starts a match with an injectable setup RNG.
+func NewMatchWithRand(v *Variant, rng *rand.Rand) *Match {
 	m := &Match{variant: v}
-	m.Load(NewPosition(v))
+	m.Load(NewPositionWithRand(v, rng))
 	return m
 }
 
@@ -169,7 +175,7 @@ func b2i(b bool) byte {
 func describe(p *Position, mv Move) string {
 	v := p.V
 	if mv.Castle >= 0 {
-		c := v.Castling[mv.Castle]
+		c := p.Castle(mv.Castle, p.Turn)
 		if c.Rook%v.Files > c.King%v.Files {
 			return "O-O"
 		}

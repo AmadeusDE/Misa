@@ -322,7 +322,8 @@ internal/
 - **Chess variants**: Every rule lives in variant YAML; the engine has no orthodox-chess special cases. Pieces are
   Betza strings (`fmWfcFifmW2` pawn, `qN` rose, `mRcpR` cannon); `royal` pieces normally may never be left attacked
   (so with two kings, mating either wins), `pawn` pieces promote and take/are taken en passant. A pawn's long first step marks
-  every crossed square for en passant. Castling entries are White's four squares, mirrored for Black. A file with
+  every crossed square for en passant. Castling entries are White's four squares, mirrored for Black, or dynamic
+  entries (`rook_side: left|right` with `rook_piece`) whose origins resolve from the position, as Chess960 needs. A file with
   `extends: <id>` inherits unset fields and merges pieces by letter; `castling: []` drops inherited castling. A later
   file with an existing id replaces it. Built-ins: chess, double (Double Chess 16×12), bigboard (Betza's 16×16),
   doublebig (Double Big Board 32×16), amazon (queen-replacement Amazon Chess), nocastling (orthodox chess without
@@ -338,9 +339,13 @@ internal/
   and `goal_reply_draw` makes White's arrival pending until Black cannot answer on a goal square, which
   draws), antichess (Antichess: `forced_capture: true` makes a legal capture compulsory, `material:
   inverse` reverses material preference, the king is non-royal so it can be captured, and `stalemate: loss`
-  makes the side that cannot move — including one that lost every piece — the winner), and atomic (Atomic
+  makes the side that cannot move — including one that lost every piece — the winner), atomic (Atomic
   Chess: an `explosion: {radius: 1, immune: [P]}` blast takes the capturer, the captured piece and every
-  adjacent non-immune piece of either colour, and `extinction: [K]` makes a side without its king lose).
+  adjacent non-immune piece of either colour, and `extinction: [K]` makes a side without its king lose), and
+  chess960 (Chess960: `NewPositionWithRand`/`NewMatchWithRand` take a seeded source, `shuffle` draws the back
+  rank from every arrangement its `between`/`opposite_color` constraints allow — Scharnagl order, bishops on
+  opposite colours, king between the rooks — mirrored on Black's rank, dynamic castling entries resolve their
+  origins per position, and `Position.FEN()` writes Shredder-FEN rook-file rights).
   `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
   and the search both honour it. `promotion_optional: true` lets a pawn stay a pawn inside `promotion_zone` (but
   not on the last rank, where promotion is forced); `promotion_captured_only: true` restricts the choices to

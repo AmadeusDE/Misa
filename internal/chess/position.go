@@ -2,6 +2,7 @@ package chess
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"slices"
 	"strconv"
 	"strings"
@@ -53,22 +54,34 @@ type Position struct {
 	Clock  int    // plies since the last capture or pawn move
 	Checks [2]int // checks each side has given, for a variant with a CheckLimit
 
-	royalSq [2][]int // kept by Apply so check tests need not scan the board
+	castling [2][]resolvedCastle
+	royalSq  [2][]int // kept by Apply so check tests need not scan the board
 }
 
-func NewPosition(v *Variant) *Position {
-	p := &Position{V: v, Board: slices.Clone(v.start), EPPawn: -1}
+func NewPosition(v *Variant) *Position { return NewPositionWithRand(v, nil) }
+
+// NewPositionWithRand constructs a position using rng for randomized setups.
+func NewPositionWithRand(v *Variant, rng *rand.Rand) *Position {
+	var board []Piece
+	if rng == nil {
+		board = v.shuffledStart(nil)
+	} else {
+		board = v.shuffledStart(rng)
+	}
+	p := &Position{V: v, Board: board, EPPawn: -1}
 	p.findRoyals()
+	p.resolveCastles("")
 	return p
 }
 
-// ParseFEN reads "placement [w|b] [castling] [checks]", where a variant with a
-// CheckLimit also takes a checks field anywhere after the side to move: "+2+1"
-// counts the checks White and Black have already given, and Lichess's "1+2"
-// gives the checks each side has left. Pieces on their setup squares count as
-// unmoved. The castling field, when given, takes rights away: "-" all of
-// them, otherwise each castle whose letter (K when the rook is on the king's
-// right, Q on its left; lower case for Black) is missing.
+// ParseFEN reads "placement [w|b] [castling] [ep] [halfmove] [checks]", where
+// a variant with a CheckLimit also takes a checks field anywhere after the side
+// to move: "+2+1" counts the checks White and Black have already given, and
+// Lichess's "1+2" gives the checks each side has left. Pieces on setup squares
+// count as unmoved. Explicit castling rights select eligible origins: K/Q for
+// the right/left rook, or a Shredder-FEN file letter for a dynamic entry (lower
+// case for Black); when the field is given it takes rights away: "-" all of
+// them, otherwise each castle whose letter is missing.
 func ParseFEN(v *Variant, fen string) (*Position, error) {
 	fields := strings.Fields(fen)
 	if len(fields) == 0 {
@@ -92,19 +105,22 @@ func ParseFEN(v *Variant, fen string) (*Position, error) {
 			return nil, fmt.Errorf("side to move %q is not w or b", fields[1])
 		}
 	}
+	p.findRoyals()
+	rights := ""
 	if len(fields) > 2 {
-		for _, color := range []Color{White, Black} {
-			for _, c := range v.Castling {
-				letter := "Q"
-				if c.Rook%v.Files > c.King%v.Files {
-					letter = "K"
+		rights = fields[2]
+	}
+	p.resolveCastles(rights)
+	if len(fields) > 3 && fields[3] != "-" {
+		// FEN records one crossed square; infer the pawn from the side to move.
+		for sq := range board {
+			if v.SquareName(sq) == fields[3] {
+				pawn := sq - p.Turn.forward()*v.Files
+				if pawn >= 0 && pawn < len(board) && board[pawn].Type != 0 && board[pawn].Color != p.Turn && v.Type(board[pawn]).Pawn {
+					p.EP = []int{sq}
+					p.EPPawn = pawn
 				}
-				if color == Black {
-					letter = strings.ToLower(letter)
-				}
-				if !strings.Contains(fields[2], letter) {
-					board[v.orient(c.Rook, color)].Moved = true
-				}
+				break
 			}
 		}
 	}
@@ -113,7 +129,11 @@ func ParseFEN(v *Variant, fen string) (*Position, error) {
 			return nil, err
 		}
 	}
-	p.findRoyals()
+	if len(fields) > 4 {
+		if n, err := strconv.Atoi(fields[4]); err == nil && n >= 0 {
+			p.Clock = n
+		}
+	}
 	return p, nil
 }
 
@@ -155,6 +175,9 @@ func (p *Position) parseChecks(fields []string) error {
 func (p *Position) clone() *Position {
 	q := *p
 	q.Board = slices.Clone(p.Board)
+	for c := range q.castling {
+		q.castling[c] = slices.Clone(p.castling[c])
+	}
 	q.EP = nil
 	q.EPPawn = -1
 	return &q
@@ -355,21 +378,26 @@ func (p *Position) promotes(sq int) bool {
 	return y < p.V.PromotionZone
 }
 
+// castles returns the castling moves available to the side to move: the
+// resolved entries still active, with an empty path between the four squares
+// and no attack on any square the king passes over or lands on.
 func (p *Position) castles() []Move {
 	v := p.V
 	var moves []Move
-	for i, c := range v.Castling {
-		king, rook := v.orient(c.King, p.Turn), v.orient(c.Rook, p.Turn)
-		kingTo, rookTo := v.orient(c.KingTo, p.Turn), v.orient(c.RookTo, p.Turn)
-		k, r := p.Board[king], p.Board[rook]
-		if k.Type == 0 || r.Type == 0 || k.Color != p.Turn || r.Color != p.Turn || k.Moved || r.Moved || !v.Type(k).Royal {
+	for i, r := range p.castling[p.Turn] {
+		if !r.active {
 			continue
 		}
-		lo := min(king, rook, kingTo, rookTo)
-		hi := max(king, rook, kingTo, rookTo)
+		c := r.castle
+		k, rook := p.Board[c.King], p.Board[c.Rook]
+		if k.Type == 0 || rook.Type == 0 || k.Color != p.Turn || rook.Color != p.Turn || k.Moved || rook.Moved || !v.Type(k).Royal {
+			continue
+		}
+		lo := min(c.King, c.Rook, c.KingTo, c.RookTo)
+		hi := max(c.King, c.Rook, c.KingTo, c.RookTo)
 		clearPath := true
 		for sq := lo; sq <= hi; sq++ {
-			if sq != king && sq != rook && p.Board[sq].Type != 0 {
+			if sq != c.King && sq != c.Rook && p.Board[sq].Type != 0 {
 				clearPath = false
 				break
 			}
@@ -378,13 +406,13 @@ func (p *Position) castles() []Move {
 			continue
 		}
 		var path []int
-		for sq := min(king, kingTo); sq <= max(king, kingTo); sq++ {
+		for sq := min(c.King, c.KingTo); sq <= max(c.King, c.KingTo); sq++ {
 			path = append(path, sq)
 		}
-		if p.castlePathAttacked(king, path) {
+		if p.castlePathAttacked(c.King, path) {
 			continue
 		}
-		moves = append(moves, Move{From: king, To: kingTo, Take: -1, Castle: i})
+		moves = append(moves, Move{From: c.King, To: c.KingTo, Take: -1, Castle: i})
 	}
 	return moves
 }
@@ -394,15 +422,16 @@ func (p *Position) Apply(m Move) *Position {
 	v := p.V
 	q := p.clone()
 	mover := p.Board[m.From]
+	q.updateCastleRights(m)
 	mover.Moved = true
 	if m.Castle >= 0 {
-		c := v.Castling[m.Castle]
-		rook := p.Board[v.orient(c.Rook, p.Turn)]
+		c := p.Castle(m.Castle, p.Turn)
+		rook := p.Board[c.Rook]
 		rook.Moved = true
 		q.Board[m.From] = Piece{}
-		q.Board[v.orient(c.Rook, p.Turn)] = Piece{}
+		q.Board[c.Rook] = Piece{}
 		q.Board[m.To] = mover
-		q.Board[v.orient(c.RookTo, p.Turn)] = rook
+		q.Board[c.RookTo] = rook
 		q.Clock++
 		q.Turn = p.Turn.Other()
 		q.findRoyals()

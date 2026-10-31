@@ -10,7 +10,8 @@ a set of built-in tools, and it ships as one self-contained binary.
 - Its own terminal emulator, so programs run inside panes
 - Built-in commands (a coreutils subset, `fetch`, `sshc`, a vi, minesweeper, battleship, a [chess
   engine for fairy variants](docs/CHESS.md)), usable on systems with no shell at all (`builtin_mode: inprocess`)
-- Chess includes Double Big Board (`chess doublebig`, two armies per side on 32×16), Amazon Chess
+- Chess includes Chess960 (`chess chess960`, randomized back ranks and position-bound castling) and
+  Double Big Board (`chess doublebig`, two armies per side on 32×16), Amazon Chess
   (`chess amazon`), No-castling Chess (`chess nocastling`), Capablanca (`chess capablanca`, 10×8 with
   Archbishop and Chancellor), Berolina Chess (`chess berolina`, pawns move diagonally without capturing
   and capture straight ahead), Stalemate-wins Chess (`chess stalematewins`, delivering stalemate wins),

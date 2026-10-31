@@ -263,7 +263,7 @@ func (g *Game) activate(sq int) {
 		return
 	}
 	if g.sel >= 0 {
-		if moves := g.movesBetween(g.sel, sq); len(moves) > 0 {
+		if moves := g.entryMoves(g.sel, sq); len(moves) > 0 {
 			if choices := promotionChoices(moves); len(choices) > 1 {
 				g.promo = choices
 				return
@@ -277,6 +277,18 @@ func (g *Game) activate(sq int) {
 		return
 	}
 	g.sel = -1
+}
+
+// entryMoves gives castling precedence over an ordinary move to the same
+// square, and also accepts the castling rook as a destination.
+func (g *Game) entryMoves(from, to int) []Move {
+	p := g.match.Position()
+	for _, mv := range g.movesBetween(from, -1) {
+		if mv.Castle >= 0 && (mv.To == to || p.Castle(mv.Castle, p.Turn).Rook == to) {
+			return []Move{mv}
+		}
+	}
+	return g.movesBetween(from, to)
 }
 
 // movesBetween lists the legal moves from one square to another, or to

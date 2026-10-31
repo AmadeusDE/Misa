@@ -168,6 +168,13 @@ either, since a lone king can still reach the eighth rank.
   [Lichess rules](https://lichess.org/variant/atomic) and
   [Wikipedia](https://en.wikipedia.org/wiki/Atomic_chess).
 
+- **Chess960** (`chess960`): Bobby Fischer's shuffle chess: the back rank is
+  drawn at random from the 960 arrangements with bishops on opposite colours
+  and the king between the rooks, Black mirrors White, and castling follows the
+  position instead of fixed squares (see [Chess960](#chess960)). Rules:
+  [FIDE Laws of Chess, Chess960 rules](https://handbook.fide.com/chapter/E012023),
+  [Wikipedia](https://en.wikipedia.org/wiki/Fischer_random_chess).
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
@@ -373,3 +380,74 @@ Variants support 1–702 files (labels `a` through `zz`) and 1–99 ranks.
 
 Large boards can be expensive to load and play: reach tables, move generation,
 and search consume more memory and time as the board grows.
+
+## Chess960
+
+Chess960 shuffles the back rank at the start of each new game, with bishops on
+opposite colors and the king between the rooks. Black mirrors White's back rank;
+the header shows the original White back rank in piece letters. Pawns start as
+in orthodox chess. There are 960 possible arrangements.
+
+Castling leaves the king on c1 and rook on d1 (queenside), or king on g1 and
+rook on f1 (kingside), mirrored for Black. The king and rook must retain their
+castling rights; the relevant paths must be clear except for the castling king
+and rook, and the king cannot start in, cross, or finish in check. Depending on
+the starting arrangement, either piece may already be on its destination, or
+the king and rook may swap squares. Select the king then its destination **or**
+the castling rook, using mouse or keyboard. If an ordinary king move shares a
+castle's destination, that entry castles; the rook is an unambiguous entry.
+Chess960 uses the engine's orthodox win and draw rules, with no special changes.
+
+Rules references: [FIDE Laws of Chess, Chess960 rules](https://handbook.fide.com/chapter/E012023)
+and [Wikipedia: Fischer random chess](https://en.wikipedia.org/wiki/Fischer_random_chess).
+
+## YAML setup and castling mechanisms
+
+A variant may shuffle a full White rank, mirrored on Black's corresponding
+rank, with constraints expressed entirely in YAML:
+
+```yaml
+shuffle:
+  rank: 1
+  opposite_color: B
+  between: {royal: K, pieces: R}
+castling:
+  - {rook_side: right, rook_piece: R, king_to: g1, rook_to: f1}
+  - {rook_side: left, rook_piece: R, king_to: c1, rook_to: d1}
+```
+
+`rank` is one-based. The setup must contain two `opposite_color` pieces, one
+`between.royal` (a royal type), and two `between.pieces` on that rank; these
+three types must differ. Other pieces retain their counts but can occupy any
+remaining files. The two opposite-color pieces occupy different square colors,
+and the royal stands between the surrounding pair. The original setup must
+have a full White rank and an identical, full Black mirror. Invalid or
+impossible constraints are load errors. Enumeration is bounded to 10 files
+and 1,000,000 arrangements to limit custom-variant loading costs.
+
+Each new match, including `n` and a variant change through the `v`/`V` picker,
+draws uniformly from the valid arrangements; consecutive draws can coincide. The engine's
+`NewPositionWithRand` and `NewMatchWithRand` accept a seeded `math/rand/v2.Rand`
+for reproducible draws (nil uses the default RNG). Chess960's enumeration uses
+Scharnagl numbering, with orthodox chess at index 518. Variants without
+`shuffle` retain their fixed setup unchanged.
+
+Dynamic castling entries replace fixed `king`/`rook` origins with `rook_side:
+left|right` and `rook_piece`, locating the royal and that side's outermost rook
+of the named type on the destination rank in the actual starting position.
+The origins and rights remain attached to the position through play, undo and
+search; moving either piece or capturing the rook permanently removes the
+right. Existing four-square castling YAML continues to work unchanged. All
+squares from king origin to destination and rook origin to destination must be
+empty except for the two castling pieces. Rook attacks do not prevent castling;
+king attacks before, during, or after the move do.
+
+`Position.FEN()` emits dynamic castling rights as Shredder-FEN rook-file letters
+(uppercase for White, lowercase for Black); the parser also accepts `KQkq`,
+meaning the outermost rook on each side. File letters identify the exact rook
+when other rooks share that side. Supply explicit rights when loading a
+non-template setup; `-` removes all rights. Fixed castling entries serialize
+with their existing `KQkq` convention. En passant, the halfmove clock and, for
+a variant with a `check_limit`, the checks each side has given also round-trip
+for ordinary chess; FEN cannot express arbitrary fairy-piece moved flags or
+multiple crossed en-passant squares.

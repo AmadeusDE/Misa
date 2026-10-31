@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -38,7 +38,11 @@ type PieceType struct {
 
 // Castle is one castling move, given by White's squares; Black's mirror them
 // across the middle rank.
-type Castle struct{ King, Rook, KingTo, RookTo int }
+type Castle struct {
+	King, Rook, KingTo, RookTo int
+	RookSide                   string
+	RookType                   uint8
+}
 
 // Explosion describes the capture blast and types immune to collateral damage.
 type Explosion struct {
@@ -69,6 +73,7 @@ type Variant struct {
 	Setup                 string
 	Source                string
 
+	shuffle     *shuffleSetup
 	start       []Piece
 	startPieces [2][]int // per side, how many of each type the setup holds
 	zobrist     zobrist
@@ -85,10 +90,12 @@ type pieceDef struct {
 }
 
 type castleDef struct {
-	King   string `yaml:"king"`
-	Rook   string `yaml:"rook"`
-	KingTo string `yaml:"king_to"`
-	RookTo string `yaml:"rook_to"`
+	King      string `yaml:"king"`
+	Rook      string `yaml:"rook"`
+	KingTo    string `yaml:"king_to"`
+	RookTo    string `yaml:"rook_to"`
+	RookSide  string `yaml:"rook_side"`
+	RookPiece string `yaml:"rook_piece"`
 }
 
 // StalemateRule is what happens to a side with no legal move that is not in
@@ -154,7 +161,8 @@ type variantDef struct {
 	Explosion             *explosionDef  `yaml:"explosion"`
 	Extinction            *extinctionDef `yaml:"extinction"`
 
-	source string
+	Shuffle *shuffleDef `yaml:"shuffle"`
+	source  string
 }
 
 type source struct {
@@ -326,6 +334,9 @@ func merge(parent, child variantDef) variantDef {
 	if child.Setup != "" {
 		d.Setup = child.Setup
 	}
+	if child.Shuffle != nil {
+		d.Shuffle = child.Shuffle
+	}
 	if child.Castling != nil {
 		d.Castling = child.Castling
 	}
@@ -462,6 +473,11 @@ func build(d variantDef) (*Variant, error) {
 		return nil, fmt.Errorf("setup: %v", err)
 	}
 	v.start = start
+	if d.Shuffle != nil {
+		if err := v.buildShuffle(d.Shuffle); err != nil {
+			return nil, fmt.Errorf("shuffle: %v", err)
+		}
+	}
 	v.countStart()
 	for _, c := range d.Castling {
 		castle, err := v.parseCastle(c)
@@ -562,6 +578,29 @@ func (v *Variant) parseGoal(squares []string) error {
 }
 
 func (v *Variant) parseCastle(c castleDef) (Castle, error) {
+	if c.RookSide != "" || c.RookPiece != "" {
+		if c.King != "" || c.Rook != "" {
+			return Castle{}, fmt.Errorf("dynamic castle cannot specify origins")
+		}
+		if c.RookSide != "left" && c.RookSide != "right" {
+			return Castle{}, fmt.Errorf("rook_side must be left or right")
+		}
+		if len(c.RookPiece) != 1 || v.TypeOf(c.RookPiece[0]) == 0 {
+			return Castle{}, fmt.Errorf("unknown rook_piece %q", c.RookPiece)
+		}
+		kt, err := v.ParseSquare(c.KingTo)
+		if err != nil {
+			return Castle{}, err
+		}
+		rt, err := v.ParseSquare(c.RookTo)
+		if err != nil {
+			return Castle{}, err
+		}
+		if kt/v.Files != rt/v.Files || kt == rt {
+			return Castle{}, fmt.Errorf("destinations must be distinct squares on one rank")
+		}
+		return Castle{KingTo: kt, RookTo: rt, RookSide: c.RookSide, RookType: v.TypeOf(c.RookPiece[0])}, nil
+	}
 	var sq [4]int
 	for i, name := range []string{c.King, c.Rook, c.KingTo, c.RookTo} {
 		s, err := v.ParseSquare(name)
@@ -579,7 +618,7 @@ func (v *Variant) parseCastle(c castleDef) (Castle, error) {
 	if sq[0] == sq[1] {
 		return Castle{}, fmt.Errorf("king and rook on the same square %s", c.King)
 	}
-	return Castle{sq[0], sq[1], sq[2], sq[3]}, nil
+	return Castle{King: sq[0], Rook: sq[1], KingTo: sq[2], RookTo: sq[3]}, nil
 }
 
 // countStart records how many of each piece type each side's setup holds.
@@ -628,6 +667,10 @@ func (v *Variant) markTrackedPieces() {
 		t.tracksMoved = t.Royal || slices.ContainsFunc(t.moves, func(c Component) bool { return c.Initial })
 	}
 	for _, c := range v.Castling {
+		if c.RookSide != "" {
+			v.Pieces[c.RookType-1].tracksMoved = true
+			continue
+		}
 		for _, color := range []Color{White, Black} {
 			if p := v.start[v.orient(c.Rook, color)]; p.Type != 0 {
 				v.Type(p).tracksMoved = true

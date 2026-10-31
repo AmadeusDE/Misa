@@ -102,6 +102,13 @@ func TestThreeCheckCounters(t *testing.T) {
 	if got := fen(t, v, trip).Checks; got != again.Checks {
 		t.Errorf("%s loaded as %v, want %v", trip, got, again.Checks)
 	}
+	// Position.FEN writes the counters back, so a FEN round trip keeps them.
+	if got := fmt.Sprintf(" +%d+%d", again.Checks[White], again.Checks[Black]); !strings.HasSuffix(again.FEN(), got) {
+		t.Errorf("%s does not end in %q", again.FEN(), got)
+	}
+	if got := fen(t, v, again.FEN()).Checks; got != again.Checks {
+		t.Errorf("%s loaded as %v, want %v", again.FEN(), got, again.Checks)
+	}
 }
 
 // TestThreeCheckNoLimitNeverCounts checks that the rule is off without a

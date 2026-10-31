@@ -143,7 +143,7 @@ func TestEngineEscapesMateThreat(t *testing.T) {
 }
 
 func TestEnginePlaysEveryVariant(t *testing.T) {
-	for _, id := range []string{"chess", "double", "bigboard", "kingofthehill", "grand", "threecheck", "racingkings", "antichess", "atomic"} {
+	for _, id := range []string{"chess", "double", "bigboard", "kingofthehill", "grand", "threecheck", "racingkings", "antichess", "atomic", "chess960"} {
 		v := builtin(t, id)
 		p := NewPosition(v)
 		start := time.Now()
