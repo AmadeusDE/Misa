@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/AmadeusDE/Misa/internal/vi/vipat"
 )
 
 func (e *Editor) substituteCmd(from, to int, cmd string, hasRange bool) {
@@ -18,45 +20,45 @@ func (e *Editor) substituteCmd(from, to int, cmd string, hasRange bool) {
 
 	global := strings.Contains(flags, "g")
 	confirm := strings.Contains(flags, "c")
-	icase := strings.Contains(flags, "i") || e.ignoreCase
+	pat, re, ok := e.usePattern(pat, strings.Contains(flags, "i") || e.ignoreCase)
+	if !ok {
+		return
+	}
 
 	if confirm {
-		e.startSubstituteConfirm(from, to, pat, repl, global, icase)
+		e.startSubstituteConfirm(from, to, re, pat, repl, global)
 		return
 	}
 
 	e.saveUndo()
-	total := 0
+	repl = replacementText(repl)
+	total, failed := 0, false
 	for i := from; i <= to && i < len(e.lines); i++ {
-		line := e.lines[i]
-		var newLine string
-		var count int
-		if global {
-			newLine, count = replaceAll(line, pat, repl, icase)
-		} else {
-			newLine, count = replaceFirst(line, pat, repl, icase)
+		newLine, count, first, err := substituteLine(re, e.lines[i], repl, global)
+		if err != nil {
+			e.statusMsg, failed = err.Error(), true
+			break
 		}
 		if count > 0 {
-			if line != newLine {
-				cleanPat := strings.ReplaceAll(strings.ReplaceAll(pat, `\(`, "("), `\)`, ")")
-				idx := strings.Index(line, cleanPat)
-				if icase {
-					idx, _ = foldIndex(line, cleanPat)
-				}
-				if idx >= 0 {
-					e.noteEdit(i, utf8.RuneCountInString(line[:idx]))
-				}
+			if newLine != e.lines[i] {
+				e.noteEdit(i, utf8.RuneCountInString(e.lines[i][:first]))
 			}
 			e.lines[i] = newLine
 			total += count
 		}
 	}
-	if total > 0 {
+	switch {
+	case failed:
+	case total > 0:
 		e.modified = true
 		e.statusMsg = fmt.Sprintf("%d substitution(s)", total)
-	} else {
+	default:
 		e.statusMsg = "Pattern not found: " + pat
 	}
+}
+
+func replacementText(repl string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(repl, `\n`, "\n"), `\t`, "\t")
 }
 
 func parseSubstitute(cmd string) (pattern, replacement, flags string, ok bool) {
@@ -72,6 +74,19 @@ func parseSubstitute(cmd string) (pattern, replacement, flags string, ok bool) {
 		flags = parts[2]
 	}
 	return
+}
+
+// cutDelim splits s at its first unescaped delimiter; the rest keeps its text.
+func cutDelim(s string, delim byte) (before, after string) {
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '\\':
+			i++
+		case delim:
+			return s[:i], s[i+1:]
+		}
+	}
+	return s, ""
 }
 
 func splitDelim(s string, delim byte) []string {
@@ -100,62 +115,59 @@ func splitDelim(s string, delim byte) []string {
 	return parts
 }
 
-func replaceFirst(line, pat, repl string, icase bool) (string, int) {
-	cleanPat := pat
-	if strings.HasPrefix(cleanPat, "\\") {
-		cleanPat = strings.ReplaceAll(cleanPat, "\\(", "(")
-		cleanPat = strings.ReplaceAll(cleanPat, "\\)", ")")
+// nextSubstitution finds the next match to replace at or after from. A line
+// that already had a match is exhausted once from reaches its end, and an empty
+// match directly after the previous one is skipped, so zero-width patterns
+// always make progress (":s/x*/-/g" turns "abc" into "-a-b-c", as in Vim).
+func nextSubstitution(re *vipat.Regexp, line string, from, prevEnd int) (start, end int, ok bool, err error) {
+	for {
+		if prevEnd >= 0 && from >= len(line) {
+			return 0, 0, false, nil
+		}
+		start, end, ok, err = re.Find(line, from)
+		if !ok || err != nil {
+			return 0, 0, false, err
+		}
+		if start != end || start != prevEnd {
+			return start, end, true, nil
+		}
+		if start >= len(line) {
+			return 0, 0, false, nil
+		}
+		_, w := utf8.DecodeRuneInString(line[start:])
+		from = start + w
 	}
-	cleanRepl := strings.ReplaceAll(repl, "\\n", "\n")
-	cleanRepl = strings.ReplaceAll(cleanRepl, "\\t", "\t")
-
-	idx, end := strings.Index(line, cleanPat), 0
-	if icase {
-		idx, end = foldIndex(line, cleanPat)
-	} else if idx >= 0 {
-		end = idx + len(cleanPat)
-	}
-	if idx < 0 {
-		return line, 0
-	}
-	return line[:idx] + cleanRepl + line[end:], 1
 }
 
-func replaceAll(line, pat, repl string, icase bool) (string, int) {
-	cleanPat := pat
-	if strings.HasPrefix(cleanPat, "\\") {
-		cleanPat = strings.ReplaceAll(cleanPat, "\\(", "(")
-		cleanPat = strings.ReplaceAll(cleanPat, "\\)", ")")
-	}
-	cleanRepl := strings.ReplaceAll(repl, "\\n", "\n")
-	cleanRepl = strings.ReplaceAll(cleanRepl, "\\t", "\t")
-
-	count := 0
-	var result strings.Builder
-	remaining := line
-	for len(remaining) > 0 {
-		idx, end := strings.Index(remaining, cleanPat), 0
-		if icase {
-			idx, end = foldIndex(remaining, cleanPat)
-		} else if idx >= 0 {
-			end = idx + len(cleanPat)
+func substituteLine(re *vipat.Regexp, line, repl string, global bool) (result string, count, first int, err error) {
+	var b strings.Builder
+	copied, from, prevEnd := 0, 0, -1
+	for {
+		start, end, ok, err := nextSubstitution(re, line, from, prevEnd)
+		if err != nil {
+			return line, 0, 0, err
 		}
-		if idx < 0 {
-			result.WriteString(remaining)
+		if !ok {
 			break
 		}
-		result.WriteString(remaining[:idx])
-		result.WriteString(cleanRepl)
-		remaining = remaining[end:]
+		if count == 0 {
+			first = start
+		}
+		b.WriteString(line[copied:start])
+		b.WriteString(repl)
+		copied, prevEnd, from = end, end, end
 		count++
-		if cleanPat == "" {
-			if len(remaining) == 0 {
-				break
-			}
-			_, n := utf8.DecodeRuneInString(remaining)
-			result.WriteString(remaining[:n])
-			remaining = remaining[n:]
+		if start == end && end < len(line) {
+			_, w := utf8.DecodeRuneInString(line[end:])
+			from = end + w
+		}
+		if !global {
+			break
 		}
 	}
-	return result.String(), count
+	if count == 0 {
+		return line, 0, 0, nil
+	}
+	b.WriteString(line[copied:])
+	return b.String(), count, first, nil
 }

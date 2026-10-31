@@ -179,6 +179,13 @@ After a search:
 n repeats the search in the same direction.
 N repeats the search in the opposite direction.
 
+Patterns use Vim syntax (default "magic"): . matches any character, * repeats,
+\+ \= \{n,m} repeat, ^ and $ anchor, \( \) group, \| alternates, [a-z] is a
+collection, \d \w \s are classes, \< and \> mark word edges. \v makes most
+of these special without a backslash; \V takes everything literal.
+An empty pattern (just Enter) reuses the last pattern. Constructs such as
+\zs, \@=, \1 and \n are not supported and report an error.
+
 Case-insensitive search:
   /word\c     forces case insensitive for this search
   /word\C     forces case sensitive for this search
@@ -325,8 +332,9 @@ With c, answer y to replace, n to skip, a to replace the remaining matches,
 q or Escape to stop, or l to replace this match and stop. Ctrl-E and Ctrl-Y
 scroll the viewport while the confirmation is open. Accepted replacements
 form one undoable change; substitution does not replace the previous dot repeat.
-Confirmation requires an explicit nonempty pattern and does not support replacements
-that produce newlines or confirmation inside :global.
+Confirmation does not support replacements that produce newlines or confirmation
+inside :global. :s and :g take the same Vim patterns as /; an empty pattern
+(:s//new/) reuses the last search pattern.
 
 The delimiter can be any character: :s|old|new|g works too.
 ________________________________________________________________________________

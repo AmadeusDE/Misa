@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/T01/T02/T03/T05
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/G01/T01/T02/T03/T05
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -72,6 +72,7 @@ without quitting Misa and preserves its register.
 | T03: shell lifecycle and reads (done) | Original `shell*_test.go` and `internal/ui/editor_shell_regression_test.go` fixtures | Async output/cancellation, shared cwd/environment, addressed file/shell reads and failure-safe filters; limits below. |
 | T05: edit another file | Original `edit*_t05_test.go`, `edit_edges_t05_test.go`, `edit_policy_t05_test.go`, reload replay fixture, and `internal/ui/editor_edit_regression_test.go` | File switching and reload contract below; automated fixtures are being added, not a claim of manual verification. |
 | T01: substitute confirmation (done) | `substitute_confirm_test.go`, `substitute_confirm_replay_test.go`, `substitute_confirm_edges_test.go`, `substitute_entry_test.go`, `internal/ui/editor_substitute_regression_test.go` | Public-event fixtures for decisions, ranges, global matches, Unicode, cursor/highlight/prompt, counts, undo/redo, no-op history, dot/register preservation, macro playback, and standalone/mux resize and return. |
+| G01: Vim pattern subset (done) | `internal/vi/vipat/*_test.go`, `pattern_g01_replay_test.go`, `pattern_entry_g01_test.go`, `substitute_line_test.go`, `internal/ui/editor_pattern_regression_test.go` | One parser/matcher (`vipat`) behind `/`, `?`, `n`/`N`, operator searches, `:s` (including `c`), `:g` and `:v`; scope below. |
 
 ### F07 file round trips and safety
 
@@ -92,16 +93,57 @@ coordination with other writers: same-inode edits restoring both size and mtime 
 and another writer can race the check. Atomic rename is not a crash-recovery or durability guarantee;
 ACLs and extended attributes are not preserved by replacement writes.
 
+### G01 Vim pattern subset
+
+Search, `:s` and `:g`/`:v` share `internal/vi/vipat`, a Vim-pattern parser and matcher written for
+this editor. Go `regexp` syntax is never exposed. Matching is backtracking, leftmost-first (Vim's
+semantics, not POSIX longest), one line at a time.
+
+Supported (default `magic`): literals; `.`; `*`, `\+`, `\=`, `\?`, `\{n,m}` (`\{n}`, `\{n,}`,
+`\{,m}`, `\{}`) and non-greedy `\{-n,m}`; `^` (only at the start of the pattern or after `\(`, `\%(`,
+`\|`) and `$` (only at the end or before `\|`, `\)`), otherwise literal; a leading `*` is literal;
+`\(\)`, `\%(\)`, `\|`; collections `[...]` with ranges, `^` negation, `[:alpha:]`-style classes and
+`\e \t \r \b \\ \] \^ \-` (an unterminated `[` is a literal, as in Vim); `\s \S \d \D \w \W \a \A \l \L
+\u \U \x \X \o \O \h \H` (ASCII); `\<`, `\>` (word characters are letters, digits and `_`, Unicode
+aware); `\t \e \r \b`; the pattern atoms `\c`/`\C` anywhere; and the magic modes `\v`, `\m`, `\M`,
+`\V` switching mid-pattern. Backward searches read `\?` as a literal `?`.
+
+Rejected with `Unsupported pattern construct: <construct>` (never treated as literals), each deferred to a
+separately scoped follow-up: `\zs`/`\ze`, `\&`, `\@=` `\@!` `\@<=` `\@<!` `\@>` (lookaround), `\1`-`\9`
+backreferences, `\n` and `\_x` (multiline), `~` (last substitute string; write `\~` for a tilde), `\%[`,
+`\%d`/`\%x`/`\%u` and the other `\%` atoms, `\i \I \k \K \f \F \p \P` (option-dependent classes),
+`[[=a=]]`, `[[.a.]]`, `\d123` codes and `\n` inside collections, and unknown alphanumeric escapes. Syntax
+errors use Vim's numbers: `E54`, `E55`, `E61`, `E64`, `E554`, `E944`. Matching is bounded: a pattern that
+backtracks past the step budget fails with `E363: Pattern too complex` instead of hanging.
+
+Wiring: an empty pattern in `/`, `?`, `:s` and `:g` reuses the last pattern (`E35` when there is none for
+`:s`/`:g`); a pattern that compiles becomes the last search pattern, including from `:s` and `:g`, a
+rejected one does not, and a rejected search also abandons a pending operator. `:s` and its confirmation
+use Vim's zero-width rules: `:s/x*/-/g` turns `abc` into `-a-b-c` and `:s/b*/-/g` into `-a-c`. A match at
+the end of a non-empty line puts the cursor on its last character, so `/$` then `n` advances. Match columns
+are rune offsets on multi-byte lines.
+
+Behaviour changes: `.`, `*`, `[`, `\(`, `\)` and the other magic characters were literal text (or ad-hoc
+`\(` handling) in `/`, `:s` and `:g` and are now pattern syntax; `~` and the constructs above now report
+errors; `:s//x/` and `:s//x/c` reuse the last pattern instead of replacing at every position or being
+rejected; `:s` and `:g` set the last search pattern. `:g/pat/cmd` previously cut the command at its next
+delimiter, so `:g/x/s/a/b/` never ran the substitute; the command is now everything after the pattern.
+
+Left to other tasks: `ignorecase`/`smartcase`/`hlsearch`/`incsearch` options (T04; the matcher takes a
+default-case flag and `\c`/`\C` already work), the replacement grammar `&`, `\1`, `~`, case conversion,
+`:&`, `g&` (G02), Ex addresses and `:g` execution order/register order (G03: `:g/pat/d` still runs
+bottom-up), `*`/`#` (H02), search offsets (`/pat/e`) and history (T07). Vim 9.1 `nocompatible`
+`:help pattern` is used as specification only; no Vim, Neovim or regex-library code is used.
+
 ### T01 scope and limits
 
-Confirmation supports the existing literal `:s` subset, `i`/`g`, `%`, numeric and Visual
+Confirmation supports the G01 pattern subset (originally literal-only), `i`/`g`, `%`, numeric and Visual
 ranges (including saved `'<,'>` bounds), and an optional trailing delimiter. The `c` prompt accepts `y`, `n`, `a`, `q`,
 `l`, Escape, and Ctrl-E/Ctrl-Y viewport scrolling. Accepted replacements form one undo
 unit and preserve registers. Confirmed substitution is not dot-repeatable and retains the
 previous dot change. Zero accepted replacements (or identical replacement text) leave history,
-redo and dirty state unchanged. The cursor finishes on the last substituted line. Empty-pattern
-reuse and newline-producing replacements are explicitly rejected in confirmation mode until G02;
-regex/replacement grammar remains G01–G02. Confirmed substitution inside `:global`/`:v` is
+redo and dirty state unchanged. The cursor finishes on the last substituted line. Newline-producing replacements are explicitly rejected in confirmation mode until G02;
+the replacement grammar remains G02. Confirmed substitution inside `:global`/`:v` is
 explicitly rejected rather than starting a prompt inside their synchronous execution (G03).
 Playback of an existing macro key stream routes confirmation answers like typed input; full
 command/confirmation recording remains deferred with H09. The `n` flag and numeric Ex counts are
@@ -204,7 +246,7 @@ claimed.
 | 3.2 | Replacement (`r`, `R`) | Character replacement and Replace mode, including `r<CR>` and dot repeat, are covered by F06. |
 | 3.3 | Change (`c`) | Existing `cw`/change ranges and semantic dot repeat are covered by F03/F06. |
 | 3.4 | `c` with motion | Existing change-motion ranges and semantic dot repeat are covered by F03/F06. |
-| 4.4 | Substitution | T01 covers literal substitution confirmation and cancellation, ranges, per-line/global matches, and optional trailing delimiter; full patterns/replacement grammar remain G01–G02. |
+| 4.4 | Substitution | T01 covers literal substitution confirmation and cancellation, ranges, per-line/global matches, and optional trailing delimiter; the pattern subset is G01 and the replacement grammar remains G02. |
 | 5.1–5.2 | Shell listing/removal and write | T03 covers asynchronous shell command routing/output; T02/F07 cover writes. |
 | 5.3 | Write a selection | T02 covers numeric and Visual range writes and file identity; complete lesson verification remains T09. |
 | 5.4 | Read file/command output | T03 covers addressed reads, exact blank lines and EOF handling. |
@@ -255,8 +297,8 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
   WORD motions `W`/`E`, `cW`/`dE` are not implemented (H01); `gu`/`gU`/`g~` are not existing
   normal operators here (G06). Sentence-motion/operator coverage remains limited; F04 motions are
   covered above.
-- **F04:** Regex and offset syntax, and command/search history (G01/T07), are unsupported. Search
-  retains the existing literal-pattern and case-suffix subset; no `//` delimiter grammar is claimed
+- **F04:** Search offsets and command/search history (T07) are unsupported; patterns are the G01 subset.
+  No `//` delimiter grammar is claimed
   (empty prompt Enter reuses the last pattern). `wrapscan`, `matchpairs`, and `cpoptions` are not
   configurable. Mark relocation/navigation enhancements (H10) and Visual parity (H07) remain deferred.
   Uppercase marks retain their existing same-buffer behavior; cross-file marks are not implemented.

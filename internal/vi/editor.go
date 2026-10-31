@@ -787,42 +787,6 @@ func byteToRuneIdx(s string, byteIdx int) int {
 	return len([]rune(s[:byteIdx]))
 }
 
-func (e *Editor) shouldIgnoreCase(pat string) bool {
-	if strings.HasSuffix(pat, `\c`) {
-		return true
-	}
-	if strings.HasSuffix(pat, `\C`) {
-		return false
-	}
-	return e.ignoreCase
-}
-
-func (e *Editor) cleanPattern(pat string) string {
-	if strings.HasSuffix(pat, `\c`) {
-		return pat[:len(pat)-2]
-	}
-	if strings.HasSuffix(pat, `\C`) {
-		return pat[:len(pat)-2]
-	}
-	return pat
-}
-
-func (e *Editor) indexOf(haystack, needle string) int {
-	if e.shouldIgnoreCase(e.searchPat) {
-		i, _ := foldIndex(haystack, needle)
-		return i
-	}
-	return strings.Index(haystack, needle)
-}
-
-func (e *Editor) lastIndexOf(haystack, needle string) int {
-	if e.shouldIgnoreCase(e.searchPat) {
-		i, _ := foldLastIndex(haystack, needle)
-		return i
-	}
-	return strings.LastIndex(haystack, needle)
-}
-
 func (e *Editor) setReg(name byte, text []string, isLine bool) {
 	if name >= 'A' && name <= 'Z' {
 		lower := name - 'A' + 'a'

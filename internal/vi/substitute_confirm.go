@@ -6,32 +6,30 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/AmadeusDE/Misa/internal/vi/vipat"
 )
 
 const confirmationInCompound = "Confirmation is not supported inside compound commands"
 
 type substituteConfirm struct {
-	pattern, replacement, display string
-	row, to                       int
-	next, start, end              int // byte positions within the current line
-	total, lastRow                int
-	global, ignoreCase            bool
+	re               *vipat.Regexp
+	replacement      string
+	display          string
+	row, to          int
+	next, start, end int // byte positions within the current line
+	prevEnd          int // end of the last handled match in the current line, or -1
+	total, lastRow   int
+	global           bool
+	err              error
 }
 
 func (c *substituteConfirm) prompt() string {
 	return fmt.Sprintf("replace with %s (y/n/a/q/l/^E/^Y)?", c.display)
 }
 
-func (e *Editor) startSubstituteConfirm(from, to int, pattern, replacement string, global, ignoreCase bool) {
-	cleanPattern := pattern
-	if strings.HasPrefix(cleanPattern, `\`) {
-		cleanPattern = strings.ReplaceAll(strings.ReplaceAll(cleanPattern, `\(`, "("), `\)`, ")")
-	}
-	cleanReplacement := strings.ReplaceAll(strings.ReplaceAll(replacement, `\n`, "\n"), `\t`, "\t")
-	if cleanPattern == "" {
-		e.statusMsg = "Empty patterns are not supported with confirmation"
-		return
-	}
+func (e *Editor) startSubstituteConfirm(from, to int, re *vipat.Regexp, pattern, replacement string, global bool) {
+	cleanReplacement := replacementText(replacement)
 	if strings.ContainsRune(cleanReplacement, '\n') {
 		e.statusMsg = "Newline replacement is not supported with confirmation"
 		return
@@ -41,11 +39,14 @@ func (e *Editor) startSubstituteConfirm(from, to int, pattern, replacement strin
 		return
 	}
 	c := &substituteConfirm{
-		pattern: cleanPattern, replacement: cleanReplacement, display: replacement,
-		row: from, to: to, lastRow: -1, global: global, ignoreCase: ignoreCase,
+		re: re, replacement: cleanReplacement, display: replacement,
+		row: from, to: to, lastRow: -1, prevEnd: -1, global: global,
 	}
 	if !c.find(e.lines) {
 		e.statusMsg = "Pattern not found: " + pattern
+		if c.err != nil {
+			e.statusMsg = c.err.Error()
+		}
 		return
 	}
 	e.beginEdit()
@@ -56,21 +57,17 @@ func (e *Editor) startSubstituteConfirm(from, to int, pattern, replacement strin
 
 func (c *substituteConfirm) find(lines []string) bool {
 	for c.row <= c.to && c.row < len(lines) {
-		line := lines[c.row]
-		if c.next <= len(line) {
-			start, end := strings.Index(line[c.next:], c.pattern), 0
-			if c.ignoreCase {
-				start, end = foldIndex(line[c.next:], c.pattern)
-			} else if start >= 0 {
-				end = start + len(c.pattern)
-			}
-			if start >= 0 {
-				c.start, c.end = c.next+start, c.next+end
-				return true
-			}
+		start, end, ok, err := nextSubstitution(c.re, lines[c.row], c.next, c.prevEnd)
+		if err != nil {
+			c.err = err
+			return false
+		}
+		if ok {
+			c.start, c.end = start, end
+			return true
 		}
 		c.row++
-		c.next = 0
+		c.next, c.prevEnd = 0, -1
 	}
 	return false
 }
@@ -84,9 +81,9 @@ func (e *Editor) showSubstituteMatch() {
 
 func (e *Editor) answerSubstitute(replace bool) bool {
 	c := e.confirm
-	c.next = c.end
+	line := e.lines[c.row]
+	c.prevEnd = c.end
 	if replace {
-		line := e.lines[c.row]
 		newLine := line[:c.start] + c.replacement + line[c.end:]
 		if newLine != line {
 			e.noteEdit(c.row, utf8.RuneCountInString(line[:c.start]))
@@ -96,11 +93,17 @@ func (e *Editor) answerSubstitute(replace bool) bool {
 		}
 		c.total++
 		c.lastRow = c.row
-		c.next = c.start + len(c.replacement)
+		c.prevEnd = c.start + len(c.replacement)
+		line = newLine
+	}
+	c.next = c.prevEnd
+	if c.start == c.end && c.next < len(line) {
+		_, w := utf8.DecodeRuneInString(line[c.next:])
+		c.next += w
 	}
 	if !c.global {
 		c.row++
-		c.next = 0
+		c.next, c.prevEnd = 0, -1
 	}
 	return c.find(e.lines)
 }
@@ -117,6 +120,9 @@ func (e *Editor) finishSubstituteConfirm() {
 	e.clampCursor()
 	e.ensureVisible()
 	e.statusMsg = fmt.Sprintf("%d substitution(s)", c.total)
+	if c.err != nil {
+		e.statusMsg = c.err.Error()
+	}
 }
 
 func (e *Editor) handleSubstituteConfirm(msg tea.KeyPressMsg) {
