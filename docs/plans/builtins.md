@@ -34,8 +34,9 @@ When a case starts passing, delete its line.
 
 1. **Safe in-process use.** `builtin_mode: inprocess` runs built-ins on goroutines in one process, so
    process-wide state is shared. Remaining: `currentUmask` flips the umask off Linux; `sort
-   --compress-program` execs; not every built-in honours `ctx.Env`; no cancellation (`tail -f`, `sleep`
-   need a `context.Context` in `builtins.Context`). Then a `builtins.Run` helper usable as a library.
+   --compress-program` execs; not every built-in honours `ctx.Env`; `builtins.Context` now carries a
+   `Cancel` channel, which `bc` observes, but `tail -f` and `sleep` are not wired to it yet. Then a
+   `builtins.Run` helper usable as a library.
 2. **Missing utilities.** `utility-comparison.md` lists every utility in toybox, BusyBox and uutils
    against Misa's (2026-10-15); `builtins-coverage.md` ranks the missing ones by how many upstream
    test cases would run unchanged and how much work they are. The POSIX ones toybox and uutils both

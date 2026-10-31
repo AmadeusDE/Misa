@@ -114,6 +114,24 @@
       ]
     },
     {
+      "name": "bc",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/bc.go",
+        "internal/builtins/bc_num.go",
+        "internal/builtins/bc_lex.go",
+        "internal/builtins/bc_parse.go",
+        "internal/builtins/bc_exec.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Misa implementation of POSIX bc following Toybox toys/pending/bc.c at 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb (0BSD) as a behavioural reference; no code copied; see docs/plans/bc.md and docs/CREDITS.md",
+      "tests": [
+        "internal/builtins/bc_test.go",
+        "internal/builtins/bc_num_test.go"
+      ]
+    },
+    {
       "name": "btop",
       "kind": "builtin",
       "sources": [

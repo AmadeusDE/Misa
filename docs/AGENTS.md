@@ -129,6 +129,8 @@ internal/
                                  — ChessGame builds the game (computer plays Black by default)
     battleship.go                `battleship [-r|--random]` — -r picks a random fleet instead of interactive
                                  placement
+    bc.go bc_num.go bc_lex.go    `bc` — POSIX calculator: exact decimals on math/big (bc_num.go), lexer,
+    bc_parse.go bc_exec.go       parser and AST evaluator; see docs/plans/bc.md
   sshclient/                     Built-in SSH client (golang.org/x/crypto/ssh); named sshc so it never shadows OpenSSH
     client.go                    Run: dial, remote PTY + raw local terminal, exit status (remote's, or 255)
     target.go                    Destination ([user@]host, ssh://) + flags + config → address, user, identities
@@ -283,7 +285,7 @@ internal/
 - **Config search order**: next to executable → `~/.config/misa/`. Same for companion, mux, fetch and gui configs. Never the working directory: a cloned repo must not be able to supply `autorun:` or aliases.
 - **Config `*bool` pattern**: `BoolDefault()`/`BoolPtr()` helpers for settings that default to true.
 - **Configurable colors**: All colors configurable via `colors:` (info items) and `ui:` (prompt, divider, ghost, etc.) in config.yaml. Defaults are gruvbox.
-- **Builtins**: Registered via `init()` with `Register(Command{...})`. Each uses the `Spec`/`ParseArgs` option parser. Context provides Dir, Args, Width, Height, Stdout/Stderr/Stdin. When adding or changing a builtin, update `internal/inventory/commands.json`, regenerate the human documentation with `go run ./internal/inventory/gen`, and verify the inventory reflects the registry.
+- **Builtins**: Registered via `init()` with `Register(Command{...})`. Each uses the `Spec`/`ParseArgs` option parser. Context provides Dir, Args, Width, Height, Stdout/Stderr/Stdin, and a `Cancel` channel that only `bc` observes so far. When adding or changing a builtin, update `internal/inventory/commands.json`, regenerate the human documentation with `go run ./internal/inventory/gen`, and verify the inventory reflects the registry.
 - **History format**: Zsh-style (`: timestamp:0;command`). Import from bash/zsh is read-only — never writes to external history files. Entries without timestamps (bash imports) sort to the front.
 - **Companion setup**: Moods, pronouns, call terms, prefixes, items/parts, emotes, kemonos, modifiers. Thirsty unlocks NSFW `{part}` (original mommy: milk, cock, cum, mouth); otherwise `{part}` uses SFW items. Modifiers can add combo lines when other modifiers are also selected. Texts load from embedded yaml under `internal/companion/data/`.
 - **Root view**: `Model.View()` returns a `tea.View` (alt screen, `MouseModeAllMotion`) only for the root; panes compose through `render() string`.
@@ -385,6 +387,6 @@ Commit trailers for agent-made commits:
 - `docs/UGH.md` — ugh: providers, running, TUI, tools, permissions, subagents, configuration.
 - `docs/ughbot/DEPLOY.md`, `docs/ughbot/WEB.md` — ughbot (experimental): setup, bots, approvals, web UI.
 - `docs/plans/` — Plans for upcoming work: `terminal.md`, `web.md`, `ugh-confinement.md`, `ughbot.md`,
-  `builtins.md` (with `utility-comparison.md` and `builtins-coverage.md`), `windows.md`, `android.md`,
-  `pkg-frontend.md`.
+  `builtins.md` (with `utility-comparison.md` and `builtins-coverage.md`), `bc.md`, `windows.md`,
+  `android.md`, `pkg-frontend.md`.
 - `SECURITY.md`, `CONTRIBUTING.md` — Reporting vulnerabilities; how changes are made here.
