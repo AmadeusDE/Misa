@@ -143,12 +143,13 @@ func runStandalone(name string, args []string) int {
 	}
 
 	ctx := &builtins.Context{
-		Dir:    dir,
-		Args:   args,
-		Width:  0,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-		Stdin:  os.Stdin,
+		Dir:     dir,
+		Args:    args,
+		CmdName: name,
+		Width:   0,
+		Stdout:  os.Stdout,
+		Stderr:  os.Stderr,
+		Stdin:   os.Stdin,
 	}
 
 	cmd, _ := builtins.Lookup(name)

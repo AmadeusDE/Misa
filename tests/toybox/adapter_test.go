@@ -24,6 +24,11 @@ import (
 
 var binDir string
 
+// fixtureDir holds the copied upstream fixture files (tests/files/... in the
+// toybox tree). Upstream suites reach them through $FILES, so the adapter
+// exports it for setup commands and shell-path invocations.
+var fixtureDir string
+
 func TestMain(m *testing.M) {
 	tmpDir, err := os.MkdirTemp("", "misa-toybox-*")
 	if err != nil {
@@ -57,6 +62,9 @@ func TestMain(m *testing.M) {
 		}
 	}
 	binDir = symlinkDir
+	if info, err := os.Stat(filepath.Join(modRoot, "tests", "toybox", "files")); err == nil && info.IsDir() {
+		fixtureDir = filepath.Join(modRoot, "tests", "toybox", "files")
+	}
 
 	os.Exit(m.Run())
 }
@@ -83,6 +91,9 @@ type testCase struct {
 	stdin    string
 	line     int
 	skip     bool
+	// nospace mirrors toybox's NOSPACE=1 harness directive: compare output with
+	// whitespace differences ignored (scripts/runtest.sh uses diff -auw).
+	nospace bool
 }
 
 var shellArgRe = regexp.MustCompile(`'[^']*'|"[^"]*"|[^\s]+`)
@@ -91,6 +102,7 @@ var echoRedirectRe = regexp.MustCompile(`^echo\s+(-[ne]+\s+)?(?:"([^"]*)"|'([^']
 var touchRe = regexp.MustCompile(`^touch\s+(.+)`)
 var mkdirRe = regexp.MustCompile(`^mkdir\s+(-p\s+)?(.+)`)
 var catHeredocRe = regexp.MustCompile(`^cat\s*>\s*(\S+)\s*<<\s*(\S+)`)
+var echoPipeRedirectRe = regexp.MustCompile(`^echo\s+.*\|\s*\S+.*>\s*\S+$`)
 
 type setupEvent struct {
 	line    int
@@ -101,6 +113,23 @@ type setupEvent struct {
 
 var varAssignRe = regexp.MustCompile(`^([A-Z_][A-Z0-9_]*)=(.*)`)
 var envPrefixRe = regexp.MustCompile(`^TZ=\S+\s+`)
+
+// nospaceSuites lists suites whose vendored cases carry toybox's NOSPACE=1
+// directive: those cases compare output with whitespace ignored (sameOutput), the
+// way upstream runs them with diff -w. Other suites keep dropping such cases so
+// their F07 accounting is untouched.
+var nospaceSuites = map[string]bool{"readelf": true}
+
+// multilineCaseSuites lists suites whose golden expected blocks span several
+// lines inside one quoted argument. Other suites write such blocks too, but
+// only for commands whose fixture variables this adapter cannot expand yet, so
+// joining them there would change their accounting without adding coverage.
+var multilineCaseSuites = map[string]bool{"readelf": true}
+
+// toyonlyRunSuites lists suites whose toyonly cases Misa runs anyway: upstream
+// marks them toyonly because binutils differs from toybox, and these builtins
+// are toybox ports, so the toybox expectation is the one that applies.
+var toyonlyRunSuites = map[string]bool{"readelf": true}
 
 type unparsedCase struct {
 	line   int
@@ -164,10 +193,32 @@ func parseTestFile(path string) (testSuite, error) {
 	var heredocFile, heredocDelim string
 	var heredocBuf strings.Builder
 	var multiLineEcho string
+	// caseBuf accumulates a testcmd/testing line whose quoted arguments span
+	// several lines (readelf.test writes its expected blocks that way).
+	var caseBuf string
+	var caseBufSkip, caseBufNoSpace bool
 
 	for sc.Scan() {
 		lineNum++
 		line := sc.Text()
+		nospace := false
+
+		if caseBuf != "" {
+			caseBuf += "\n" + line
+			if !quotesBalanced(caseBuf) {
+				if len(caseBuf) > 256*1024 {
+					suite.unparsed = append(suite.unparsed, unparsedCase{lineNum, "multiline case too long"})
+					caseBuf, caseBufSkip, caseBufNoSpace = "", false, false
+				}
+				continue
+			}
+			line = caseBuf
+			if caseBufSkip {
+				line = "toyonly " + line
+			}
+			nospace = caseBufNoSpace
+			caseBuf, caseBufSkip, caseBufNoSpace = "", false, false
+		}
 
 		if multiLineEcho != "" {
 			multiLineEcho += "\n" + line
@@ -221,6 +272,15 @@ func parseTestFile(path string) (testSuite, error) {
 
 		line = strings.TrimSpace(line)
 		line = strings.TrimPrefix(line, "export ")
+		// NOSPACE=1 is a toybox harness directive (whitespace-insensitive diff),
+		// not a command option. It is honoured for the suites in nospaceSuites;
+		// elsewhere the token stays part of an undiscovered line, because running
+		// those cases would change their accounting for pre-existing
+		// output-format differences owned by F08.
+		if nospaceSuites[suite.cmdName] && strings.HasPrefix(line, "NOSPACE=1 ") {
+			line = strings.TrimPrefix(line, "NOSPACE=1 ")
+			nospace = true
+		}
 
 		if strings.HasPrefix(line, "chmod ") {
 			fields := strings.Fields(line)
@@ -263,6 +323,8 @@ func parseTestFile(path string) (testSuite, error) {
 						l = ""
 					}
 				}
+				val = strings.ReplaceAll(val, "${FILES}", fixtureDir)
+				val = strings.ReplaceAll(val, "$FILES", fixtureDir)
 				if key != "" && (key[0] >= 'A' && key[0] <= 'Z' || key[0] >= 'a' && key[0] <= 'z') {
 					if (suite.cmdName == "hostname" && key == "HOST") || (suite.cmdName == "expand" && (key == "TABSTOP" || key == "BIGTAB" || key == "BIGLINE" || key == "EXPANDLINE" || key == "POW")) {
 						// Keep precalculated values for hostname and expand suites
@@ -341,6 +403,11 @@ func parseTestFile(path string) (testSuite, error) {
 			}
 		} else if m := regexp.MustCompile(`^umask\s+([0-7]+)`).FindStringSubmatch(line); m != nil {
 			suite.setupLog = append(suite.setupLog, setupEvent{lineNum, "umask", m[1], false})
+		} else if echoPipeRedirectRe.MatchString(line) {
+			// `echo ... | xxd -r -p > name` and friends generate small binary
+			// fixtures. The redirect target is validated like any other setup
+			// path, so replaying the pipeline stays inside the test directory.
+			suite.setupLog = append(suite.setupLog, setupEvent{lineNum, "exec", line, false})
 		} else if strings.HasPrefix(line, "ln ") || strings.HasPrefix(line, "cp ") || (strings.Contains(line, ";") && !strings.HasPrefix(line, "testcmd") && !strings.HasPrefix(line, "testing")) {
 			suite.setupLog = append(suite.setupLog, setupEvent{lineNum, "exec", line, false})
 		} else if strings.HasPrefix(line, "echo ") && strings.Count(line, "\"")-strings.Count(line, "\\\"") == 1 {
@@ -370,8 +437,17 @@ func parseTestFile(path string) (testSuite, error) {
 			continue
 		}
 
+		// Only an expected-output argument may span lines (readelf.test writes
+		// its golden blocks that way). A command argument continued on the next
+		// line is left to the existing unparsed accounting.
+		if multilineCaseSuites[suite.cmdName] &&
+			(strings.HasPrefix(line, "testcmd ") || strings.HasPrefix(line, "testing ")) && expectedSpansLines(line) {
+			caseBuf, caseBufSkip, caseBufNoSpace = line, skip, nospace
+			continue
+		}
+
 		if strings.HasPrefix(line, "testcmd ") {
-			if strings.Contains(line, "$1") {
+			if strings.Contains(line, "$1") || strings.Contains(line, "$ONE") || strings.Contains(line, "$TWO") {
 				suite.unparsed = append(suite.unparsed, unparsedCase{lineNum, "parameterized helper cannot be represented by adapter"})
 				continue
 			}
@@ -402,7 +478,7 @@ func parseTestFile(path string) (testSuite, error) {
 				}
 				continue
 			}
-			tc, err := parseTestcmd(line[len("testcmd "):], lineNum, skip, suite.vars)
+			tc, err := parseTestcmd(line[len("testcmd "):], lineNum, skip, nospace, suite.vars)
 			if err != nil {
 				suite.unparsed = append(suite.unparsed, unparsedCase{lineNum, err.Error()})
 				continue
@@ -412,7 +488,7 @@ func parseTestFile(path string) (testSuite, error) {
 			}
 			suite.cases = append(suite.cases, tc)
 		} else if strings.HasPrefix(line, "testing ") {
-			tc, err := parseTesting(line[len("testing "):], suite.cmdName, lineNum, skip, suite.vars)
+			tc, err := parseTesting(line[len("testing "):], suite.cmdName, lineNum, skip, nospace, suite.vars)
 			if err != nil {
 				suite.unparsed = append(suite.unparsed, unparsedCase{lineNum, err.Error()})
 				continue
@@ -429,7 +505,7 @@ func parseTestFile(path string) (testSuite, error) {
 	return suite, sc.Err()
 }
 
-func parseTestcmd(s string, lineNum int, skip bool, vars map[string]string) (testCase, error) {
+func parseTestcmd(s string, lineNum int, skip, nospace bool, vars map[string]string) (testCase, error) {
 	fields, err := extractQuotedFields(s)
 	if err != nil || len(fields) < 3 {
 		return testCase{}, fmt.Errorf("parse error line %d", lineNum)
@@ -439,19 +515,38 @@ func parseTestcmd(s string, lineNum int, skip bool, vars map[string]string) (tes
 		fields = append(fields, "")
 	}
 
+	infile := unescapeTestStr(expandVars(fields[3], vars))
+	if content, ok := echoExprContent(infile); ok {
+		infile = content
+	}
+
 	tc := testCase{
 		name:     fields[0],
 		args:     expandVars(fields[1], vars),
 		expected: unescapeTestStr(expandVars(fields[2], vars)),
-		infile:   unescapeTestStr(expandVars(fields[3], vars)),
+		infile:   infile,
 		stdin:    unescapeTestStr(expandVars(fields[4], vars)),
 		line:     lineNum,
 		skip:     skip,
+		nospace:  nospace,
 	}
 	return tc, nil
 }
 
-func parseTesting(s string, cmdName string, lineNum int, skip bool, vars map[string]string) (testCase, error) {
+// echoExprContent expands the `$(echo -e '...')` form the upstream fixtures use
+// for binary fixture content (file.test's ar header). Anything else is left to
+// the caller unchanged.
+var echoExprRe = regexp.MustCompile(`(?s)^\$\(echo( -e)? '(.*)'\)(\n?)$`)
+
+func echoExprContent(s string) (string, bool) {
+	m := echoExprRe.FindStringSubmatch(s)
+	if m == nil {
+		return "", false
+	}
+	return unescapeTestStr(m[2]) + "\n" + m[3], true
+}
+
+func parseTesting(s string, cmdName string, lineNum int, skip, nospace bool, vars map[string]string) (testCase, error) {
 	fields, err := extractQuotedFields(s)
 	if err != nil || len(fields) < 3 {
 		return testCase{}, fmt.Errorf("parse error line %d", lineNum)
@@ -485,8 +580,49 @@ func parseTesting(s string, cmdName string, lineNum int, skip bool, vars map[str
 		stdin:    unescapeTestStr(expandVars(fields[4], vars)),
 		line:     lineNum,
 		skip:     skip,
+		nospace:  nospace,
 	}
 	return tc, nil
+}
+
+// quotesBalanced reports whether every quoted word in s is terminated.
+func quotesBalanced(s string) bool {
+	_, err := extractQuotedFields(s)
+	return err == nil
+}
+
+// expectedSpansLines reports whether s holds a case name, a complete command
+// argument and then an unterminated quoted expected-output argument, which is
+// how readelf.test writes multi-line golden blocks. Continuation lines that
+// break a command argument are not accepted, so their accounting is unchanged.
+func expectedSpansLines(s string) bool {
+	if quotesBalanced(s) {
+		return false
+	}
+	i, complete := 0, 0
+	for i < len(s) {
+		for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+			i++
+		}
+		if i >= len(s) {
+			return false
+		}
+		if s[i] != '"' && s[i] != '\'' {
+			// Bare words (the testing/testcmd helper name) carry no quoted field.
+			for i < len(s) && s[i] != ' ' && s[i] != '\t' {
+				i++
+			}
+			continue
+		}
+		end := findClosingQuote(s, i+1, s[i])
+		if end < 0 {
+			// Only a double-quoted expected argument spans lines upstream.
+			return complete == 2 && s[i] == '"'
+		}
+		complete++
+		i = end + 1
+	}
+	return false
 }
 
 func unescapeDQ(s string) string {
@@ -786,7 +922,7 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, setupLog []setupEven
 		t.Skip(reason)
 	}
 
-	if tc.skip {
+	if tc.skip && !toyonlyRunSuites[cmdName] {
 		skipRecorded(t, rec, testaccount.Deferred, "toyonly or host-restricted test")
 	}
 	if _, ok := builtins.Lookup(cmdName); !ok {
@@ -930,7 +1066,7 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, setupLog []setupEven
 	cmd.Run(ctx)
 
 	got := stdout.String()
-	if got != tc.expected {
+	if !sameOutput(got, tc.expected, tc.nospace) {
 		t.Errorf("stdout mismatch:\n  got:  %q\n  want: %q\n  args: %q\n  stderr: %q",
 			got, tc.expected, args, stderr.String())
 	}
@@ -1117,13 +1253,33 @@ func runTestCaseShell(t *testing.T, cmdName string, tc testCase, setupLog []setu
 	got := stdout.String()
 	expected := tc.expected
 
-	if got != expected {
+	if !sameOutput(got, expected, tc.nospace) {
 		if cmdName == "strings" {
 			t.Logf("STRINGS FAIL: fullCmd=%q got=%q expected=%q stderr=%q stdinLen=%d", fullCmd, got, expected, stderr.String(), len(tc.stdin))
 		}
 		t.Errorf("stdout mismatch:\n  got:  %q\n  want: %q\n  cmd:  %q\n  stderr: %q",
 			got, tc.expected, fullCmd, stderr.String())
 	}
+}
+
+// sameOutput compares a case's output. nospace cases mirror toybox's
+// NOSPACE=1 directive, which runs diff -auw: whitespace is ignored entirely.
+func sameOutput(got, want string, nospace bool) bool {
+	if got == want {
+		return true
+	}
+	if !nospace {
+		return false
+	}
+	strip := func(s string) string {
+		return strings.Map(func(r rune) rune {
+			if r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f' {
+				return -1
+			}
+			return r
+		}, s)
+	}
+	return strip(got) == strip(want)
 }
 
 func classifyKnown(name, detail string) *testaccount.Reason {

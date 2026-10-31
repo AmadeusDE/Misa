@@ -103,7 +103,9 @@ through stale-pass probes; those probes report unchecked skips explicitly.
 ## Fixture provenance
 
 `tests/provenance/fixtures.json` inventories the local fixture bytes with SHA-256,
-source-registry IDs and reported upstream paths. Its tests check completeness,
+source-registry IDs and reported upstream paths. That includes the copied upstream
+fixtures under `tests/toybox/files/`, which the toybox adapter exposes to suites as
+`$FILES`; every file there must be reviewed, pinned and inventoried. Its tests check completeness,
 hashes and safe file types without network access. Approved source URLs, pinned
 revisions and licenses resolve through the F01 registry; the per-file verification
 status must be read alongside them: `matches-pin` means byte-identical;

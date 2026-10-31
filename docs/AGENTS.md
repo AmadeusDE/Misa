@@ -123,6 +123,11 @@ internal/
     tail.go proc.go sysutil.go   System utilities
     man.go install.go util.go    Misc helpers
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
+    file.go                      `file [-bhLs]` — describe file types (ELF, archives, images, scripts; else "data").
+                                 Ported from toybox toys/posix/file.c (0BSD); bounded prefix + bounded ELF reads
+    readelf.go                   `readelf [-AadehlnSsW] [-p SECTION] [-x SECTION]` — ELF header/program/section/
+                                 dynamic/symbol/note dumps and section string/hex dumps (ELF32/64, LE/BE).
+                                 Ported from toybox toys/other/readelf.c (0BSD); every accessor is bounds-checked
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
     mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game
     chess.go                     `chess [variant] [-f file.yaml] [--fen pos] [-c white|black|both|none] [--level name] [--think s] [-l]`
