@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03
+# Vi compatibility ledger — F01/F02/F03/F04
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -12,7 +12,9 @@ whereas Vim defaults `Y` to `yy`. This task does not change `Y`.
 Vim/Neovim documentation and black-box behavior are specifications only. The fixtures and helper
 are original; no external editor source, runtime files, tests, or tutor passages were imported or
 newly adapted. The implementation uses [Vim motion documentation](https://vimhelp.org/motion.txt.html)
-as a specification only. Existing Toybox/vis attribution in `internal/vi/NOTICE` remains unchanged.
+as a specification only. Optional black-box checks of counted till repeats used Debian Vim
+9.1.1230 (`-u NONE -U NONE -i NONE -N -n`, default `cpoptions`); normal tests do not run it.
+Existing Toybox/vis attribution in `internal/vi/NOTICE` remains unchanged.
 
 ## Replay fixtures (F01)
 
@@ -41,13 +43,16 @@ without quitting Misa and preserves its register.
 | Scope | Original regression fixtures | Status |
 | --- | --- | --- |
 | F01: classic tutor lessons 1–2 skills | `hjkl`, `x`, `i`, `A`, `dw`, `d$`, `de`, `2w`, `3e`, `0`, `d2w`, `dd`, `2dd`, `u`, `U`, Ctrl-R | Seeded in `tutor_f01_test.go`; full-state line-delete expectations now pass, alongside narrower content/register checks. This is not full tutor conformance. |
-| F01: safety and entry paths | Empty buffers/lines, empty-line forward search, cancellation, `:q` protection, `:q!`, `:wq`, standalone quit and embedded mux return | Tested; forward search now bounds its start slice on an empty line. |
+| F01: safety and entry paths | Empty buffers/lines, empty-line forward search, cancellation, `:q` protection, `:q!`, `:wq`, standalone quit and embedded mux return | Tested; forward search handles empty lines without indexing past their end. |
 | F02: counts and prefixes | `2d3w`, `5gg`, `2fx`, `3rx`, `3p`, `3P`, counted `D/C/S/s/J/x/X`, `"a2yy` then `"ap` | Tested in `count_replay_test.go` and focused state/safety tests. Counts survive prefixes; operator and motion counts multiply. `3J` joins three lines, not four. |
 | F02: cancellation | Escape while `d`, `2"`, or `"a` is pending; invalid operators/prefixes; next-command isolation | Pending count, register, and operator state is discarded on cancellation or invalid input. |
 | F02: count safety | Huge `x`, `dd`, multiplied counts, wrapping search and absolute line positions above 10000 | Overflow-safe, bounded by the limits below. The original exhausted-word and line-delete expectations now pass without changing their expected state. |
 | F03: operator range normalization and motions | `operator_range_replay_test.go`, `operator_edges_replay_test.go`, `operator_entry_test.go` | Explicit exclusive/inclusive/linewise motion normalization for existing `d`, `c`, `y`, `<`, `>` operators; backward motions and no-ops; `dl`, `dh`, `d0`, `$`, counted `$`, `_`, counted `_`, `dj`/`dk` counts, `gg`/`G` linewise ranges (including operator-pending `gg`). |
 | F03: word and line-end ranges | `operator_range_replay_test.go`, `operator_edges_replay_test.go` | `dw`/`de`/`db`/`cw` including whitespace and EOL/EOF, `cw` word-end behavior, `c$`, `cc`/counted `cc`, `y` word/end/`$`; sentence-motion fixtures cover exclusive motions landing at a later line's column zero. `w` as an operator's final step at EOL does not consume the newline, including counted operations and yanks. |
 | F03: cursor and dirty-state edge cases | `operator_range_replay_test.go`, `operator_entry_test.go`, `internal/ui/editor_range_regression_test.go` | Preferred column after short lines and `$`; linewise `d`/`c` naturally mark the buffer dirty. The existing dirty-only skips are enabled and pass. Basic multiline change uses the existing single snapshot; broader saved-state and undo transaction correctness remains F05. |
+| F04: find/search motions | `find_f04_replay_test.go`, `search_f04_replay_test.go` | `f`/`t` are inclusive, `F`/`T` exclusive; `;`/`,` counts preserve/reverse direction; literal `/` and `?`, `n`/`N`, wrapping, operator composition and multiplied counts, empty-pattern prompt Enter (`/<CR>`) reuse, cancellation, failures, and empty-line safety. |
+| F04: structural motions | `structural_f04_replay_test.go` | `%` matching pairs, fallback scan and inclusive operator ranges; `1..100%` linewise; `gg`/`G` linewise operators; `m[a-z]`, apostrophe linewise and backtick exclusive local marks. |
+| F04: entry paths | `motion_entry_test.go`, `internal/ui/editor_motion_regression_test.go` | Standalone and mux motion entry/return coverage through the editor event path. |
 
 ## Count safety policy
 
@@ -62,9 +67,15 @@ without quitting Misa and preserves its register.
 ## Deferred and skipped expectations
 
 - **F03:** The range and motion coverage above is partial, not general Vim operator compatibility.
-  WORD motions `W`/`E`, `cW`/`dE` are not implemented (H01). `gu`/`gU`/`g~` are not existing
-  normal operators here (G06). F04 find/search/`%` operator motions remain deferred; `gg` is the
-  implemented exception. No broader sentence-motion/operator coverage is claimed.
+  WORD motions `W`/`E`, `cW`/`dE` are not implemented (H01); `gu`/`gU`/`g~` are not existing
+  normal operators here (G06). Sentence-motion/operator coverage remains limited; F04 motions are
+  covered above.
+- **F04:** Regex and offset syntax, and command/search history (G01/T07), are unsupported. Search
+  retains the existing literal-pattern and case-suffix subset; no `//` delimiter grammar is claimed
+  (empty prompt Enter reuses the last pattern). `wrapscan`, `matchpairs`, and `cpoptions` are not
+  configurable. Mark relocation/navigation enhancements (H10), Visual parity (H07), dot (F06), and
+  undo units (F05) remain deferred. Uppercase marks retain their existing same-buffer behavior;
+  cross-file marks are not implemented.
 - **F05:** Linewise `d`/`c` now mark the buffer dirty, and existing dirty-only skips are enabled and pass.
   Broader saved-state correctness and undo transactions remain deferred. Basic multiline change uses
   the existing single snapshot; this does not establish general undo transaction behavior.
@@ -72,7 +83,10 @@ without quitting Misa and preserves its register.
   Skipped fixtures record dot losing a put count and counted insert leaving the cursor at the first
   repetition instead of the last. Narrower content-growth coverage still runs. Macro composition/
   recording and counted macro replay (`@`) are unchanged and not certified by this fixture subset.
+  A narrow normal-mode find/delete macro replay is tested. The implicit bracket form of `d%`
+  remains a bracket motion on dot; broader dot semantics are not certified. A skipped fixture in
+  `motion_edges_replay_test.go` records that dot after a `c`-motion does not replay the change.
 
-`misatutor` already describes counted `gg`, edits, and insert commands; these changes make those
-existing count claims more accurate and require no new tutor prose. Its wider operator/macro claims
-remain outside this PR's compatibility claim.
+`misatutor` already describes counted `gg`, operator-find, and `d%`; these existing examples now
+use the shared motion path, so no new tutor prose is needed. Broader macro and text-object
+compatibility remains deferred.

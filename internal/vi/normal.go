@@ -96,24 +96,21 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 	e.count = 0
 	e.countGiven = false
 
-	// Operator pending: next key must be a motion
+	// Multi-key motions retain the operator, count, and register until resolved.
+	if isMotionPrefix(key) {
+		e.count, e.countGiven = count, cg
+		e.pendingKey = key
+		return nil
+	}
+	if key == "/" || key == "?" {
+		e.count, e.countGiven = count, cg
+		e.startSearch(key)
+		return nil
+	}
 	if e.pendingOp != 0 {
-		if key == "g" {
-			e.count, e.countGiven = count, cg
-			e.pendingKey = "g"
-			return nil
-		}
-		c := count
-		if e.opCountGiven {
-			c = countProduct(e.opCount, count)
-		}
-		op := e.pendingOp
-		hadOpCount := e.opCountGiven
-		e.pendingOp = 0
-		e.opCount = 0
-		e.opCountGiven = false
-		e.executeOperatorMotion(op, key, c, cg || hadOpCount)
-		e.hasReg, e.pendingReg = false, 0
+		count, cg = e.commandMotionCount(count, cg)
+		e.executeOperatorMotion(e.pendingOp, key, count, cg)
+		e.clearCommandState()
 		return nil
 	}
 
@@ -125,8 +122,8 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 	}()
 
 	// --- Standalone motions ---
-	if m, ok := e.motionDest(key, count, cg); ok {
-		if key == "G" || key == "gg" {
+	if m, ok := e.resolveMotion(key, count, cg); ok {
+		if motionAddsJump(key) {
 			e.addJump()
 		}
 		if key == "j" || key == "k" || key == "up" || key == "down" {
@@ -362,11 +359,6 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 			e.ensureVisible()
 		}
 		return nil
-	case "%":
-		e.matchBracket()
-		return nil
-	case "n", "N":
-		e.searchCounted(count, key == "N")
 
 	case "ctrl+g":
 		fname := e.filename
@@ -389,16 +381,6 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 	case "ctrl+i":
 		e.jumpForward()
 
-	// Find char
-	case "f", "F", "t", "T":
-		e.opCount = count
-		e.pendingKey = key
-		return nil
-	case ";":
-		e.repeatFind(count, false)
-	case ",":
-		e.repeatFind(count, true)
-
 	// Macros
 	case "q":
 		if !e.recording {
@@ -412,9 +394,6 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 	// Marks
 	case "m":
 		e.pendingKey = "m"
-		return nil
-	case "'", "`":
-		e.pendingKey = key
 		return nil
 
 	// Insert mode entry
@@ -499,24 +478,10 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		e.count, e.countGiven = count, cg
 		e.pendingKey = "]"
 		return nil
-	case "g":
-		e.count, e.countGiven = count, cg
-		e.pendingKey = "g"
-		return nil
 
 	// Mode entry
 	case ":":
 		e.mode = ModeCommand
-		e.cmdBuf = ""
-		return nil
-	case "/":
-		e.searchDir = 1
-		e.mode = ModeSearch
-		e.cmdBuf = ""
-		return nil
-	case "?":
-		e.searchDir = -1
-		e.mode = ModeSearch
 		e.cmdBuf = ""
 		return nil
 
@@ -561,37 +526,10 @@ func (e *Editor) handlePendingKey(key string) tea.Cmd {
 		}
 		return nil
 
-	case "f", "F", "t", "T":
-		runes := []rune(key)
-		if len(runes) == 1 {
-			count := e.opCount
-			if count < 1 {
-				count = 1
-			}
-			if e.pendingOp != 0 {
-				op := e.pendingOp
-				e.pendingOp = 0
-				startRow, startCol := e.row, e.col
-				if e.findChar(runes[0], pending[0], count) {
-					e.saveUndo()
-					toC := e.col
-					if pending == "f" || pending == "t" {
-						toC++
-					}
-					e.row = startRow
-					e.col = startCol
-					fromC := e.col
-					if fromC > toC {
-						fromC, toC = toC, fromC
-					}
-					e.applyCharOp(op, e.row, fromC, e.row, toC, pending+key, count)
-				}
-			} else {
-				e.findChar(runes[0], pending[0], count)
-			}
+	case "f", "F", "t", "T", "'", "`":
+		if len([]rune(key)) == 1 {
+			e.completePendingMotion(pending + key)
 		}
-		e.opCount = 0
-		e.opCountGiven = false
 		return nil
 
 	case "Z":
@@ -663,36 +601,7 @@ func (e *Editor) handlePendingKey(key string) tea.Cmd {
 		}
 		switch key {
 		case "g":
-			count := 1
-			cg := false
-			if e.countGiven {
-				count = e.count
-				cg = true
-			}
-			e.count = 0
-			e.countGiven = false
-
-			if e.pendingOp != 0 {
-				op := e.pendingOp
-				if e.opCountGiven {
-					count = countProduct(e.opCount, count)
-					cg = true
-				}
-				e.pendingOp = 0
-				e.opCount = 0
-				e.opCountGiven = false
-				e.executeOperatorMotion(op, "gg", count, cg)
-				e.hasReg, e.pendingReg = false, 0
-				return nil
-			}
-
-			e.addJump()
-			if m, ok := e.motionDest("gg", count, cg); ok {
-				e.row = m.row
-				e.col = m.col
-			}
-			e.clampCursor()
-			e.ensureVisible()
+			e.completePendingMotion("gg")
 		case "d":
 			// gd - go to local declaration (just go to first occurrence of word under cursor)
 			word := e.wordUnderCursor()
@@ -747,35 +656,6 @@ func (e *Editor) handlePendingKey(key string) tea.Cmd {
 		}
 		return nil
 
-	case "'":
-		if len(key) == 1 {
-			ch := key[0]
-			if p, ok := e.marks[ch]; ok {
-				e.addJump()
-				e.row = p.row
-				e.col = e.firstNonBlank(p.row)
-				e.clampCursor()
-				e.ensureVisible()
-			} else {
-				e.statusMsg = fmt.Sprintf("Mark '%c' not set", ch)
-			}
-		}
-		return nil
-
-	case "`":
-		if len(key) == 1 {
-			ch := key[0]
-			if p, ok := e.marks[ch]; ok {
-				e.addJump()
-				e.row = p.row
-				e.col = p.col
-				e.clampCursor()
-				e.ensureVisible()
-			} else {
-				e.statusMsg = fmt.Sprintf("Mark '%c' not set", ch)
-			}
-		}
-		return nil
 	}
 
 	return nil

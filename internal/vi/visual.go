@@ -373,14 +373,8 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "g":
 			e.pendingKey = "g"
-		case "/":
-			e.searchDir = 1
-			e.mode = ModeSearch
-			e.cmdBuf = ""
-		case "?":
-			e.searchDir = -1
-			e.mode = ModeSearch
-			e.cmdBuf = ""
+		case "/", "?":
+			e.startSearch(key)
 		case "n":
 			if e.searchPat != "" {
 				e.searchNext()
