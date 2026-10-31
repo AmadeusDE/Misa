@@ -56,6 +56,34 @@ jobs:
       - name: Race (terminal, web, UI, agent)
         run: go test -race -count=1 ./internal/term/ ./internal/webui/ ./internal/mweb/ ./internal/ui/ ./internal/ugh/...
 
+  # Windows gates (#108 F05). Package scope: .github/windows/packages.txt.
+  # The cross-build keeps both architectures compiling, tests included.
+  windows-cross:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.27.1"
+      - name: Build, vet and compile tests for windows/amd64 and windows/arm64
+        run: .github/windows/cross.sh "$RUNNER_TEMP/windows"
+
+  # The packages marked native in packages.txt, run on a real Windows host.
+  windows-native:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.27.1"
+      - name: Test
+        run: .github/windows/native.sh
+
   # Termux CLI cross-build. Kept off `check` so a missing NDK cannot hide a
   # Linux failure. NDK revision is android/ndk.version (D2).
   android:

@@ -43,6 +43,8 @@ ANDROID_NDK_HOME=... ANDROID_HOME=... just apk-release
 # returns term.ErrUnsupported until ConPTY (plan P02). platformset_test.go pins the package set.
 GOOS=windows GOARCH=amd64 go build -tags 'nough noweb' -o /dev/null .
 GOOS=windows GOARCH=arm64 go build -tags 'nough noweb' -o /dev/null .
+# CI (windows-cross, windows-native): .github/windows/packages.txt is the package scope. cross.sh builds, vets and
+# compiles the tests for both arches; native.sh runs the `native` packages on windows-latest. Grow the list per feature.
 ```
 
 Single binary, no external build tools needed except the Android NDK for `GOOS=android`

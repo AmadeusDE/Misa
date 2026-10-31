@@ -1,0 +1,38 @@
+# Windows CI package scope (#108 F05). One package per line: <path> <mode>.
+#   native   compiled for windows/amd64 and windows/arm64 on ubuntu AND tested on a windows runner
+#   compile  compiled and vetted for both arches only (tests not run natively yet); give the reason after '#'
+# This list grows with each Windows feature: move a package from compile to native once it passes natively,
+# and add new packages here. It must stay equal to windowsProduct in platformset_test.go.
+# Excluded on purpose: cmd/ugh and internal/ugh/* (agent port is part 2 of docs/plans/windows.md),
+# cmd/ughbot and internal/ughbot/* (outside the port), cmd/misagui and internal/gui/android (Android JNI),
+# internal/wayland and internal/xkb (Wayland, Unix only), internal/webui, internal/mweb, internal/webadmin,
+# internal/webdevtui (--web, built with noweb), tests/* (Unix-only conformance suites: syscall.Umask, Mkfifo).
+. native
+internal/ascii native
+internal/battleship native
+internal/builtins native
+internal/chess native
+internal/clipboard native
+internal/color native
+internal/companion native
+internal/config native
+internal/fileops native
+internal/gitinfo native
+internal/gradle native
+internal/gui native
+internal/help native
+internal/jobleader native
+internal/justfile native
+internal/launcher native
+internal/lscore native
+internal/makefile native
+internal/mines native
+internal/pkgmanager native
+internal/procmon native
+internal/sshclient native
+internal/sysinfo native
+internal/term native
+internal/termkeys native
+internal/thefuck native
+internal/ui native
+internal/vi native
