@@ -1,12 +1,35 @@
-// Package awk implements the core of the AWK language: a lexer, parser and
-// interpreter for pattern-action programs with fields and records,
-// POSIX numeric-string coercion, printf formatting and the string and math
-// builtins that need no arrays. Regular expressions are POSIX EREs from
-// internal/posixre.
+// Package awk implements the AWK language: a lexer, parser and interpreter
+// for pattern-action programs with fields and records, POSIX numeric-string
+// coercion, printf formatting, the string and math builtins, associative
+// arrays, user-defined functions, getline, output redirection, pipes and
+// system(). Regular expressions are POSIX EREs from internal/posixre.
 //
-// Arrays, user-defined functions, getline, output redirection, pipes and
-// system calls are not implemented yet; programs using them are rejected
-// with an error that names the feature.
+// Commands (system, "cmd" | getline, print | "cmd") run through Config.Run, a
+// Runner that executes one shell command line. Without a Runner they fail with
+// a runtime error. Streams are shared by name: every use of the same file or
+// command string refers to the same open stream until close() is called, and
+// all streams are flushed and closed (commands waited for) when the program
+// ends. Standard output is flushed before a command starts, before system()
+// and before a pipe is closed, so output appears in program order; a pipe left
+// open at the end produces its output after everything awk itself printed.
+//
+// Arrays keep insertion order: `for (k in a)` visits the elements that exist
+// when the loop starts, in the order they were first created, skips ones
+// deleted before they are reached and does not visit ones added meanwhile.
+// length(array) is supported. ARGV is read when the main input moves to the
+// next operand, so changes in BEGIN take effect. ENVIRON comes from Config.Env.
+//
+// Unsupported gawk extensions are rejected with an error naming them, never
+// run silently: BEGINFILE and ENDFILE, @include and the other @-directives,
+// the functions gensub, strftime, systime, mktime, asort, asorti, patsplit,
+// strtonum, isarray, typeof and the bit functions (and, or, xor, compl,
+// lshift, rshift), the variables PROCINFO, IGNORECASE, RT, FIELDWIDTHS, FPAT,
+// ERRNO, ARGIND, BINMODE, FUNCTAB, SYMTAB, LINT and TEXTDOMAIN, switch,
+// arrays of arrays (a[i][j]), \u string escapes, /inet/ network files and the
+// two-way pipe |&. A user function with one of the function names above is
+// allowed. Accepted extensions: `**` and `**=`, `func`, delete of a whole
+// array, length(array), nextfile, a regular-expression RS and the printf
+// conversions %i and %F.
 //
 // Text is handled as UTF-8: length, substr, index, match and field
 // splitting with an empty FS count characters, and every invalid byte

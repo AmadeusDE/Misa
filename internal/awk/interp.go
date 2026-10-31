@@ -2,6 +2,7 @@ package awk
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -21,8 +22,14 @@ type Config struct {
 	Stdin    io.Reader
 	Stdout   io.Writer
 	Stderr   io.Writer
-	// Done, when closed, stops the program at its next record or loop turn.
+	// Done, when closed, stops the program at its next record or loop turn
+	// and cancels the context handed to Run.
 	Done <-chan struct{}
+	// Env is the environment behind ENVIRON, as KEY=value strings.
+	Env []string
+	// Run executes a command line for system() and for pipes. Without it
+	// those fail with a runtime error.
+	Run Runner
 }
 
 type control uint8
@@ -34,7 +41,21 @@ const (
 	ctlNext
 	ctlNextFile
 	ctlExit
+	ctlReturn
 )
+
+// unwind carries exit, next and nextfile out of a user function call.
+type unwind struct{ c control }
+
+type local struct {
+	v    Value
+	a    *array
+	bind func(*array) // gives an array created from an untyped parameter to the caller
+}
+
+type frame struct{ locals []local }
+
+const maxCallDepth = 20000
 
 type interp struct {
 	cfg  Config
@@ -43,6 +64,16 @@ type interp struct {
 	r    record
 	in   inputs
 	out  *bufio.Writer
+	outw io.Writer // standard output shared with commands
+	errw io.Writer
+	ctx  context.Context
+	st   streams
+
+	garrs  []*array
+	frame  *frame
+	depth  int
+	retval Value
+	stdinR *reader
 
 	fs, ofs, ors, rs, subsep, convfmt, ofmt string
 
@@ -64,10 +95,23 @@ func Run(cfg Config) (status int) {
 		fmt.Fprintf(cfg.Stderr, "awk: %v\n", err)
 		return 2
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if cfg.Done != nil {
+		go func() {
+			select {
+			case <-cfg.Done:
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+	}
 	in := newInterp(cfg, prog)
+	in.ctx = ctx
 	defer func() {
-		if r := recover(); r != nil {
-			in.out.Flush()
+		r := recover()
+		if r != nil {
+			in.shutdown()
 			switch e := r.(type) {
 			case *Error:
 				fmt.Fprintf(cfg.Stderr, "awk: %v\n", e)
@@ -78,6 +122,12 @@ func Run(cfg Config) (status int) {
 			default:
 				panic(r)
 			}
+			return
+		}
+		in.shutdown()
+		if in.cancelRequested() {
+			fmt.Fprintln(cfg.Stderr, "awk: canceled")
+			status = 1
 		}
 	}()
 	if msg := in.setup(); msg != "" {
@@ -85,7 +135,6 @@ func Run(cfg Config) (status int) {
 		return 2
 	}
 	in.run()
-	in.out.Flush()
 	if in.exitCode != 0 {
 		return in.exitCode
 	}
@@ -94,7 +143,17 @@ func Run(cfg Config) (status int) {
 
 func newInterp(cfg Config, prog *Program) *interp {
 	in := &interp{cfg: cfg, prog: prog, vars: make([]Value, prog.nvars), seed: 1}
-	in.out = bufio.NewWriterSize(cfg.Stdout, 32<<10)
+	if in.cfg.Stdin == nil {
+		in.cfg.Stdin = strings.NewReader("")
+	}
+	in.cfg.Stdin = shareable(in.cfg.Stdin)
+	in.outw = &lockedWriter{w: cfg.Stdout}
+	in.errw = &lockedWriter{w: cfg.Stderr}
+	in.cfg.Stderr = in.errw
+	in.out = bufio.NewWriterSize(in.outw, 32<<10)
+	in.garrs = make([]*array, prog.nvars)
+	in.st = streams{outs: map[string]*stream{}, ins: map[inKey]*stream{}}
+	in.initArrays()
 	in.reCache = map[string]*posixre.Regexp{}
 	in.rng = rand.New(rand.NewSource(1))
 	in.vars[vFS] = str(" ")
@@ -110,7 +169,7 @@ func newInterp(cfg Config, prog *Program) *interp {
 	in.vars[vFNR] = num(0)
 	in.vars[vARGC] = num(float64(len(cfg.Operands) + 1))
 	in.refreshCaches()
-	in.in.operands = cfg.Operands
+	in.in.next = 1
 	in.setRecord("")
 	return in
 }
@@ -151,6 +210,18 @@ func (in *interp) warnf(format string, args ...any) {
 	fmt.Fprintf(in.cfg.Stderr, "awk: "+format+"\n", args...)
 }
 
+func (in *interp) cancelRequested() bool {
+	if in.cfg.Done == nil {
+		return false
+	}
+	select {
+	case <-in.cfg.Done:
+		return true
+	default:
+		return false
+	}
+}
+
 func (in *interp) tick() {
 	in.steps++
 	if in.steps&0xfff != 0 || in.cfg.Done == nil {
@@ -172,9 +243,28 @@ func (in *interp) run() {
 	in.runEnd()
 }
 
+// guarded runs f, turning exit/next/nextfile raised inside a user function
+// back into a control value.
+func (in *interp) guarded(f func() control) (c control) {
+	if len(in.prog.funcs) == 0 {
+		return f()
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			u, ok := r.(unwind)
+			if !ok {
+				panic(r)
+			}
+			in.frame, in.depth = nil, 0
+			c = u.c
+		}
+	}()
+	return f()
+}
+
 func (in *interp) runBegin() bool {
 	for _, body := range in.prog.begins {
-		if in.execList(body) == ctlExit {
+		if in.guarded(func() control { return in.execList(body) }) == ctlExit {
 			return true
 		}
 	}
@@ -185,7 +275,7 @@ func (in *interp) runRecords() {
 	for in.nextRecord() {
 		in.tick()
 		for _, r := range in.prog.rules {
-			c := in.runRule(r)
+			c := in.guarded(func() control { return in.runRule(r) })
 			if c == ctlExit {
 				return
 			}
@@ -201,7 +291,7 @@ func (in *interp) runRecords() {
 
 func (in *interp) runEnd() {
 	for _, body := range in.prog.ends {
-		if in.execList(body) == ctlExit {
+		if in.guarded(func() control { return in.execList(body) }) == ctlExit {
 			return
 		}
 	}
@@ -288,6 +378,16 @@ func (in *interp) exec(s stmt) control {
 		}
 	case *forStmt:
 		return in.execFor(s)
+	case *forInStmt:
+		return in.execForIn(s)
+	case *deleteStmt:
+		in.execDelete(s)
+	case *returnStmt:
+		in.retval = Value{}
+		if s.e != nil {
+			in.retval = in.eval(s.e)
+		}
+		return ctlReturn
 	case *nextStmt:
 		return ctlNext
 	case *nextFileStmt:
@@ -303,6 +403,32 @@ func (in *interp) exec(s stmt) control {
 		return ctlExit
 	}
 	return ctlNone
+}
+
+func (in *interp) execForIn(s *forInStmt) control {
+	arr := in.arrayFor(s.arr)
+	for _, k := range arr.keys() {
+		if !arr.has(k) {
+			continue
+		}
+		in.tick()
+		in.store(in.resolve(s.v), str(k))
+		if c := in.exec(s.body); c == ctlBreak {
+			break
+		} else if c != ctlNone && c != ctlContinue {
+			return c
+		}
+	}
+	return ctlNone
+}
+
+func (in *interp) execDelete(s *deleteStmt) {
+	arr := in.arrayFor(s.arr)
+	if s.subs == nil {
+		arr.clear()
+		return
+	}
+	arr.del(in.subscript(s.subs))
 }
 
 func (in *interp) execFor(s *forStmt) control {
@@ -331,22 +457,36 @@ func (in *interp) outputText(v Value) string {
 }
 
 func (in *interp) execPrint(s *printStmt) {
+	if s.dest == nil {
+		in.writePrint(in.out, s)
+		return
+	}
+	st := in.output(s.redir, in.eval(s.dest).text(in.convfmt))
+	in.writePrint(st.w, s)
+	if st.eager {
+		st.w.Flush()
+	}
+}
+
+func (in *interp) writePrint(w *bufio.Writer, s *printStmt) {
 	if s.printf {
 		format := in.eval(s.args[0]).text(in.convfmt)
-		in.out.WriteString(sprintf(format, in.evalAll(s.args[1:]), in.cfg.Bytes, in.convfmt))
+		w.WriteString(sprintf(format, in.evalAll(s.args[1:]), in.cfg.Bytes, in.convfmt))
 		return
 	}
 	if len(s.args) == 0 {
-		in.printRecord()
+		in.ensureRecord()
+		w.WriteString(in.r.rec)
+		w.WriteString(in.ors)
 		return
 	}
 	for i, a := range s.args {
 		if i > 0 {
-			in.out.WriteString(in.ofs)
+			w.WriteString(in.ofs)
 		}
-		in.out.WriteString(in.outputText(in.eval(a)))
+		w.WriteString(in.outputText(in.eval(a)))
 	}
-	in.out.WriteString(in.ors)
+	w.WriteString(in.ors)
 }
 
 func (in *interp) evalAll(args []expr) []Value {
@@ -392,18 +532,24 @@ func (in *interp) getVar(idx int) Value {
 	return in.vars[idx]
 }
 
-// ref is a resolved assignment target: a variable or a field.
+// ref is a resolved assignment target: a variable, a field or an element.
 type ref struct {
 	field bool
+	local bool
 	idx   int
+	name  string
+	arr   *array // element target
+	key   string
 }
 
 func (in *interp) resolve(lv expr) ref {
 	switch lv := lv.(type) {
 	case *varRef:
-		return ref{idx: lv.idx}
+		return ref{idx: lv.idx, local: lv.local, name: lv.name}
 	case *fieldRef:
 		return ref{field: true, idx: in.fieldIndex(lv)}
+	case *indexExpr:
+		return ref{arr: in.arrayFor(lv.arr), key: in.subscript(lv.subs)}
 	}
 	runtimeErrorf("assignment to a non-variable")
 	return ref{}
@@ -421,18 +567,50 @@ func (in *interp) fieldIndex(f *fieldRef) int {
 }
 
 func (in *interp) load(r ref) Value {
-	if r.field {
+	switch {
+	case r.field:
 		return in.field(r.idx)
+	case r.arr != nil:
+		return r.arr.get(r.key)
+	case r.local:
+		return in.loadLocal(r.idx, r.name)
 	}
-	return in.getVar(r.idx)
+	return in.loadGlobal(r.idx, r.name)
 }
 
 func (in *interp) store(r ref, v Value) {
-	if r.field {
+	switch {
+	case r.field:
 		in.setField(r.idx, v)
-		return
+	case r.arr != nil:
+		r.arr.set(r.key, v)
+	case r.local:
+		l := &in.frame.locals[r.idx]
+		if l.a != nil {
+			runtimeErrorf("can't assign to %s: it is an array", r.name)
+		}
+		l.v = v
+	default:
+		if in.garrs[r.idx] != nil {
+			runtimeErrorf("can't assign to %s: it is an array", r.name)
+		}
+		in.setVar(r.idx, v)
 	}
-	in.setVar(r.idx, v)
+}
+
+func (in *interp) loadLocal(idx int, name string) Value {
+	l := &in.frame.locals[idx]
+	if l.a != nil {
+		runtimeErrorf("can't use array %s in a scalar context", name)
+	}
+	return l.v
+}
+
+func (in *interp) loadGlobal(idx int, name string) Value {
+	if in.garrs[idx] != nil {
+		runtimeErrorf("can't use array %s in a scalar context", name)
+	}
+	return in.getVar(idx)
 }
 
 func (in *interp) regex(src string) *posixre.Regexp {
@@ -475,7 +653,18 @@ func (in *interp) eval(e expr) Value {
 		in.ensureRecord()
 		return boolVal(in.matches(in.regex(e.src), in.r.rec))
 	case *varRef:
-		return in.getVar(e.idx)
+		if e.local {
+			return in.loadLocal(e.idx, e.name)
+		}
+		return in.loadGlobal(e.idx, e.name)
+	case *indexExpr:
+		return in.arrayFor(e.arr).get(in.subscript(e.subs))
+	case *inExpr:
+		return boolVal(in.arrayFor(e.arr).has(in.subscript(e.subs)))
+	case *getlineExpr:
+		return in.getline(e)
+	case *userCall:
+		return in.callUser(e)
 	case *fieldRef:
 		return in.field(in.fieldIndex(e))
 	case *groupExpr:

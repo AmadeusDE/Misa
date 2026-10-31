@@ -96,18 +96,25 @@ func (in *interp) setField(i int, v Value) {
 const maxFields = 10_000_000
 
 func (in *interp) splitFields(rec string) []string {
-	if rec == "" {
+	return in.splitBy(rec, in.fs, in.rs == "")
+}
+
+// splitBy splits s by a separator string with the FS rules: a blank is
+// whitespace, empty is per character, one other character is literal and
+// anything longer is a regular expression.
+func (in *interp) splitBy(s, fs string, newlineToo bool) []string {
+	if s == "" {
 		return nil
 	}
 	switch {
-	case in.fs == " ":
-		return splitBlanks(rec)
-	case in.fs == "":
-		return in.splitChars(rec)
-	case len(in.fs) == 1:
-		return splitByte(rec, in.fs[0], in.rs == "")
+	case fs == " ":
+		return splitBlanks(s)
+	case fs == "":
+		return in.splitChars(s)
+	case len(fs) == 1:
+		return splitByte(s, fs[0], newlineToo)
 	}
-	return in.splitRegex(rec, in.fs)
+	return in.splitRegex(s, fs)
 }
 
 func splitBlanks(s string) []string {

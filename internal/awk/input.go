@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -179,7 +180,6 @@ func (f flushReader) Read(p []byte) (int, error) {
 // inputs walks the file operands, applying var=value operands as it
 // reaches them, and falls back to standard input when there are no files.
 type inputs struct {
-	operands []string
 	next     int
 	cur      *reader
 	sawFile  bool
@@ -199,16 +199,26 @@ func isAssignment(arg string) (name, value string, ok bool) {
 	return arg[:i], arg[i+1:], true
 }
 
-func (in *interp) openStdin() *reader {
-	return newReader(flushReader{in.cfg.Stdin, in.out}, nil)
+func (in *interp) openStdin() *reader { return in.sharedStdin() }
+
+// argv returns ARGV[i], or false when it is unset or empty.
+func (in *interp) argv(i int) (string, bool) {
+	v, ok := in.garrs[vARGV].peek(strconv.Itoa(i))
+	if !ok || v.text(in.convfmt) == "" {
+		return "", false
+	}
+	return v.text(in.convfmt), true
 }
 
 // openNext opens the next input file, returning false when none remain.
 func (in *interp) openNext() bool {
 	ip := &in.in
-	for ip.next < len(ip.operands) {
-		arg := ip.operands[ip.next]
+	for ip.next < int(in.vars[vARGC].float()) {
+		arg, ok := in.argv(ip.next)
 		ip.next++
+		if !ok {
+			continue
+		}
 		if name, value, ok := isAssignment(arg); ok {
 			in.assignOperand(name, value)
 			continue
@@ -251,17 +261,25 @@ func (in *interp) skipFile() {
 
 // nextRecord reads the next record into $0 and bumps NR and FNR.
 func (in *interp) nextRecord() bool {
+	s, ok := in.readMain()
+	if ok {
+		in.setRecord(s)
+	}
+	return ok
+}
+
+// readMain reads the next record of the main input and bumps NR and FNR.
+func (in *interp) readMain() (string, bool) {
 	for {
 		if in.in.cur == nil && !in.openNext() {
-			return false
+			return "", false
 		}
 		cur := in.in.cur
 		s, ok := in.readRecord(cur)
 		if ok {
-			in.setRecord(s)
 			in.vars[vNR] = num(in.vars[vNR].float() + 1)
 			in.vars[vFNR] = num(in.vars[vFNR].float() + 1)
-			return true
+			return s, true
 		}
 		if cur.err != nil {
 			in.warnf("read error: %v", cur.err)

@@ -74,6 +74,8 @@ func runAwk(ctx *Context) int {
 		Stdin:    ctx.Stdin,
 		Stdout:   ctx.Stdout,
 		Stderr:   ctx.Stderr,
+		Env:      awkEnviron(ctx),
+		Run:      awkShell(ctx),
 	}
 	if fs, ok := flags.ExplicitString("F"); ok {
 		cfg.FS = &fs

@@ -223,6 +223,8 @@ func (lx *lexer) stringLit(tok token) (token, error) {
 			b.WriteByte(c)
 		case lx.pos >= len(lx.src):
 			b.WriteByte('\\')
+		case lx.src[lx.pos] == 'u':
+			return tok, lx.errorf("\\u escapes are not supported")
 		default:
 			lx.escape(&b)
 		}
@@ -327,6 +329,9 @@ var operators = []struct {
 
 func (lx *lexer) operator(tok token) (token, error) {
 	rest := lx.src[lx.pos:]
+	if strings.HasPrefix(rest, "|&") {
+		return tok, lx.errorf("two-way pipes (|&) are gawk extensions and are not supported")
+	}
 	for _, op := range operators {
 		if strings.HasPrefix(rest, op.text) {
 			lx.pos += len(op.text)
@@ -334,6 +339,9 @@ func (lx *lexer) operator(tok token) (token, error) {
 			tok.text = op.text
 			return tok, nil
 		}
+	}
+	if rest[0] == '@' {
+		return tok, lx.errorf("@-directives (@include, @load, @namespace) are gawk extensions and are not supported")
 	}
 	return tok, lx.errorf("unexpected character " + strconv.QuoteRune(rune(rest[0])))
 }
