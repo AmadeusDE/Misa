@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -14,8 +14,10 @@ are original; no external editor source, runtime files, tests, or tutor passages
 newly adapted. The implementation uses Vim motion documentation as a specification only. Optional
 black-box checks of counted till repeats used Debian Vim 9.1.1230 (`-u NONE -U NONE -i NONE -N -n`,
 default `cpoptions`); normal tests do not run it. F05 behavior references Vim 9.1 `nocompatible`
-documentation for `undo`, `undo-blocks`, `U`, `:w`, and `modified` only. Existing Toybox/vis
-attribution in `internal/vi/NOTICE` remains unchanged.
+documentation for `undo`, `undo-blocks`, `U`, `:w`, and `modified` only. F06 uses the same
+reference profile and documentation for `.`, `repeat.txt`, `r`, `R`, and Replace-mode Backspace
+as specifications only; no external code was used. Existing Toybox/vis attribution in
+`internal/vi/NOTICE` remains unchanged.
 
 ## Replay fixtures (F01)
 
@@ -56,6 +58,21 @@ without quitting Misa and preserves its register.
 | F04: entry paths | `motion_entry_test.go`, `internal/ui/editor_motion_regression_test.go` | Standalone and mux motion entry/return coverage through the editor event path. |
 | F05: tutor undo, `U`, Ctrl-R | `undo_f05_replay_test.go` | Covers undo/redo and line restore behavior, including no-op and changed-line cases; tutor 2.7 undo/U/Ctrl-R scenarios are covered without claiming full tutor parity. |
 | F05: edit transactions and saved identity | `undo_f05_replay_test.go`, `undo_f05_transaction_test.go`, `undo_entry_test.go`, `internal/ui/editor_undo_regression_test.go` | Insert through Escape (including Backspace, newline, counts) and `cw` change form single undo units; clean quit after undo to the saved revision is checked standalone and in a mux pane. No-op/failing commands, yanks, and motions do not create history or clear redo; a committed real new edit clears redo. |
+| F06: semantic dot repeat and count overrides | `repeat_operator_f06_test.go`, `repeat_interactions_f06_test.go`, `insert_replace_f06_test.go` | Repeats semantic operator/change, put, insert and Replace-mode edits; explicit dot counts override the stored count. Yank does not replace the repeatable change. A no-op does not replace the prior repeat. |
+| F06: insert/Replace behavior and repeat transactions | `insert_replace_f06_test.go`, `repeat_entry_test.go`, `internal/ui/editor_repeat_regression_test.go` | Insert and Replace streams (including Backspace) repeat; `r<CR>` is supported. Each dot execution is one undo transaction; repeated insert/Replace cursor placement and standalone/mux entry paths are covered. |
+
+### Tutor mapping (selected lessons only)
+
+| Tutor lesson | Relevant operation | F06 ledger coverage |
+| --- | --- | --- |
+| 3.1 | Put (`p`/`P`) | Put behavior/counts are covered by F02; semantic put repeat by F06. |
+| 3.2 | Replacement (`r`, `R`) | Character replacement and Replace mode, including `r<CR>` and dot repeat, are covered by F06. |
+| 3.3 | Change (`c`) | Existing `cw`/change ranges and semantic dot repeat are covered by F03/F06. |
+| 3.4 | `c` with motion | Existing change-motion ranges and semantic dot repeat are covered by F03/F06. |
+| 6.1 | Open lines | Existing insert/open-line behavior is covered where exercised by insertion fixtures; no complete lesson-parity claim. |
+| 6.2 | Append | `A` and insertion behavior are covered in F01/F06; no complete lesson-parity claim. |
+| 6.3 | Replace mode | Replace stream, Backspace and semantic repeat are covered by F06. |
+| 6.4 | Yank/put | Yank/register behavior is covered by F02/F03; yanks do not replace the dot repeat, and put is covered by F06. |
 
 ## Count safety policy
 
@@ -64,10 +81,10 @@ without quitting Misa and preserves its register.
   they are **not** limited to 10000 lines.
 - Non-wrapping motions/deletions bound their work by the buffer. Wrapping `n`/`N` searches skip
   complete cycles without changing the resulting counted position.
-- Content-producing puts (`p`/`P`) and insert repetitions are limited to **10000 repetitions**.
-  This bounds the repetition multiplier, not total buffer bytes.
+- Content-producing puts (`p`/`P`) and insert/Replace repetitions (including dot) are limited to
+  **10000 repetitions**. This bounds the repetition multiplier, not total buffer bytes.
 
-## Undo model and limitations (F05)
+## Undo model and limitations (F05/F06)
 
 Snapshot storage is retained and capped at **200 undo units**. The cap counts units, not bytes. A
 saved revision that falls out of the retained history cannot cause another revision to be treated as
@@ -76,19 +93,19 @@ length. Revision IDs allocated for edits are monotonic; undo/redo restore the pr
 A successful write updates the saved identity.
 
 Nested `beginEdit`/`commitEdit`/`abortEdit` groups compound changes. Insert mode, through Escape,
-is one unit (including Backspace, newline, and count repetitions); `cw` is one unit. Only a committed
-real edit clears redo. No-ops, failures, yanks, and motions create no history and do not clear redo.
-A successful write inside an explicit transaction materializes a saved revision without splitting
-its undo unit; further edits or aborting back to the earlier text are still dirty relative to that write.
-`U` restores only the last-changed line while it remains tracked; leaving that row discards the
-line-restore target, so moving away and back does not recover it. A successful `U` itself creates
-a new undoable revision. Undo/redo place the cursor at the earliest recorded mutation position
-(clamped in the restored buffer), falling back to the first differing position for edits without
-recorded coordinates. Repeated-text insertions/deletions use the actual mutation start, not the
-end of a common prefix. Intermediate edits later reversed within a transaction can still determine
-this cursor position: `liX<BS><BS>az<Esc>u` on `abc` restores at column zero, even though the final
-text difference started at column one. Full Vim deleted-line, indentation, and cursor heuristics
-are not claimed. Arrow-driven insert undo breaks are not claimed.
+is one unit (including Backspace, newline, and count repetitions); `cw` is one unit. Every dot
+execution is one undo unit. Only a committed real edit clears redo. No-ops, failures, yanks, and motions
+create no history and do not clear redo. A successful write inside an explicit transaction materializes
+a saved revision without splitting its undo unit; further edits or aborting back to the earlier text
+are still dirty relative to that write. `U` restores only the last-changed line while it remains
+tracked; leaving that row discards the line-restore target, so moving away and back does not recover it.
+A successful `U` itself creates a new undoable revision. Undo/redo place the cursor at the earliest
+recorded mutation position (clamped in the restored buffer), falling back to the first differing
+position for edits without recorded coordinates. Repeated-text insertions/deletions use the actual
+mutation start, not the end of a common prefix. Intermediate edits later reversed within a transaction
+can still determine this cursor position: `liX<BS><BS>az<Esc>u` on `abc` restores at column zero, even
+though the final text difference started at column one. Full Vim deleted-line, indentation, and cursor
+heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
 
 ## Deferred and skipped expectations
 
@@ -99,23 +116,21 @@ are not claimed. Arrow-driven insert undo breaks are not claimed.
 - **F04:** Regex and offset syntax, and command/search history (G01/T07), are unsupported. Search
   retains the existing literal-pattern and case-suffix subset; no `//` delimiter grammar is claimed
   (empty prompt Enter reuses the last pattern). `wrapscan`, `matchpairs`, and `cpoptions` are not
-  configurable. Mark relocation/navigation enhancements (H10), Visual parity (H07), and dot (F06)
-  remain deferred. Uppercase marks retain their existing same-buffer behavior; cross-file marks are
-  not implemented.
+  configurable. Mark relocation/navigation enhancements (H10) and Visual parity (H07) remain deferred.
+  Uppercase marks retain their existing same-buffer behavior; cross-file marks are not implemented.
 - **F05:** Undo behavior is limited to the model and cases above; it is not full Vim undo parity.
   In particular, arrow-driven insert undo breaks and full Vim cursor/deleted-line/indent heuristics
   are not claimed.
+- **F06:** Visual-mode and text-object dot repeat are deferred (H07/H04). Numbered-register
+  auto-advance on dot (for example, `"1p` followed by `.` selecting `"2`) is TODO(H08). Macro behavior
+  is unchanged and not certified. Arrow-driven input expansion and related behavior are unchanged; see
+  F08. Dot repeats the last real change semantically, with an explicit count overriding the stored
+  count; no-op commands and yanks do not replace that repeat. `r<CR>` is supported. Each dot execution
+  is one undo transaction.
 - **T05:** `:e`/`:e!` is not implemented. The reload-command fixture remains skipped as `TODO(T05)`;
   F05 tests the internal buffer-history reset boundary only. This reset establishes a fresh clean
   revision and clears undo, redo, and line-restore state; file loading/protection stays in T05.
-- **F06:** Dot count overrides and semantic repeat of changes/puts are not implemented here.
-  Skipped fixtures record dot losing a put count and counted insert leaving the cursor at the first
-  repetition instead of the last. Narrower content-growth coverage still runs. Macro composition/
-  recording and counted macro replay (`@`) are unchanged and not certified by this fixture subset.
-  A narrow normal-mode find/delete macro replay is tested. The implicit bracket form of `d%`
-  remains a bracket motion on dot; broader dot semantics are not certified. A skipped fixture in
-  `motion_edges_replay_test.go` records that dot after a `c`-motion does not replay the change.
 
-`misatutor` already describes counted `gg`, operator-find, and `d%`; these existing examples now
-use the shared motion path, so no new tutor prose is needed. Broader macro and text-object
-compatibility remains deferred.
+`misatutor` already describes counted `gg`, operator-find, and `d%`; these existing examples use the
+shared motion path. No tutor prose change is needed. This ledger does not claim complete tutor parity.
+Broader macro and text-object compatibility remains deferred.

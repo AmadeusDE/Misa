@@ -137,6 +137,7 @@ func (e *Editor) abortEdit() {
 }
 
 func (e *Editor) resetHistory() {
+	e.repeatPending = semanticChange{}
 	e.undoStack, e.redoStack = nil, nil
 	e.editDepth, e.editAuto = 0, false
 	e.editBefore = undoEntry{}

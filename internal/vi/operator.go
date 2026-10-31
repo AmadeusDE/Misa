@@ -2,6 +2,7 @@ package vi
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -74,6 +75,11 @@ func (e *Editor) wordOperatorDest(count int) motionResult {
 }
 
 func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGiven bool) {
+	before := slices.Clone(e.lines)
+	change := semanticChange{command: string(op), motion: key, count: count, countGiven: countGiven, register: e.repeatRegister()}
+	defer func() { e.recordOperatorChange(change, before) }()
+	change.findChar, change.findCmd = e.lastFChar, e.lastFCmd
+	change.searchPat, change.searchDir = e.searchPat, e.searchDir
 	m, ok := e.resolveMotion(key, count, countGiven)
 	if !ok {
 		return
@@ -99,14 +105,14 @@ func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGive
 		m.col = min(e.col+count, len(e.lineRunes(e.row)))
 	}
 	e.executeOperatorResult(op, key, count, m)
-	if op == 'd' && key == "%" && !countGiven {
-		e.lastRepeat = func(ed *Editor) {
-			ed.executeOperatorMotion('d', "%", count, false)
-		}
-	}
 }
 
 func (e *Editor) executeOperatorResult(op byte, key string, count int, m motionResult) {
+	if key == "n" && e.pendingOp != 0 {
+		before := slices.Clone(e.lines)
+		change := semanticChange{command: string(op), motion: key, count: count, countGiven: true, register: e.repeatRegister(), searchPat: e.searchPat, searchDir: e.searchDir}
+		defer func() { e.recordOperatorChange(change, before) }()
+	}
 	fromR, fromC, toR, toC, linewise := e.operatorRange(m)
 	if !linewise && fromR == toR && fromC == toC {
 		if op == 'c' && (key == "$" || key == "end") {
@@ -160,12 +166,6 @@ func (e *Editor) applyLineOp(op byte, fromR, toR int, motionKey string, count in
 			e.row = len(e.lines) - 1
 		}
 		e.col = e.firstNonBlank(e.row)
-		mk := motionKey
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeOperatorMotion('d', mk, n, true)
-		}
 	case 'c':
 		e.noteEdit(fromR, 0)
 		e.modified = true
@@ -195,12 +195,6 @@ func (e *Editor) applyLineOp(op byte, fromR, toR int, motionKey string, count in
 		e.modified = true
 		e.row = fromR
 		e.col = e.firstNonBlank(fromR)
-		mk := motionKey
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeOperatorMotion('>', mk, n, true)
-		}
 	case '<':
 		for i := fromR; i <= toR && i < len(e.lines); i++ {
 			line := e.lines[i]
@@ -218,12 +212,6 @@ func (e *Editor) applyLineOp(op byte, fromR, toR int, motionKey string, count in
 		e.modified = true
 		e.row = fromR
 		e.col = e.firstNonBlank(fromR)
-		mk := motionKey
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeOperatorMotion('<', mk, n, true)
-		}
 	}
 }
 
@@ -236,12 +224,6 @@ func (e *Editor) applyCharOp(op byte, fromR, fromC, toR, toC int, motionKey stri
 		e.deleteRange(fromR, fromC, toR, toC)
 		e.row = fromR
 		e.col = fromC
-		mk := motionKey
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeOperatorMotion('d', mk, n, true)
-		}
 	case 'c':
 		e.deleteToReg([]string{text}, false)
 		e.deleteRange(fromR, fromC, toR, toC)
@@ -281,6 +263,9 @@ func (e *Editor) applyCharOp(op byte, fromR, fromC, toR, toC int, motionKey stri
 }
 
 func (e *Editor) executeLineOp(op byte, count int) {
+	before := slices.Clone(e.lines)
+	change := semanticChange{command: string(op), motion: "line", count: count, countGiven: true, register: e.repeatRegister()}
+	defer func() { e.recordOperatorChange(change, before) }()
 	to := min(e.row+count-1, len(e.lines)-1)
 	if op != 'y' {
 		e.saveUndo()
@@ -288,12 +273,6 @@ func (e *Editor) executeLineOp(op byte, count int) {
 	e.applyLineOp(op, e.row, to, "_", count)
 	if op == 'c' {
 		e.insertEntry = "S"
-	}
-	if op == 'd' || op == '<' || op == '>' {
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeLineOp(op, count)
-		}
 	}
 	e.goalValid, e.goalEnd = false, false
 	e.clampCursor()
