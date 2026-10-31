@@ -164,11 +164,21 @@ func (p *Position) clone() *Position {
 func (p *Position) Moves() []Move {
 	var legal []Move
 	for _, m := range p.pseudoMoves() {
-		if !p.Apply(m).royalAttacked(p.Turn) {
+		if p.Apply(m).legalAfter(p.Turn) {
 			legal = append(legal, m)
 		}
 	}
 	return legal
+}
+
+// legalAfter reports whether a move by mover is legal once made: no royal of
+// the mover may be left attacked and, where the variant forbids checking, no
+// royal of the other side may be attacked either.
+func (p *Position) legalAfter(mover Color) bool {
+	if p.royalAttacked(mover) {
+		return false
+	}
+	return !p.V.NoChecks || !p.royalAttacked(mover.Other())
 }
 
 // InCheck reports whether any of the side to move's royal pieces is attacked.

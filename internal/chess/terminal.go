@@ -1,8 +1,11 @@
 package chess
 
+import "slices"
+
 // outcome is a game the variant's rules have already ended, and its winner.
-// drawn marks the one ending the rules leave without a winner, a stalemate
-// under the draw rule; every other outcome is decisive.
+// drawn marks the endings the rules leave without a winner: a stalemate under
+// the draw rule and a goal arrival the other side answers on a goal square.
+// Every other outcome is decisive.
 type outcome struct {
 	status Status
 	winner Color // the winner; meaningless when drawn
@@ -21,8 +24,8 @@ type outcome struct {
 // true and adjudicate only the immediate wins, a goal arrival or a check
 // limit.
 func adjudicate(p *Position, hasMoves bool) (outcome, bool) {
-	if p.goalWinner() {
-		return outcome{status: GoalWin, winner: p.Turn.Other()}, true
+	if o, over := p.goalOutcome(); over {
+		return o, true
 	}
 	if p.checkWinner() {
 		return outcome{status: CheckWin, winner: p.Turn.Other()}, true
@@ -45,11 +48,12 @@ func adjudicate(p *Position, hasMoves bool) (outcome, bool) {
 // score turns an outcome into a search score from the side to move's point of
 // view, counted from the root. Goal arrivals, check limits and checkmates are
 // mates, and so is a stalemate under a winning or a losing stalemate rule; a
-// drawn stalemate scores 0. A decisive ending scores as if mate came on this
+// drawn ending, a drawn stalemate or a goal arrival the other side answers on
+// a goal square, scores 0. A decisive ending scores as if mate came on this
 // ply, so the root prefers to win sooner and lose later.
 func (o outcome) score(turn Color, ply int) int {
 	switch o.status {
-	case GoalWin, CheckWin, Checkmate, Stalemate:
+	case GoalWin, CheckWin, Checkmate, Stalemate, DrawGoalReply:
 		if o.drawn {
 			return 0
 		}
@@ -69,18 +73,44 @@ func (p *Position) checkWinner() bool {
 	return limit > 0 && p.Checks[p.Turn.Other()] >= limit
 }
 
-// goalWinner reports whether the side that just moved has a royal piece on a
-// goal square. Goal squares are absolute and shared by both colours. A royal
-// standing there could only have arrived on the previous move, so the other
-// side cannot also be on one in a live game.
-func (p *Position) goalWinner() bool {
+// goalOutcome reports what the royals standing on the variant's goal squares
+// have settled. Goal squares are absolute and shared by both colours, and a
+// royal stands there only because it arrived on the previous move.
+//
+// With GoalReplyDraw, an arrival by the side that moves first is not yet a win
+// while the other side can arrive in reply: answering on a goal square draws,
+// and the arrival wins once the other side has no arrival left to play.
+func (p *Position) goalOutcome() (outcome, bool) {
 	if len(p.V.Goal) == 0 {
-		return false
+		return outcome{}, false
+	}
+	var arrived [2]bool
+	for _, sq := range p.V.Goal {
+		if pc := p.Board[sq]; pc.Type != 0 && p.V.Type(pc).Royal {
+			arrived[pc.Color] = true
+		}
 	}
 	justMoved := p.Turn.Other()
-	for _, sq := range p.V.Goal {
-		pc := p.Board[sq]
-		if pc.Type != 0 && pc.Color == justMoved && p.V.Type(pc).Royal {
+	switch {
+	case p.V.GoalReplyDraw && arrived[White] && arrived[Black]:
+		return outcome{status: DrawGoalReply, drawn: true}, true
+	case arrived[justMoved]:
+		if p.V.GoalReplyDraw && justMoved == White && p.canReachGoal() {
+			return outcome{}, false
+		}
+		return outcome{status: GoalWin, winner: justMoved}, true
+	case p.V.GoalReplyDraw && arrived[p.Turn]:
+		// The first side's arrival went unanswered.
+		return outcome{status: GoalWin, winner: p.Turn}, true
+	}
+	return outcome{}, false
+}
+
+// canReachGoal reports whether the side to move has a legal move that puts one
+// of its royals on a goal square.
+func (p *Position) canReachGoal() bool {
+	for _, m := range p.Moves() {
+		if p.V.Type(p.Board[m.From]).Royal && slices.Contains(p.V.Goal, m.To) {
 			return true
 		}
 	}

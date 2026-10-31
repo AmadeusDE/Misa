@@ -324,15 +324,21 @@ internal/
   Chess: delivering stalemate wins), selfcapture (Self-capture Chess: `self_capture: true` in the variant
   YAML lets a side capture its own non-royal pieces with normal capture moves; Tomašev et al., arXiv:2009.04374),
   kingofthehill (chess plus `goal: [d4, d5, e4, e5]`: a royal arriving on one of those absolute, unmirrored
-  squares wins), grand (Freeling's 10×10 with marshal `RN` and cardinal `BN`, no castling), and threecheck
-  (chess plus `check_limit: 3`: the third check given wins at once, the checkmating one included).
+  squares wins), grand (Freeling's 10×10 with marshal `RN` and cardinal `BN`, no castling), threecheck
+  (chess plus `check_limit: 3`: the third check given wins at once, the checkmating one included), and
+  racingkings (Racing Kings: 8×8 with no pawns or castling, both armies on ranks 1-2; `no_checks` makes a
+  move that leaves the enemy royal attacked illegal so mate never happens, `goal` is the whole eighth rank,
+  and `goal_reply_draw` makes White's arrival pending until Black cannot answer on a goal square, which draws).
   `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
   and the search both honour it. `promotion_optional: true` lets a pawn stay a pawn inside `promotion_zone` (but
   not on the last rank, where promotion is forced); `promotion_captured_only: true` restricts the choices to
   piece types its side has fewer of than in the setup, i.e. to captured pieces, and blocks the last rank when
   none is available. Grand uses both with `promotion_zone: 3`. `check_limit:` counts the checks a side must give
   to win; Position.Checks travels with history and undo and is hashed, adjudicate/score treat the limit like a
-  goal arrival (before mate and stalemate), and the header shows the checks left.
+  goal arrival (before mate and stalemate), and the header shows the checks left. `no_checks:` and
+  `goal_reply_draw:` are pointers like the promotion flags, so `extends` inherits them and a child may set them
+  back to `false`; a `goal_reply_draw` without goal squares is a load error. An answered goal arrival is the
+  `DrawGoalReply` status, which Match.Decisive and outcome.score treat as a draw.
   Movement is checked by perft (`position_test.go`), so run the chess tests after touching move generation.
   The engine only uses what variants define (values, royal/pawn flags, ranks to promotion), so new pieces need at
   most a `value:`. Search runs off the UI goroutine on immutable Positions; cancel() sets the Stop flag and bumps
