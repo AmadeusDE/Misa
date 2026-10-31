@@ -146,7 +146,7 @@ func TestPromotionByClick(t *testing.T) {
 }
 
 func TestViewFitsEachVariant(t *testing.T) {
-	for _, id := range []string{"chess", "double", "bigboard"} {
+	for _, id := range []string{"chess", "double", "bigboard", "duck"} {
 		g := newGame(t, id, 80, 24)
 		out := g.View()
 		lines := strings.Split(out, "\n")
@@ -192,6 +192,11 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	keys(g, "v", "x", "i", "a", "n", "g", "enter")
 	if got := g.match.Variant().ID; got != "xiangqi" {
 		t.Fatalf("picker selected %s, want xiangqi", got)
+	}
+	// Duck Chess is another entry, reached the same way.
+	keys(g, "v", "d", "u", "c", "k", "enter")
+	if got := g.match.Variant().ID; got != "duck" {
+		t.Fatalf("picker selected %s, want duck", got)
 	}
 	// Fog of War is in the list as well; its name filters to it.
 	keys(g, "v", "f", "o", "g", "enter")

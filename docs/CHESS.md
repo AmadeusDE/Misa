@@ -211,6 +211,11 @@ either, since a lone king can still reach the eighth rank.
   own pieces and the squares they can reach. There is no check or checkmate and
   capturing the enemy king wins (see [Fog of War](#fog-of-war)).
 
+- **Duck Chess** (`duck`): 8×8 king-capture chess with one neutral, uncapturable
+  duck that must be placed on an empty square after every piece move; the duck
+  blocks movement and starts off the board. Capturing the enemy king wins, and a
+  side with no legal turn wins (see [Duck Chess](#duck-chess)).
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
@@ -244,6 +249,35 @@ through attacked squares; en passant and promotion work as usual. The computer
 searches the complete position, including pieces hidden from the human player.
 It therefore has full information and does not play as a genuinely fog-limited
 opponent.
+
+### Duck Chess
+
+Duck Chess starts from the standard chess position with the duck off the board.
+Each turn is compound: a piece move, then the duck placed on a different empty
+square. The duck blocks movement and cannot be captured. Select a piece and its
+destination, then click or move the cursor to the duck's destination and confirm
+to complete the turn; `esc` cancels the whole turn. Even a king capture includes
+the duck placement.
+
+Kings are not royal, so there is no check or checkmate and capturing the enemy
+king wins. Castling is allowed without check restrictions, though the duck can
+block its transit or destination squares. A side with no legal turn wins. En
+passant, promotion, repetition and the move-limit draw otherwise apply.
+
+The variant sets `blocker: true`, `extinction: [K]` and `stalemate: loss`. That
+last value describes the side delivering stalemate: it loses, so the stalemated
+side wins.
+
+A setup or FEN marks the duck with `*`, for example
+`rnbqkbnr/pppppppp/8/8/8/4P3/PPPP*PPP/RNBQKBNR b KQkq`. The duck is hashed, so
+repetition and the transposition table see it. Move history appends `@square`
+after the piece move, as in `e2-e4@e2`.
+
+For affordable computer play the search samples at most eight evenly spaced
+legal duck destinations for each piece move (and keeps a previous
+transposition-table choice). Every legal piece move is still searched, king
+captures included, but not every duck placement. Human move selection and the
+legal-move list stay exhaustive.
 
 ### Xiangqi
 
@@ -340,6 +374,11 @@ from that variant and merges pieces by letter; `castling: []` drops inherited
 castling. A later file with an existing id replaces it. Files are read from the
 embedded set, then `chess/*.yaml` next to the binary, then
 `~/.config/misa/chess/`.
+
+`blocker: true` gives the variant one neutral duck that both sides must relocate
+after every piece move (see [Duck Chess](#duck-chess)); a setup may place it with
+`*`. `stalemate:` selects the stalemate ending, as described under
+[Stalemate rules](#stalemate-rules).
 
 `goal` names **absolute** squares, not White's squares: a royal piece arriving
 on any of them wins immediately, for either side, and that arrival outranks a

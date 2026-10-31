@@ -15,8 +15,8 @@ func (p *Position) dropMoves() []Move {
 		}
 		t := p.V.Pieces[typ-1]
 		for sq, pc := range p.Board {
-			if pc.Type != 0 {
-				continue
+			if pc.Type != 0 || (p.V.Blocker && sq == p.Blocker) {
+				continue // a duck's square is not empty for a drop
 			}
 			_, y := p.V.XY(sq)
 			rank := y + 1

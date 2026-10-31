@@ -32,7 +32,9 @@ a set of built-in tools, and it ships as one self-contained binary.
   as a loss for the stalemated side, and perpetual check drawn by repetition; also Horde
   (`chess horde`), where White's kingless horde of pawns wins by checkmating Black and Black wins by
   capturing every horde piece, and Fog of War (`chess fog`), where each side sees only its own pieces
-  and the squares they can reach, there is no check or checkmate, and capturing the enemy king wins.
+  and the squares they can reach, there is no check or checkmate, and capturing the enemy king wins;
+  and Duck Chess (`chess duck`), where a neutral duck must be relocated to an empty square after every
+  move and, as in Fog of War, capturing the enemy king wins.
 - Minesweeper controls: `space` open, `f` flag, `n` new game, `1`–`3` select a level, `c` custom game, `q` quit
 - Data-driven package manager menus, a file browser, and tldr/man help
 - `misa --gui`: an optional Wayland window, pure Go and software rendered

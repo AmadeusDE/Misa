@@ -1,0 +1,9 @@
+id: duck
+name: Duck Chess
+description: Chess with a neutral duck that blocks movement; capture the enemy king to win.
+extends: chess
+pieces:
+  - {letter: K, name: King, betza: K, royal: false, glyph: ♚}
+blocker: true
+extinction: [K]
+stalemate: loss

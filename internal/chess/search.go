@@ -101,7 +101,14 @@ func (e *Engine) Think(root *Position, past []uint64, lim Limits) Result {
 
 func (e *Engine) think(root *Position, past []uint64, lim Limits, policy selection, seed uint64) Result {
 	start := time.Now()
-	legal := root.Moves()
+	var legal []Move
+	if root.V.Blocker {
+		// A duck variant's legal turns are compound; the root samples them like
+		// the rest of the search and settles on a legal one below.
+		legal = root.searchMoves(false, Move{})
+	} else {
+		legal = root.Moves()
+	}
 	if _, over := adjudicate(root, len(legal) > 0); over {
 		return Result{}
 	}
@@ -249,9 +256,9 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 
 	// A null move can invent or hide an immediate explosion or extinction
 	// threat, and it is no shortcut where captures are compulsory, material is
-	// inverted, the side has no royal left, or a pocket can change the position
-	// without a move.
-	if allowNull && e.v.Explosion == nil && len(e.v.Extinction) == 0 && !e.v.ForcedCapture && !e.v.InverseMaterial && !e.v.Drops && len(p.royalSq[p.Turn]) > 0 && !inCheck && depth >= 3 && beta < mateScore-maxPly && e.hasPieces(p) {
+	// inverted, the side has no royal left, a pocket can change the position
+	// without a move, or a duck must move with it.
+	if allowNull && e.v.Explosion == nil && len(e.v.Extinction) == 0 && !e.v.Blocker && !e.v.ForcedCapture && !e.v.InverseMaterial && !e.v.Drops && len(p.royalSq[p.Turn]) > 0 && !inCheck && depth >= 3 && beta < mateScore-maxPly && e.hasPieces(p) {
 		r := 2
 		if depth >= 6 {
 			r = 3
@@ -271,7 +278,7 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 	origAlpha := alpha
 	best, bestMove := -infinity, Move{Castle: -2}
 	legal := 0
-	for _, mv := range e.order(p, p.moveCandidates(), ttMove, ply) {
+	for _, mv := range e.order(p, p.nodeMoves(false, ttMove), ttMove, ply) {
 		child := p.Apply(mv)
 		if !child.legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
 			continue
@@ -343,17 +350,20 @@ func (e *Engine) quiesce(p *Position, ply, alpha, beta int) int {
 	if ply >= maxPly-1 {
 		return e.eval.evaluate(p)
 	}
-	// A royal-less side can be stalemated without being in check; stand pat
-	// must not turn that draw into a material evaluation.
-	if len(p.royalSq[p.Turn]) == 0 && len(p.Moves()) == 0 {
+	// A royal-less side can be stalemated without being in check, and a variant
+	// with a winning or losing stalemate rule ends the game there; stand pat
+	// must not turn that ending into a material evaluation. A duck variant's
+	// royal-less positions reach this too, so the test is cheap by design.
+	if (len(p.royalSq[p.Turn]) == 0 || p.V.Stalemate != StalemateDraw) && !p.InCheck() && !p.hasLegalMove() {
 		o, _ := adjudicate(p, false)
 		return o.score(p.Turn, ply)
 	}
 	inCheck := p.InCheck()
 	// In compulsory-capture and no-royal games stand-pat can conceal a win
 	// by having no legal moves, or an obligatory capture. Generate legal moves
-	// before evaluating in those positions.
-	special := e.v.ForcedCapture || len(p.royalSq[White]) == 0 || len(p.royalSq[Black]) == 0
+	// before evaluating in those positions. A duck variant's compound turns are
+	// too many to enumerate here, and its stalemate is adjudicated above.
+	special := !e.v.Blocker && (e.v.ForcedCapture || len(p.royalSq[White]) == 0 || len(p.royalSq[Black]) == 0)
 	var moves []Move
 	forced := false
 	if special {
@@ -373,9 +383,9 @@ func (e *Engine) quiesce(p *Position, ply, alpha, beta int) int {
 	}
 	if !special {
 		if inCheck {
-			moves = p.moveCandidates()
+			moves = p.nodeMoves(false, Move{})
 		} else {
-			moves = p.captures()
+			moves = p.nodeMoves(true, Move{})
 		}
 	} else if !inCheck && !forced {
 		moves = slices.DeleteFunc(moves, func(m Move) bool { return m.Take < 0 && m.Promote == 0 })

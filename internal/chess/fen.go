@@ -26,11 +26,11 @@ func ParseFEN(v *Variant, fen string) (*Position, error) {
 	if err != nil {
 		return nil, err
 	}
-	board, err := v.parsePlacement(placement)
+	board, blocker, err := v.parsePlacementBlocker(placement)
 	if err != nil {
 		return nil, err
 	}
-	p := &Position{V: v, Board: board, Hands: hands, EPPawn: -1, Fullmove: 1}
+	p := &Position{V: v, Board: board, Hands: hands, Blocker: blocker, EPPawn: -1, Fullmove: 1}
 	for sq, pc := range board {
 		start := v.start[sq]
 		board[sq].Moved = pc.Type != 0 && (start.Type != pc.Type || start.Color != pc.Color || pc.Promoted != 0)
@@ -125,7 +125,16 @@ func (p *Position) FEN() string {
 		}
 		empty := 0
 		for x := 0; x < p.V.Files; x++ {
-			pc := p.Board[p.V.Square(x, y)]
+			sq := p.V.Square(x, y)
+			pc := p.Board[sq]
+			if p.V.Blocker && sq == p.Blocker {
+				if empty > 0 {
+					fmt.Fprint(&b, empty)
+					empty = 0
+				}
+				b.WriteByte('*')
+				continue
+			}
 			if pc.Type == 0 {
 				empty++
 				continue
