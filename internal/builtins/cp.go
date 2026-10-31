@@ -1,3 +1,5 @@
+// F08 creation-mode behavior is checked against Toybox tests/cp.test
+// at 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb (0BSD). Native Go implementation.
 package builtins
 
 import (
@@ -128,17 +130,17 @@ func subtractPreserve(base, minus preserveAttrs) preserveAttrs {
 
 // Backup control styles, resolved from --backup[=CONTROL] / -b / VERSION_CONTROL.
 
-func backupSuffix(flags *ParseResult) string {
+func backupSuffix(ctx *Context, flags *ParseResult) string {
 	if s, ok := flags.String("suffix"); ok && s != "" {
 		return s
 	}
-	if s := os.Getenv("SIMPLE_BACKUP_SUFFIX"); s != "" {
+	if s := ctx.Getenv("SIMPLE_BACKUP_SUFFIX"); s != "" {
 		return s
 	}
 	return "~"
 }
 
-func backupControl(flags *ParseResult) (control string, given bool, err error) {
+func backupControl(ctx *Context, flags *ParseResult) (control string, given bool, err error) {
 	longVal, longGiven := flags.String("backup")
 	given = flags.Bool("b") || longGiven
 	if !given {
@@ -146,7 +148,7 @@ func backupControl(flags *ParseResult) (control string, given bool, err error) {
 	}
 	val := longVal
 	if val == "" {
-		val = os.Getenv("VERSION_CONTROL")
+		val = ctx.Getenv("VERSION_CONTROL")
 		if val == "" {
 			val = "existing"
 		}
@@ -345,13 +347,13 @@ func runCp(ctx *Context) int {
 		}
 	}
 
-	backupCtl, backupGiven, backupErr := backupControl(flags)
+	backupCtl, backupGiven, backupErr := backupControl(ctx, flags)
 	if backupErr != nil {
 		fmt.Fprintf(ctx.Stderr, "cp: %s\n", backupErr)
 		return 1
 	}
 	backupActive := backupGiven && backupCtl != "none"
-	suffix := backupSuffix(flags)
+	suffix := backupSuffix(ctx, flags)
 
 	if backupActive && (updateMode == "none" || updateMode == "none-fail") {
 		fmt.Fprintln(ctx.Stderr, "cp: --backup is mutually exclusive with -n or --update=none-fail")
@@ -874,9 +876,8 @@ func applyCopiedAttrs(dst string, srcInfo os.FileInfo, preserve preserveAttrs) {
 	if preserve.mode {
 		os.Chmod(dst, srcInfo.Mode().Perm())
 	}
-	// Else: leave dst's mode as the OS already set it at creation time
-	// (the standard 0666/0777 default masked by the process umask) —
-	// GNU cp does *not* fall back to "source mode minus umask".
+	// Else: leave the destination mode as set by open (source mode masked
+	// by umask for a new file, unchanged for an existing file).
 	if preserve.timestamps {
 		os.Chtimes(dst, srcInfo.ModTime(), srcInfo.ModTime())
 	}
@@ -952,10 +953,10 @@ func copyOneFile(src, dst string, srcInfo os.FileInfo, preserve preserveAttrs, f
 	} else if force {
 		_ = os.Remove(dst)
 	}
-	df, err := os.Create(dst)
+	df, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, srcInfo.Mode().Perm())
 	if err != nil && force && !backupActive {
 		_ = os.Remove(dst)
-		df, err = os.Create(dst)
+		df, err = os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, srcInfo.Mode().Perm())
 	}
 	if err != nil {
 		return bpath, fmt.Errorf("cannot create regular file '%s': %s", displayDst, fmtOsErr(err))
