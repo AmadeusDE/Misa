@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05/H01
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05/H01/H02
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -76,6 +76,7 @@ without quitting Misa and preserves its register.
 | F09: bounded viewport and display cells (done) | `internal/vi/layout_test.go`, `display_f09_test.go`, `internal/ui/editor_display_regression_test.go` | One line-to-cells layout (`layout.go`) behind rendering, cursor, Visual/confirm highlights and `j`/`k`; scope below. |
 | G01: Vim pattern subset (done) | `internal/vi/vipat/*_test.go`, `pattern_g01_replay_test.go`, `pattern_entry_g01_test.go`, `substitute_line_test.go`, `internal/ui/editor_pattern_regression_test.go` | One parser/matcher (`vipat`) behind `/`, `?`, `n`/`N`, operator searches, `:s` (including `c`), `:g` and `:v`; scope below. |
 | H01: WORD motions | `word_h01_replay_test.go` | `W`/`B`/`E` move by whitespace-delimited WORDs; operator forms use the same motion path, including `dW`/`cW`/`dE`. Counts and line-boundary behavior are covered. |
+| H02: word searches | `word_search_h02_replay_test.go` | `*`/`#` search forward/backward for a whole keyword; `g*`/`g#` also match within words. Punctuation is searched literally. Normal, Visual and operator searches use shared search state, including counts, wrapping, `n`/`N`, options and highlighting. |
 
 ### F08 input and paste contract
 
@@ -146,7 +147,7 @@ errors; `:s//x/` and `:s//x/c` reuse the last pattern instead of replacing at ev
 rejected; `:s` and `:g` set the last search pattern. `:g/pat/cmd` previously cut the command at its next
 delimiter, so `:g/x/s/a/b/` never ran the substitute; the command is now everything after the pattern.
 
-Left to other tasks: the replacement grammar `&`, `\1`, `~`, case conversion, `:&`, `g&` (G02), Ex addresses and `:g` execution order/register order (G03: `:g/pat/d` still runs bottom-up), `*`/`#` (H02), search offsets (`/pat/e`) and history (T07). Vim 9.1 `nocompatible` `:help pattern` is used as specification only; no Vim, Neovim or regex-library code is used.
+Left to other tasks: the replacement grammar `&`, `\1`, `~`, case conversion, `:&`, `g&` (G02), Ex addresses and `:g` execution order/register order (G03: `:g/pat/d` still runs bottom-up), search offsets (`/pat/e`) and history (T07). Vim 9.1 `nocompatible` `:help pattern` is used as specification only; no Vim, Neovim or regex-library code is used.
 
 ### T04 search options
 

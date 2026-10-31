@@ -19,7 +19,7 @@ func isMotionPrefix(key string) bool {
 }
 
 func motionAddsJump(key string) bool {
-	return key == "G" || key == "gg" || key == "%" || key == "n" || key == "N" ||
+	return key == "G" || key == "gg" || key == "%" || key == "n" || key == "N" || key == "*" || key == "#" || key == "g*" || key == "g#" ||
 		strings.HasPrefix(key, "'") || strings.HasPrefix(key, "`")
 }
 

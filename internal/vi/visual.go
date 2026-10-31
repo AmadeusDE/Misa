@@ -43,8 +43,8 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 		e.pendingKey = ""
 		count := max(1, e.count)
 		e.count, e.countGiven = 0, false
-		if key == "e" || key == "E" {
-			if m, ok := e.motionDest("g"+key, count, false); ok {
+		if key == "e" || key == "E" || key == "*" || key == "#" {
+			if m, ok := e.resolveMotion("g"+key, count, false); ok {
 				e.row, e.col = m.row, m.col
 				e.clampCursor()
 				e.ensureVisible()
@@ -346,7 +346,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return nil, nil
 
 	default:
-		if m, ok := e.motionDest(key, count, cg); ok {
+		if m, ok := e.resolveMotion(key, count, cg); ok {
 			e.row = m.row
 			e.col = m.col
 			e.clampCursor()
