@@ -299,7 +299,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `poweroff` | other | – | – | – | – | no tests | 46 | – | light |
 | `pr` | – | – | coreutils:84 | 77 | – | uutils: Rust, 77/84 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1703 | heavy |
 | `prlimit` | posix | – | – | – | – | no tests | 124 | – | light |
-| `ps` | posix | 1 | procps:25 | 13 | root | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 13/25 simple new_ucmd! cases parseable by tests/uutils adapter | 2004 | 1238 | heavy |
 | `ptx` | – | – | coreutils:50 | 50 | – | uutils: Rust, 50/50 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1233 | medium |
 | `pwck` | – | – | shadow:18 | 0 | root | uutils: Rust, 0/18 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1231 | heavy |
 | `pwconv` | – | – | shadow:13 | 0 | root | uutils: Rust, 0/13 simple new_ucmd! cases parseable by tests/uutils adapter | – | 660 | heavy |
