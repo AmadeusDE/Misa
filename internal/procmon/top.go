@@ -137,13 +137,16 @@ func (t *TopViewer) View() string {
 	var lines []string
 
 	now := time.Now().Format("15:04:05")
-	line1 := fmt.Sprintf("%s up %s, load average: %.2f, %.2f, %.2f",
+	line1 := fmt.Sprintf("%s up %s, load average: %s",
 		topHeaderStyle.Render("top - "+now),
-		FmtUptime(t.cur.Uptime), t.cur.LoadAvg[0], t.cur.LoadAvg[1], t.cur.LoadAvg[2])
+		t.cur.UptimeStr(), t.cur.LoadStr())
 	lines = append(lines, TruncStr(line1, t.width))
 
-	line2 := fmt.Sprintf("%s %d total, %d running, %d sleeping, %d stopped, %d zombie",
-		topLabelStyle.Render("Tasks:"), total, running, sleeping, stopped, zombie)
+	line2 := fmt.Sprintf("%s %d total", topLabelStyle.Render("Tasks:"), total)
+	if StatesKnown(procs) {
+		line2 = fmt.Sprintf("%s %d total, %d running, %d sleeping, %d stopped, %d zombie",
+			topLabelStyle.Render("Tasks:"), total, running, sleeping, stopped, zombie)
+	}
 	lines = append(lines, TruncStr(line2, t.width))
 
 	var line3 string
@@ -156,15 +159,19 @@ func (t *TopViewer) View() string {
 	}
 	lines = append(lines, TruncStr(line3, t.width))
 
-	line4 := fmt.Sprintf("%s %9s total, %9s free, %9s used, %9s buff/cache",
-		topLabelStyle.Render("MiB Mem:"),
-		FmtBytes(mem.Total), FmtBytes(mem.Free), FmtBytes(mem.Used()), FmtBytes(mem.BuffCache()))
-	lines = append(lines, TruncStr(line4, t.width))
-
-	line5 := fmt.Sprintf("%s %9s total, %9s free, %9s used. %9s avail",
-		topLabelStyle.Render("MiB Swap:"),
-		FmtBytes(mem.SwapTotal), FmtBytes(mem.SwapFree), FmtBytes(mem.SwapUsed()), FmtBytes(mem.Available))
-	lines = append(lines, TruncStr(line5, t.width))
+	var line4, line5 string
+	if !t.cur.SystemAvailable {
+		line4 = topLabelStyle.Render("MiB Mem:") + " " + unavailable
+		line5 = topLabelStyle.Render("MiB Swap:") + " " + unavailable
+	} else {
+		line4 = fmt.Sprintf("%s %9s total, %9s free, %9s used, %9s buff/cache",
+			topLabelStyle.Render("MiB Mem:"),
+			FmtBytes(mem.Total), FmtBytes(mem.Free), FmtBytes(mem.Used()), FmtBytes(mem.BuffCache()))
+		line5 = fmt.Sprintf("%s %9s total, %9s free, %9s used. %9s avail",
+			topLabelStyle.Render("MiB Swap:"),
+			FmtBytes(mem.SwapTotal), FmtBytes(mem.SwapFree), FmtBytes(mem.SwapUsed()), FmtBytes(mem.Available))
+	}
+	lines = append(lines, TruncStr(line4, t.width), TruncStr(line5, t.width))
 
 	lines = append(lines, "")
 
@@ -198,13 +205,14 @@ func (t *TopViewer) View() string {
 	}
 
 	for _, p := range procs[t.scrollOffset:end] {
-		row := fmt.Sprintf("  %7d %-9s %3d %4d %7s %7s %7s %s %5.1f %5.1f %9s %s",
-			p.PID, TruncStr(p.User, 9),
-			p.Priority, p.Nice,
-			FmtBytes(p.VSize), FmtBytes(p.RSSBytes()), FmtBytes(p.SHRBytes()),
-			p.StateStr(),
-			p.CPUPct, p.MemPct,
-			FmtCPUTime(p.CPUTime()),
+		row := fmt.Sprintf("  %7d %s %s %s %s %s %s %s %s %s %s %s",
+			p.PID, CellTextLeft(TruncStr(p.User, 9), p.HasUser(), 9),
+			CellInt(p.Priority, p.HasPriority(), 3), CellInt(p.Nice, p.HasPriority(), 4),
+			CellBytes(p.VSize, p.HasVirt(), 7), CellBytes(p.RSSBytes(), p.HasMemory(), 7),
+			CellBytes(p.SHRBytes(), p.HasShared(), 7),
+			CellText(p.StateStr(), p.HasState()),
+			CellFloat(p.CPUPct, p.HasCPUTime(), 5, 1), CellFloat(p.MemPct, p.HasMemPct(), 5, 1),
+			CellTextRight(FmtCPUTime(p.CPUTime()), p.HasCPUTime(), 9),
 			p.Comm)
 		lines = append(lines, TruncStr(row, t.width))
 	}

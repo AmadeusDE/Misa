@@ -574,3 +574,69 @@ vet for `windows/amd64` and `windows/arm64`. Unix (Android included) output is u
   F03/F04 (`internal/builtins`: `Stat_t`, signals in `util.go`, `Umask`, `Mkfifo`, `Getpriority`, and so on
   across `arch`, `chown`, `cp`, `du`, `mkdir`, `mv`, `nice`, `proc`, `rm`, `split`, `stat`, `sysutil`,
   `touch`, `truncate`, `umask`, `util`).
+
+## I04 delivered (#108)
+
+Windows process monitor backend. `internal/procmon` now reads an honest Windows process table; nothing reads
+`/proc` on Windows and nothing fills a field it could not read. Unix and Android output is unchanged
+(byte-identical rows and headers, verified by the new layout tests).
+
+- **Enumeration** — `procs_windows.go`: `CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS)` with
+  `Process32First`/`Process32Next` gives pid, parent pid, image name, thread count and `PriClassBase`.
+  Enumeration succeeds for every process, including protected ones.
+- **Per-process detail** — `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` then `GetProcessTimes`
+  (kernel and user in 100 ns units), `GetProcessMemoryInfo` and `QueryFullProcessImageNameW`. x/sys has no
+  wrapper for the memory call, so it is resolved from `kernel32.dll` (`K32GetProcessMemoryInfo`, Windows 7+)
+  with `psapi.dll` (`GetProcessMemoryInfo`) as the fallback, through `windows.NewLazySystemDLL`. No cgo, no
+  new dependency. Working set is RES, pagefile usage is the VIRT equivalent, the image path becomes
+  COMMAND.
+- **Honest failure** — a process that exits mid-read (`OpenProcess` → `ERROR_INVALID_PARAMETER`) is dropped
+  from that snapshot. Access-denied and protected processes (the System process, other users' processes)
+  keep their row with the detail fields flagged missing, and PID 0 — the idle process, which has no handle
+  to open — keeps its row with no detail for the same reason. Never faked.
+- **Missing fields** — `Process.Missing` (`ProcMissing` bit set in `missing.go`) mirrors `lscore`'s
+  `FileInfo.Missing`: zero means everything is available, a flagged field renders `?`. Windows has no run
+  state, owner or shared-memory counter in this backend, so those three plus %MEM are always flagged; the
+  task counts (`N total, … running … sleeping`) and the `Running` tiles are omitted rather than printed as
+  zeros. `CellText`/`CellInt`/`CellFloat`/`CellBytes` render every column of `top`, `htop`, `btop` and the
+  task manager, so all four skins behave the same.
+- **CPU normalization** — per core, Irix mode, exactly as on Unix: `%CPU` is
+  `(kernel+user delta) / (wall delta) × 100`, where 100 % is one logical CPU busy, so a process using every
+  core of an N-core machine reports N×100 % and a thread-heavy process can exceed 100 % on one core. It is
+  deliberately not divided by the logical CPU count, which keeps `top`, `htop`, `btop` and the task manager
+  consistent with their Unix output. `GetProcessTimes` already sums all threads, so the same formula gives
+  the same scale. `Process.Identity` (start time on Unix, creation time on Windows) makes a recycled PID keep
+  `0 %` instead of subtracting the previous owner's CPU time; a counter that goes backwards is ignored.
+- **Priority** — Windows has priority classes, not nice values. `priority.go` maps them to the existing
+  nice-like UI range (documented Win32 base priorities in brackets): High `-10` [13], Above normal `-5`
+  [10], Normal `0` [8], Below normal `10` [6], Idle `19` [4]; Realtime [24] is read but never offered
+  (a privilege and a starving-system hazard). PR shows the class base priority, NI the nice equivalent.
+  `GetPriorityClass` (with the query handle) is authoritative and overrides the enumerated base priority;
+  protected processes keep the enumeration value. `Actions.Levels` plus `PriorityStep` let htop's `F7`/`F8`
+  step between classes; away from a class boundary they report "already at the highest/lowest priority"
+  instead of a change that did not happen. Setting a class uses `OpenProcess(PROCESS_SET_INFORMATION)` +
+  `SetPriorityClass`; privileges or ACLs that refuse it surface in the status line. This supersedes F02's
+  temporary `ErrUnsupported` for priority changes.
+- **Termination** — unchanged from F02: the signal menu is `Cancel` and `Terminate` only
+  (`OpenProcess(PROCESS_TERMINATE)` + `TerminateProcess`). HUP/INT/STOP/CONT are not offered on Windows at
+  all rather than failing later.
+- **System-wide sections stay unavailable** — `Snapshot.SystemAvailable` is true where procfs supplies
+  uptime, load average, memory, per-core CPU, network and disk counters, and false on Windows until the
+  native system information provider (I03, PR #127) lands. The four skins render `—` for the uptime/load
+  header, the memory bars, the disk and network panels, and the task manager's MEMORY/DISK/NETWORK
+  sections, instead of showing zeros. `TakeSnapshot`/`TakeFullSnapshot` and the system-counter readers are
+  the platform split (`procfs.go` / `system_windows.go`).
+- **Tests** — portable on Linux: `missing_test.go` (cells, flags, snapshot strings, state counts),
+  `priority_test.go` (class/base/name mapping, step with and without levels, ordering, Realtime excluded),
+  `procrow_test.go` (row seeding, detail application including the 100 ns → tick conversion, recycled PIDs,
+  per-core CPU percentages, gone/unreadable processes), `views_test.go` (the exact Unix `top` and `htop` row
+  layouts, the count of `?` columns on a bare and a detail Windows row, and all four skins rendering an
+  unavailable-systems snapshot without inventing values). Native Windows tests
+  (`procs_windows_test.go`, build-tagged) enumerate self, check that a snapshot reports the system sections
+  as unavailable, assert no row ever carries a value for a flagged field, and start a test-owned child
+  (the test binary re-exec'd as a helper) to change its priority class through Idle/Above normal/High/Normal
+  and to terminate it; invalid PIDs must fail. They compile and vet for `windows/amd64` and `windows/arm64`
+  but have not been executed (no Windows machine or CI job yet, F05/R02).
+- **Temporary limitations** — no per-process run state, owner or shared size; no system memory, uptime,
+  load, CPU totals, disk or network counters (`—`, I03); no thread-level CPU; `GOOS=windows go build
+  -tags 'nough noweb' .` still stops in `internal/term` (P01) and `internal/builtins` (F03/F04).
