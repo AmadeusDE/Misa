@@ -290,7 +290,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `openvt` | other | – | – | – | – | no tests | 115 | – | light |
 | `partprobe` | other | – | – | – | – | no tests | 30 | – | light |
 | `passwd` | lsb | – | shadow:20 | 0 | root | uutils: Rust, 0/20 simple new_ucmd! cases parseable by tests/uutils adapter | 116 | 1482 | medium |
-| `patch` | posix | 13 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 485 | – | medium |
 | `pidof` | lsb | 5 | procps:12 | 12 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 12/12 simple new_ucmd! cases parseable by tests/uutils adapter | 45 | 225 | light |
 | `pidwait` | – | – | procps:4 | 4 | – | uutils: Rust, 4/4 simple new_ucmd! cases parseable by tests/uutils adapter | – | 141 | light |
 | `ping` | net | – | – | – | – | no tests | 309 | – | heavy |

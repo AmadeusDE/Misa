@@ -416,7 +416,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `partprobe` |  | ✓ other | ✓ |  |
 | `passwd` |  | ✓ lsb (default n) | ✓ | ✓ shadow |
 | `paste` | ✓ | ✓ posix | ✓ | ✓ coreutils |
-| `patch` |  | ✓ posix | ✓ |  |
+| `patch` | ✓ | ✓ posix | ✓ |  |
 | `pathchk` | ✓ |  |  | ✓ coreutils |
 | `pgrep` | ✓ | ✓ posix | ✓ | ✓ procps |
 | `pidof` |  | ✓ lsb | ✓ | ✓ procps |
