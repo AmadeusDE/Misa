@@ -112,6 +112,10 @@ internal/
     delegate.go                  Compact list delegate using titled interface
     items.go                     menuItem and fileItem types
   builtins/                      Shell built-in commands (coreutils subset + top-commands)
+    flock.go fsync.go            flock(2) locking with command wrapping (unix-only; the `_other.go` sibling
+    fallocate.go                 reports an honest unsupported error), fsync with -d, and fallocate -l/-o with
+                                 per-platform tag files; flock's descriptor form reaches only fds 0-2 until
+                                 S09 gives builtins a descriptor table
     registry.go                  Command registry — Register/Lookup/Names
     args.go                      POSIX/GNU option parser with compact spec strings
     topcommands.go               History analytics — ranked command frequency across shells

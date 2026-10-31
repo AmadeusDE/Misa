@@ -191,7 +191,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `expr` | ✓ | ✓ pending | ✓ | ✓ coreutils |
 | `factor` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `fakeidentd` |  |  | ✓ |  |
-| `fallocate` |  | ✓ other | ✓ |  |
+| `fallocate` | ✓ | ✓ other | ✓ |  |
 | `false` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `fatattr` |  |  | ✓ |  |
 | `fatlabel` |  |  | ✓ |  |
@@ -211,7 +211,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `flash_lock` |  |  | ✓ |  |
 | `flash_unlock` |  |  | ✓ |  |
 | `flashcp` |  |  | ✓ |  |
-| `flock` |  | ✓ other | ✓ |  |
+| `flock` | ✓ | ✓ other | ✓ |  |
 | `fmt` | ✓ | ✓ other |  | ✓ coreutils |
 | `fold` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `free` |  | ✓ other | ✓ | ✓ procps |
@@ -221,7 +221,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `fsfreeze` |  | ✓ other | ✓ | ✓ util-linux |
 | `fstrim` |  |  | ✓ |  |
 | `fstype` |  | ✓ other |  |  |
-| `fsync` |  | ✓ other | ✓ |  |
+| `fsync` | ✓ | ✓ other | ✓ |  |
 | `ftpd` |  |  | ✓ |  |
 | `ftpget` |  | ✓ net | ✓ |  |
 | `ftpput` |  | ✓ net | ✓ |  |

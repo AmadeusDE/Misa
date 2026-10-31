@@ -30,6 +30,20 @@ Grouped by cause:
 
 When a case starts passing, delete its line.
 
+## Platform limits
+
+- `flock` wraps `flock(2)` and exists only where Go binds it (Linux, macOS and the BSDs); other platforms
+  register it anyway and return "not supported on this platform". Its `FILE COMMAND [ARG]...` form, directory
+  operands and `-w` are Misa extensions over toybox's descriptor-only command. The descriptor form can only
+  reach stdin/stdout/stderr: builtins have no descriptor table until S09 (redirections) exists, so any other
+  number fails with "fd N not available (needs shell redirection support, S09)".
+- `fsync -d` calls `fdatasync(2)` where Go binds it (Linux, AIX, Solaris) and falls back to a full `fsync`
+  elsewhere, syncing metadata too.
+- `fallocate` needs Linux `fallocate(2)`. Darwin's `F_PREALLOCATE` and the BSDs' `posix_fallocate(2)` have no
+  Go binding, so those platforms fail with "not supported on this platform" instead of faking allocation by
+  writing zeros. A zero or negative length is rejected by the kernel (EINVAL), as toybox reports it, and a
+  shorter request never shrinks the file.
+
 ## Next
 
 1. **Safe in-process use.** `builtin_mode: inprocess` runs built-ins on goroutines in one process, so
