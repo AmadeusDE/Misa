@@ -11,6 +11,12 @@ import (
 func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 	key := typedKey(msg)
 
+	if key != "j" && key != "k" && key != "up" && key != "down" &&
+		!(len(key) == 1 && key[0] >= '0' && key[0] <= '9' && (key != "0" || e.countGiven)) {
+		e.goalValid = false
+		e.goalEnd = false
+	}
+
 	if e.recording {
 		if key == "q" && e.pendingOp == 0 && e.pendingKey == "" {
 			e.recording = false
@@ -92,15 +98,21 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 
 	// Operator pending: next key must be a motion
 	if e.pendingOp != 0 {
+		if key == "g" {
+			e.count, e.countGiven = count, cg
+			e.pendingKey = "g"
+			return nil
+		}
 		c := count
 		if e.opCountGiven {
 			c = countProduct(e.opCount, count)
 		}
 		op := e.pendingOp
+		hadOpCount := e.opCountGiven
 		e.pendingOp = 0
 		e.opCount = 0
 		e.opCountGiven = false
-		e.executeOperatorMotion(op, key, c, cg)
+		e.executeOperatorMotion(op, key, c, cg || hadOpCount)
 		e.hasReg, e.pendingReg = false, 0
 		return nil
 	}
@@ -117,9 +129,21 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		if key == "G" || key == "gg" {
 			e.addJump()
 		}
+		if key == "j" || key == "k" || key == "up" || key == "down" {
+			if !e.goalValid {
+				e.goalCol, e.goalValid = e.col, true
+			}
+			m.col = e.goalCol
+			if e.goalEnd {
+				m.col = len(e.lineRunes(m.row)) - 1
+			}
+		}
 		e.row = m.row
 		e.col = m.col
 		e.clampCursor()
+		if key == "$" || key == "end" {
+			e.goalValid, e.goalEnd = true, true
+		}
 		e.ensureVisible()
 		return nil
 	}
@@ -633,6 +657,10 @@ func (e *Editor) handlePendingKey(key string) tea.Cmd {
 		}
 
 	case "g":
+		if e.pendingOp != 0 && key != "g" {
+			e.clearCommandState()
+			return nil
+		}
 		switch key {
 		case "g":
 			count := 1
@@ -646,10 +674,15 @@ func (e *Editor) handlePendingKey(key string) tea.Cmd {
 
 			if e.pendingOp != 0 {
 				op := e.pendingOp
+				if e.opCountGiven {
+					count = countProduct(e.opCount, count)
+					cg = true
+				}
 				e.pendingOp = 0
 				e.opCount = 0
 				e.opCountGiven = false
 				e.executeOperatorMotion(op, "gg", count, cg)
+				e.hasReg, e.pendingReg = false, 0
 				return nil
 			}
 
@@ -815,268 +848,6 @@ func (e *Editor) processKey(key string) {
 	case ModeSearch:
 		e.handleSearch(msg)
 	}
-}
-
-// --- Operator execution ---
-
-func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGiven bool) {
-	m, ok := e.motionDest(key, count, countGiven)
-	if !ok {
-		return
-	}
-
-	startRow, startCol := e.row, e.col
-
-	e.saveUndo()
-
-	if m.lineWise {
-		fromR, toR := startRow, m.row
-		if fromR > toR {
-			fromR, toR = toR, fromR
-		}
-		e.applyLineOp(op, fromR, toR, key, count)
-	} else {
-		fromR, fromC := startRow, startCol
-		toR, toC := m.row, m.col
-		if fromR > toR || (fromR == toR && fromC > toC) {
-			fromR, fromC, toR, toC = toR, toC, fromR, fromC
-		}
-		if m.inclusive {
-			toC++
-		}
-		e.applyCharOp(op, fromR, fromC, toR, toC, key, count)
-	}
-
-	e.clampCursor()
-	e.ensureVisible()
-}
-
-func (e *Editor) applyLineOp(op byte, fromR, toR int, motionKey string, count int) {
-	deleted := make([]string, 0, toR-fromR+1)
-	for i := fromR; i <= toR && i < len(e.lines); i++ {
-		deleted = append(deleted, e.lines[i])
-	}
-
-	switch op {
-	case 'd':
-		e.deleteToReg(deleted, true)
-		if toR >= len(e.lines) {
-			toR = len(e.lines) - 1
-		}
-		e.lines = append(e.lines[:fromR], e.lines[toR+1:]...)
-		if len(e.lines) == 0 {
-			e.lines = []string{""}
-		}
-		e.row = fromR
-		if e.row >= len(e.lines) {
-			e.row = len(e.lines) - 1
-		}
-		e.col = e.firstNonBlank(e.row)
-		mk := motionKey
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeOperatorMotion('d', mk, n, true)
-		}
-	case 'c':
-		e.deleteToReg(deleted, true)
-		if toR >= len(e.lines) {
-			toR = len(e.lines) - 1
-		}
-		e.lines = append(e.lines[:fromR], e.lines[toR+1:]...)
-		nl := make([]string, 0, len(e.lines)+1)
-		nl = append(nl, e.lines[:fromR]...)
-		nl = append(nl, "")
-		nl = append(nl, e.lines[fromR:]...)
-		e.lines = nl
-		e.row = fromR
-		e.col = 0
-		e.mode = ModeInsert
-		e.insertEntry = "c-" + motionKey
-		e.insertBuf.Reset()
-		e.insertCount = 0
-	case 'y':
-		e.yankToReg(deleted, true)
-		e.statusMsg = fmt.Sprintf("%d lines yanked", len(deleted))
-	case '>':
-		for i := fromR; i <= toR && i < len(e.lines); i++ {
-			e.lines[i] = "\t" + e.lines[i]
-		}
-		e.modified = true
-		e.row = fromR
-		e.col = e.firstNonBlank(fromR)
-		mk := motionKey
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeOperatorMotion('>', mk, n, true)
-		}
-	case '<':
-		for i := fromR; i <= toR && i < len(e.lines); i++ {
-			line := e.lines[i]
-			if len(line) > 0 && line[0] == '\t' {
-				e.lines[i] = line[1:]
-			} else {
-				trimmed := strings.TrimLeft(line, " ")
-				removed := len(line) - len(trimmed)
-				if removed > 8 {
-					removed = 8
-				}
-				e.lines[i] = line[removed:]
-			}
-		}
-		e.modified = true
-		e.row = fromR
-		e.col = e.firstNonBlank(fromR)
-		mk := motionKey
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeOperatorMotion('<', mk, n, true)
-		}
-	}
-}
-
-func (e *Editor) applyCharOp(op byte, fromR, fromC, toR, toC int, motionKey string, count int) {
-	text := e.extractText(fromR, fromC, toR, toC)
-
-	switch op {
-	case 'd':
-		e.deleteToReg([]string{text}, false)
-		e.deleteRange(fromR, fromC, toR, toC)
-		e.row = fromR
-		e.col = fromC
-		mk := motionKey
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeOperatorMotion('d', mk, n, true)
-		}
-	case 'c':
-		e.deleteToReg([]string{text}, false)
-		e.deleteRange(fromR, fromC, toR, toC)
-		e.row = fromR
-		e.col = fromC
-		e.mode = ModeInsert
-		e.insertEntry = "c-" + motionKey
-		e.insertBuf.Reset()
-		e.insertCount = 0
-	case 'y':
-		e.yankToReg([]string{text}, false)
-	case '>':
-		for i := fromR; i <= toR && i < len(e.lines); i++ {
-			e.lines[i] = "\t" + e.lines[i]
-		}
-		e.modified = true
-		e.row = fromR
-		e.col = e.firstNonBlank(fromR)
-	case '<':
-		for i := fromR; i <= toR && i < len(e.lines); i++ {
-			line := e.lines[i]
-			if len(line) > 0 && line[0] == '\t' {
-				e.lines[i] = line[1:]
-			} else {
-				trimmed := strings.TrimLeft(line, " ")
-				removed := len(line) - len(trimmed)
-				if removed > 8 {
-					removed = 8
-				}
-				e.lines[i] = line[removed:]
-			}
-		}
-		e.modified = true
-		e.row = fromR
-		e.col = e.firstNonBlank(fromR)
-	}
-}
-
-func (e *Editor) executeLineOp(op byte, count int) {
-	e.saveUndo()
-	from := e.row
-	to := e.row + count - 1
-	if to >= len(e.lines) {
-		to = len(e.lines) - 1
-	}
-	switch op {
-	case 'd':
-		deleted := make([]string, 0, to-from+1)
-		for i := from; i <= to; i++ {
-			deleted = append(deleted, e.lines[i])
-		}
-		e.deleteToReg(deleted, true)
-		e.lines = append(e.lines[:from], e.lines[to+1:]...)
-		if len(e.lines) == 0 {
-			e.lines = []string{""}
-		}
-		if e.row >= len(e.lines) {
-			e.row = len(e.lines) - 1
-		}
-		e.col = e.firstNonBlank(e.row)
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeLineOp('d', n)
-		}
-	case 'c':
-		deleted := make([]string, 0, to-from+1)
-		for i := from; i <= to; i++ {
-			deleted = append(deleted, e.lines[i])
-		}
-		e.deleteToReg(deleted, true)
-		e.lines = append(e.lines[:from], e.lines[to+1:]...)
-		nl := make([]string, 0, len(e.lines)+1)
-		nl = append(nl, e.lines[:from]...)
-		nl = append(nl, "")
-		nl = append(nl, e.lines[from:]...)
-		e.lines = nl
-		e.row = from
-		e.col = 0
-		e.mode = ModeInsert
-		e.insertEntry = "S"
-		e.insertBuf.Reset()
-		e.insertCount = 0
-	case 'y':
-		yanked := make([]string, 0, to-from+1)
-		for i := from; i <= to; i++ {
-			yanked = append(yanked, e.lines[i])
-		}
-		e.yankToReg(yanked, true)
-		e.statusMsg = fmt.Sprintf("%d lines yanked", len(yanked))
-	case '>':
-		for i := from; i <= to && i < len(e.lines); i++ {
-			e.lines[i] = "\t" + e.lines[i]
-		}
-		e.modified = true
-		e.col = e.firstNonBlank(e.row)
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeLineOp('>', n)
-		}
-	case '<':
-		for i := from; i <= to && i < len(e.lines); i++ {
-			line := e.lines[i]
-			if len(line) > 0 && line[0] == '\t' {
-				e.lines[i] = line[1:]
-			} else {
-				trimmed := strings.TrimLeft(line, " ")
-				removed := len(line) - len(trimmed)
-				if removed > 8 {
-					removed = 8
-				}
-				e.lines[i] = line[removed:]
-			}
-		}
-		e.modified = true
-		e.col = e.firstNonBlank(e.row)
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			ed.executeLineOp('<', n)
-		}
-	}
-	e.clampCursor()
-	e.ensureVisible()
 }
 
 // --- Put ---

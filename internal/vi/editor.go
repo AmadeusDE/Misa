@@ -57,10 +57,12 @@ type Editor struct {
 	filename string
 	modified bool
 
-	row, col int
-	topLine  int
-	width    int
-	height   int
+	row, col           int
+	goalCol            int
+	goalValid, goalEnd bool
+	topLine            int
+	width              int
+	height             int
 
 	mode      Mode
 	cmdBuf    string
@@ -1459,139 +1461,6 @@ func (e *Editor) handleSearch(msg tea.KeyPressMsg) tea.Cmd {
 		}
 	}
 	return nil
-}
-
-// --- Motion destination (used by normal mode & operators) ---
-
-type motionResult struct {
-	row, col  int
-	lineWise  bool
-	inclusive bool
-}
-
-func (e *Editor) motionDest(key string, count int, countGiven bool) (motionResult, bool) {
-	switch key {
-	case "w", "b", "e", "{", "}", "(", ")":
-		count = e.motionLimit(count)
-	}
-	switch key {
-	case "h", "left":
-		c := e.col - count
-		if c < 0 {
-			c = 0
-		}
-		return motionResult{e.row, c, false, false}, true
-	case "l", "right":
-		runes := e.lineRunes(e.row)
-		mx := len(runes) - 1
-		if mx < 0 {
-			mx = 0
-		}
-		c := e.col + count
-		if c > mx {
-			c = mx
-		}
-		return motionResult{e.row, c, false, true}, true
-	case "j", "down":
-		r := e.row + count
-		if r >= len(e.lines) {
-			r = len(e.lines) - 1
-		}
-		return motionResult{r, e.col, true, false}, true
-	case "k", "up":
-		r := e.row - count
-		if r < 0 {
-			r = 0
-		}
-		return motionResult{r, e.col, true, false}, true
-	case "w":
-		r, c := e.wordForward(count)
-		return motionResult{r, c, false, false}, true
-	case "b":
-		r, c := e.wordBackward(count)
-		return motionResult{r, c, false, false}, true
-	case "e":
-		r, c := e.wordEnd(count)
-		return motionResult{r, c, false, true}, true
-	case "$", "end":
-		runes := e.lineRunes(e.row)
-		c := len(runes) - 1
-		if c < 0 {
-			c = 0
-		}
-		return motionResult{e.row, c, false, true}, true
-	case "0":
-		return motionResult{e.row, 0, false, false}, true
-	case "home":
-		return motionResult{e.row, 0, false, false}, true
-	case "^", "_":
-		return motionResult{e.row, e.firstNonBlank(e.row), false, false}, true
-	case "H":
-		r := e.topLine
-		return motionResult{r, e.firstNonBlank(r), true, false}, true
-	case "M":
-		r := e.topLine + e.height/2
-		if r >= len(e.lines) {
-			r = len(e.lines) - 1
-		}
-		return motionResult{r, e.firstNonBlank(r), true, false}, true
-	case "L":
-		r := e.topLine + e.height - 1
-		if r >= len(e.lines) {
-			r = len(e.lines) - 1
-		}
-		return motionResult{r, e.firstNonBlank(r), true, false}, true
-	case "+", "enter":
-		r := e.row + count
-		if r >= len(e.lines) {
-			r = len(e.lines) - 1
-		}
-		return motionResult{r, e.firstNonBlank(r), true, false}, true
-	case "-":
-		r := e.row - count
-		if r < 0 {
-			r = 0
-		}
-		return motionResult{r, e.firstNonBlank(r), true, false}, true
-	case "{":
-		r := e.paragraphBack(count)
-		return motionResult{r, 0, true, false}, true
-	case "}":
-		r := e.paragraphForward(count)
-		return motionResult{r, 0, true, false}, true
-	case "(":
-		r, c := e.sentenceBack(count)
-		return motionResult{r, c, false, false}, true
-	case ")":
-		r, c := e.sentenceForward(count)
-		return motionResult{r, c, false, false}, true
-	case "G":
-		if countGiven {
-			r := count - 1
-			if r >= len(e.lines) {
-				r = len(e.lines) - 1
-			}
-			if r < 0 {
-				r = 0
-			}
-			return motionResult{r, e.firstNonBlank(r), true, false}, true
-		}
-		r := len(e.lines) - 1
-		return motionResult{r, e.firstNonBlank(r), true, false}, true
-	case "gg":
-		r := 0
-		if countGiven {
-			r = count - 1
-		}
-		if r >= len(e.lines) {
-			r = len(e.lines) - 1
-		}
-		if r < 0 {
-			r = 0
-		}
-		return motionResult{r, e.firstNonBlank(r), true, false}, true
-	}
-	return motionResult{}, false
 }
 
 // --- Standalone ---

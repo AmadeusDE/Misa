@@ -25,10 +25,8 @@ func TestCountReplay(t *testing.T) {
 		{name: "count X", input: "abcdef\n", keys: "$3X", want: replayState{lines: []string{"abf"}, col: 2, reg: []string{"cde"}, modified: true}},
 		{name: "cancel operator then edit", input: "abcd\n", keys: "d<Esc>x", want: replayState{lines: []string{"bcd"}, reg: []string{"a"}, modified: true}},
 		{name: "invalid counted prefix resets", input: "abcd\n", keys: "2g!x", want: replayState{lines: []string{"bcd"}, reg: []string{"a"}, modified: true}},
-		// TODO(F03): an exhausted word motion omits the final character.
-		{name: "huge count multiplication", skip: "TODO(F03): dw at EOF leaves the final character", input: "one two three\n", keys: "999999999999999999999d999999999999999999999w", want: replayState{lines: []string{""}, reg: []string{"one two three"}, modified: true}},
-		// TODO(F05): linewise deletion does not mark the buffer modified.
-		{name: "huge count delete lines full state", skip: "TODO(F05): dd leaves modified false", input: "one\ntwo\nthree\n", keys: "99999999999dd", want: replayState{lines: []string{""}, reg: []string{"one", "two", "three"}, linewise: true, modified: true}},
+		{name: "huge count multiplication", input: "one two three\n", keys: "999999999999999999999d999999999999999999999w", want: replayState{lines: []string{""}, reg: []string{"one two three"}, modified: true}},
+		{name: "huge count delete lines full state", input: "one\ntwo\nthree\n", keys: "99999999999dd", want: replayState{lines: []string{""}, reg: []string{"one", "two", "three"}, linewise: true, modified: true}},
 		{name: "cancel count register", input: "abcd\n", keys: "2\"<Esc>x", want: replayState{lines: []string{"bcd"}, reg: []string{"a"}, modified: true}},
 		{name: "cancel named register", input: "abcd\n", keys: "\"a<Esc>x", want: replayState{lines: []string{"bcd"}, reg: []string{"a"}, modified: true}},
 		{name: "invalid operator resets", input: "abcd\n", keys: "d!x", want: replayState{lines: []string{"bcd"}, reg: []string{"a"}, modified: true}},
@@ -39,7 +37,7 @@ func TestCountReplay(t *testing.T) {
 	}
 }
 
-// Full-state coverage remains skipped until F05 fixes dd's dirty flag.
+// Content-focused checks complement the full-state replay fixtures.
 func TestHugeCountDeleteLinesContent(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "lines")

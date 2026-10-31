@@ -21,15 +21,13 @@ func TestTutorLessonsOneTwo(t *testing.T) {
 		{name: "three ends", input: "red blue green gold\n", keys: "3e", want: replayState{lines: []string{"red blue green gold"}, col: 13}},
 		{name: "zero", input: "red blue\n", keys: "w0", want: replayState{lines: []string{"red blue"}}},
 		{name: "delete two words", input: "red blue green\n", keys: "d2w", want: replayState{lines: []string{"green"}, reg: []string{"red blue "}, modified: true}},
-		// TODO(F05): line deletion does not mark the buffer modified.
-		{name: "delete line", skip: "TODO(F05): dd leaves modified false", input: "red\nblue\ngreen\n", keys: "dd", want: replayState{lines: []string{"blue", "green"}, reg: []string{"red"}, linewise: true, modified: true}},
-		{name: "delete two lines", skip: "TODO(F05): 2dd leaves modified false", input: "red\nblue\ngreen\n", keys: "2dd", want: replayState{lines: []string{"green"}, reg: []string{"red", "blue"}, linewise: true, modified: true}},
+		{name: "delete line", input: "red\nblue\ngreen\n", keys: "dd", want: replayState{lines: []string{"blue", "green"}, reg: []string{"red"}, linewise: true, modified: true}},
+		{name: "delete two lines", input: "red\nblue\ngreen\n", keys: "2dd", want: replayState{lines: []string{"green"}, reg: []string{"red", "blue"}, linewise: true, modified: true}},
 		{name: "undo", input: "red\n", keys: "xu", want: replayState{lines: []string{"red"}, reg: []string{"r"}}},
 		{name: "redo", input: "red\n", keys: "xu<C-r>", want: replayState{lines: []string{"ed"}, reg: []string{"r"}, modified: true}},
 		{name: "undo line", input: "red\n", keys: "xU", want: replayState{lines: []string{"red"}, reg: []string{"r"}, modified: true}},
 		{name: "empty file motion", input: "", keys: "hjkl0", want: replayState{lines: []string{""}}},
-		// TODO(F05): deleting an empty line also fails to mark the buffer modified.
-		{name: "empty line delete", skip: "TODO(F05): dd leaves modified false", input: "\nnext\n", keys: "dd", want: replayState{lines: []string{"next"}, reg: []string{""}, linewise: true, modified: true}},
+		{name: "empty line delete", input: "\nnext\n", keys: "dd", want: replayState{lines: []string{"next"}, reg: []string{""}, linewise: true, modified: true}},
 		{name: "cancel insert", input: "red\n", keys: "i<Esc>", want: replayState{lines: []string{"red"}}},
 		{name: "cancel command", input: "red\n", keys: ":q<Esc>", want: replayState{lines: []string{"red"}}},
 		{name: "cancel operator", input: "red blue\n", keys: "d<Esc>w", want: replayState{lines: []string{"red blue"}, col: 4}},
@@ -90,8 +88,7 @@ func TestTutorWriteQuit(t *testing.T) {
 	}
 }
 
-// The complete dd expectations above remain skipped for F05. This narrower
-// check still exercises the linewise edit and register through public events.
+// This focused check also exercises linewise edits through public events.
 func TestTutorDeleteLineContentAndRegister(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "line.txt")
