@@ -20,7 +20,13 @@ func init() {
 	Register(Command{Name: "strings", Run: runStrings})
 }
 
-func runStrings(ctx *Context) int {
+func runStrings(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	flags, err := stringsSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "strings:", err)
@@ -90,11 +96,12 @@ func runStrings(ctx *Context) int {
 }
 
 func stringsExtract(ctx *Context, r io.Reader, minLen int, prefix string, offsetRadix string) {
-	br := bufio.NewReader(r)
+	br := bufio.NewReader(ContextReader(ctx.CancellationContext(), r))
 	var cur []byte
 	offset := int64(0)
 	startOffset := int64(0)
 
+	failed := false
 	flush := func() {
 		if len(cur) >= minLen {
 			if offsetRadix != "" {
@@ -107,9 +114,11 @@ func stringsExtract(ctx *Context, r io.Reader, minLen int, prefix string, offset
 				default:
 					fmtStr = "%7d "
 				}
-				fmt.Fprintf(ctx.Stdout, "%s"+fmtStr+"%s\n", prefix, startOffset, cur)
+				_, err := fmt.Fprintf(ctx.Stdout, "%s"+fmtStr+"%s\n", prefix, startOffset, cur)
+				failed = err != nil
 			} else {
-				fmt.Fprintf(ctx.Stdout, "%s%s\n", prefix, cur)
+				_, err := fmt.Fprintf(ctx.Stdout, "%s%s\n", prefix, cur)
+				failed = err != nil
 			}
 		}
 		cur = cur[:0]
@@ -128,6 +137,9 @@ func stringsExtract(ctx *Context, r io.Reader, minLen int, prefix string, offset
 			cur = append(cur, b)
 		} else {
 			flush()
+		}
+		if failed {
+			return
 		}
 		offset++
 	}

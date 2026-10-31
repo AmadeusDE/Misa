@@ -231,7 +231,7 @@ func TestFindCancellation(t *testing.T) {
 	cctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	var out, stderr bytes.Buffer
-	c := &Context{Dir: t.TempDir(), Stdout: &out, Stderr: &stderr, Cancellation: cctx}
+	c := &Context{Dir: t.TempDir(), Stdout: &out, Stderr: &stderr, Ctx: cctx}
 	if code := runFind(c); code != 1 || out.Len() != 0 || !strings.Contains(stderr.String(), "context canceled") {
 		t.Fatalf("%q %q %d", out.String(), stderr.String(), code)
 	}

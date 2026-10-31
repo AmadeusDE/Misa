@@ -33,7 +33,13 @@ func parseFmtNum(val string, optName string) (int64, error) {
 	return v, nil
 }
 
-func runFmt(ctx *Context) int {
+func runFmt(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	var widthVal, goalVal string
 	var hasWidth, hasGoal bool
 	var argsForSpec []string
@@ -136,13 +142,33 @@ func runFmt(ctx *Context) int {
 			r = fh
 		}
 
-		fmtProcess(ctx, r, int(width), int(goal), splitOnly)
+		if err := fmtProcess(ctx, r, int(width), int(goal), splitOnly); err != nil {
+			return 1
+		}
 	}
 	return exitCode
 }
 
-func fmtProcess(ctx *Context, r io.Reader, width, goal int, splitOnly bool) {
-	sc := bufio.NewScanner(r)
+type fmtOutput struct {
+	io.Writer
+	err error
+}
+
+func (w *fmtOutput) Write(p []byte) (int, error) {
+	if w.err != nil {
+		return 0, w.err
+	}
+	n, err := w.Writer.Write(p)
+	w.err = err
+	return n, err
+}
+
+func fmtProcess(ctx *Context, r io.Reader, width, goal int, splitOnly bool) error {
+	local := *ctx
+	output := &fmtOutput{Writer: ctx.Stdout}
+	local.Stdout = output
+	ctx = &local
+	sc := bufio.NewScanner(ContextReader(ctx.CancellationContext(), r))
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
 	var para []string
@@ -168,6 +194,9 @@ func fmtProcess(ctx *Context, r io.Reader, width, goal int, splitOnly bool) {
 	}
 
 	for sc.Scan() {
+		if output.err != nil {
+			return output.err
+		}
 		line := sc.Text()
 		if strings.TrimSpace(line) == "" {
 			flush()
@@ -177,6 +206,10 @@ func fmtProcess(ctx *Context, r io.Reader, width, goal int, splitOnly bool) {
 		}
 	}
 	flush()
+	if output.err != nil {
+		return output.err
+	}
+	return sc.Err()
 }
 
 func fmtWrap(ctx *Context, words []string, width, goal int) {

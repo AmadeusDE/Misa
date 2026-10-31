@@ -9,13 +9,14 @@ import (
 	"io"
 	"math"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/AmadeusDE/Misa/internal/commandexec"
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 )
 
 func init() {
@@ -68,20 +69,27 @@ func runTimeout(ctx *Context) int {
 	childCtx := *ctx
 	childCtx.Stdout = timeoutOutput(ctx.Stdout, &outputMu)
 	childCtx.Stderr = timeoutOutput(ctx.Stderr, &outputMu)
-	path, err := timeoutLookPath(ctx, args[0])
-	var cmd *exec.Cmd
-	if err == nil {
-		cmd, err = timeoutStart(&childCtx, path, args)
+	inv := commandexec.Invocation{Dir: ctx.Dir, Env: ctx.Environ(), Args: args[1:],
+		Stdin: ctx.Stdin, Stdout: childCtx.Stdout, Stderr: childCtx.Stderr}
+	options := commandexec.Options{ShareGroup: opts.Bool("f"), WaitDelay: 100 * time.Millisecond}
+	var proc *commandexec.Process
+	if _, builtin := Lookup(args[0]); builtin && !strings.ContainsAny(args[0], `/\`) {
+		proc, err = proceffect.StartOptions(ctx.CancellationContext(), proceffect.Request{DispatchOnly: true, Argv: args}, proceffect.Invocation{
+			Dir: inv.Dir, Env: inv.Env, Stdin: inv.Stdin, Stdout: inv.Stdout, Stderr: inv.Stderr,
+		}, options)
+	} else {
+		proc, err = commandexec.Start(ctx.CancellationContext(), args[0], inv, options)
 	}
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr, "timeout: failed to run command '%s': %s\n", args[0], fmtOsErr(err))
-		if errors.Is(err, os.ErrNotExist) || errors.Is(err, exec.ErrNotFound) {
-			return 127
+		if errors.Is(err, proceffect.ErrUnavailable) {
+			return 125
 		}
-		return 126
+		if ctx.CancellationContext().Err() != nil {
+			return commandexec.ContextStatus(ctx.CancellationContext().Err())
+		}
+		return commandexec.ErrorStatus(err)
 	}
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
 	var timer *time.Timer
 	var alarm <-chan time.Time
 	if duration != 0 {
@@ -92,8 +100,8 @@ func runTimeout(ctx *Context) int {
 	timedOut := false
 	for {
 		select {
-		case err := <-done:
-			status := timeoutExitCode(err)
+		case <-proc.Done():
+			status := proc.Wait()
 			if timedOut && !opts.Bool("p") && status != 137 {
 				return 124
 			}
@@ -101,8 +109,8 @@ func runTimeout(ctx *Context) int {
 		case <-alarm:
 			// Prefer an already completed command when its deadline coincides with Wait.
 			select {
-			case err := <-done:
-				status := timeoutExitCode(err)
+			case <-proc.Done():
+				status := proc.Wait()
 				if timedOut && !opts.Bool("p") && status != 137 {
 					return 124
 				}
@@ -113,13 +121,9 @@ func runTimeout(ctx *Context) int {
 			if opts.Bool("v") {
 				fmt.Fprintf(childCtx.Stderr, "timeout: sending signal %s to command '%s'\n", timeoutSignalName(sig), args[0])
 			}
-			pid := cmd.Process.Pid
-			if !opts.Bool("f") {
-				pid = -pid
-			}
-			_ = syscall.Kill(pid, sig)
+			_ = proc.Signal(sig, !opts.Bool("f"))
 			if sig != syscall.SIGKILL && sig != syscall.SIGCONT {
-				_ = syscall.Kill(pid, syscall.SIGCONT)
+				_ = proc.Signal(syscall.SIGCONT, !opts.Bool("f"))
 			}
 			alarm = nil
 			if killAfter > 0 && sig != syscall.SIGKILL {
@@ -147,84 +151,6 @@ func (w *timeoutWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.writer.Write(p)
-}
-
-func timeoutStart(ctx *Context, path string, args []string) (*exec.Cmd, error) {
-	start := func(path string, argv []string) (*exec.Cmd, error) {
-		cmd := &exec.Cmd{Path: path, Args: argv, Dir: ctx.Dir, Env: ctx.Env,
-			Stdin: ctx.Stdin, Stdout: ctx.Stdout, Stderr: ctx.Stderr,
-			SysProcAttr: &syscall.SysProcAttr{Setpgid: true}, WaitDelay: 100 * time.Millisecond}
-		err := cmd.Start()
-		return cmd, err
-	}
-	cmd, err := start(path, args)
-	if errors.Is(err, syscall.ENOEXEC) {
-		sh := timeoutShell()
-		argv := append([]string{sh, path}, args[1:]...)
-		return start(sh, argv)
-	}
-	return cmd, err
-}
-
-func timeoutShell() string {
-	for _, sh := range []string{"/bin/sh", "/usr/bin/sh", "/system/bin/sh"} {
-		info, err := os.Stat(sh)
-		if err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
-			return sh
-		}
-	}
-	return "/bin/sh"
-}
-
-func timeoutLookPath(ctx *Context, name string) (string, error) {
-	if strings.ContainsRune(name, '/') {
-		return filepath.Abs(resolvePath(ctx, name))
-	}
-	if name == "" {
-		return "", exec.ErrNotFound
-	}
-	path, ok := lookupEnv(ctx, "PATH")
-	if !ok {
-		// /system/bin is Android's toybox directory. Missing entries are skipped.
-		path = "/bin:/usr/bin:/system/bin"
-	}
-	var denied error
-	for _, dir := range strings.Split(path, string(os.PathListSeparator)) {
-		candidate, err := filepath.Abs(resolvePath(ctx, filepath.Join(dir, name)))
-		if err != nil {
-			return "", err
-		}
-		info, err := os.Stat(candidate)
-		if err != nil {
-			if errors.Is(err, os.ErrPermission) {
-				denied = err
-			}
-			continue
-		}
-		if info.IsDir() || info.Mode()&0111 == 0 {
-			denied = os.ErrPermission
-			continue
-		}
-		return candidate, nil
-	}
-	if denied != nil {
-		return "", denied
-	}
-	return "", exec.ErrNotFound
-}
-
-func timeoutExitCode(err error) int {
-	if err == nil || errors.Is(err, exec.ErrWaitDelay) {
-		return 0
-	}
-	var exit *exec.ExitError
-	if errors.As(err, &exit) {
-		if status, ok := exit.Sys().(syscall.WaitStatus); ok && status.Signaled() {
-			return 128 + int(status.Signal())
-		}
-		return exit.ExitCode()
-	}
-	return 125
 }
 
 func timeoutDuration(input string) (time.Duration, error) {

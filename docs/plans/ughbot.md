@@ -67,10 +67,10 @@ and `docs/ughbot/WEB.md`.
 5. **Shared libraries and remote machines:**
    - `internal/search`: the pure-Go walker and matcher from `internal/ugh/tools/search.go` (rg stays an optional
      fast path), with new `grep` and `find` built-ins over it, developed against the toybox and uutils suites.
-   - Built-ins safe for concurrent in-process use: `currentUmask` still flips the process umask off Linux (no
-     `/proc/self/status`), `ctx.Env` honoured everywhere, `sort` reading `ctx.Stdin` and never exec'ing for
-     `--compress-program`, a `context.Context` for cancellation (`tail -f`, `sleep`). Then a
-     `builtins.Run(ctx, name, args, dir, env, stdin)` helper. This is also the seam for a future shell.
+   - Built-ins safe for concurrent in-process use: F02–F05 now provide `builtins.Run`, invocation-local
+     environment, cooperative cancellation and child-only process effects (see `invocation.md`). Shared
+     launcher cleanup (F06), terminal owners and blocking-operation limits remain; in-process safety
+     is capability-specific. This is also the seam for a future shell.
    - `internal/sshclient`: `Dial(ctx, Options, Policy)` with an injectable prompter and host-key policy and a
      batch mode; `Conn.Exec`, `Conn.PTY` (independent of a local tty, to feed a `term.Terminal`), keepalive,
      SFTP.

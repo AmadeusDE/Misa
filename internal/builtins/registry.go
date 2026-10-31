@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Context is an invocation's state; Run supplies defaults without changing it.
 type Context struct {
 	Dir     string
 	Args    []string
@@ -16,12 +17,18 @@ type Context struct {
 	Stdout  io.Writer
 	Stderr  io.Writer
 	Stdin   io.Reader
-	Env     []string
 
 	// Optional invocation-local services. Nil preserves existing callers.
-	Clock        func() time.Time
-	Cancellation context.Context
+	Clock func() time.Time
+	Env   []string // nil inherits; a non-nil empty slice is deliberately empty.
+
+	Ctx                            context.Context
+	StdinTTY, StdoutTTY, StderrTTY bool
+	Exec                           Executor
 }
+
+// Executor runs a nested command without imposing a dependency on a shell.
+type Executor func(context.Context, string, *Context) int
 
 type Command struct {
 	Name string

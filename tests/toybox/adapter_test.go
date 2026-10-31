@@ -18,12 +18,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AmadeusDE/Misa/internal/builtinexec"
 	"github.com/AmadeusDE/Misa/internal/builtins"
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 )
 
 var binDir string
 
 func TestMain(m *testing.M) {
+	_ = proceffect.EnableSelfHelper()
+	if len(os.Args) > 1 && os.Args[1] == proceffect.Flag {
+		os.Exit(builtinexec.ProcessEffect(os.Args[2:]))
+	}
 	tmpDir, err := os.MkdirTemp("", "misa-toybox-*")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to create temp dir: %v\n", err)

@@ -24,16 +24,10 @@ var defaultColors = map[string]string{
 	"st": "37;44",    // sticky: white on blue
 }
 
-var extColors map[string]string
-
-// extFold maps a lowercased extension to the single color it resolves to
-// when every case-variant of that extension in LS_COLORS agrees on the
-// same value. When case-variants disagree, the extension is absent here
-// and only an exact-case match in extColors applies.
-var extFold map[string]string
-
-func init() {
-	extColors, extFold = parseLSColors(os.Getenv("LS_COLORS"))
+// colorState belongs to one formatting call.
+type colorState struct {
+	extColors, extFold map[string]string
+	firstUsed          bool
 }
 
 func parseLSColors(val string) (map[string]string, map[string]string) {
@@ -74,9 +68,9 @@ func parseLSColors(val string) (map[string]string, map[string]string) {
 	return m, fold
 }
 
-func lookupColor(key string) string {
-	if extColors != nil {
-		if c, ok := extColors[key]; ok {
+func (c *colorState) lookupColor(key string) string {
+	if c.extColors != nil {
+		if c, ok := c.extColors[key]; ok {
 			return c
 		}
 	}
@@ -90,107 +84,99 @@ func lookupColor(key string) string {
 // leading dot, e.g. ".jpg"), honoring GNU ls's case-sensitivity rules:
 // an exact-case match always wins; otherwise a case-insensitive match is
 // used only if every case-variant of that extension maps to the same color.
-func lookupExtColor(ext string) string {
+func (c *colorState) lookupExtColor(ext string) string {
 	if ext == "" {
 		return ""
 	}
 	key := "*" + ext
-	if extColors != nil {
-		if c, ok := extColors[key]; ok {
+	if c.extColors != nil {
+		if c, ok := c.extColors[key]; ok {
 			return c
 		}
 	}
-	if extFold != nil {
-		if c, ok := extFold[strings.ToLower(key)]; ok {
+	if c.extFold != nil {
+		if c, ok := c.extFold[strings.ToLower(key)]; ok {
 			return c
 		}
 	}
 	return ""
 }
 
-// colorFirstUsed tracks whether a color escape has already been emitted
-// during the current Format() invocation. GNU ls only emits the leading
-// "reset to normal" sequence before the first colored name it prints in a
-// given run; later colored names skip that leading reset. ls invocations
-// run one at a time within a single process, so this package-level flag
-// (reset by Format at the start of each call) is safe.
-var colorFirstUsed bool
-
-func resetColorState() {
-	colorFirstUsed = false
-}
-
 func ColorName(fi *FileInfo, opts FormatOpts, name string) string {
 	if opts.NoColor {
 		return name
 	}
-	code := fileColor(fi)
+	state := opts.colors
+	if state == nil {
+		state = &colorState{}
+	}
+	code := state.fileColor(fi)
 	if code == "" {
 		return name
 	}
 	prefix := "\033[" + code + "m"
-	if !colorFirstUsed {
+	if !state.firstUsed {
 		prefix = "\033[0m" + prefix
-		colorFirstUsed = true
+		state.firstUsed = true
 	}
 	return prefix + name + "\033[0m"
 }
 
-func fileColor(fi *FileInfo) string {
+func (c *colorState) fileColor(fi *FileInfo) string {
 	if fi.IsSymlink {
 		if fi.LinkBroken {
-			return lookupColor("or")
+			return c.lookupColor("or")
 		}
-		return lookupColor("ln")
+		return c.lookupColor("ln")
 	}
 
 	if fi.IsDir {
 		mode := fi.Mode
 		if mode&os.ModeSticky != 0 && mode&0002 != 0 {
-			return lookupColor("tw")
+			return c.lookupColor("tw")
 		}
 		if mode&os.ModeSticky != 0 {
-			return lookupColor("st")
+			return c.lookupColor("st")
 		}
 		if mode&0002 != 0 {
-			return lookupColor("ow")
+			return c.lookupColor("ow")
 		}
-		return lookupColor("di")
+		return c.lookupColor("di")
 	}
 
 	if fi.Mode&os.ModeSocket != 0 {
-		return lookupColor("so")
+		return c.lookupColor("so")
 	}
 	if fi.Mode&os.ModeNamedPipe != 0 {
-		return lookupColor("pi")
+		return c.lookupColor("pi")
 	}
 	if fi.Mode&os.ModeDevice != 0 {
 		if fi.Mode&os.ModeCharDevice != 0 {
-			return lookupColor("cd")
+			return c.lookupColor("cd")
 		}
-		return lookupColor("bd")
+		return c.lookupColor("bd")
 	}
 
 	if fi.Mode&os.ModeSetuid != 0 {
-		return lookupColor("su")
+		return c.lookupColor("su")
 	}
 	if fi.Mode&os.ModeSetgid != 0 {
-		return lookupColor("sg")
+		return c.lookupColor("sg")
 	}
 
 	if fi.Mode&0111 != 0 {
-		return lookupColor("ex")
+		return c.lookupColor("ex")
 	}
 
 	if fi.Nlink > 1 {
-		if mh := lookupColor("mh"); mh != "" && mh != "00" {
+		if mh := c.lookupColor("mh"); mh != "" && mh != "00" {
 			return mh
 		}
 	}
 
 	ext := extFromName(fi.Name)
 	if ext != "" {
-		if c := lookupExtColor(ext); c != "" {
+		if c := c.lookupExtColor(ext); c != "" {
 			return c
 		}
 	}

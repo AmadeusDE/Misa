@@ -26,7 +26,7 @@ func TestContextCancellationDefaultAndOverride(t *testing.T) {
 	}
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
-	c.Cancellation = cancelled
+	c.Ctx = cancelled
 	if c.DoneContext().Err() != context.Canceled {
 		t.Fatal("invocation cancellation ignored")
 	}

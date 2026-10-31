@@ -36,3 +36,4 @@ find/32  # -ilname: case-insensitive symlink-target glob predicate is not implem
 find/39  # -printf .N: format precision is outside the supported subset
 find/55  # newerat: -newerat timestamp predicate is not implemented
 find/56  # newer nano: -newerat fractional timestamp predicate is not implemented
+env/norecurse  # builtin-first policy (F06): env does not bypass Misa builtins for PATH-shadowed names; see docs F06/S04

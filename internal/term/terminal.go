@@ -1,6 +1,7 @@
 package term
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -123,6 +124,7 @@ type Terminal struct {
 	sid        int      // the PTY's session, checked at start (0: unknown)
 	fnDone     chan int // exit code of a StartFunc session
 	fnAbort    atomic.Bool
+	fnCancel   context.CancelFunc
 	procStatus chan int // exit status of a StartArgv process
 	stopped    atomic.Bool
 	input      inputQueue
@@ -206,11 +208,16 @@ func (t *Terminal) StartArgv(dir string, argv ...string) error {
 	return nil
 }
 
-// StartFunc runs fn as the session's program on a goroutine of this process.
-// fn gets the PTY's terminal side as stdin/stdout, so it sees a real tty.
-// Interrupt abandons it: the session ends at once with status 130 while fn
-// finishes in the background with its terminal gone.
+// StartFunc keeps the legacy callback API; cancellation-aware programs should
+// use StartFuncContext. Legacy callbacks must stop when their terminal closes.
 func (t *Terminal) StartFunc(fn func(tty *os.File) int) error {
+	return t.StartFuncContext(context.Background(), func(_ context.Context, tty *os.File) int { return fn(tty) })
+}
+
+// StartFuncContext runs fn with a session context and the PTY's terminal side.
+// Interrupt and Close cancel the context before closing the terminal. fn must
+// cooperate with cancellation; Go cannot forcibly terminate an arbitrary callback.
+func (t *Terminal) StartFuncContext(parent context.Context, fn func(context.Context, *os.File) int) error {
 	ptm, tty, err := pty.Open()
 	if err != nil {
 		return err
@@ -220,10 +227,16 @@ func (t *Terminal) StartFunc(fn func(tty *os.File) int) error {
 		tty.Close()
 		return err
 	}
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithCancel(parent)
+	t.fnCancel = cancel
 	t.fnDone = make(chan int, 1)
 	go func() {
-		t.fnDone <- fn(tty)
-		tty.Close()
+		defer cancel()
+		defer tty.Close()
+		t.fnDone <- fn(ctx, tty)
 	}()
 	return nil
 }
@@ -419,6 +432,9 @@ func copyGrid(dst, src [][]Cell, dr, dc, sr, sc int) {
 }
 
 func (t *Terminal) Close() {
+	if t.fnCancel != nil {
+		t.fnCancel()
+	}
 	if t.cmd != nil && t.cmd.Process != nil {
 		t.killSession()
 	}

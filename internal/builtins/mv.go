@@ -34,7 +34,10 @@ func statOrLstat(path string) (os.FileInfo, error) {
 	return os.Lstat(path)
 }
 
-func runMv(ctx *Context) int {
+func runMv(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	flags, err := mvSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "mv:", err)
@@ -80,13 +83,13 @@ func runMv(ctx *Context) int {
 		}
 	}
 
-	backupCtl, backupGiven, backupErr := backupControl(flags)
+	backupCtl, backupGiven, backupErr := backupControl(ctx, flags)
 	if backupErr != nil {
 		fmt.Fprintf(ctx.Stderr, "mv: %s\n", backupErr)
 		return 1
 	}
 	backupActive := backupGiven && backupCtl != "none"
-	suffix := backupSuffix(flags)
+	suffix := backupSuffix(ctx, flags)
 
 	if backupActive && noClobber {
 		fmt.Fprintln(ctx.Stderr, "mv: cannot combine --backup with -n")
@@ -126,6 +129,9 @@ func runMv(ctx *Context) int {
 
 	if exchange {
 		for _, src := range sources {
+			if ctx.CancellationContext().Err() != nil {
+				return 1
+			}
 			srcPath := resolvePath(ctx, src)
 			target := dst
 			displayTarget := displayDst
@@ -193,6 +199,9 @@ func runMv(ctx *Context) int {
 
 	exitCode := 0
 	for _, src := range sources {
+		if ctx.CancellationContext().Err() != nil {
+			return 1
+		}
 		srcPath := resolvePath(ctx, src)
 
 		srcInfo, err := os.Lstat(srcPath)
@@ -320,6 +329,9 @@ func runMv(ctx *Context) int {
 			if ctx.Stdin != nil {
 				fmt.Fscanln(ctx.Stdin, &resp)
 			}
+			if ctx.CancellationContext().Err() != nil {
+				return 1
+			}
 			resp = strings.TrimSpace(resp)
 			if len(resp) == 0 || (resp[0] != 'y' && resp[0] != 'Y') {
 				exitCode = 1
@@ -350,7 +362,7 @@ func runMv(ctx *Context) int {
 		if err != nil {
 			var linkErr *os.LinkError
 			if errors.As(err, &linkErr) && errors.Is(linkErr.Err, syscall.EXDEV) {
-				if cpErr := crossDeviceMove(srcPath, target); cpErr != nil {
+				if cpErr := crossDeviceMove(ctx, srcPath, target); cpErr != nil {
 					fmt.Fprintf(ctx.Stderr, "mv: %v\n", cpErr)
 					exitCode = 1
 					continue
@@ -376,7 +388,7 @@ func runMv(ctx *Context) int {
 	return exitCode
 }
 
-func crossDeviceMove(src, dst string) error {
+func crossDeviceMove(ctx *Context, src, dst string) error {
 	info, err := os.Lstat(src)
 	if err != nil {
 		return err
@@ -393,13 +405,16 @@ func crossDeviceMove(src, dst string) error {
 		return os.Remove(src)
 	}
 	if info.IsDir() {
-		if err := copyDirRecursive(src, dst, preserveAttrs{}, true, false, false, nil, nil, false, "", ""); err != nil {
+		if err := copyDirRecursive(src, dst, preserveAttrs{}, true, false, false, ctx, nil, false, "", ""); err != nil {
 			return err
 		}
 	} else {
-		if _, err := copyOneFile(src, dst, info, preserveAttrs{}, false, src, dst, false, "", ""); err != nil {
+		if _, err := copyOneFile(ctx, src, dst, info, preserveAttrs{}, false, src, dst, false, "", ""); err != nil {
 			return err
 		}
+	}
+	if err := ctx.CancellationContext().Err(); err != nil {
+		return err
 	}
 	return os.RemoveAll(src)
 }
