@@ -3,28 +3,16 @@ package builtinexec
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/AmadeusDE/Misa/internal/builtins"
+	"github.com/AmadeusDE/Misa/internal/commandexec"
 )
 
 // For selects the default nested executor for a builtin.
-func For(name string) builtins.Executor {
-	if name == "env" {
-		// TODO(F03): legacy process env bridge until getenv migration.
-		return nil
-	}
-	return Run
-}
+func For(name string) builtins.Executor { return Run }
 
-// Run executes an exact builtin name or an external command with invocation-local
-// streams, directory and environment. Builtin dispatch selects the default
-// nested executor with For.
+// Run executes exact bare builtin names first; explicit paths are external.
 func Run(ctx context.Context, name string, inv *builtins.Context) int {
 	if ctx == nil {
 		ctx = inv.CancellationContext()
@@ -36,93 +24,12 @@ func Run(ctx context.Context, name string, inv *builtins.Context) int {
 		inv = &builtins.Context{}
 	}
 	local := *inv
-	if local.Exec == nil {
-		local.Exec = For(name)
-	}
+	local.Exec = For(name)
 	if _, ok := builtins.Lookup(name); ok && !strings.ContainsAny(name, `/\`) {
-		local.Exec = For(name)
 		return builtins.Run(ctx, name, &local)
 	}
-	dir, err := filepath.Abs(local.Dir)
-	if err != nil {
-		return builtins.ExitInternal
-	}
-	local.Dir = dir
-	path, err := resolve(name, &local)
-	if err != nil {
-		if local.Stderr != nil {
-			fmt.Fprintf(local.Stderr, "%s: %v\n", name, err)
-		}
-		if errors.Is(err, os.ErrNotExist) {
-			return builtins.ExitNotFound
-		}
-		return builtins.ExitCannotExecute
-	}
-	cmd := exec.CommandContext(ctx, path, local.Args...)
-	cmd.Args[0] = name
-	cmd.Dir, cmd.Env = local.Dir, local.Env
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = local.Stdin, local.Stdout, local.Stderr
-	err = cmd.Run()
-	if ctx.Err() != nil {
-		return builtins.ExitStatus(ctx.Err())
-	}
-	if err != nil {
-		var exit *exec.ExitError
-		if !errors.As(err, &exit) {
-			if local.Stderr != nil {
-				fmt.Fprintf(local.Stderr, "%s: %v\n", name, err)
-			}
-			if errors.Is(err, os.ErrNotExist) {
-				return builtins.ExitNotFound
-			}
-			return builtins.ExitCannotExecute
-		}
-	}
-	return builtins.ExitStatus(err)
-}
-
-func resolve(name string, inv *builtins.Context) (string, error) {
-	if name == "" {
-		return "", os.ErrNotExist
-	}
-	if strings.ContainsAny(name, `/\`) {
-		if !filepath.IsAbs(name) {
-			return filepath.Join(inv.Dir, name), nil
-		}
-		return name, nil
-	}
-	path, ok := inv.LookupEnv("PATH")
-	if !ok {
-		return "", os.ErrNotExist
-	}
-	var denied bool
-	dirs := filepath.SplitList(path)
-	if path == "" {
-		dirs = []string{""}
-	}
-	for _, dir := range dirs {
-		if dir == "" {
-			dir = "."
-		}
-		if !filepath.IsAbs(dir) {
-			dir = filepath.Join(inv.Dir, dir)
-		}
-		candidate := filepath.Join(dir, name)
-		info, err := os.Stat(candidate)
-		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				denied = true
-			}
-			continue
-		}
-		if info.IsDir() || info.Mode().Perm()&0111 == 0 {
-			denied = true
-			continue
-		}
-		return candidate, nil
-	}
-	if denied {
-		return "", os.ErrPermission
-	}
-	return "", os.ErrNotExist
+	return commandexec.Run(ctx, name, commandexec.Invocation{
+		Dir: local.Dir, Env: local.Env, Args: local.Args, Argv0: local.CmdName,
+		Stdin: local.Stdin, Stdout: local.Stdout, Stderr: local.Stderr,
+	})
 }

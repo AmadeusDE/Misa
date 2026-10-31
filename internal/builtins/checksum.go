@@ -35,7 +35,10 @@ func makeChecksumRunner(name string, newHash func() hash.Hash) func(*Context) in
 	}
 }
 
-func runChecksumWith(ctx *Context, cmdName string, newHash func() hash.Hash) int {
+func runChecksumWith(ctx *Context, cmdName string, newHash func() hash.Hash) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	flags, err := checksumSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr, "%s: %v\n", cmdName, err)
@@ -75,7 +78,7 @@ func runChecksumWith(ctx *Context, cmdName string, newHash func() hash.Hash) int
 				exitCode = 1
 				continue
 			}
-			io.Copy(h, fh)
+			CopyContext(ctx.CancellationContext(), h, fh)
 			fh.Close()
 			displayName = f
 		}
@@ -106,7 +109,7 @@ func checksumCheck(ctx *Context, cmdName string, newHash func() hash.Hash, files
 				return 1
 			}
 			defer fh.Close()
-			scanner = bufio.NewScanner(fh)
+			scanner = bufio.NewScanner(ContextReader(ctx.CancellationContext(), fh))
 		}
 
 		for scanner.Scan() {
@@ -143,7 +146,7 @@ func checksumCheck(ctx *Context, cmdName string, newHash func() hash.Hash, files
 				exitCode = 1
 				continue
 			}
-			io.Copy(h, fh)
+			CopyContext(ctx.CancellationContext(), h, fh)
 			fh.Close()
 
 			actual := fmt.Sprintf("%x", h.Sum(nil))

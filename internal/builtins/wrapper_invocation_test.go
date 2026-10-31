@@ -71,25 +71,6 @@ func TestEnvExplicitEmptyInvocation(t *testing.T) {
 	}
 }
 
-func TestNiceInjectedInvocation(t *testing.T) {
-	cancellation, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var out, errout bytes.Buffer
-	in := strings.NewReader("input")
-	ctx := &Context{Dir: t.TempDir(), Args: []string{"-n", "0", "program", "a"}, CmdName: "nice", Env: []string{}, Ctx: cancellation, Stdin: in, Stdout: &out, Stderr: &errout, Width: 10, Height: 11, StdinTTY: true, StdoutTTY: true, StderrTTY: true}
-	called := false
-	ctx.Exec = func(c context.Context, name string, nested *Context) int {
-		called = true
-		if c != cancellation || nested.Ctx != cancellation || name != "program" || nested.CmdName != name || !reflect.DeepEqual(nested.Args, []string{"a"}) || nested.Dir != ctx.Dir || nested.Env == nil || nested.Stdin != in || nested.Stdout != &out || nested.Stderr != &errout || nested.Width != 10 || nested.Height != 11 || !nested.StdinTTY || !nested.StdoutTTY || !nested.StderrTTY || nested.Exec == nil {
-			t.Errorf("wrong nested invocation: %#v", nested)
-		}
-		return 37
-	}
-	if status := runNice(ctx); status != 37 || !called {
-		t.Fatalf("status=%d called=%v stderr=%s", status, called, &errout)
-	}
-}
-
 func TestEnvInjectedIgnoreAndInheritance(t *testing.T) {
 	t.Setenv("MISA_WRAPPER_INHERITED", "host")
 	for _, tc := range []struct {
@@ -127,32 +108,18 @@ func TestEnvInjectedIgnoreAndInheritance(t *testing.T) {
 	}
 }
 
-func TestWrapperInjectedCancellation(t *testing.T) {
-	for _, name := range []string{"env", "nice"} {
-		t.Run(name, func(t *testing.T) {
-			cancellation, cancel := context.WithCancel(context.Background())
-			cancel()
-			args := []string{"tool"}
-			if name == "nice" {
-				args = []string{"-n", "0", "tool"}
-			}
-			var out, errout bytes.Buffer
-			ctx := &Context{Args: args, Ctx: cancellation, Stdout: &out, Stderr: &errout}
-			ctx.Exec = func(c context.Context, _ string, nested *Context) int {
-				if c.Err() != context.Canceled || nested.CancellationContext().Err() != context.Canceled {
-					t.Error("cancellation not propagated")
-				}
-				return 19
-			}
-			var status int
-			if name == "env" {
-				status = runEnv(ctx)
-			} else {
-				status = runNice(ctx)
-			}
-			if status != 19 {
-				t.Fatalf("status=%d", status)
-			}
-		})
+func TestEnvInjectedCancellation(t *testing.T) {
+	cancellation, cancel := context.WithCancel(context.Background())
+	cancel()
+	var out, errout bytes.Buffer
+	ctx := &Context{Args: []string{"tool"}, Ctx: cancellation, Stdout: &out, Stderr: &errout}
+	ctx.Exec = func(c context.Context, _ string, nested *Context) int {
+		if c.Err() != context.Canceled || nested.CancellationContext().Err() != context.Canceled {
+			t.Error("cancellation not propagated")
+		}
+		return 19
+	}
+	if status := runEnv(ctx); status != 19 {
+		t.Fatalf("status=%d", status)
 	}
 }

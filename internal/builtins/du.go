@@ -110,7 +110,13 @@ type duOptions struct {
 	term          string
 }
 
-func runDu(ctx *Context) int {
+func runDu(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	flags, err := duSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "du:", err)
@@ -218,7 +224,7 @@ func runDu(ctx *Context) int {
 				content, err = io.ReadAll(ctx.Stdin)
 			}
 		} else {
-			content, err = os.ReadFile(resolvePath(ctx, f0))
+			content, err = ReadFileContext(ctx.CancellationContext(), resolvePath(ctx, f0))
 		}
 		if err != nil {
 			fmt.Fprintf(ctx.Stderr, "du: %v\n", err)
@@ -284,7 +290,7 @@ func duReadExcludeFile(ctx *Context, name string) ([]string, error) {
 	defer f.Close()
 
 	var patterns []string
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(ContextReader(ctx.CancellationContext(), f))
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line != "" {
@@ -376,6 +382,9 @@ func duPrintValue(ctx *Context, value int64, name string, opts *duOptions) {
 }
 
 func duWalk(ctx *Context, absPath, displayPath string, depth int64, opts *duOptions, visited map[uint64]bool, startDev uint64) (int64, error) {
+	if err := ctx.CancellationContext().Err(); err != nil {
+		return 0, err
+	}
 	var info os.FileInfo
 	var err error
 	if opts.derefAll || (opts.derefArgs && depth == 0) {
@@ -432,6 +441,9 @@ func duWalk(ctx *Context, absPath, displayPath string, depth int64, opts *duOpti
 	var ownTotal int64
 	var walkErr error
 	for _, e := range entries {
+		if err := ctx.CancellationContext().Err(); err != nil {
+			return recursiveTotal, err
+		}
 		childAbs := filepath.Join(realPath, e.Name())
 		childDisplay := filepath.Join(displayPath, e.Name())
 

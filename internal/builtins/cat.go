@@ -23,7 +23,10 @@ func init() {
 	Register(Command{Name: "cat", Run: runCat})
 }
 
-func runCat(ctx *Context) int {
+func runCat(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	flags, err := catSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "cat:", err)
@@ -60,8 +63,13 @@ func runCat(ctx *Context) int {
 	exitCode := 0
 	prevBlank := false
 	pendingCR := false
+	lineStart := true
 
 	for _, f := range files {
+		if ctx.CancellationContext().Err() != nil {
+			return 1
+		}
+		var fh *os.File
 		var r io.Reader
 
 		if f == "-" {
@@ -76,24 +84,45 @@ func runCat(ctx *Context) int {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(ctx.Dir, path)
 			}
-			fh, err := os.Open(path)
+			var err error
+			fh, err = os.Open(path)
 			if err != nil {
 				fmt.Fprintf(ctx.Stderr, "cat: %s: %s\n", f, fmtOsErr(err))
 				exitCode = 1
 				continue
 			}
-			defer fh.Close()
 			r = fh
 		}
 
 		if !number && !numberNonBlank && !squeeze && !showEnds && !showTabs && !showNonPrint {
-			io.Copy(ctx.Stdout, r)
+			_, err := CopyContext(ctx.CancellationContext(), ctx.Stdout, r)
+			if fh != nil {
+				fh.Close()
+			}
+			if err != nil {
+				fmt.Fprintf(ctx.Stderr, "cat: %v\n", err)
+				return 1
+			}
 			continue
 		}
 
-		br := bufio.NewReader(r)
+		br := bufio.NewReader(ContextReader(ctx.CancellationContext(), r))
 		for {
-			rawLine, readErr := br.ReadBytes('\n')
+			rawLine, readErr := br.ReadSlice('\n')
+			continued := readErr == bufio.ErrBufferFull
+			if continued {
+				readErr = nil
+			}
+			if ctx.CancellationContext().Err() != nil {
+				if fh != nil {
+					fh.Close()
+				}
+				return 1
+			}
+			if readErr != nil && readErr != io.EOF {
+				fmt.Fprintf(ctx.Stderr, "cat: %s: %v\n", f, readErr)
+				exitCode = 1
+			}
 			if len(rawLine) == 0 && readErr != nil {
 				break
 			}
@@ -101,15 +130,35 @@ func runCat(ctx *Context) int {
 			if pendingCR {
 				if len(rawLine) > 0 && rawLine[0] == '\n' {
 					if showEnds || showNonPrint {
-						ctx.Stdout.Write([]byte("^M"))
+						if _, err := ctx.Stdout.Write([]byte("^M")); err != nil {
+							if fh != nil {
+								fh.Close()
+							}
+							return 1
+						}
 					} else {
-						ctx.Stdout.Write([]byte{'\r'})
+						if _, err := ctx.Stdout.Write([]byte{'\r'}); err != nil {
+							if fh != nil {
+								fh.Close()
+							}
+							return 1
+						}
 					}
 				} else {
 					if showNonPrint {
-						ctx.Stdout.Write([]byte("^M"))
+						if _, err := ctx.Stdout.Write([]byte("^M")); err != nil {
+							if fh != nil {
+								fh.Close()
+							}
+							return 1
+						}
 					} else {
-						ctx.Stdout.Write([]byte{'\r'})
+						if _, err := ctx.Stdout.Write([]byte{'\r'}); err != nil {
+							if fh != nil {
+								fh.Close()
+							}
+							return 1
+						}
 					}
 				}
 				pendingCR = false
@@ -125,22 +174,24 @@ func runCat(ctx *Context) int {
 
 			isBlank := len(content) == 0 || (len(content) == 1 && content[0] == '\r')
 
-			if squeeze && isBlank && prevBlank {
+			if lineStart && squeeze && isBlank && prevBlank {
 				if readErr != nil {
 					break
 				}
 				continue
 			}
-			prevBlank = isBlank
+			if lineStart {
+				prevBlank = isBlank
+			}
 
 			var out strings.Builder
 
-			if numberNonBlank {
+			if numberNonBlank && lineStart {
 				if !isBlank {
 					fmt.Fprintf(&out, "%6d\t", lineNum)
 					lineNum++
 				}
-			} else if number {
+			} else if number && lineStart {
 				fmt.Fprintf(&out, "%6d\t", lineNum)
 				lineNum++
 			}
@@ -195,19 +246,32 @@ func runCat(ctx *Context) int {
 			if hasNewline {
 				out.WriteByte('\n')
 			}
-			ctx.Stdout.Write([]byte(out.String()))
+			if _, err := ctx.Stdout.Write([]byte(out.String())); err != nil {
+				if fh != nil {
+					fh.Close()
+				}
+				return 1
+			}
 
+			lineStart = !continued
 			if readErr != nil {
 				break
 			}
+		}
+		if fh != nil {
+			fh.Close()
 		}
 	}
 
 	if pendingCR {
 		if showNonPrint {
-			ctx.Stdout.Write([]byte("^M"))
+			if _, err := ctx.Stdout.Write([]byte("^M")); err != nil {
+				return 1
+			}
 		} else {
-			ctx.Stdout.Write([]byte{'\r'})
+			if _, err := ctx.Stdout.Write([]byte{'\r'}); err != nil {
+				return 1
+			}
 		}
 		pendingCR = false
 	}

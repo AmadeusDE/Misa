@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,17 @@ import (
 )
 
 func TestHelperProcess(t *testing.T) {
+	if os.Getenv("BUILTINEXEC_HELPER") == "argv0" {
+		fmt.Fprint(os.Stdout, os.Args[0])
+		os.Exit(0)
+	}
+	if os.Getenv("BUILTINEXEC_HELPER") == "env" {
+		env := os.Environ()
+		sort.Strings(env)
+		dir, _ := os.Getwd()
+		fmt.Fprint(os.Stdout, strings.Join(env, "\n")+"\n"+dir)
+		os.Exit(0)
+	}
 	if os.Getenv("BUILTINEXEC_HELPER") != "1" {
 		return
 	}
@@ -125,7 +137,7 @@ func TestInvocationPath(t *testing.T) {
 	}
 }
 
-func TestEnvLegacyNestedPrintenv(t *testing.T) {
+func TestEnvNestedPrintenv(t *testing.T) {
 	t.Setenv("BUILTINEXEC_ENV_TEST", "parent")
 	for _, tc := range []struct {
 		args   []string
@@ -142,7 +154,7 @@ func TestEnvLegacyNestedPrintenv(t *testing.T) {
 			t.Fatalf("args %v: status %d stdout %q stderr %q", tc.args, got, out.String(), stderr.String())
 		}
 		if os.Getenv("BUILTINEXEC_ENV_TEST") != "parent" {
-			t.Fatal("process environment not restored")
+			t.Fatal("process environment changed")
 		}
 	}
 }
@@ -200,5 +212,76 @@ func TestCancelRunningExternal(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("child still holds stdout open")
+	}
+}
+
+func TestEnvIsolation(t *testing.T) {
+	t.Setenv("MISA_ENV_F03", "ambient")
+	for _, tc := range []struct {
+		args   []string
+		want   string
+		status int
+	}{
+		{[]string{"-i", "printenv"}, "", 0},
+		{[]string{"-u", "MISA_ENV_F03", "printenv", "MISA_ENV_F03"}, "", 1},
+		{[]string{"MISA_ENV_F03=local", "printenv", "MISA_ENV_F03"}, "local\n", 0},
+		{[]string{"MISA_ENV_F03=local", "env", "-i", "printenv"}, "", 0},
+	} {
+		var out, stderr bytes.Buffer
+		got := Run(context.Background(), "env", &builtins.Context{Args: tc.args, Stdout: &out, Stderr: &stderr})
+		if got != tc.status || out.String() != tc.want {
+			t.Errorf("%v: status %d output length %d stderr %q", tc.args, got, out.Len(), stderr.String())
+		}
+		if os.Getenv("MISA_ENV_F03") != "ambient" {
+			t.Fatal("process environment changed")
+		}
+	}
+}
+
+func TestEnvExternalExactEnvironmentAndDir(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	var out, stderr bytes.Buffer
+	args := []string{"-i", "-C", dir, "BUILTINEXEC_HELPER=env", "ONLY=value", exe, "-test.run=TestHelperProcess"}
+	got := Run(context.Background(), "env", &builtins.Context{Args: args, Env: []string{"LEAK=bad"}, Stdout: &out, Stderr: &stderr})
+	if got != 0 || out.String() != "BUILTINEXEC_HELPER=env\nONLY=value\n"+dir {
+		t.Fatalf("status %d stdout %q stderr %q", got, out.String(), stderr.String())
+	}
+}
+
+func TestEnvBuiltinPrecedesLocalExecutable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix executable permissions")
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.Symlink(exe, filepath.Join(dir, "echo")); err != nil {
+		t.Fatal(err)
+	}
+	var out, stderr bytes.Buffer
+	inv := &builtins.Context{Dir: t.TempDir(), Args: []string{"-C", dir, "-i", "BUILTINEXEC_HELPER=argv0", "echo", "-test.run=TestHelperProcess"}, Stdout: &out, Stderr: &stderr}
+	got := Run(context.Background(), "env", inv)
+	if got != 0 || out.String() != "-test.run=TestHelperProcess\n" {
+		t.Fatalf("status %d output %q stderr %q", got, out.String(), stderr.String())
+	}
+}
+
+func TestExternalArgv0(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ cmdName, want string }{{"", exe}, {"original-name", "original-name"}} {
+		var out, stderr bytes.Buffer
+		inv := &builtins.Context{CmdName: tc.cmdName, Args: []string{"-test.run=TestHelperProcess"}, Env: []string{"BUILTINEXEC_HELPER=argv0"}, Stdout: &out, Stderr: &stderr}
+		if got := Run(context.Background(), exe, inv); got != 0 || out.String() != tc.want {
+			t.Errorf("cmdname %q: status %d output %q stderr %q", tc.cmdName, got, out.String(), stderr.String())
+		}
 	}
 }

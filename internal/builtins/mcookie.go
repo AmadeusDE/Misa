@@ -14,7 +14,10 @@ import (
 
 func init() { Register(Command{Name: "mcookie", Run: runMcookie}) }
 
-func runMcookie(ctx *Context) int {
+func runMcookie(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	max := int64(4096)
 	verbose := false
 	var files []string
@@ -82,7 +85,7 @@ func runMcookie(ctx *Context) int {
 			defer f.Close()
 			r = f
 		}
-		n, err := io.CopyN(h, r, max)
+		n, err := io.CopyN(h, ContextReader(ctx.CancellationContext(), r), max)
 		if err != nil && err != io.EOF {
 			fmt.Fprintf(ctx.Stderr, "mcookie: %v\n", err)
 			return 1
