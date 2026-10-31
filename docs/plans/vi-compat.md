@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/T01
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -60,15 +60,32 @@ without quitting Misa and preserves its register.
 | F05: edit transactions and saved identity | `undo_f05_replay_test.go`, `undo_f05_transaction_test.go`, `undo_entry_test.go`, `internal/ui/editor_undo_regression_test.go` | Insert through Escape (including Backspace, newline, counts) and `cw` change form single undo units; clean quit after undo to the saved revision is checked standalone and in a mux pane. No-op/failing commands, yanks, and motions do not create history or clear redo; a committed real new edit clears redo. |
 | F06: semantic dot repeat and count overrides | `repeat_operator_f06_test.go`, `repeat_interactions_f06_test.go`, `insert_replace_f06_test.go` | Repeats semantic operator/change, put, insert and Replace-mode edits; explicit dot counts override the stored count. Yank does not replace the repeatable change. A no-op does not replace the prior repeat. |
 | F06: insert/Replace behavior and repeat transactions | `insert_replace_f06_test.go`, `repeat_entry_test.go`, `internal/ui/editor_repeat_regression_test.go` | Insert and Replace streams (including Backspace) repeat; `r<CR>` is supported. Each dot execution is one undo transaction; repeated insert/Replace cursor placement and standalone/mux entry paths are covered. |
+| T01: substitute confirmation (done) | `substitute_confirm_test.go`, `substitute_confirm_replay_test.go`, `substitute_confirm_edges_test.go`, `substitute_entry_test.go`, `internal/ui/editor_substitute_regression_test.go` | Public-event fixtures for decisions, ranges, global matches, Unicode, cursor/highlight/prompt, counts, undo/redo, no-op history, dot/register preservation, macro playback, and standalone/mux resize and return. |
+
+### T01 scope and limits
+
+Confirmation supports the existing literal `:s` subset, `i`/`g`, `%`, numeric and Visual
+ranges (including saved `'<,'>` bounds), and an optional trailing delimiter. The `c` prompt accepts `y`, `n`, `a`, `q`,
+`l`, Escape, and Ctrl-E/Ctrl-Y viewport scrolling. Accepted replacements form one undo
+unit and preserve registers. Confirmed substitution is not dot-repeatable and retains the
+previous dot change. Zero accepted replacements (or identical replacement text) leave history,
+redo and dirty state unchanged. The cursor finishes on the last substituted line. Empty-pattern
+reuse and newline-producing replacements are explicitly rejected in confirmation mode until G02;
+regex/replacement grammar remains G01–G02. Confirmed substitution inside `:global`/`:v` is
+explicitly rejected rather than starting a prompt inside their synchronous execution (G03).
+Playback of an existing macro key stream routes confirmation answers like typed input; full
+command/confirmation recording remains deferred with H09. The `n` flag and numeric Ex counts are
+not added. T01 uses Vim 9.1 `nocompatible` documentation (`:s_c`, `:s_flags`) as specification only.
 
 ### Tutor mapping (selected lessons only)
 
-| Tutor lesson | Relevant operation | F06 ledger coverage |
+| Tutor lesson | Relevant operation | Ledger coverage |
 | --- | --- | --- |
 | 3.1 | Put (`p`/`P`) | Put behavior/counts are covered by F02; semantic put repeat by F06. |
 | 3.2 | Replacement (`r`, `R`) | Character replacement and Replace mode, including `r<CR>` and dot repeat, are covered by F06. |
 | 3.3 | Change (`c`) | Existing `cw`/change ranges and semantic dot repeat are covered by F03/F06. |
 | 3.4 | `c` with motion | Existing change-motion ranges and semantic dot repeat are covered by F03/F06. |
+| 4.4 | Substitution | T01 covers literal substitution confirmation and cancellation, ranges, per-line/global matches, and optional trailing delimiter; full patterns/replacement grammar remain G01–G02. |
 | 6.1 | Open lines | Existing insert/open-line behavior is covered where exercised by insertion fixtures; no complete lesson-parity claim. |
 | 6.2 | Append | `A` and insertion behavior are covered in F01/F06; no complete lesson-parity claim. |
 | 6.3 | Replace mode | Replace stream, Backspace and semantic repeat are covered by F06. |
@@ -94,7 +111,8 @@ A successful write updates the saved identity.
 
 Nested `beginEdit`/`commitEdit`/`abortEdit` groups compound changes. Insert mode, through Escape,
 is one unit (including Backspace, newline, and count repetitions); `cw` is one unit. Every dot
-execution is one undo unit. Only a committed real edit clears redo. No-ops, failures, yanks, and motions
+execution is one undo unit. All accepted replacements in a confirmed substitution form one unit.
+Only a committed real edit clears redo. No-ops, failures, yanks, and motions
 create no history and do not clear redo. A successful write inside an explicit transaction materializes
 a saved revision without splitting its undo unit; further edits or aborting back to the earlier text
 are still dirty relative to that write. `U` restores only the last-changed line while it remains
@@ -131,6 +149,6 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
   F05 tests the internal buffer-history reset boundary only. This reset establishes a fresh clean
   revision and clears undo, redo, and line-restore state; file loading/protection stays in T05.
 
-`misatutor` already describes counted `gg`, operator-find, and `d%`; these existing examples use the
-shared motion path. No tutor prose change is needed. This ledger does not claim complete tutor parity.
+`misatutor` describes counted `gg`, operator-find, `d%`, and substitution confirmation;
+the motion examples use the shared motion path. This ledger does not claim complete tutor parity.
 Broader macro and text-object compatibility remains deferred.

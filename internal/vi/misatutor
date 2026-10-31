@@ -319,6 +319,14 @@ ________________________________________________________________________________
 Flags:
   g    replace all occurrences per line (not just the first)
   i    case insensitive matching
+  c    ask before each replacement
+
+With c, answer y to replace, n to skip, a to replace the remaining matches,
+q or Escape to stop, or l to replace this match and stop. Ctrl-E and Ctrl-Y
+scroll the viewport while the confirmation is open. Accepted replacements
+form one undoable change; substitution does not replace the previous dot repeat.
+Confirmation requires an explicit nonempty pattern and does not support replacements
+that produce newlines or confirmation inside :global.
 
 The delimiter can be any character: :s|old|new|g works too.
 ________________________________________________________________________________

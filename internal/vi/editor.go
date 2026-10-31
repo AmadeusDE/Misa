@@ -26,6 +26,7 @@ const (
 	ModeReplaceChar
 	ModeCommand
 	ModeSearch
+	ModeConfirm
 )
 
 type visualKind int
@@ -59,6 +60,7 @@ type Editor struct {
 	mode      Mode
 	cmdBuf    string
 	statusMsg string
+	confirm   *substituteConfirm
 
 	undoStack                             []undoEntry
 	redoStack                             []undoEntry
@@ -208,6 +210,8 @@ func (e *Editor) Update(msg tea.Msg) tea.Cmd {
 			return e.handleCommand(msg)
 		case ModeSearch:
 			return e.handleSearch(msg)
+		case ModeConfirm:
+			e.handleSubstituteConfirm(msg)
 		}
 	}
 	return nil
