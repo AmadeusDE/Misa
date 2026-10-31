@@ -1,6 +1,7 @@
 package builtins
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -69,5 +70,33 @@ func TestParseLongPrefixWithValue(t *testing.T) {
 	v, ok = r.String("w")
 	if !ok || v != "42" {
 		t.Errorf("expected wrap=42, got %q ok=%v", v, ok)
+	}
+}
+
+func TestGenerateUsageHelpLine(t *testing.T) {
+	// A command that defines -h itself (df, du: human-readable) can only offer
+	// --help, so the list must not print a duplicated or blank -h entry.
+	cases := []struct {
+		name string
+		spec string
+		want string
+	}{
+		{"free h", "a(all)", "  -h, --help     display this help and exit\n"},
+		{"taken h", "a(all)h(human-readable)", "      --help     display this help and exit\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec, err := ParseSpec(tc.spec)
+			if err != nil {
+				t.Fatalf("ParseSpec: %v", err)
+			}
+			usage := spec.GenerateUsage("cmd")
+			if !strings.Contains(usage, tc.want) {
+				t.Errorf("usage missing %q:\n%s", tc.want, usage)
+			}
+			if strings.Contains(usage, "-h, --help") && tc.name == "taken h" {
+				t.Errorf("usage still claims -h is help:\n%s", usage)
+			}
+		})
 	}
 }

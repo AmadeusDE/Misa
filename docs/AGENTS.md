@@ -121,6 +121,7 @@ internal/
     chmod.go chown.go link.go    Permissions and links
     tail.go proc.go sysutil.go   System utilities
     man.go install.go util.go    Misc helpers
+    df.go df_size.go             `df` — space/inode table from internal/mounts; units, human sizes and -B labels
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
     mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game
@@ -128,6 +129,9 @@ internal/
                                  — ChessGame builds the game (computer plays Black by default)
     battleship.go                `battleship [-r|--random]` — -r picks a random fleet instead of interactive
                                  placement
+  mounts/                        Mount table and statfs readers used by `df`: /proc/self/mountinfo (with octal-escape
+                                 decoding, /proc/mounts fallback), getfsstat/statfs on darwin and the BSDs via
+                                 golang.org/x/sys/unix, an honest "unsupported on this platform" elsewhere
   sshclient/                     Built-in SSH client (golang.org/x/crypto/ssh); named sshc so it never shadows OpenSSH
     client.go                    Run: dial, remote PTY + raw local terminal, exit status (remote's, or 255)
     target.go                    Destination ([user@]host, ssh://) + flags + config → address, user, identities

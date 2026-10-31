@@ -1,5 +1,22 @@
 # uutils cases Misa does not pass yet. Each line: <command>/<case>  # reason
 # They are skipped; MISA_KNOWN_FAILURES=1 runs them. Remove a line once it passes.
+df/test_df_arguments_override_themselves_11_L70  # df: --sync is not implemented (rejected as an unknown option)
+df/test_df_arguments_override_themselves_3_L62  # df: --total is not implemented (rejected as an unknown option)
+df/test_df_arguments_override_themselves_8_L67  # df: -l/--local is not implemented (rejected as an unknown option)
+df/test_df_arguments_override_themselves_9_L68  # df: --no-sync is not implemented (rejected as an unknown option)
+df/test_df_binary_edge_cases_1_L926  # df: -B0B reports "invalid --block-size argument", not "invalid suffix"
+df/test_df_binary_edge_cases_2_L931  # df: no "too large" block-size check
+df/test_df_compatible_sync_L52  # df: --sync is not implemented (rejected as an unknown option)
+df/test_df_conflicts_overriding_2_L78  # df: --sync/--no-sync are not implemented (rejected as unknown options)
+df/test_df_conflicts_overriding_3_L79  # df: --sync/--no-sync are not implemented (rejected as unknown options)
+df/test_nonexistent_file_1_L1056  # df: --output is not implemented and the operand error is quoted toybox-style
+df/test_nonexistent_file_L1052  # df: prints the header even when every operand fails (toybox layout)
+df/test_output_option_1_L313  # df: --output=<fields> is not implemented (rejected as an unknown option)
+df/test_output_option_L312  # df: --output is not implemented (rejected as an unknown option)
+df/test_output_option_without_equals_sign_L320  # df: --output is not implemented (rejected as an unknown option)
+df/test_total_option_with_single_dash_L271  # df: '-total' parses as -t otal, so it is accepted
+df/test_type_option_0_L335  # df: a -t with no match prints just the header and exits 0 (no 'no file systems processed')
+df/test_type_option_with_file_0_L352  # df: a -t with no match prints just the header and exits 0 (no 'no file systems processed')
 id/test_id_digital_username_0_L580  # adapter: upstream test only runs when a user named 200 exists
 ln/test_symlink_remove_existing_same_src_and_dest_0_L971  # ln -sf a a: should fail like GNU
 ls/test_invalid_value_returns_1_7_L10  # ls: --time doesn't take a value yet

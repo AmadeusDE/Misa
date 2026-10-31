@@ -28,7 +28,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | # | Utility | Portable cases | toybox cases | uutils #[test] (simple) | toybox LOC | Needs |
 |---|---|---|---|---|---|---|
 | 1 | `shuf` | 64 | – | 78 (64) | 63 | – |
-| 2 | `df` | 63 | – | 67 (63) | 197 | kernel/fs, tty |
 | 3 | `basenc` | 35 | – | 38 (35) | – | – |
 | 4 | `hexdump` | 30 | 14 | 22 (16) | 146 | kernel/fs |
 | 5 | `timeout` | 28 | 16 | 37 (12) | 107 | – |
@@ -143,7 +142,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `delgroup` | pending | – | – | – | – | no tests | 61 | – | light |
 | `deluser` | pending | – | – | – | – | no tests | 114 | – | light |
 | `devmem` | other | 26 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 103 | – | light |
-| `df` | posix | – | coreutils:67 | 63 | kernel/fs, tty | uutils: Rust, 63/67 simple new_ucmd! cases parseable by tests/uutils adapter | 197 | 3345 | light |
 | `dhcp` | pending | – | – | – | – | no tests | 1513 | – | heavy |
 | `dhcp6` | pending | – | – | – | – | no tests | 686 | – | heavy |
 | `dhcpd` | pending | – | – | – | – | no tests | 2049 | – | heavy |

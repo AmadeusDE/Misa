@@ -31,7 +31,7 @@ uutils org repos checked that ship no utilities (libraries/docs/trackers): rust-
 
 | Column | Utilities |
 |---|---|
-| Misa | 114 |
+| Misa | 115 |
 | toybox (all) | 349 |
 | toybox: non-pending, default y | 250 |
 | toybox: non-pending, default n | 3 |
@@ -155,7 +155,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `depmod` |  |  | ✓ |  |
 | `devfsd` |  |  | ✓ |  |
 | `devmem` |  | ✓ other | ✓ |  |
-| `df` |  | ✓ posix | ✓ | ✓ coreutils |
+| `df` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `dhcp` |  | ✓ pending |  |  |
 | `dhcp6` |  | ✓ pending |  |  |
 | `dhcpd` |  | ✓ pending |  |  |
@@ -651,4 +651,4 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `yes` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `zcat` |  | ✓ lsb | ✓ |  |
 | `zcip` |  |  | ✓ |  |
-| **Total** | **114** | **349** (250 default, 96 pending) | **445** | **190** |
+| **Total** | **115** | **349** (250 default, 96 pending) | **445** | **190** |
