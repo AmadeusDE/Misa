@@ -175,6 +175,18 @@ either, since a lone king can still reach the eighth rank.
   [FIDE Laws of Chess, Chess960 rules](https://handbook.fide.com/chapter/E012023),
   [Wikipedia](https://en.wikipedia.org/wiki/Fischer_random_chess).
 
+- **Crazyhouse** (`crazyhouse`): orthodox chess with pockets. A capture does not
+  remove the captured piece but changes its colour and puts it in the captor's
+  pocket; a captured promoted piece returns as a pawn. Instead of moving, a
+  player may drop a pocket piece on an empty square, must leave their own king
+  safe (a drop may give check or checkmate), and may not drop a pawn on its
+  first or last rank. Castling, en passant, promotion, checkmate, stalemate
+  draws, repetition and the 50-move rule work as in chess, and a dropped rook
+  never restores castling rights. See [Playing with pockets](#playing-with-pockets)
+  for the controls and [Custom drop rules](#custom-drop-rules) for the YAML.
+  Rules: [Lichess](https://lichess.org/variant/crazyhouse),
+  [Wikipedia](https://en.wikipedia.org/wiki/Crazyhouse).
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
@@ -451,3 +463,57 @@ with their existing `KQkq` convention. En passant, the halfmove clock and, for
 a variant with a `check_limit`, the checks each side has given also round-trip
 for ordinary chess; FEN cannot express arbitrary fairy-piece moved flags or
 multiple crossed en-passant squares.
+
+## Playing with pockets
+
+Both sides' pockets show each available piece and its count beside the board.
+Click a piece in your pocket, then a legal empty board square to drop it.
+Alternatively, press the **uppercase** piece letter (for example `N` or `P`),
+move the cursor, and press enter/space. Uppercase pocket keys leave the usual
+lowercase game shortcuts unchanged. Illegal destinations are ignored; escape
+cancels pocket selection. Drops appear in the move list as `N@f3` (with `+` or
+`#` for check or checkmate).
+
+## Custom drop rules
+
+Drop support is opt-in and independent of variant ids. A variant can inherit
+orthodox chess and enable it with `drops: true`. Captures then add the captured
+piece to the capturing side's hand, and a move may instead place one hand piece
+on an empty square, subject to the same royal-safety check as any other move.
+Dropped pieces count as moved; a `pawn: true` piece dropped on a rank
+containing that side's setup pawns of the same type may use its initial-only
+movement components. Drops are quiet moves, not quiescence captures (check
+evasions still consider all legal drops). The computer values pocket material at 80% of its board value.
+
+Piece definitions support:
+
+- `drop_forbid_ranks: [1, 8]`: ranks on which this type may not be dropped,
+  counted from the dropping side, starting at 1. An omitted list allows all
+  ranks. This is a per-piece restriction, not an engine pawn special case.
+- `demote: P`: original type to use when reading a promoted piece marked `~`
+  in FEN. Actual promotions remember the original piece type, so capturing a
+  promoted piece returns that original type to the hand. Promotion does not
+  change ordinary movement or royal-safety rules.
+
+As with other inherited pieces, overriding a piece definition replaces its
+whole definition, so repeat its movement and flags as well as drop settings.
+`drops: false` disables inherited drop rules.
+
+### Pocket FEN
+
+Drop variants accept a bracketed hand after the placement field. Uppercase
+letters belong to White, lowercase to Black, and repeated letters give counts:
+
+```text
+rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR[Qn] w KQkq - 0 1
+```
+
+Mark a promoted board piece with `~`, for example `Q~`, so it returns as the
+configured `demote` type when captured. `Position.FEN()` writes this form for
+drop variants, including an empty `[]` hand. Existing ordinary FEN placements
+remain valid; non-drop variants do not acquire pockets or promoted-piece rules.
+
+The remaining fields are side, castling rights, en passant target, halfmove
+clock, and fullmove number. Standard FEN has only one en passant target: for a
+custom pawn that crosses several squares, serialization retains only the first
+crossed square. This limitation does not affect orthodox chess or Crazyhouse.

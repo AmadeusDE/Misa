@@ -24,7 +24,8 @@ a set of built-in tools, and it ships as one self-contained binary.
   first king onto the eighth rank wins; Black answering there draws, Antichess (`chess antichess`):
   captures are compulsory and a side that loses all its pieces, or cannot move, wins, and Atomic
   (`chess atomic`): captures explode, destroying adjacent non-pawns, and blowing up the enemy king
-  wins.
+  wins, and Crazyhouse (`chess crazyhouse`): captured pieces change sides and join the captor's
+  pocket, from where they can be dropped back onto the board instead of moving.
 - Minesweeper controls: `space` open, `f` flag, `n` new game, `1`–`3` select a level, `c` custom game, `q` quit
 - Data-driven package manager menus, a file browser, and tldr/man help
 - `misa --gui`: an optional Wayland window, pure Go and software rendered

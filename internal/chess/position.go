@@ -33,26 +33,30 @@ func (c Color) forward() int {
 }
 
 type Piece struct {
-	Type  uint8 // 0 for an empty square, else Variant.Pieces[Type-1]
-	Color Color
-	Moved bool
+	Type     uint8 // 0 for an empty square, else Variant.Pieces[Type-1]
+	Color    Color
+	Moved    bool
+	Promoted uint8 // original type before promotion, or 0
 }
 
 type Move struct {
 	From, To int
 	Take     int   // square of the captured piece (differs from To en passant), or -1
+	Drop     uint8 // type dropped from hand, or 0
 	Promote  uint8 // piece type the pawn becomes, or 0
 	Castle   int   // index into Variant.Castling, or -1
 }
 
 type Position struct {
-	V      *Variant
-	Board  []Piece
-	Turn   Color
-	EP     []int  // squares the last move's pawn crossed
-	EPPawn int    // that pawn, or -1
-	Clock  int    // plies since the last capture or pawn move
-	Checks [2]int // checks each side has given, for a variant with a CheckLimit
+	V        *Variant
+	Board    []Piece
+	Hands    [2][]int // drop-variant pockets, counts indexed by piece type
+	Turn     Color
+	EP       []int  // squares the last move's pawn crossed
+	EPPawn   int    // that pawn, or -1
+	Clock    int    // plies since the last capture or pawn move
+	Fullmove int    // move number, incremented after Black moves
+	Checks   [2]int // checks each side has given, for a variant with a CheckLimit
 
 	castling [2][]resolvedCastle
 	royalSq  [2][]int // kept by Apply so check tests need not scan the board
@@ -68,73 +72,16 @@ func NewPositionWithRand(v *Variant, rng *rand.Rand) *Position {
 	} else {
 		board = v.shuffledStart(rng)
 	}
-	p := &Position{V: v, Board: board, EPPawn: -1}
+	p := &Position{V: v, Board: board, EPPawn: -1, Fullmove: 1}
+	for c := range p.Hands {
+		p.Hands[c] = slices.Clone(v.startHands[c])
+		if len(p.Hands[c]) != len(v.Pieces)+1 {
+			p.Hands[c] = make([]int, len(v.Pieces)+1)
+		}
+	}
 	p.findRoyals()
 	p.resolveCastles("")
 	return p
-}
-
-// ParseFEN reads "placement [w|b] [castling] [ep] [halfmove] [checks]", where
-// a variant with a CheckLimit also takes a checks field anywhere after the side
-// to move: "+2+1" counts the checks White and Black have already given, and
-// Lichess's "1+2" gives the checks each side has left. Pieces on setup squares
-// count as unmoved. Explicit castling rights select eligible origins: K/Q for
-// the right/left rook, or a Shredder-FEN file letter for a dynamic entry (lower
-// case for Black); when the field is given it takes rights away: "-" all of
-// them, otherwise each castle whose letter is missing.
-func ParseFEN(v *Variant, fen string) (*Position, error) {
-	fields := strings.Fields(fen)
-	if len(fields) == 0 {
-		return nil, fmt.Errorf("empty position")
-	}
-	board, err := v.parsePlacement(fields[0])
-	if err != nil {
-		return nil, err
-	}
-	p := &Position{V: v, Board: board, EPPawn: -1}
-	for sq, pc := range board {
-		start := v.start[sq]
-		board[sq].Moved = pc.Type != 0 && (start.Type != pc.Type || start.Color != pc.Color)
-	}
-	if len(fields) > 1 {
-		switch fields[1] {
-		case "w":
-		case "b":
-			p.Turn = Black
-		default:
-			return nil, fmt.Errorf("side to move %q is not w or b", fields[1])
-		}
-	}
-	p.findRoyals()
-	rights := ""
-	if len(fields) > 2 {
-		rights = fields[2]
-	}
-	p.resolveCastles(rights)
-	if len(fields) > 3 && fields[3] != "-" {
-		// FEN records one crossed square; infer the pawn from the side to move.
-		for sq := range board {
-			if v.SquareName(sq) == fields[3] {
-				pawn := sq - p.Turn.forward()*v.Files
-				if pawn >= 0 && pawn < len(board) && board[pawn].Type != 0 && board[pawn].Color != p.Turn && v.Type(board[pawn]).Pawn {
-					p.EP = []int{sq}
-					p.EPPawn = pawn
-				}
-				break
-			}
-		}
-	}
-	if len(fields) > 3 {
-		if err := p.parseChecks(fields[3:]); err != nil {
-			return nil, err
-		}
-	}
-	if len(fields) > 4 {
-		if n, err := strconv.Atoi(fields[4]); err == nil && n >= 0 {
-			p.Clock = n
-		}
-	}
-	return p, nil
 }
 
 // parseChecks reads the optional checks field: "+n+m" counts the checks White
@@ -177,6 +124,9 @@ func (p *Position) clone() *Position {
 	q.Board = slices.Clone(p.Board)
 	for c := range q.castling {
 		q.castling[c] = slices.Clone(p.castling[c])
+	}
+	for c := range q.Hands {
+		q.Hands[c] = slices.Clone(p.Hands[c])
 	}
 	q.EP = nil
 	q.EPPawn = -1
@@ -353,7 +303,8 @@ func (p *Position) generate(tactical bool) []Move {
 	if tactical {
 		return moves
 	}
-	return append(moves, p.castles()...)
+	moves = append(moves, p.castles()...)
+	return append(moves, p.dropMoves()...)
 }
 
 func (p *Position) enPassant(sq int) bool {
@@ -421,6 +372,13 @@ func (p *Position) castles() []Move {
 func (p *Position) Apply(m Move) *Position {
 	v := p.V
 	q := p.clone()
+	if p.Turn == Black {
+		q.Fullmove++
+	}
+	if m.Drop != 0 {
+		q.applyDrop(m)
+		return q
+	}
 	mover := p.Board[m.From]
 	q.updateCastleRights(m)
 	mover.Moved = true
@@ -439,9 +397,22 @@ func (p *Position) Apply(m Move) *Position {
 		return q
 	}
 	if m.Take >= 0 {
+		if v.Drops {
+			captured := p.Board[m.Take]
+			typ := captured.Type
+			if captured.Promoted != 0 {
+				typ = captured.Promoted
+			}
+			if typ != 0 && int(typ) < len(q.Hands[p.Turn]) {
+				q.Hands[p.Turn][typ]++
+			}
+		}
 		q.Board[m.Take] = Piece{}
 	}
 	if m.Promote != 0 {
+		if v.Drops && mover.Promoted == 0 {
+			mover.Promoted = mover.Type
+		}
 		mover.Type = m.Promote
 	}
 	q.Board[m.From] = Piece{}

@@ -153,6 +153,13 @@ func (m *Match) Hashes() []uint64 {
 
 func onlyRoyals(p *Position) bool {
 	found := false
+	for _, hand := range p.Hands {
+		for typ, count := range hand {
+			if typ > 0 && count > 0 && !p.V.Pieces[typ-1].Royal {
+				return false
+			}
+		}
+	}
 	for _, pc := range p.Board {
 		if pc.Type != 0 {
 			if !p.V.Type(pc).Royal {
@@ -174,6 +181,9 @@ func b2i(b bool) byte {
 // describe writes a move in long algebraic notation: Ng1-f3, e7xd8=Q, O-O.
 func describe(p *Position, mv Move) string {
 	v := p.V
+	if mv.Drop != 0 {
+		return string(v.Pieces[mv.Drop-1].Letter) + "@" + v.SquareName(mv.To)
+	}
 	if mv.Castle >= 0 {
 		c := p.Castle(mv.Castle, p.Turn)
 		if c.Rook%v.Files > c.King%v.Files {

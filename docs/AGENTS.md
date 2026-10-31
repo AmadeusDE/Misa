@@ -153,9 +153,14 @@ internal/
                                  the embedded variants in menu order
     position.go                  Move generation (walk per component; a full open circle of a q rider is a pass),
                                  legality (no royal left attacked), castling, en passant on every crossed square,
-                                 Apply (keeps royal squares), ParseFEN; captures() for quiescence
+                                 Apply (keeps royal squares, pockets captures); captures() for quiescence
+    drops.go                     dropMoves/applyDrop for `drops: true` variants: pocket pieces placed on empty
+                                 squares the drop_forbid_ranks allow, as quiet moves that must leave royals safe
+    fen.go                       ParseFEN (placement[pockets], side, castling, ep, clocks, checks) and
+                                 Position.FEN, which writes pockets, promoted-piece `~` marks and fullmove
     attack.go                    anyAttacked, pre-filtered by per-type reach tables (offsets a piece could ever hit)
-    zobrist.go                   Position.Hash: pieces, moved flags that matter, side, en passant
+    zobrist.go                   Position.Hash: pieces, moved flags that matter, side, en passant, checks,
+                                 pockets and the promotions a captured piece would revert through
     match.go                     Match: history/undo, long algebraic notation, repetition/move-limit/bare-royals
                                  endings, Hashes for the search
     terminal.go                  adjudicate(p, hasMoves) -> (outcome, bool), the single game-end function:
@@ -170,8 +175,9 @@ internal/
     difficulty.go                Typed levels (normal default), shallow weak profiles with isolated tables,
                                  seeded full-window root candidate selection; --think changes time only
     game.go view.go run.go       procmon.Viewer screen: cursor/mouse, selection hints, promotion prompt, flip,
-                                 letters toggle, move list panel; the computer thinks in a tea.Cmd (thoughtMsg,
-                                 gen drops abandoned searches); standalone runner
+                                 letters toggle, move list panel, pocket rows (click a pocket piece or press its
+                                 uppercase letter, then a destination); the computer thinks in a tea.Cmd
+                                 (thoughtMsg, gen drops abandoned searches); standalone runner
   vi/                            Built-in vi editor implementation
   ascii/                         ASCII art loading (embedded + external dirs). Android and Termux art
                                  live under distro/pfetch; ids come from sysinfo (termux / android)
@@ -345,7 +351,14 @@ internal/
   chess960 (Chess960: `NewPositionWithRand`/`NewMatchWithRand` take a seeded source, `shuffle` draws the back
   rank from every arrangement its `between`/`opposite_color` constraints allow — Scharnagl order, bishops on
   opposite colours, king between the rooks — mirrored on Black's rank, dynamic castling entries resolve their
-  origins per position, and `Position.FEN()` writes Shredder-FEN rook-file rights).
+  origins per position, and `Position.FEN()` writes Shredder-FEN rook-file rights), and crazyhouse
+  (Crazyhouse: `drops: true` puts a captured piece - a promoted one demoted back to its `demote`
+  type - into the captor's pocket, from where a move may drop it on an empty square that is not on
+  a rank in that piece's `drop_forbid_ranks`; pockets and promotion marks round-trip through FEN
+  (`Placement[PQp]` and `Q~`) and are hashed, the evaluation values pocket material at 80%, and the
+  UI shows both pockets for clicking or an uppercase letter). General `drops`, per-piece
+  `drop_forbid_ranks` and `demote` settings, pocket FEN and the UI drop controls are documented in
+  `docs/CHESS.md`; a captured promoted piece returns its original type to the hand.
   `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
   and the search both honour it. `promotion_optional: true` lets a pawn stay a pawn inside `promotion_zone` (but
   not on the last rank, where promotion is forced); `promotion_captured_only: true` restricts the choices to
