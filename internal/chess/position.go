@@ -163,19 +163,48 @@ func (p *Position) clone() *Position {
 // Moves returns the legal moves for the side to move.
 func (p *Position) Moves() []Move {
 	var legal []Move
-	for _, m := range p.pseudoMoves() {
-		if !p.Apply(m).royalAttacked(p.Turn) {
+	for _, m := range p.moveCandidates() {
+		if p.Apply(m).legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
 			legal = append(legal, m)
 		}
 	}
 	return legal
 }
 
+// legalAfter reports whether a move by mover is legal once made: no royal of
+// the mover may be left attacked and, where the variant forbids checking, no
+// royal of the other side may be attacked either. previousRoyals is the mover's
+// royal count before the move: with explosions or extinction in play, a move
+// that costs the mover a royal is illegal, while one that extinguishes the
+// other side wins even when the mover is left in check.
+func (p *Position) legalAfter(mover Color, previousRoyals int) bool {
+	if p.V.Explosion != nil || len(p.V.Extinction) > 0 {
+		if len(p.royalSq[mover]) < previousRoyals {
+			return false
+		}
+		if p.extinct(mover.Other()) {
+			return true
+		}
+	}
+	if p.royalAttacked(mover) {
+		return false
+	}
+	return !p.V.NoChecks || !p.royalAttacked(mover.Other())
+}
+
 // InCheck reports whether any of the side to move's royal pieces is attacked.
 func (p *Position) InCheck() bool { return p.royalAttacked(p.Turn) }
 
 func (p *Position) royalAttacked(c Color) bool {
-	return p.anyAttacked(p.royalSq[c], c.Other())
+	if p.V.Explosion == nil {
+		return p.anyAttacked(p.royalSq[c], c.Other())
+	}
+	for _, sq := range p.royalSq[c] {
+		if !p.connectedRoyal(sq, c.Other()) && p.anyAttacked([]int{sq}, c.Other()) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Position) findRoyals() {
@@ -192,6 +221,25 @@ func (p *Position) Royals(c Color) []int { return slices.Clone(p.royalSq[c]) }
 
 func (p *Position) pseudoMoves() []Move { return p.generate(false) }
 
+// moveCandidates applies the compulsory capture rule before the common royal
+// safety filter. Only legal captures suppress quiet moves, including promotions.
+func (p *Position) moveCandidates() []Move {
+	if !p.V.ForcedCapture {
+		return p.pseudoMoves()
+	}
+	tactical := p.captures()
+	var captures []Move
+	for _, m := range tactical {
+		if m.Take >= 0 && p.Apply(m).legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
+			captures = append(captures, m)
+		}
+	}
+	if len(captures) != 0 {
+		return captures
+	}
+	return p.pseudoMoves()
+}
+
 // captures lists the moves that take something or promote, for the
 // quiescence search.
 func (p *Position) captures() []Move { return p.generate(true) }
@@ -199,7 +247,7 @@ func (p *Position) captures() []Move { return p.generate(true) }
 func (p *Position) generate(tactical bool) []Move {
 	v := p.V
 	var moves []Move
-	seen := make([]bool, v.Size())
+	seen := make([]int, v.Size())
 	// Captured-only promotion compares the board with the setup, so count the
 	// side's pieces once instead of per promoting pawn.
 	capturedOnly := v.PromotionCapturedOnly && len(v.Promotion) > 0
@@ -225,11 +273,19 @@ func (p *Position) generate(tactical bool) []Move {
 		t := v.Type(pc)
 		clear(seen)
 		add := func(to, take int) {
-			if seen[to] {
+			promotes := t.Pawn && to != from && p.promotes(to) && len(v.Promotion) > 0
+			if seen[to] != 0 {
+				// A move and an en-passant component can reach the same empty
+				// square. The capture takes precedence over the quiet move.
+				for i := seen[to] - 1; i < len(moves) && moves[i].From == from && moves[i].To == to; i++ {
+					if take >= 0 && moves[i].Take < 0 {
+						moves[i].Take = take
+					}
+				}
 				return
 			}
-			seen[to] = true
-			if t.Pawn && to != from && p.promotes(to) && len(v.Promotion) > 0 {
+			seen[to] = len(moves) + 1
+			if promotes {
 				for _, promo := range v.Promotion {
 					if available(promo) {
 						moves = append(moves, Move{From: from, To: to, Take: take, Promote: promo, Castle: -1})
@@ -258,10 +314,10 @@ func (p *Position) generate(tactical bool) []Move {
 				switch {
 				case to == from && comp.Move:
 					add(to, -1)
-				case target.Type == 0 && comp.Move:
-					add(to, -1)
 				case target.Type == 0 && comp.Capture && t.Pawn && p.enPassant(to):
 					add(to, p.EPPawn)
+				case target.Type == 0 && comp.Move:
+					add(to, -1)
 				case target.Type != 0 && target.Color != pc.Color && comp.Capture:
 					add(to, to)
 				case target.Type != 0 && target.Color == pc.Color && v.SelfCapture && !v.Type(target).Royal && comp.Capture:
@@ -325,7 +381,7 @@ func (p *Position) castles() []Move {
 		for sq := min(king, kingTo); sq <= max(king, kingTo); sq++ {
 			path = append(path, sq)
 		}
-		if p.anyAttacked(path, p.Turn.Other()) {
+		if p.castlePathAttacked(king, path) {
 			continue
 		}
 		moves = append(moves, Move{From: king, To: kingTo, Take: -1, Castle: i})
@@ -361,6 +417,9 @@ func (p *Position) Apply(m Move) *Position {
 	}
 	q.Board[m.From] = Piece{}
 	q.Board[m.To] = mover
+	if m.Take >= 0 && v.Explosion != nil {
+		q.explode(m.To)
+	}
 	q.Clock++
 	if pawn := v.Type(p.Board[m.From]).Pawn; pawn || m.Take >= 0 {
 		q.Clock = 0
@@ -372,7 +431,7 @@ func (p *Position) Apply(m Move) *Position {
 		}
 	}
 	q.Turn = p.Turn.Other()
-	if v.Pieces[mover.Type-1].Royal || v.Type(p.Board[m.From]).Royal || (m.Take >= 0 && v.Type(p.Board[m.Take]).Royal) {
+	if (m.Take >= 0 && v.Explosion != nil) || v.Pieces[mover.Type-1].Royal || v.Type(p.Board[m.From]).Royal || (m.Take >= 0 && v.Type(p.Board[m.Take]).Royal) {
 		q.findRoyals()
 	}
 	q.countCheck()

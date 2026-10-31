@@ -15,10 +15,12 @@ const (
 	DrawMaterial
 	GoalWin
 	CheckWin
+	DrawGoalReply
+	ExtinctionWin
 )
 
 func (s Status) String() string {
-	return [...]string{"playing", "checkmate", "stalemate", "draw by the move limit", "draw by repetition", "draw: only royal pieces left", "goal reached", "check limit reached"}[s]
+	return [...]string{"playing", "checkmate", "stalemate", "draw by the move limit", "draw by repetition", "draw: only royal pieces left", "goal reached", "check limit reached", "draw by the goal reply", "extinction"}[s]
 }
 
 // Match is a game in progress: the positions so far, so moves can be taken
@@ -30,6 +32,7 @@ type Match struct {
 	moves    []Move
 	legal    []Move
 	status   Status
+	winner   Color
 }
 
 func NewMatch(v *Variant) *Match {
@@ -55,22 +58,25 @@ func (m *Match) Turn() Color         { return m.Position().Turn }
 func (m *Match) Over() bool          { return m.status != Playing }
 
 // Status reports how the game stands; the winner only means something when
-// the game is decisive, which a goal arrival, a check limit and checkmate are,
-// and so is a stalemate under a stalemate rule that names a winner.
+// the game is decisive, which a goal arrival, a check limit, an extinction and
+// checkmate are, and so is a stalemate under a stalemate rule that names a
+// winner. The drawn endings, the goal reply draw among them, name no winner.
 func (m *Match) Status() (Status, Color) {
-	winner := m.Position().Turn.Other()
-	if m.status == Stalemate && m.variant.Stalemate == StalemateLoss {
-		winner = m.Position().Turn
-	}
-	return m.status, winner
+	return m.status, m.winner
 }
 
 // Decisive reports whether the game ended with a winner rather than a draw:
-// a checkmate, a goal arrival, a check limit, or a stalemate under whichever
-// rule says one side wins or loses it.
+// a checkmate, a goal arrival, a check limit, an extinction, or a stalemate
+// under whichever rule says one side wins or loses it. The goal reply draw and
+// the other draw rules are not decisive.
 func (m *Match) Decisive() bool {
-	return m.status == Checkmate || m.status == GoalWin || m.status == CheckWin ||
-		m.status == Stalemate && m.variant.Stalemate != StalemateDraw
+	switch m.status {
+	case Checkmate, GoalWin, CheckWin, ExtinctionWin:
+		return true
+	case Stalemate:
+		return m.variant.Stalemate != StalemateDraw
+	}
+	return false
 }
 
 // Play makes a move, which must be one of Legal.
@@ -81,7 +87,7 @@ func (m *Match) Play(mv Move) {
 	m.refresh()
 	text := describe(before, mv)
 	switch {
-	case m.status == Checkmate:
+	case m.status == Checkmate || m.status == ExtinctionWin:
 		text += "#"
 	case m.Position().InCheck():
 		text += "+"
@@ -103,9 +109,9 @@ func (m *Match) Undo() bool {
 func (m *Match) refresh() {
 	p := m.Position()
 	m.legal = p.Moves()
-	m.status = Playing
+	m.status, m.winner = Playing, p.Turn.Other()
 	if o, over := adjudicate(p, len(m.legal) > 0); over {
-		m.status = o.status
+		m.status, m.winner = o.status, o.winner
 		return
 	}
 	switch {
@@ -113,7 +119,7 @@ func (m *Match) refresh() {
 		m.status = DrawRepetition
 	case p.Clock >= 2*m.variant.MoveLimit:
 		m.status = DrawMoveLimit
-	case onlyRoyals(p):
+	case len(m.variant.Goal) == 0 && onlyRoyals(p):
 		m.status = DrawMaterial
 	}
 }
@@ -140,12 +146,16 @@ func (m *Match) Hashes() []uint64 {
 }
 
 func onlyRoyals(p *Position) bool {
+	found := false
 	for _, pc := range p.Board {
-		if pc.Type != 0 && !p.V.Type(pc).Royal {
-			return false
+		if pc.Type != 0 {
+			if !p.V.Type(pc).Royal {
+				return false
+			}
+			found = true
 		}
 	}
-	return true
+	return found
 }
 
 func b2i(b bool) byte {

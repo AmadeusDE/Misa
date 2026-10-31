@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -40,6 +40,12 @@ type PieceType struct {
 // across the middle rank.
 type Castle struct{ King, Rook, KingTo, RookTo int }
 
+// Explosion describes the capture blast and types immune to collateral damage.
+type Explosion struct {
+	Radius int
+	Immune []uint8
+}
+
 type Variant struct {
 	ID, Name, Description string
 	Files, Ranks          int
@@ -52,8 +58,14 @@ type Variant struct {
 	PromotionCapturedOnly bool    // a type is available only once its setup piece is gone
 	MoveLimit             int     // moves by each side without a capture or pawn move before a draw
 	Stalemate             StalemateRule
-	CheckLimit            int   // checks a side must give to win, or 0 for no such rule
-	Goal                  []int // absolute squares whose arrival by a royal wins
+	CheckLimit            int        // checks a side must give to win, or 0 for no such rule
+	Goal                  []int      // absolute squares whose arrival by a royal wins
+	NoChecks              bool       // a move that leaves the other side's royals attacked is illegal
+	GoalReplyDraw         bool       // the first side's goal arrival is drawn when the other can arrive in reply
+	ForcedCapture         bool       // a legal capture may not be declined
+	InverseMaterial       bool       // the evaluation prefers having fewer, less valuable pieces
+	Explosion             *Explosion // captures explode, destroying nearby non-immune pieces
+	Extinction            []uint8    // loss when no pieces of any listed type remain
 	Setup                 string
 	Source                string
 
@@ -89,6 +101,28 @@ const (
 	StalemateLoss StalemateRule = "loss" // the side delivering stalemate loses
 )
 
+type explosionDef struct {
+	Radius int      `yaml:"radius"`
+	Immune []string `yaml:"immune"`
+}
+
+// extinctionDef accepts either a sequence of letters or the scalar all or *.
+type extinctionDef struct {
+	All     bool
+	Letters []string
+}
+
+func (e *extinctionDef) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind == yaml.ScalarNode && n.Tag == "!!str" && (strings.EqualFold(n.Value, "all") || n.Value == "*") {
+		e.All = true
+		return nil
+	}
+	if n.Kind != yaml.SequenceNode {
+		return fmt.Errorf("extinction: expected a list of pieces or all")
+	}
+	return n.Decode(&e.Letters)
+}
+
 // variantDef is a variant file. With extends, unset fields come from the named
 // variant and pieces add to or replace (by letter) the parent's.
 type variantDef struct {
@@ -104,14 +138,21 @@ type variantDef struct {
 	Promotion     []string    `yaml:"promotion"`
 	PromotionZone int         `yaml:"promotion_zone"`
 	// The two promotion rules are pointers so an inheriting variant can tell
-	// "unset" (keep the parent's) from "false".
-	PromotionOptional     *bool         `yaml:"promotion_optional"`
-	PromotionCapturedOnly *bool         `yaml:"promotion_captured_only"`
-	MoveLimit             int           `yaml:"move_limit"`
-	CheckLimit            int           `yaml:"check_limit"`
-	Stalemate             StalemateRule `yaml:"stalemate"`
-	SelfCapture           *bool         `yaml:"self_capture"`
-	Goal                  []string      `yaml:"goal"`
+	// "unset" (keep the parent's) from "false". no_checks and goal_reply_draw
+	// are pointers for the same reason.
+	PromotionOptional     *bool          `yaml:"promotion_optional"`
+	PromotionCapturedOnly *bool          `yaml:"promotion_captured_only"`
+	MoveLimit             int            `yaml:"move_limit"`
+	CheckLimit            int            `yaml:"check_limit"`
+	Stalemate             StalemateRule  `yaml:"stalemate"`
+	SelfCapture           *bool          `yaml:"self_capture"`
+	Goal                  []string       `yaml:"goal"`
+	NoChecks              *bool          `yaml:"no_checks"`
+	GoalReplyDraw         *bool          `yaml:"goal_reply_draw"`
+	ForcedCapture         *bool          `yaml:"forced_capture"`
+	Material              string         `yaml:"material"`
+	Explosion             *explosionDef  `yaml:"explosion"`
+	Extinction            *extinctionDef `yaml:"extinction"`
 
 	source string
 }
@@ -315,6 +356,24 @@ func merge(parent, child variantDef) variantDef {
 	if child.Goal != nil {
 		d.Goal = child.Goal
 	}
+	if child.NoChecks != nil {
+		d.NoChecks = child.NoChecks
+	}
+	if child.GoalReplyDraw != nil {
+		d.GoalReplyDraw = child.GoalReplyDraw
+	}
+	if child.ForcedCapture != nil {
+		d.ForcedCapture = child.ForcedCapture
+	}
+	if child.Material != "" {
+		d.Material = child.Material
+	}
+	if child.Explosion != nil {
+		d.Explosion = child.Explosion
+	}
+	if child.Extinction != nil {
+		d.Extinction = child.Extinction
+	}
 	d.Pieces = slices.Clone(parent.Pieces)
 	for _, p := range child.Pieces {
 		i := slices.IndexFunc(d.Pieces, func(q pieceDef) bool { return strings.EqualFold(q.Letter, p.Letter) })
@@ -336,6 +395,16 @@ func build(d variantDef) (*Variant, error) {
 		SelfCapture:           d.SelfCapture != nil && *d.SelfCapture,
 		PromotionOptional:     d.PromotionOptional != nil && *d.PromotionOptional,
 		PromotionCapturedOnly: d.PromotionCapturedOnly != nil && *d.PromotionCapturedOnly,
+	}
+	if d.ForcedCapture != nil {
+		v.ForcedCapture = *d.ForcedCapture
+	}
+	switch d.Material {
+	case "", "normal":
+	case "inverse":
+		v.InverseMaterial = true
+	default:
+		return nil, fmt.Errorf("material must be normal or inverse")
 	}
 	if v.Name == "" {
 		v.Name = v.ID
@@ -363,6 +432,15 @@ func build(d variantDef) (*Variant, error) {
 	if err := v.parseGoal(d.Goal); err != nil {
 		return nil, err
 	}
+	if d.NoChecks != nil {
+		v.NoChecks = *d.NoChecks
+	}
+	if d.GoalReplyDraw != nil {
+		v.GoalReplyDraw = *d.GoalReplyDraw
+	}
+	if v.GoalReplyDraw && len(v.Goal) == 0 {
+		return nil, fmt.Errorf("goal_reply_draw needs goal squares")
+	}
 	if len(d.Pieces) == 0 || len(d.Pieces) > 255 {
 		return nil, fmt.Errorf("needs 1-255 piece types")
 	}
@@ -375,6 +453,9 @@ func build(d variantDef) (*Variant, error) {
 			return nil, fmt.Errorf("piece letter %c used twice", t.Letter)
 		}
 		v.Pieces = append(v.Pieces, t)
+	}
+	if err := v.setCaptureRules(d); err != nil {
+		return nil, err
 	}
 	start, err := v.parsePlacement(d.Setup)
 	if err != nil {
@@ -397,6 +478,49 @@ func build(d variantDef) (*Variant, error) {
 	v.estimateValues()
 	v.zobrist = newZobrist(v)
 	return v, nil
+}
+
+func (v *Variant) setCaptureRules(d variantDef) error {
+	parse := func(field string, letters []string) ([]uint8, error) {
+		var result []uint8
+		for _, l := range letters {
+			if len(l) != 1 || v.TypeOf(l[0]) == 0 {
+				return nil, fmt.Errorf("%s: unknown piece %q", field, l)
+			}
+			t := v.TypeOf(l[0])
+			if slices.Contains(result, t) {
+				return nil, fmt.Errorf("%s: piece %q listed twice", field, l)
+			}
+			result = append(result, t)
+		}
+		return result, nil
+	}
+	if d.Explosion != nil {
+		if d.Explosion.Radius < 0 {
+			return fmt.Errorf("explosion: radius must be nonnegative")
+		}
+		immune, err := parse("explosion immune", d.Explosion.Immune)
+		if err != nil {
+			return err
+		}
+		if d.Explosion.Radius > 0 {
+			v.Explosion = &Explosion{Radius: d.Explosion.Radius, Immune: immune}
+		}
+	}
+	if d.Extinction != nil {
+		if d.Extinction.All {
+			for i := range v.Pieces {
+				v.Extinction = append(v.Extinction, uint8(i+1))
+			}
+		} else {
+			var err error
+			v.Extinction, err = parse("extinction", d.Extinction.Letters)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func buildPiece(p pieceDef) (*PieceType, error) {

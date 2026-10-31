@@ -23,11 +23,16 @@ The bundled `stalematewins` variant (Stalemate-wins Chess) uses the
 and is not in check loses, so the player who delivered stalemate wins. See
 Tomašev, Paquet, Hassabis and Kramnik, [*Assessing Game Balance with AlphaZero:
 Exploring Alternative Rule Sets in Chess*](https://arxiv.org/abs/2009.04374)
-(2020).
+(2020). The bundled `antichess` variant goes the other way: captures are
+compulsory, a side with no legal move wins, material preference is reversed,
+and the king is non-royal, so it can be captured and promotion may produce one.
 
 Custom variant YAML can set `stalemate` to `draw`, `win`, or `loss`. The default
 when the field is omitted is `draw` (orthodox chess); `win` means the side
 delivering stalemate wins, and `loss` means the side delivering it loses.
+`forced_capture: true` requires a capture whenever one is legal, and
+`material: inverse` makes the evaluation prefer having fewer, less valuable
+pieces; both are described under [Variant files](#variant-files).
 
 | Level | Default time ceiling | Depth cap | Node cap | Root selection |
 | --- | ---: | ---: | ---: | --- |
@@ -131,6 +136,38 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
   limit-th check is also mate the game is won either way. See
   [Variant files](#variant-files) for the `check_limit` key.
 
+- **Racing Kings** (`racingkings`): V. R. Parton, 1961: 8×8 with no pawns, no
+  castling and no promotion, both armies on ranks 1 and 2 (Black on the a–d
+  files, White on the e–h files), and neither side may give check. The whole
+  eighth rank is a goal for both colours: the first king there wins, except
+  that White's arrival is only pending while Black can answer on the eighth
+  rank, which draws. See [Variant files](#variant-files) for the `goal`,
+  `no_checks` and `goal_reply_draw` keys.
+
+Because checking is illegal, no move in Racing Kings can ever be mate:
+stalemate, repetition and the move limit are what end a race that no king wins.
+The bare-kings material rule does not apply while a variant has goal squares
+either, since a lone king can still reach the eighth rank.
+
+- **Antichess** (`antichess`): orthodox chess except that a capture is
+  compulsory whenever one is legal, and a side with no legal move at all wins,
+  so a player wins by being stalemated or by losing every piece. The king is a
+  non-royal piece that can be captured, and pawns may promote to it, so
+  checkmate plays no part. Material preference is reversed (`material:
+  inverse`), and the computer sheds pieces instead of hoarding them. See
+  [Variant files](#variant-files) for the `forced_capture`, `material` and
+  `stalemate` keys.
+
+- **Atomic Chess** (`atomic`): 8×8, orthodox chess except that a capture
+  explodes: it removes the capturing piece, the captured piece and every
+  adjacent non-pawn piece of either colour. Kings move as `mK` and so never
+  capture, a move that would explode its own king is illegal, and exploding the
+  enemy king wins at once, even when the moving side would otherwise be in
+  check. See [Explosions and extinction](#explosions-and-extinction) for the
+  `explosion` and `extinction` keys, the
+  [Lichess rules](https://lichess.org/variant/atomic) and
+  [Wikipedia](https://en.wikipedia.org/wiki/Atomic_chess).
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
@@ -185,9 +222,9 @@ goal: [d4, d5, e4, e5]
 ```
 
 Each entry accepts a square label as for `castling` (e.g. `d4`). A variant
-without `goal` has no goal squares: it is won only by checkmate and otherwise
-ends in stalemate, repetition or the move limit. Grand Chess, for one, sets no
-goal.
+without `goal` has no goal squares: it can still be won by checkmate or, when
+the variant configures it, extinction; otherwise it ends in stalemate,
+repetition or the move limit. Grand Chess, for one, sets no goal.
 
 Promotion is governed by four keys:
 
@@ -231,6 +268,104 @@ side-to-move field: `+2+1` counts the checks White and Black have already
 given, while Lichess's `1+2` style gives the checks each side has left. A
 variant without a check limit ignores the field, so existing FENs are
 unchanged.
+
+Two flags refine goal variants. `no_checks: true` makes a move that leaves the
+opponent's royal piece attacked illegal, for both colours, so a checking move is
+never a legal move at all: the move list, the notation, the search and the UI
+all agree that it does not exist, and checkmate can therefore never occur.
+`goal_reply_draw: true` makes the arrival provisional for the side that moves
+first. White reaching a goal square is not yet a win while Black has a legal
+move that also puts a royal on a goal square; if Black plays it the game ends as
+`draw by the goal reply`, and if Black cannot, the arrival wins. A goal arrival
+by Black always wins at once. Both flags default to `false`, are inherited
+through `extends` like every other field, and a child file may set them back to
+`false`. `goal_reply_draw` without goal squares would do nothing, so it is a
+load error. A variant with goal squares is also never drawn by the bare-kings
+material rule, because a lone king can still reach a goal.
+
+`racingkings` uses both flags; its piece list is the ordinary one, so only the
+shape of the variant is shown here:
+
+```yaml
+id: racingkings
+name: Racing Kings
+files: 8
+ranks: 8
+setup: 8/8/8/8/8/8/krbnNBRK/qrbnNBRQ   # Black a-d, White e-h, ranks 1-2
+castling: []
+promotion: []
+goal: [a8, b8, c8, d8, e8, f8, g8, h8]  # the eighth rank, both colours
+no_checks: true
+goal_reply_draw: true
+```
+
+`forced_capture: true` makes every legal capture compulsory: the move list
+holds only captures whenever one exists, en passant and capture-promotions
+included, and a capture that would leave the mover's own royal in check does
+not restrict the quiet moves. It defaults to `false` and is inherited through
+`extends` like the other flags. `material:` decides how the evaluation weighs
+material: `normal` (the default) prefers more and more valuable pieces, and
+`inverse` prefers fewer, so the engine seeks to give its own pieces away. Both
+keys are what makes antichess play like antichess:
+
+```yaml
+id: antichess
+name: Antichess
+extends: chess
+pieces:
+  - {letter: K, name: King, betza: K, royal: false, value: 300, glyph: ♚}
+castling: []
+promotion: [Q, R, B, N, K]
+forced_capture: true
+material: inverse
+stalemate: loss
+```
+
+Dropping `royal` from the king leaves a variant with no royal piece at all.
+Nothing can then be in check or mate, the bare-kings material draw does not
+apply, and every ending comes from `stalemate:`, which antichess sets to `loss`:
+the side that cannot move wins, whether it lost its last piece or is
+simply stuck.
+
+## Explosions and extinction
+
+Variants can configure these mechanisms independently, for example:
+
+```yaml
+explosion: {radius: 1, immune: [P]}
+extinction: [K]
+```
+
+A capture explodes around its destination, removing pieces within the configured
+Chebyshev radius (a square neighbourhood). Listed immune piece types survive the
+blast, but the capturer and captured piece are always removed, even if immune.
+Radius 0 disables explosions, including an inherited configuration. With
+explosions enabled, a royal within that radius of an enemy royal is connected
+and is not considered in check. A legal move must preserve all of the mover's
+royals and either extinguish the opponent or leave the mover out of check.
+
+A side loses when none of its listed extinction types remain. Extinguishing the
+opponent wins immediately, before goal, check limit, checkmate, stalemate or
+draw adjudication, and it is the `extinction` status the header, Match.Decisive
+and the search treat as decisive. If both sides become extinct at once, the side
+that just moved wins (losing a royal still makes that move illegal). The scalar
+`all` or `"*"` expands to all piece types, useful for horde-style armies. An
+empty list (`extinction: []`) clears inherited extinction. An omitted
+`explosion` inherits the parent's configuration; an explicit `explosion`
+mapping replaces it as a whole. Other unspecified variant fields are inherited
+from the parent. The computer disables null-move pruning when explosions are
+enabled, since passing is not a safe tactical shortcut for these positions.
+
+### Atomic
+
+A capture removes the capturer, captured piece and all adjacent nonpawns of
+either side. En passant explodes around the capturing pawn’s destination, not
+the captured pawn’s square. Kings use `mK` and cannot capture. A move that
+explodes its own royal is illegal; exploding the enemy king wins immediately,
+even if the moving king would otherwise be in check. Connected royals suppress
+check. Normal castling, en passant, promotion, checkmate, stalemate, repetition
+and move-limit rules remain in effect. See [Lichess Atomic rules](https://lichess.org/variant/atomic)
+and [Wikipedia: Atomic chess](https://en.wikipedia.org/wiki/Atomic_chess).
 
 ## Custom board dimensions
 

@@ -247,7 +247,9 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 		}
 	}
 
-	if allowNull && !inCheck && depth >= 3 && beta < mateScore-maxPly && e.hasPieces(p) {
+	// A null move can invent or hide an immediate explosion threat, and it is
+	// no shortcut where captures are compulsory or the side has no royal left.
+	if e.v.Explosion == nil && allowNull && !e.v.ForcedCapture && !e.v.InverseMaterial && len(p.royalSq[p.Turn]) > 0 && !inCheck && depth >= 3 && beta < mateScore-maxPly && e.hasPieces(p) {
 		r := 2
 		if depth >= 6 {
 			r = 3
@@ -267,9 +269,9 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 	origAlpha := alpha
 	best, bestMove := -infinity, Move{Castle: -2}
 	legal := 0
-	for _, mv := range e.order(p, p.pseudoMoves(), ttMove, ply) {
+	for _, mv := range e.order(p, p.moveCandidates(), ttMove, ply) {
 		child := p.Apply(mv)
-		if child.royalAttacked(p.Turn) {
+		if !child.legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
 			continue
 		}
 		legal++
@@ -313,8 +315,7 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 		// adjudicate names the winner for checkmate and for each stalemate
 		// rule; the goal cannot have been reached here, since a royal cannot
 		// arrive on a goal square and leave the mover to move.
-		o, _ := adjudicate(p, false)
-		return o.score(p.Turn, ply)
+		return terminalScore(p, ply)
 	}
 	flag := ttExact
 	switch {
@@ -341,27 +342,45 @@ func (e *Engine) quiesce(p *Position, ply, alpha, beta int) int {
 		return e.eval.evaluate(p)
 	}
 	inCheck := p.InCheck()
+	// In compulsory-capture and no-royal games stand-pat can conceal a win
+	// by having no legal moves, or an obligatory capture. Generate legal moves
+	// before evaluating in those positions.
+	special := e.v.ForcedCapture || len(p.royalSq[White]) == 0 || len(p.royalSq[Black]) == 0
+	var moves []Move
+	forced := false
+	if special {
+		moves = p.Moves()
+		if len(moves) == 0 {
+			return terminalScore(p, ply)
+		}
+		forced = e.v.ForcedCapture && moves[0].Take >= 0
+	}
 	stand := -infinity
-	if !inCheck {
+	if !inCheck && !forced {
 		stand = e.eval.evaluate(p)
 		if stand >= beta {
 			return stand
 		}
 		alpha = max(alpha, stand)
 	}
-	var moves []Move
-	if inCheck {
-		moves = p.pseudoMoves()
-	} else {
-		moves = p.captures()
+	if !special {
+		if inCheck {
+			moves = p.moveCandidates()
+		} else {
+			moves = p.captures()
+		}
+	} else if !inCheck && !forced {
+		moves = slices.DeleteFunc(moves, func(m Move) bool { return m.Take < 0 && m.Promote == 0 })
 	}
 	legal := 0
 	for _, mv := range e.order(p, moves, Move{Castle: -2}, ply) {
-		if !inCheck && mv.Promote == 0 && stand+e.victimValue(p, mv)+200 < alpha {
+		// Explosions and extinction make a quiet move's value unpredictable, so
+		// delta pruning only applies where neither is configured.
+		if e.v.Explosion == nil && len(e.v.Extinction) == 0 && !special && !inCheck && mv.Promote == 0 && stand+e.victimValue(p, mv)+200 < alpha {
 			continue
 		}
 		child := p.Apply(mv)
-		if child.royalAttacked(p.Turn) {
+		if !child.legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
 			continue
 		}
 		legal++
@@ -375,8 +394,7 @@ func (e *Engine) quiesce(p *Position, ply, alpha, beta int) int {
 		alpha = max(alpha, score)
 	}
 	if inCheck && legal == 0 {
-		o, _ := adjudicate(p, false)
-		return o.score(p.Turn, ply)
+		return terminalScore(p, ply)
 	}
 	return alpha
 }
@@ -468,9 +486,37 @@ func (e *Engine) victimValue(p *Position, mv Move) int {
 	if mv.Take < 0 {
 		return 0
 	}
-	value := e.v.Pieces[p.Board[mv.Take].Type-1].Value
-	if p.Board[mv.Take].Color == p.Turn { // a self-capture loses material
-		return -value
+	if e.v.Explosion == nil {
+		value := e.v.Pieces[p.Board[mv.Take].Type-1].Value
+		if p.Board[mv.Take].Color == p.Turn { // a self-capture loses material
+			return -value
+		}
+		return value
+	}
+	// Count the capturer, captured piece and nonimmune blast victims directly.
+	// This also handles en passant, whose captured pawn is not at To.
+	x, y := e.v.XY(mv.To)
+	value, enemySurvivors := 0, 0
+	for sq, pc := range p.Board {
+		if pc.Type == 0 {
+			continue
+		}
+		sx, sy := e.v.XY(sq)
+		removed := sq == mv.From || sq == mv.Take ||
+			(max(abs(sx-x), abs(sy-y)) <= e.v.Explosion.Radius && !slices.Contains(e.v.Explosion.Immune, pc.Type))
+		if removed {
+			v := e.v.Pieces[pc.Type-1].Value
+			if pc.Color == p.Turn {
+				value -= v
+			} else {
+				value += v
+			}
+		} else if pc.Color != p.Turn && slices.Contains(e.v.Extinction, pc.Type) {
+			enemySurvivors++
+		}
+	}
+	if len(e.v.Extinction) > 0 && enemySurvivors == 0 {
+		return mateScore
 	}
 	return value
 }
