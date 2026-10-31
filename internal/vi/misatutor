@@ -89,6 +89,10 @@ replacement, then press esc. diw deletes that word; daw also includes adjacent
 whitespace. For a whitespace-delimited WORD (including punctuation), use iW
 or aW instead. These objects can also be used in Visual mode.
 
+The same idea works for brackets and quotes: ci( changes what is inside the
+parentheses around the cursor, da" deletes a quoted string with its spaces.
+Use i or a with ( ) b [ ] { } B < > " ' or `.
+
 You can use C to change until end of the line.
 
 You can replace a character and keep typing with s, fix this dpo.
@@ -517,6 +521,7 @@ Normal mode:
   w b e         word forward, backward, end
   W B E         WORD forward, backward, end (whitespace-delimited)
   iw aw iW aW   word / WORD text objects (with operators or Visual mode)
+  i( a( i[ a[ i{ a{ i< a< i" a"   bracket and quote objects (also ib ab iB aB i' i`)
   0 $ ^         line start, end, first non-blank
   G gg          go to end/start of file
   x X           delete char forward/backward

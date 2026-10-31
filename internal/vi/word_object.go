@@ -2,7 +2,8 @@ package vi
 
 import "unicode"
 
-// Word text objects: iw, aw, iW and aW.
+// Word text objects: iw, aw, iW and aW. The paired and quoted objects of H05
+// (delim_object.go) share the span form and the dispatch below.
 //
 // The buffer is described with runs: maximal stretches of one character class
 // inside a single line. A line break separates the runs of two lines and never
@@ -400,6 +401,12 @@ func (e *Editor) backwardObject(cursor textPos, count int, big, around bool) (te
 
 // executeObjectOperator applies d, c, y, >, < or ! to a word object.
 func (e *Editor) executeObjectOperator(op byte, key string, count int) {
+	if d, ok := delimObjectFor(key); ok {
+		if span, ok := e.delimSpan(d, key[0] == 'a', textPos{e.row, e.col}, count); ok {
+			e.applyDelimSpan(op, key, count, span)
+		}
+		return
+	}
 	big, around := key[1] == 'W', key[0] == 'a'
 	span, stop, ok := e.textObject(textPos{e.row, e.col}, count, big, around)
 	if !ok {

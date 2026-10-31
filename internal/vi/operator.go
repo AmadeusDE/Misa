@@ -84,7 +84,7 @@ func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGive
 	defer func() { e.recordOperatorChange(change, before) }()
 	change.findChar, change.findCmd = e.lastFChar, e.lastFCmd
 	change.searchPat, change.searchDir = e.searchPat, e.searchDir
-	if key == "iw" || key == "aw" || key == "iW" || key == "aW" {
+	if isTextObjectKey(key) {
 		e.executeObjectOperator(op, key, count)
 		return
 	}
