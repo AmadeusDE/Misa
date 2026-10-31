@@ -44,10 +44,12 @@ type regContent struct {
 }
 
 type Editor struct {
-	lines    []string
-	filename string
-	modified bool
-	file     fileState
+	lines             []string
+	filename          string
+	alternateFilename string
+	dir               string
+	modified          bool
+	file              fileState
 
 	row, col           int
 	goalCol            int

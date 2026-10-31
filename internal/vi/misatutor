@@ -424,6 +424,19 @@ file changed outside the editor, a normal save is refused. Review the change
 before using :w!, :wq!, or :x! to overwrite it. A failed save keeps your edits
 marked as unsaved.
 
+:w other writes a copy without changing the current filename or clearing its
+unsaved state. In an unnamed buffer, a full :w name adopts that name. Use
+:saveas name to write and adopt a different name, or :file name to rename the
+buffer without writing. Relative paths are resolved from the editor directory.
+
+:2,4w excerpt writes those lines to a file. In Visual mode, press : and use
+w excerpt to write the selected lines. A range write never marks the buffer
+saved, even if it includes every line. A partial write to the current file
+requires !. Use :w >> file to append; creating a missing append target requires
+:w! >> file. :w !command sends the lines to a shell command synchronously.
+A clean buffer stays clean even after a partial write or append changes its
+current file. Use a full :w if you want the file to match the buffer again.
+
 Line endings and the presence or absence of a final newline are preserved.
 Ordinary files use a temporary file and rename; links and files owned by
 another user are written in place, so those saves are not atomic.
