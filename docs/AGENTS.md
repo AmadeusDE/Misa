@@ -124,6 +124,13 @@ internal/
                                  -o FIELDS[:width][=title] -p -u -U -g -G -t -k/--sort -w). Unsupported options
                                  (-M -n -O -P -s -T -Z, thread listing) fail as unknown options instead of
                                  pretending to work
+    pidof.go killall.go pidwait.go
+                                 `pidof` (-s -o PID[,PID|A-B|%PPID] -x), `killall` (-SIGNAL|-s SIG -l -i -q -v -w)
+                                 and `pidwait` (-f -x -u USER) over internal/proc snapshots: Toybox name
+                                 matching (comm, argv0/exe basename), killall never signals itself, pidwait
+                                 polls with a seam-able interval and treats a changed start time as PID reuse
+    pwdx.go                      `pwdx PID...` — `<root>/PID/cwd` per operand, Toybox-style per-pid error
+                                 lines on stdout, exit 1 when a lookup fails
     man.go install.go util.go    Misc helpers
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
@@ -141,10 +148,10 @@ internal/
                                  keyboard-interactive, password
     escape.go resize.go          `~.` disconnect / `~~`; SIGWINCH plus polling (in-process panes get no SIGWINCH)
     prompt.go                    Terminal prompts read byte-wise so typed-ahead input still reaches the remote
-  proc/                         Process snapshots for `ps`: /proc/<pid> parsing (stat, status, cmdline, exe, the
-                                 raw dev_t TTY and its name) from a configurable proc root so tests can use
-                                 fixtures. Disappearing processes are skipped and denied fields come back empty
-                                 (never an error). proc_linux.go covers Linux and Android; elsewhere (BSD, macOS)
+  proc/                         Process snapshots for `ps`, `pidof`, `killall` and `pidwait`: /proc/<pid>
+                                 parsing (stat, status, cmdline, exe, the raw dev_t TTY and its name) from a
+                                 configurable proc root so tests can use fixtures. Disappearing processes are
+                                 skipped and denied fields come back empty (never an error). proc_linux.go covers Linux and Android; elsewhere (BSD, macOS)
                                  ErrUnsupported until a sysctl backend exists
   lscore/                        ls formatting engine — colors, icons, git status, sorting
   mines/                         Minesweeper clone: board.go (rules, first reveal always safe, flood fill, chording),

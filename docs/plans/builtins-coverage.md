@@ -35,7 +35,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | 6 | `devmem` | 26 | 26 | – | 103 | – |
 | 7 | `hugetop` | 24 | – | 24 (24) | – | – |
 | 8 | `xxd` | 22 | 22 | – | 182 | – |
-| 9 | `pidof` | 17 | 5 | 12 (12) | 45 | – |
 | 10 | `mkfifo` | 15 | 5 | 16 (10) | 40 | kernel/fs |
 | 11 | `pmap` | 14 | – | 21 (14) | 103 | – |
 | 12 | `vmstat` | 14 | – | 14 (14) | 155 | – |
@@ -53,7 +52,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | 24 | `uudecode` | 9 | 9 | – | 113 | – |
 | 25 | `sysctl` | 9 | – | 9 (9) | 149 | – |
 | 26 | `uuidgen` | 8 | 1 | 7 (7) | 25 | kernel/fs |
-| 27 | `pwdx` | 8 | – | 8 (8) | 33 | – |
 | 28 | `setsid` | 8 | – | 11 (8) | 58 | kernel/fs, tty |
 | 29 | `sha3sum` | 8 | 8 | – | 105 | – |
 | 30 | `sum` | 8 | – | 13 (8) | – | kernel/fs, network |
@@ -72,7 +70,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | 43 | `shred` | 4 | – | 31 (4) | 99 | kernel/fs, tty |
 | 44 | `more` | 4 | 2 | 11 (2) | 172 | – |
 | 45 | `zcat` | 4 | 4 | – | 179 | – |
-| 46 | `pidwait` | 4 | – | 4 (4) | – | – |
 | 47 | `setpgid` | 4 | – | 5 (4) | – | – |
 | 48 | `users` | 4 | – | 5 (4) | – | – |
 | 49 | `fallocate` | 3 | 3 | – | 33 | – |
@@ -82,7 +79,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | 53 | `nologin` | 2 | – | 2 (2) | 24 | – |
 | 54 | `unlink` | 2 | – | 7 (2) | 24 | – |
 | 55 | `who` | 2 | – | 27 (2) | 44 | – |
-| 56 | `killall` | 2 | 2 | – | 123 | – |
 | 57 | `b2sum` | 2 | – | 15 (2) | – | – |
 | 58 | `getfacl` | 2 | – | 5 (2) | – | – |
 | 59 | `mountpoint` | 1 | – | 1 (1) | 62 | – |
@@ -229,7 +225,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `iprule` | pending | – | – | – | – | no tests | 2934 | – | heavy |
 | `iptunnel` | pending | – | – | – | – | no tests | 2934 | – | heavy |
 | `join` | – | – | coreutils:49 | 38 | tty | uutils: Rust, 38/49 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1226 | medium |
-| `killall` | lsb | 2 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 123 | – | light |
 | `killall5` | posix | – | – | – | – | no tests | 158 | – | light |
 | `klogd` | pending | – | – | – | – | no tests | 98 | – | light |
 | `last` | pending | – | util-linux:12 | 10 | – | uutils: Rust, 10/12 simple new_ucmd! cases parseable by tests/uutils adapter | 196 | 767 | light |
@@ -289,8 +284,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `partprobe` | other | – | – | – | – | no tests | 30 | – | light |
 | `passwd` | lsb | – | shadow:20 | 0 | root | uutils: Rust, 0/20 simple new_ucmd! cases parseable by tests/uutils adapter | 116 | 1482 | medium |
 | `patch` | posix | 13 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 485 | – | medium |
-| `pidof` | lsb | 5 | procps:12 | 12 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 12/12 simple new_ucmd! cases parseable by tests/uutils adapter | 45 | 225 | light |
-| `pidwait` | – | – | procps:4 | 4 | – | uutils: Rust, 4/4 simple new_ucmd! cases parseable by tests/uutils adapter | – | 141 | light |
 | `ping` | net | – | – | – | – | no tests | 309 | – | heavy |
 | `ping6` | net | – | – | – | – | no tests | 309 | – | heavy |
 | `pinky` | – | – | coreutils:8 | 2 | root | uutils: Rust, 2/8 simple new_ucmd! cases parseable by tests/uutils adapter | – | 605 | heavy |
@@ -302,7 +295,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `ptx` | – | – | coreutils:50 | 50 | – | uutils: Rust, 50/50 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1233 | medium |
 | `pwck` | – | – | shadow:18 | 0 | root | uutils: Rust, 0/18 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1231 | heavy |
 | `pwconv` | – | – | shadow:13 | 0 | root | uutils: Rust, 0/13 simple new_ucmd! cases parseable by tests/uutils adapter | – | 660 | heavy |
-| `pwdx` | other | – | procps:8 | 8 | – | uutils: Rust, 8/8 simple new_ucmd! cases parseable by tests/uutils adapter | 33 | 63 | light |
 | `pwgen` | other | – | – | – | – | no tests | 74 | – | light |
 | `pwunconv` | – | – | shadow:– | – | – | no tests | – | 42 | light |
 | `readahead` | other | – | – | – | – | no tests | 28 | – | light |

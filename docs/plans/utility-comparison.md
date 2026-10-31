@@ -304,7 +304,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `join` |  |  | ✓ | ✓ coreutils |
 | `kbd_mode` |  |  | ✓ |  |
 | `kill` | ✓ | ✓ posix | ✓ | ✓ coreutils |
-| `killall` |  | ✓ lsb | ✓ |  |
+| `killall` | ✓ | ✓ lsb | ✓ |  |
 | `killall5` |  | ✓ posix | ✓ |  |
 | `klogd` |  | ✓ pending | ✓ |  |
 | `l1` | ✓ |  |  |  |
@@ -417,8 +417,8 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `patch` |  | ✓ posix | ✓ |  |
 | `pathchk` | ✓ |  |  | ✓ coreutils |
 | `pgrep` | ✓ | ✓ posix | ✓ | ✓ procps |
-| `pidof` |  | ✓ lsb | ✓ | ✓ procps |
-| `pidwait` |  |  |  | ✓ procps |
+| `pidof` | ✓ | ✓ lsb | ✓ | ✓ procps |
+| `pidwait` | ✓ |  |  | ✓ procps |
 | `ping` |  | ✓ net | ✓ |  |
 | `ping6` |  | ✓ net | ✓ |  |
 | `pinky` |  |  |  | ✓ coreutils |
@@ -440,7 +440,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `pwck` |  |  |  | ✓ shadow |
 | `pwconv` |  |  |  | ✓ shadow |
 | `pwd` | ✓ | ✓ posix | ✓ | ✓ coreutils |
-| `pwdx` |  | ✓ other | ✓ | ✓ procps |
+| `pwdx` | ✓ | ✓ other | ✓ | ✓ procps |
 | `pwgen` |  | ✓ other |  |  |
 | `pwunconv` |  |  |  | ✓ shadow |
 | `raidautorun` |  |  | ✓ |  |
