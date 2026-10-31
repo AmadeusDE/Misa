@@ -145,6 +145,7 @@ func (e *Editor) applyLineOp(op byte, fromR, toR int, motionKey string, count in
 
 	switch op {
 	case 'd':
+		e.noteEdit(fromR, 0)
 		e.modified = true
 		e.deleteToReg(deleted, true)
 		if toR >= len(e.lines) {
@@ -166,6 +167,7 @@ func (e *Editor) applyLineOp(op byte, fromR, toR int, motionKey string, count in
 			ed.executeOperatorMotion('d', mk, n, true)
 		}
 	case 'c':
+		e.noteEdit(fromR, 0)
 		e.modified = true
 		e.deleteToReg(deleted, true)
 		if toR >= len(e.lines) {

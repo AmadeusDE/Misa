@@ -85,6 +85,7 @@ func (e *Editor) deleteCountedChars(count int, backwards, register bool) {
 	if register {
 		e.deleteToReg([]string{string(r[start:end])}, false)
 	}
+	e.noteEdit(e.row, start)
 	e.setLine(e.row, string(r[:start])+string(r[end:]))
 	e.col = start
 }
@@ -104,6 +105,7 @@ func (e *Editor) joinCounted(joins int) {
 		b.WriteString(next)
 		width += len([]rune(next))
 	}
+	e.noteEdit(e.row, len([]rune(e.lines[e.row])))
 	e.lines[e.row] = b.String()
 	e.lines = append(e.lines[:e.row+1], e.lines[e.row+joins+1:]...)
 	e.col = col

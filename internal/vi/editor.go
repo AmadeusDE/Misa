@@ -36,14 +36,6 @@ const (
 	visualLine
 )
 
-const maxUndo = 200
-
-type undoEntry struct {
-	lines    []string
-	row, col int
-	seq      int
-}
-
 type pos struct{ row, col int }
 
 type regContent struct {
@@ -68,9 +60,16 @@ type Editor struct {
 	cmdBuf    string
 	statusMsg string
 
-	undoStack []undoEntry
-	redoStack []undoEntry
-	undoSeq   int
+	undoStack                             []undoEntry
+	redoStack                             []undoEntry
+	revision, savedRevision, nextRevision uint64
+	editDepth                             int
+	editBefore                            undoEntry
+	editSavedLines                        []string
+	editSavedRevision                     uint64
+	editPos                               pos
+	editPosSet                            bool
+	editAuto                              bool
 
 	register []string
 	regLine  bool
@@ -184,6 +183,7 @@ func (e *Editor) Resize(w, h int) {
 }
 
 func (e *Editor) Update(msg tea.Msg) tea.Cmd {
+	defer e.finishEditEvent(e.row)
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		e.Resize(msg.Width, msg.Height)
@@ -209,76 +209,6 @@ func (e *Editor) Update(msg tea.Msg) tea.Cmd {
 		}
 	}
 	return nil
-}
-
-// --- Undo ---
-
-func (e *Editor) saveUndo() {
-	cp := make([]string, len(e.lines))
-	copy(cp, e.lines)
-	e.undoSeq++
-	e.undoStack = append(e.undoStack, undoEntry{lines: cp, row: e.row, col: e.col, seq: e.undoSeq})
-	if len(e.undoStack) > maxUndo {
-		e.undoStack = e.undoStack[len(e.undoStack)-maxUndo:]
-	}
-	e.redoStack = nil
-
-	if !e.lineUndoSet || e.lineUndoRow != e.row {
-		e.lineUndoRow = e.row
-		e.lineUndoText = e.currentLine()
-		e.lineUndoSet = true
-	}
-}
-
-func (e *Editor) undo() {
-	if len(e.undoStack) == 0 {
-		e.statusMsg = "Already at oldest change"
-		return
-	}
-	cur := make([]string, len(e.lines))
-	copy(cur, e.lines)
-	e.redoStack = append(e.redoStack, undoEntry{lines: cur, row: e.row, col: e.col, seq: e.undoSeq + 1})
-
-	u := e.undoStack[len(e.undoStack)-1]
-	e.undoStack = e.undoStack[:len(e.undoStack)-1]
-	e.lines = u.lines
-	e.row = u.row
-	e.col = u.col
-	e.modified = len(e.undoStack) > 0
-	e.clampCursor()
-}
-
-func (e *Editor) redo() {
-	if len(e.redoStack) == 0 {
-		e.statusMsg = "Already at newest change"
-		return
-	}
-	cur := make([]string, len(e.lines))
-	copy(cur, e.lines)
-	e.undoStack = append(e.undoStack, undoEntry{lines: cur, row: e.row, col: e.col, seq: e.undoSeq})
-
-	r := e.redoStack[len(e.redoStack)-1]
-	e.redoStack = e.redoStack[:len(e.redoStack)-1]
-	e.lines = r.lines
-	e.row = r.row
-	e.col = r.col
-	e.modified = true
-	e.clampCursor()
-}
-
-func (e *Editor) undoLine() {
-	if !e.lineUndoSet {
-		e.statusMsg = "No line changes to undo"
-		return
-	}
-	if e.row != e.lineUndoRow || e.lineUndoRow >= len(e.lines) {
-		e.statusMsg = "No line changes to undo"
-		return
-	}
-	e.saveUndo()
-	e.setLine(e.row, e.lineUndoText)
-	e.col = 0
-	e.clampCursor()
 }
 
 func (e *Editor) addJump() {
@@ -343,6 +273,10 @@ func (e *Editor) lineRunes(row int) []rune {
 
 func (e *Editor) setLine(row int, s string) {
 	if row >= 0 && row < len(e.lines) {
+		if e.lines[row] != s {
+			_, col := changedPosition([]string{e.lines[row]}, []string{s})
+			e.noteEdit(row, col)
+		}
 		e.lines[row] = s
 		e.modified = true
 	}
@@ -353,6 +287,7 @@ func (e *Editor) insertCharAt(row, col int, ch rune) {
 	if col > len(runes) {
 		col = len(runes)
 	}
+	e.noteEdit(row, col)
 	nr := make([]rune, 0, len(runes)+1)
 	nr = append(nr, runes[:col]...)
 	nr = append(nr, ch)
@@ -365,6 +300,7 @@ func (e *Editor) deleteCharAt(row, col int) rune {
 	if col >= len(runes) {
 		return 0
 	}
+	e.noteEdit(row, col)
 	ch := runes[col]
 	nr := make([]rune, 0, len(runes)-1)
 	nr = append(nr, runes[:col]...)
@@ -378,6 +314,7 @@ func (e *Editor) deleteLine(row int) string {
 		return ""
 	}
 	line := e.lines[row]
+	e.noteEdit(row, 0)
 	e.lines = append(e.lines[:row], e.lines[row+1:]...)
 	if len(e.lines) == 0 {
 		e.lines = []string{""}
@@ -393,6 +330,7 @@ func (e *Editor) insertLineAfter(row int, s string) {
 	if row >= len(e.lines) {
 		row = len(e.lines) - 1
 	}
+	e.noteEdit(row+1, 0)
 	nl := make([]string, 0, len(e.lines)+1)
 	nl = append(nl, e.lines[:row+1]...)
 	nl = append(nl, s)
@@ -408,6 +346,7 @@ func (e *Editor) insertLineBefore(row int, s string) {
 	if row > len(e.lines) {
 		row = len(e.lines)
 	}
+	e.noteEdit(row, 0)
 	nl := make([]string, 0, len(e.lines)+1)
 	nl = append(nl, e.lines[:row]...)
 	nl = append(nl, s)
@@ -421,6 +360,7 @@ func (e *Editor) splitLine(row, col int) {
 	if col > len(runes) {
 		col = len(runes)
 	}
+	e.noteEdit(row, col)
 	before := string(runes[:col])
 	after := string(runes[col:])
 	e.lines[row] = before
@@ -432,6 +372,7 @@ func (e *Editor) doJoinLine(row int) {
 		return
 	}
 	a := e.lines[row]
+	e.noteEdit(row, len([]rune(a)))
 	b := strings.TrimLeft(e.lines[row+1], " \t")
 	e.col = len([]rune(a))
 	if len(a) > 0 && len(b) > 0 {
@@ -447,6 +388,7 @@ func (e *Editor) deleteRange(fromRow, fromCol, toRow, toCol int) {
 	if fromRow > toRow || (fromRow == toRow && fromCol > toCol) {
 		fromRow, fromCol, toRow, toCol = toRow, toCol, fromRow, fromCol
 	}
+	e.noteEdit(fromRow, fromCol)
 	if fromRow == toRow {
 		runes := e.lineRunes(fromRow)
 		if fromCol > len(runes) {
@@ -975,7 +917,7 @@ func (e *Editor) save() error {
 	if err := os.WriteFile(e.filename, []byte(content), 0o644); err != nil {
 		return err
 	}
-	e.modified = false
+	e.savedEdit()
 	return nil
 }
 
@@ -1019,6 +961,7 @@ func (e *Editor) handleInsert(msg tea.KeyPressMsg) tea.Cmd {
 			e.insertBuf.WriteRune('\b')
 		} else if e.row > 0 {
 			prevLen := len(e.lineRunes(e.row - 1))
+			e.noteEdit(e.row-1, prevLen)
 			e.lines[e.row-1] += e.lines[e.row]
 			e.lines = append(e.lines[:e.row], e.lines[e.row+1:]...)
 			e.row--
