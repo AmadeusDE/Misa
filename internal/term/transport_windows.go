@@ -143,7 +143,9 @@ func startProcess(spec startSpec) (conn, proc, error) {
 		return nil, nil, err
 	}
 	var pi windows.ProcessInformation
-	err = windows.CreateProcess(app, command, nil, nil, false, windows.CREATE_SUSPENDED|windows.CREATE_UNICODE_ENVIRONMENT|windows.EXTENDED_STARTUPINFO_PRESENT, &block[0], cwd, &si.StartupInfo, &pi)
+	err = withCtrlCEnabled(func() error {
+		return windows.CreateProcess(app, command, nil, nil, false, windows.CREATE_SUSPENDED|windows.CREATE_UNICODE_ENVIRONMENT|windows.EXTENDED_STARTUPINFO_PRESENT, &block[0], cwd, &si.StartupInfo, &pi)
+	})
 	if err != nil {
 		return nil, nil, err
 	}

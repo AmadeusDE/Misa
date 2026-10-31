@@ -117,6 +117,10 @@ func TestNativeTransportHelper(t *testing.T) {
 		time.Sleep(time.Hour)
 	case "sleep":
 		time.Sleep(time.Hour)
+	case "ctrlc":
+		// The Go runtime's default CTRL_C_EVENT action exits with STATUS_CONTROL_C_EXIT.
+		nativeEmit(nativePayload{Input: fmt.Sprintf("ignore=%v", ignoringCtrlC())})
+		time.Sleep(time.Hour)
 	default:
 		os.Exit(94)
 	}

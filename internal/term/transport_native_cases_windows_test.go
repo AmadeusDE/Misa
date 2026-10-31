@@ -202,3 +202,26 @@ func TestNativeTransportRejectsDriveRelativeDirectory(t *testing.T) {
 		}
 	}
 }
+
+// ^C written to the pseudoconsole interrupts the child even when this process
+// (as under a CI runner) ignores CTRL+C, and reads as status 130.
+func TestNativeTransportCtrlCInterrupts(t *testing.T) {
+	t.Logf("parent ignores CTRL+C: %v", ignoringCtrlC())
+	c, p, cap := nativeStart(t, "ctrlc", "")
+	got := nativeWaitMessages(t, cap, 1)[0]
+	if got.Input != "ignore=false" {
+		t.Errorf("child CTRL+C disposition: %s, want ignore=false", got.Input)
+	}
+	if _, err := c.Write([]byte("\x03")); err != nil {
+		t.Fatal(err)
+	}
+	nativeStatus(t, p, 130)
+}
+
+func TestShellStatus(t *testing.T) {
+	for code, want := range map[uint32]int{0: 0, 1: 1, 23: 23, statusControlCExit: 130} {
+		if got := shellStatus(code); got != want {
+			t.Errorf("shellStatus(%#x) = %d, want %d", code, got, want)
+		}
+	}
+}

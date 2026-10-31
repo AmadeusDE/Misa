@@ -26,5 +26,5 @@ func (p *windowsProc) wait() {
 	// output ends with the leader. Descendants it left behind stay in the job
 	// until Close kills them. The reader keeps draining while the close runs.
 	go p.conn.closeConsole()
-	p.status <- int(code)
+	p.status <- shellStatus(code)
 }
