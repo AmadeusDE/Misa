@@ -122,6 +122,7 @@ internal/
     tail.go proc.go sysutil.go   System utilities
     man.go install.go util.go    Misc helpers
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
+    gzip.go                      `gzip`, `gunzip`, `zcat` — compress/gzip with -c/-d/-k/-n/-N/-t and -1..-9 levels
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
     mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game
     chess.go                     `chess [variant] [-f file.yaml] [--fen pos] [-c white|black|both|none] [--level name] [--think s] [-l]`

@@ -194,8 +194,8 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `grpck` | – | – | shadow:16 | 0 | root | uutils: Rust, 0/16 simple new_ucmd! cases parseable by tests/uutils adapter | – | 620 | heavy |
 | `grpconv` | – | – | shadow:– | – | – | no tests | – | 42 | light |
 | `grpunconv` | – | – | shadow:– | – | – | no tests | – | 42 | light |
-| `gunzip` | lsb | 6 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
-| `gzip` | lsb | 11 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
+| `gunzip` | lsb | 6 | – | – | – | implemented: `internal/builtins/gzip.go`; toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
+| `gzip` | lsb | 11 | – | – | – | implemented: `internal/builtins/gzip.go`; toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
 | `halt` | other | – | – | – | – | no tests | 46 | – | light |
 | `hd` | other | – | – | – | – | no tests | 62 | – | light |
 | `help` | other | – | – | – | – | no tests | 89 | – | light |
@@ -395,4 +395,4 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `xargs` | posix | 35 | findutils:33 | 0 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 0/33 simple new_ucmd! cases parseable by tests/uutils adapter | 236 | – | medium |
 | `xxd` | other | 22 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 182 | – | light |
 | `xzcat` | pending | 4 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 2651 | – | heavy |
-| `zcat` | lsb | 4 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
+| `zcat` | lsb | 4 | – | – | – | implemented: `internal/builtins/gzip.go`; toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |

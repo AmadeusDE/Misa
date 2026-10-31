@@ -54,6 +54,11 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 - **toybox** by Rob Landley et al. — 0BSD
   https://github.com/landley/toybox
 
+- **toybox gzip** (`gzip`, `gunzip` and `zcat` in `internal/builtins/gzip.go`, following
+  `toys/lsb/gzip.c`) — 0BSD
+  https://github.com/landley/toybox at commit
+  6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb
+
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils
 
