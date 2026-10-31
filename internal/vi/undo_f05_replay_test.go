@@ -23,7 +23,7 @@ func TestUndoF05Replay(t *testing.T) {
 		{name: "save undo redo clean", input: "abcd\n", keys: "x:w<CR>u<C-r>", want: replayState{lines: []string{"bcd"}, reg: []string{"a"}}},
 		{name: "same text different revision stays dirty", input: "abcd\n", keys: "x:w<CR>ux", want: replayState{lines: []string{"bcd"}, reg: []string{"a"}, modified: true}},
 		{name: "write then quit", input: "abcd\n", keys: "x:w<CR>:q<CR>", want: replayState{lines: []string{"bcd"}, reg: []string{"a"}, quit: true}},
-		{name: "reload discards undo", skip: "TODO(T05): :e! reload command is not implemented", input: "abcd\n", keys: "x:e!<CR>u", want: replayState{lines: []string{"abcd"}, reg: []string{"a"}}},
+		{name: "reload discards undo", input: "abcd\n", keys: "x:e!<CR>u", want: replayState{lines: []string{"abcd"}, reg: []string{"a"}}},
 		{name: "yank no undo unit", input: "abcd\n", keys: "xyyu", want: replayState{lines: []string{"abcd"}, reg: []string{"bcd"}, linewise: true}},
 		{name: "failed find no undo unit", input: "abcd\n", keys: "xdfxu", want: replayState{lines: []string{"abcd"}, reg: []string{"a"}}},
 		{name: "moves no undo unit", input: "abcd\n", keys: "xllu", want: replayState{lines: []string{"abcd"}, reg: []string{"a"}}},

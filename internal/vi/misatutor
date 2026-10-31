@@ -437,13 +437,37 @@ Counts work everywhere: 3dw deletes 3 words, d3w also deletes 3 words,
 2d3w deletes 6 words.
 ________________________________________________________________________________
 
+                          Opening and Reloading Files
+
+:e notes.txt   open another file; :ed, :edi, and :edit also work
+:e            reload the current file
+:e!           discard unsaved changes and reload; :e! notes.txt forces a switch
+:e #          open the alternate filename, if there is one
+
+An unsaved buffer blocks :e with E37, even for the same file. Save first, or use
+! only when you intend to discard changes. A nonexistent file opens empty as
+[New]. Other read errors leave the current buffer and its history intact.
+A successful edit starts at line 1, column 1, clears undo/redo, local marks and
+jumps, but keeps registers and the previous dot change. Switching to a different
+name records the old name as the alternate; there is no buffer cache.
+
+The entire argument is a filename, so spaces are literal: :e my notes.txt.
+% and # in an argument expand to the current and alternate names. ~/ and $VAR
+or ${VAR} use the environment captured when the editor started. Variable names
+must match [A-Za-z_][A-Za-z0-9_]*. Malformed or unsupported dollar forms and
+unset or empty variables are errors and leave the buffer unchanged. Relative
+paths use the editor directory. Shell expansion, globs, ~user, filename modifiers,
+and shell-style quoting are not supported. :edit does not accept a line range,
++cmd or ++opt, and cannot be nested inside :global.
+________________________________________________________________________________
+
                               File Safety
 
-A missing file opens as a new buffer. If a file cannot be read, the error is
-shown and saving requires :w!; check the path before forcing a write. If the
-file changed outside the editor, a normal save is refused. Review the change
-before using :w!, :wq!, or :x! to overwrite it. A failed save keeps your edits
-marked as unsaved.
+A missing file opens as a new buffer. If the initial file cannot be read, the error
+is shown and saving requires :w!; check the path before forcing a write. A failed
+:edit instead keeps the current buffer unchanged. If the file changed outside
+the editor, a normal save is refused. Review the change before using :w!, :wq!,
+or :x! to overwrite it. A failed save keeps your edits marked as unsaved.
 
 :w other writes a copy without changing the current filename or clearing its
 unsaved state. In an unnamed buffer, a full :w name adopts that name. Use
@@ -497,6 +521,7 @@ Normal mode:
   ^e ^y         scroll one line
 
 Command mode:
+  :e file :e :e!        open / reload / force edit
   :w :q :wq :q!         save / quit
   :s/old/new/g          substitute
   :g/pat/cmd :v/pat/cmd global / inverse global

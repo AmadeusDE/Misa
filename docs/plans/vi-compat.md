@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/T01/T02/T03
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/T01/T02/T03/T05
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -70,6 +70,7 @@ without quitting Misa and preserves its register.
 | F07: file safety (done) | `file*_f07_test.go`, `internal/ui/editor_file_f07_test.go`, `internal/ui/editor_file_regression_test.go` | Load errors, newline preservation, safe writes and external-change guards; scope and limitations below. |
 | T02: range writes and file identity (done) | Original `*t02*` regression fixtures | Numeric and Visual range writes, append, write identity, save-as and rename semantics; scope and residual deferrals below. |
 | T03: shell lifecycle and reads (done) | Original `shell*_test.go` and `internal/ui/editor_shell_regression_test.go` fixtures | Async output/cancellation, shared cwd/environment, addressed file/shell reads and failure-safe filters; limits below. |
+| T05: edit another file | Original `edit*_t05_test.go`, `edit_edges_t05_test.go`, `edit_policy_t05_test.go`, reload replay fixture, and `internal/ui/editor_edit_regression_test.go` | File switching and reload contract below; automated fixtures are being added, not a claim of manual verification. |
 | T01: substitute confirmation (done) | `substitute_confirm_test.go`, `substitute_confirm_replay_test.go`, `substitute_confirm_edges_test.go`, `substitute_entry_test.go`, `internal/ui/editor_substitute_regression_test.go` | Public-event fixtures for decisions, ranges, global matches, Unicode, cursor/highlight/prompt, counts, undo/redo, no-op history, dot/register preservation, macro playback, and standalone/mux resize and return. |
 
 ### F07 file round trips and safety
@@ -168,6 +169,33 @@ The reference is Vim 9.1 `nocompatible` documentation (`:!`, `:r!`, `:range!`, `
 `shellcmdflag`) as specification only, with the stricter failure policy described above. No
 external implementation, fixtures, or tutor prose were copied; existing attribution is unchanged.
 
+### T05 edit and reload boundary
+
+`:e`, `:ed`, `:edi`, and `:edit` load a file, with optional `!`. Without an
+argument they reload the current filename; an unnamed buffer reports an error.
+A modified buffer is protected by E37 unless forced, including a reload or an
+explicit edit of the same path. A missing file opens empty with `[New]`; other
+read failures preserve the current buffer, name, history and alternate name.
+On success, undo/redo and line-restore history are reset, local marks and jumps
+are cleared, and the cursor starts at line 1, column 1, including `:e #`.
+Registers and the previous dot change survive. The previous filename becomes
+the alternate only when the filename changes. This is a small identity/history
+boundary for future help and H12, not a multi-buffer cache.
+
+The whole argument is one filename, including literal spaces. `%` and `#`
+expand to current and alternate names anywhere in it; `~/` and `$VAR`/`${VAR}`
+use the environment captured when the editor was created. Variable names match
+`[A-Za-z_][A-Za-z0-9_]*`; malformed or unsupported dollar forms and unset or
+empty variables are rejected without changing the buffer. Relative paths use
+the editor working directory. There is no shell or glob expansion, `~user`,
+filename modifiers, or quote grammar. Ranges, `+cmd`/`++opt`, and edit nested
+in `:global` are unsupported. Full buffer navigation and independent buffer
+histories remain H12; help remains T06; complete tutor verification remains T09.
+
+T05 references Vim 9.1 `nocompatible` documentation only. No external code was
+consulted and no new attribution is required. No live-terminal manual check is
+claimed.
+
 ### Tutor mapping (selected lessons only)
 
 | Tutor lesson | Relevant operation | Ledger coverage |
@@ -184,6 +212,7 @@ external implementation, fixtures, or tutor prose were copied; existing attribut
 | 6.2 | Append | `A` and insertion behavior are covered in F01/F06; no complete lesson-parity claim. |
 | 6.3 | Replace mode | Replace stream, Backspace and semantic repeat are covered by F06. |
 | 6.4 | Yank/put | Yank/register behavior is covered by F02/F03; yanks do not replace the dot repeat, and put is covered by F06. |
+| 7.2 | Edit/reload a file | T05 covers the edit boundary; Misa-native startup configuration remains T08 and full lesson verification T09. |
 
 ## Count safety policy
 
@@ -242,9 +271,9 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
   is one undo transaction.
 - **T02/T03 residual:** Full tutor 5.x verification remains T09; broader Ex addressing and
   compound asynchronous command execution remain G03, and buffer navigation H12.
-- **T05:** A future `:edit` read failure must preserve the current buffer. `:e`/`:e!` is not implemented. The reload-command fixture remains skipped as `TODO(T05)`;
-  F05 tests the internal buffer-history reset boundary only. This reset establishes a fresh clean
-  revision and clears undo, redo, and line-restore state; file loading/protection stays in T05.
+- **T05:** Ranges, `+cmd`/`++opt`, edit inside global, shell/glob and other
+  filename grammar remain unsupported; H12 buffer navigation and T09 manual tutor
+  verification remain deferred. See the T05 boundary above.
 
 `misatutor` describes counted `gg`, operator-find, `d%`, and substitution confirmation;
 the motion examples use the shared motion path. This ledger does not claim complete tutor parity.
