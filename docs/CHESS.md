@@ -94,7 +94,8 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
 - Arrows or `h/j/k/l`: move the cursor; space/enter or click: select/move.
 - `d`: cycle beginner → easy → normal → hard → expert → beginner.
 - `c`: cycle computer sides; `u`/backspace: undo to a human turn.
-- `n`: new game; `v`/`V`: next/previous variant.
+- `n`: new game; `v`/`V`: open the variant picker. Type to filter by name or id;
+  ↑/↓ or `j`/`k` (when the filter is empty) to move, enter to switch, esc to cancel.
 - `f`: flip; `t`: toggle piece letters; `q`: quit.
 
 The header shows, for example, `Chess · hard · Black to move · thinking…`.
