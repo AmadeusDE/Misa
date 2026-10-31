@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/AmadeusDE/Misa/internal/builtins"
+	"github.com/AmadeusDE/Misa/tests/testaccount"
 )
 
 var binDir string
@@ -44,6 +45,16 @@ func TestMain(m *testing.M) {
 	os.MkdirAll(symlinkDir, 0755)
 	for _, name := range builtins.Names() {
 		os.Symlink(multicall, filepath.Join(symlinkDir, name))
+	}
+	// Only these fixed host helpers are made available to fixture shells.
+	for _, name := range []string{"sed", "grep", "egrep", "od"} {
+		for _, base := range []string{"/usr/bin", "/bin"} {
+			path := filepath.Join(base, name)
+			if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+				os.Symlink(path, filepath.Join(symlinkDir, name))
+				break
+			}
+		}
 	}
 	binDir = symlinkDir
 
@@ -91,7 +102,13 @@ type setupEvent struct {
 var varAssignRe = regexp.MustCompile(`^([A-Z_][A-Z0-9_]*)=(.*)`)
 var envPrefixRe = regexp.MustCompile(`^TZ=\S+\s+`)
 
+type unparsedCase struct {
+	line   int
+	reason string
+}
+
 type testSuite struct {
+	unparsed   []unparsedCase
 	cmdName    string
 	cases      []testCase
 	setupFiles map[string]string
@@ -355,6 +372,7 @@ func parseTestFile(path string) (testSuite, error) {
 
 		if strings.HasPrefix(line, "testcmd ") {
 			if strings.Contains(line, "$1") {
+				suite.unparsed = append(suite.unparsed, unparsedCase{lineNum, "parameterized helper cannot be represented by adapter"})
 				continue
 			}
 			if suite.cmdName == "chmod" && strings.Contains(line, "$U$G$O") {
@@ -386,6 +404,7 @@ func parseTestFile(path string) (testSuite, error) {
 			}
 			tc, err := parseTestcmd(line[len("testcmd "):], lineNum, skip, suite.vars)
 			if err != nil {
+				suite.unparsed = append(suite.unparsed, unparsedCase{lineNum, err.Error()})
 				continue
 			}
 			if suite.cmdName == "cp" && tc.name == "file->dir/file" {
@@ -395,6 +414,7 @@ func parseTestFile(path string) (testSuite, error) {
 		} else if strings.HasPrefix(line, "testing ") {
 			tc, err := parseTesting(line[len("testing "):], suite.cmdName, lineNum, skip, suite.vars)
 			if err != nil {
+				suite.unparsed = append(suite.unparsed, unparsedCase{lineNum, err.Error()})
 				continue
 			}
 			if suite.cmdName == "hostname" && tc.name == "set" && os.Getuid() != 0 {
@@ -759,12 +779,30 @@ func buildSetupAt(log []setupEvent, atLine int) map[string]string {
 	return files
 }
 
-func runTestCase(t *testing.T, cmdName string, tc testCase, setupLog []setupEvent, vars map[string]string) {
+func runTestCase(t *testing.T, cmdName string, tc testCase, setupLog []setupEvent, vars map[string]string, rec *testaccount.Case) {
 	t.Helper()
-	skipKnownFailure(t)
+	if reason, ok := knownFailures()[strings.TrimPrefix(t.Name(), "TestToyboxSuite/")]; ok && os.Getenv("MISA_KNOWN_FAILURES") == "" {
+		rec.Reason = classifyKnown(strings.TrimPrefix(t.Name(), "TestToyboxSuite/"), reason)
+		t.Skip(reason)
+	}
 
 	if tc.skip {
-		t.Skip("toyonly test")
+		skipRecorded(t, rec, testaccount.Deferred, "toyonly or host-restricted test")
+	}
+	if _, ok := builtins.Lookup(cmdName); !ok {
+		skipRecorded(t, rec, testaccount.Deferred, fmt.Sprintf("builtin %q not registered", cmdName))
+	}
+
+	// Validate the whole case and every prior setup event before performing any
+	// fixture writes or invoking a shell, including for the direct path.
+	if err := validateSetup(setupLog, tc.line); err != nil {
+		skipRecorded(t, rec, testaccount.UnsafeSetup, err.Error())
+	}
+	if err := validateScript(cmdName + " " + tc.args); err != nil {
+		skipRecorded(t, rec, testaccount.UnsafeSetup, err.Error())
+	}
+	if strings.Contains(tc.expected, "$(") || strings.Contains(tc.expected, "`") {
+		skipRecorded(t, rec, testaccount.UnsafeSetup, "expected output contains command substitution")
 	}
 
 	args := tc.args
@@ -772,16 +810,16 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, setupLog []setupEven
 		strings.Contains(args, "|") || strings.Contains(args, ">") ||
 		strings.Contains(args, "$") || strings.Contains(args, "`") ||
 		strings.Contains(args, ";") {
-		runTestCaseShell(t, cmdName, tc, setupLog, vars)
+		runTestCaseShell(t, cmdName, tc, setupLog, vars, rec)
 		return
 	}
 
 	if sandboxUnsafeRe.MatchString(args) || sandboxUnsafeRe.MatchString(tc.stdin) {
-		t.Skip("sandbox-unsafe operation")
+		skipRecorded(t, rec, testaccount.UnsafeSetup, "sandbox-unsafe operation")
 	}
 
 	if strings.Contains(args, "/dev/full") || strings.Contains(args, "/dev/null") {
-		t.Skip("device access needed")
+		skipRecorded(t, rec, testaccount.HostDependent, "device access needed")
 	}
 
 	parsedArgs := splitShellArgs(args)
@@ -801,14 +839,14 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, setupLog []setupEven
 				continue
 			}
 			if _, err := os.Stat(a); err != nil {
-				t.Skipf("references external absolute path %q", a)
+				skipRecorded(t, rec, testaccount.HostDependent, fmt.Sprintf("references external absolute path %q", a))
 			}
 		}
 	}
 
 	cmd, ok := builtins.Lookup(cmdName)
 	if !ok {
-		t.Skipf("builtin %q not registered", cmdName)
+		skipRecorded(t, rec, testaccount.Deferred, fmt.Sprintf("builtin %q not registered", cmdName))
 	}
 
 	dir := t.TempDir()
@@ -821,9 +859,15 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, setupLog []setupEven
 		if ev.name == "umask" {
 			continue
 		}
+		if ev.name != "ln" && ev.name != "exec" {
+			if err := validateSetupPath(dir, ev.name); err != nil {
+				skipRecorded(t, rec, testaccount.UnsafeSetup, fmt.Sprintf("setup line %d: %v", ev.line, err))
+			}
+		}
 		if ev.name == "ln" || ev.name == "exec" {
-			c := exec.Command("bash", "-c", "PATH="+binDir+":$PATH; "+ev.content)
+			c := exec.Command("/bin/bash", "-c", ev.content)
 			c.Dir = dir
+			c.Env = toyEnvironment(dir, nil)
 			c.Run()
 		} else if strings.HasPrefix(ev.content, "chmod:") {
 			modeStr := strings.TrimPrefix(ev.content, "chmod:")
@@ -875,12 +919,14 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, setupLog []setupEven
 		Dir:     dir,
 		Args:    parsedArgs,
 		CmdName: cmdName,
+		Env:     toyEnvironment(dir, vars),
 		Width:   80,
 		Height:  24,
 		Stdout:  &stdout,
 		Stderr:  &stderr,
 		Stdin:   strings.NewReader(tc.stdin),
 	}
+	rec.Executed = true
 	cmd.Run(ctx)
 
 	got := stdout.String()
@@ -890,11 +936,11 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, setupLog []setupEven
 	}
 }
 
-func runTestCaseShell(t *testing.T, cmdName string, tc testCase, setupLog []setupEvent, vars map[string]string) {
+func runTestCaseShell(t *testing.T, cmdName string, tc testCase, setupLog []setupEvent, vars map[string]string, rec *testaccount.Case) {
 	t.Helper()
 	syscall.Umask(0022)
 	if binDir == "" {
-		t.Skip("multicall binary not available")
+		skipRecorded(t, rec, testaccount.Deferred, "multicall binary not available")
 		return
 	}
 
@@ -904,7 +950,7 @@ func runTestCaseShell(t *testing.T, cmdName string, tc testCase, setupLog []setu
 	}
 	fullCmd := "enable -n " + cmdName + " 2>/dev/null; " + cmdName + " " + argsStr
 	if strings.Contains(fullCmd, "/dev/full") {
-		t.Skip("sandbox-unsafe /dev/full test")
+		skipRecorded(t, rec, testaccount.UnsafeSetup, "sandbox-unsafe /dev/full test")
 	}
 	if strings.Contains(fullCmd, "$SIZE") {
 		fullCmd = strings.ReplaceAll(fullCmd, "$SIZE", "&& stat -c %s freep")
@@ -938,9 +984,15 @@ func runTestCaseShell(t *testing.T, cmdName string, tc testCase, setupLog []setu
 		if ev.name == "umask" {
 			continue
 		}
+		if ev.name != "ln" && ev.name != "exec" {
+			if err := validateSetupPath(dir, ev.name); err != nil {
+				skipRecorded(t, rec, testaccount.UnsafeSetup, fmt.Sprintf("setup line %d: %v", ev.line, err))
+			}
+		}
 		if ev.name == "ln" || ev.name == "exec" {
-			c := exec.Command("bash", "-c", "PATH="+binDir+":$PATH; "+ev.content)
+			c := exec.Command("/bin/bash", "-c", ev.content)
 			c.Dir = dir
+			c.Env = toyEnvironment(dir, nil)
 			if out, err := c.CombinedOutput(); err != nil {
 				t.Logf("setup %s failed: %v: %s", ev.name, err, out)
 			}
@@ -1050,40 +1102,20 @@ func runTestCaseShell(t *testing.T, cmdName string, tc testCase, setupLog []setu
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "bash", "-c", fullCmd)
+	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", fullCmd)
 	cmd.Dir = dir
 	cmd.Stdin = strings.NewReader(tc.stdin)
-	env := append(os.Environ(),
-		"PATH="+binDir+":"+os.Getenv("PATH"),
-		"C="+filepath.Join(binDir, cmdName),
-	)
-	for k, v := range vars {
-		if !strings.ContainsRune(v, 0) {
-			if k == "PATH" {
-				env = append(env, "PATH="+v+":"+binDir+":"+os.Getenv("PATH"))
-			} else {
-				env = append(env, k+"="+v)
-			}
-		}
-	}
-	cmd.Env = env
+	cmd.Env = append(toyEnvironment(dir, vars), "C="+filepath.Join(binDir, cmdName))
 	cmd.Stdin = strings.NewReader(tc.stdin)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	rec.Executed = true
 	cmd.Run()
 
 	got := stdout.String()
 	expected := tc.expected
-	if strings.Contains(expected, "$(") || strings.Contains(expected, "`") {
-		expCmd := exec.CommandContext(ctx, "bash", "-c", "printf '%s' \""+expected+"\"")
-		expCmd.Dir = dir
-		expCmd.Env = cmd.Env
-		if out, err := expCmd.Output(); err == nil {
-			expected = string(out)
-		}
-	}
 
 	if got != expected {
 		if cmdName == "strings" {
@@ -1094,7 +1126,37 @@ func runTestCaseShell(t *testing.T, cmdName string, tc testCase, setupLog []setu
 	}
 }
 
+func classifyKnown(name, detail string) *testaccount.Reason {
+	r := &testaccount.Reason{Category: testaccount.KnownFailure, Detail: detail}
+	if strings.HasPrefix(detail, "adapter:") {
+		r.Category = testaccount.Deferred
+		r.Task = "F07"
+	}
+	if strings.HasPrefix(name, "du/") {
+		r.Category = testaccount.HostDependent
+	}
+	if strings.HasPrefix(name, "chmod/") || strings.HasPrefix(name, "mv/") || strings.HasPrefix(name, "cp/symlink") {
+		r.Native = "tests/native/upstream_constructs_test.go:TestAdapterNativeConstructs"
+	}
+	return r
+}
+
+func skipRecorded(t *testing.T, rec *testaccount.Case, category, detail string) {
+	t.Helper()
+	rec.Reason = &testaccount.Reason{Category: category, Detail: detail}
+	if category == testaccount.Deferred {
+		rec.Reason.Task = "F07"
+	}
+	t.Skip(detail)
+}
+
 func TestToyboxSuite(t *testing.T) {
+	collector := testaccount.New("toybox")
+	defer func() {
+		if err := collector.WriteEnv(); err != nil {
+			t.Error(err)
+		}
+	}()
 	testDir := "."
 	if _, err := os.Stat(testDir); err != nil {
 		testDir = "tests/toybox"
@@ -1115,22 +1177,27 @@ func TestToyboxSuite(t *testing.T) {
 		path := filepath.Join(testDir, e.Name())
 		suite, err := parseTestFile(path)
 		if err != nil {
-			t.Logf("WARN: failed to parse %s: %v", e.Name(), err)
+			t.Errorf("failed to parse %s: %v", e.Name(), err)
 			continue
 		}
 
+		for _, u := range suite.unparsed {
+			reason := &testaccount.Reason{Category: testaccount.Unparseable, Detail: u.reason}
+			if suite.cmdName == "chmod" || suite.cmdName == "cp" || suite.cmdName == "ln" {
+				reason.Native = "tests/native/upstream_constructs_test.go:TestAdapterNativeConstructs"
+			}
+			if err := collector.Add(testaccount.Case{Utility: suite.cmdName, ID: fmt.Sprintf("line%d", u.line), File: path, Line: u.line, Status: "skipped", Reason: reason}); err != nil {
+				t.Error(err)
+			}
+		}
 		if len(suite.cases) == 0 {
-			continue
-		}
-
-		if _, ok := builtins.Lookup(suite.cmdName); !ok {
 			continue
 		}
 
 		totalParsed += len(suite.cases)
 
 		t.Run(suite.cmdName, func(t *testing.T) {
-			for _, tc := range suite.cases {
+			for caseIndex, tc := range suite.cases {
 				tc := tc
 				name := tc.name
 				if name == "" {
@@ -1138,7 +1205,25 @@ func TestToyboxSuite(t *testing.T) {
 				}
 				t.Run(name, func(t *testing.T) {
 					totalRun++
-					runTestCase(t, suite.cmdName, tc, suite.setupLog, suite.vars)
+					rec := testaccount.Case{Utility: suite.cmdName, ID: fmt.Sprintf("%s@%d:%d", name, tc.line, caseIndex), File: path, Line: tc.line, Parsed: true}
+					defer func() {
+						switch {
+						case t.Failed():
+							rec.Status = "failed"
+							rec.Reason = nil
+						case t.Skipped():
+							rec.Status = "skipped"
+							if rec.Reason == nil {
+								rec.Reason = &testaccount.Reason{Category: testaccount.Deferred, Detail: "test skipped", Task: "F07"}
+							}
+						default:
+							rec.Status = "passed"
+						}
+						if err := collector.Add(rec); err != nil {
+							t.Error(err)
+						}
+					}()
+					runTestCase(t, suite.cmdName, tc, suite.setupLog, suite.vars, &rec)
 				})
 			}
 		})
