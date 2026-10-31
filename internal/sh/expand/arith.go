@@ -14,6 +14,13 @@ import (
 // TODO(v4): the arithmetic APIs should return int64 for portability with 32-bit systems,
 // even if Bash only supports native int sizes.
 
+// ArithmeticNumberError reports a malformed integer in an arithmetic expansion.
+type ArithmeticNumberError struct{ Value string }
+
+func (e ArithmeticNumberError) Error() string {
+	return fmt.Sprintf("invalid arithmetic number: %s", e.Value)
+}
+
 func Arithm(cfg *Config, expr syntax.ArithmExpr) (int, error) {
 	switch expr := expr.(type) {
 	case *syntax.Word:
@@ -21,27 +28,18 @@ func Arithm(cfg *Config, expr syntax.ArithmExpr) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		// recursively fetch vars
-		i := 0
-		for syntax.ValidName(str) {
-			val := cfg.envGet(str)
-			if val == "" {
-				break
-			}
-			if i++; i >= maxNameRefDepth {
-				break
-			}
-			str = val
-		}
-		// default to 0
-		return int(atoi(str)), nil
+		n, err := cfg.arithmeticNumber(str)
+		return int(n), err
 	case *syntax.ParenArithm:
 		return Arithm(cfg, expr.X)
 	case *syntax.UnaryArithm:
 		switch expr.Op {
 		case syntax.Inc, syntax.Dec:
 			name := expr.X.(*syntax.Word).Lit()
-			old := atoi(cfg.envGet(name))
+			old, err := cfg.arithmeticNumber(cfg.envGet(name))
+			if err != nil {
+				return 0, err
+			}
 			val := old
 			if expr.Op == syntax.Inc {
 				val++
@@ -85,7 +83,7 @@ func Arithm(cfg *Config, expr syntax.ArithmExpr) (int, error) {
 				return 0, err
 			}
 			b2 := expr.Y.(*syntax.BinaryArithm) // must have Op==TernColon
-			if cond == 1 {
+			if cond != 0 {
 				return Arithm(cfg, b2.X)
 			}
 			return Arithm(cfg, b2.Y)
@@ -93,6 +91,12 @@ func Arithm(cfg *Config, expr syntax.ArithmExpr) (int, error) {
 		left, err := Arithm(cfg, expr.X)
 		if err != nil {
 			return 0, err
+		}
+		if expr.Op == syntax.AndArit && left == 0 {
+			return 0, nil
+		}
+		if expr.Op == syntax.OrArit && left != 0 {
+			return 1, nil
 		}
 		right, err := Arithm(cfg, expr.Y)
 		if err != nil {
@@ -111,16 +115,36 @@ func oneIf(b bool) int {
 	return 0
 }
 
-// atoi is like [strconv.ParseInt](s, 10, 64), but it ignores errors and trims whitespace.
-func atoi(s string) int64 {
-	s = strings.TrimSpace(s)
-	n, _ := strconv.ParseInt(s, 10, 64)
-	return n
+// arithmeticNumber resolves variable names and parses POSIX integer bases.
+// Recursive arithmetic expressions in variable values are not supported.
+func (cfg *Config) arithmeticNumber(str string) (int64, error) {
+	for i := 0; syntax.ValidName(str) && i < maxNameRefDepth; i++ {
+		str = cfg.envGet(str)
+		if str == "" {
+			break
+		}
+	}
+	str = strings.TrimSpace(str)
+	if str == "" || syntax.ValidName(str) {
+		return 0, nil
+	}
+	n, err := strconv.ParseInt(str, 0, 64)
+	if err != nil {
+		return 0, ArithmeticNumberError{Value: str}
+	}
+	return n, nil
 }
 
 func (cfg *Config) assgnArit(b *syntax.BinaryArithm) (int, error) {
 	name := b.X.(*syntax.Word).Lit()
-	val := atoi(cfg.envGet(name))
+	var val int64
+	if b.Op != syntax.Assgn {
+		var err error
+		val, err = cfg.arithmeticNumber(cfg.envGet(name))
+		if err != nil {
+			return 0, err
+		}
+	}
 	arg_, err := Arithm(cfg, b.Y)
 	if err != nil {
 		return 0, err

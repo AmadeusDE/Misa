@@ -363,3 +363,81 @@ The interpreter changes are a recorded Misa patch of the imported foundation:
 verifies the recorded bytes and that every patched file is declared. No upstream
 test or external implementation was copied; the behaviour follows POSIX and the
 documented `cd` semantics only.
+
+## S08 — quoting and expansion contract
+
+S08 exercises the same POSIX parser and interpreter through the session API and
+`shcli.Run` (`misa sh -c`), not a host shell. The native table tests use temporary
+directories, an explicit empty `PATH`, a temporary `HOME`, injected exact-argv
+capture, or the interpreter's `printf` with an argument count and per-argument
+markers. Successful cases assert status and empty diagnostics; failure cases
+assert exact diagnostics, status, and that the command was not dispatched.
+No new registry utility, dependency, parser, execution surface, or TUI migration
+is introduced.
+
+### Tested matrix
+
+| Area | Contract and cases | Tests in `internal/shell/` |
+| --- | --- | --- |
+| Quote removal | Single/double quotes, concatenation, literal special characters, backslash inside/outside double quotes, non-special double-quoted backslashes, escaped newlines, empty quoted arguments, removal of unquoted empty expansions | `session/s08_quote_test.go` |
+| Field splitting | Unset/default/custom/empty `IFS`; leading/trailing whitespace; non-whitespace separators and adjacent empty fields; mixed separators; splitting only expansion results; adjacent expansions and literal prefixes/suffixes | `session/s08_split_test.go` |
+| Positionals | `"$@"`, `$@`, `"$*"`, `$*`; zero, empty, and spaced parameters; concatenation; unset/empty/custom `IFS`; full first UTF-8 character for quoted `$*` | `session/s08_split_test.go` |
+| Pathnames | Sorted matches, `*`/`?`/brackets, no-match retains pattern, quoted/escaped metacharacters, dotfiles, parameter/substitution-produced patterns, `set -f` and `set +f` | `session/glob_expansion_test.go` |
+| Parameters | Unset/empty/set `-`, `:-`, `=`, `:=`, `?`, `:?`, `+`, `:+`; assignment side effects; `${#x}`; shortest/longest prefix/suffix removal; unused operator words must not run assignments or substitutions; quoting inside an operator word survives (quoted defaults, quoted removal patterns) | `session/parameter_expansion_test.go` |
+| Arithmetic | Precedence, parentheses, variables, assignment, decimal/octal/hex, nonzero ternary conditions, logical short-circuit, malformed syntax, invalid numeric constants, division/remainder by zero | `session/arithmetic_expansion_test.go` |
+| Substitution | Assignment takes last substitution's status, nested quotes in `$(...)`, trailing newline removal with internal newlines preserved | `session/substitution_expansion_test.go` |
+| CLI boundary | Representative exact count/argument markers, empty args, IFS, positionals, globs, parameter operators, arithmetic, substitutions and failed expansion/lookup diagnostics through `-c` | `shcli/expansion_test.go` |
+
+### Recorded interpreter corrections
+
+The existing expansion machinery is retained. The small `posix-expansion` patch
+in `internal/sh/SOURCE.json` records changes to `expand/expand.go`,
+`expand/param.go`, `expand/arith.go`, and `interp/runner.go`:
+
+- Non-whitespace IFS delimiters preserve empty fields; adjacent IFS whitespace
+  belongs to the delimiter, including across adjacent expansion parts.
+- Unquoted `$@` and `$*` start with separate positional fields rather than
+  injecting spaces that may not be IFS delimiters. Quoted `$*` joins with the
+  first complete IFS character, not its first byte.
+- Escaped glob metacharacters retain quoting until pathname expansion, without
+  disabling adjacent unescaped metacharacters.
+- An unused parameter-operator word is not expanded, so nested assignments and
+  command substitutions do not have unwanted side effects; a used word keeps its
+  quoting, so `${x:-'a b'}` stays one field and `"${x%"b*"}"` treats the quoted
+  pattern literally.
+- Arithmetic honors nonzero truth, short-circuits `&&`/`||`, and recognizes
+  octal/hexadecimal integer constants. Invalid integer constants and division
+  by zero diagnose and stop the noninteractive submission with status 1,
+  instead of printing a diagnostic and reporting success. Invalid syntax is a
+  typed parse error with status 2; the CLI writes its source-located diagnostic.
+
+These are native regressions against the imported baseline, not tests copied
+from another implementation. The references are POSIX Shell Command Language
+[§2.2 and §2.6](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html)
+and the vendored mvdan/sh v3.13.1, revision
+`2f3f5e36d9b0f8f14c998d50aa20a28832205ae8` (BSD-3-Clause), specifically the four
+patched files above. Upstream tests were deliberately omitted by S01; all
+existing in-tree `internal/sh/...` packages and tests remain unchanged apart
+from the recorded production patches.
+
+### Deliberate limits and follow-ups
+
+- `TestS08DollarSingleQuotePOSIXParser` is a named skipped conformance case:
+  the imported older POSIX parser treats `$'a\nb'` as a literal dollar followed
+  by a single-quoted word, not ANSI-C escape quoting. That form is traditionally
+  a Bash-style extension and is standardized in POSIX.1-2024 §2.2.4; support
+  requires a separate S08 parser/dialect follow-up. No Bash parity is claimed.
+- This matrix is a tested subset, not a claim that every POSIX expansion corner
+  case or locale is conformant. Arithmetic uses the interpreter's native Go
+  `int` width and integer-only model; recursive expression-valued variables
+  (`x='1+2'; $((x))`) and arbitrary Bash arithmetic extensions are not promised,
+  because POSIX only requires integer constants. `$@`/`$*` inside an operator
+  word, arrays and `${x:offset:length}` stay Bash-extension territory.
+- `read`/`getopts` line splitting is S11: it keeps the imported `expand.ReadFields`,
+  which drops an empty field between two non-whitespace `IFS` delimiters
+  (`IFS=: read x y z` on `a::b` gives `a`, `b`, empty). Word expansion splitting
+  is the corrected one above; unifying `read` with it is follow-up work.
+- S09/S10 still own redirection and pipeline/substitution resource lifecycle;
+  S11 owns remaining control-flow and special-builtin assignment scope; S12–S14
+  own their remaining source/eval/alias semantics. S05/S06 and S15–S22 retain
+  the worker, UI, process-state, job-control, migration and rollout work.

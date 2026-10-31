@@ -7,3 +7,7 @@ Misa patches POSIX export/readonly parsing and adds session last-status and expl
 Misa also patches POSIX directory and variable semantics (cd -L/-P and CDPATH,
 exported PWD/OLDPWD, readonly unset, export/readonly listings); the patched
 files are recorded in SOURCE.json.
+Misa S08 patches quoting and expansion: IFS empty fields and positionals, UTF-8
+IFS joining, escaped glob quoting, lazy parameter words, integer arithmetic
+bases/truth/short-circuiting, and nonzero expansion-error status. See the
+posix-expansion patch in SOURCE.json and native internal/shell/session tests.

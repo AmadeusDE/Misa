@@ -85,7 +85,7 @@ func reversePatch(b []byte, patch []shReplacement) ([]byte, error) {
 
 // checkShFiles verifies the imported bytes and the declared reversible patches.
 func checkShFiles(dir string, s shSource) error {
-	if len(s.LocalPatches) < 1 || len(s.LocalPatches) > 5 {
+	if len(s.LocalPatches) < 1 || len(s.LocalPatches) > 6 {
 		return fmt.Errorf("invalid patches")
 	}
 	p := s.LocalPatches[0]
@@ -118,6 +118,8 @@ func checkShFiles(dir string, s shSource) error {
 			arg0Patch = true
 		case "posix-dirs-vars":
 			expected = map[string]bool{"interp/api.go": true, "interp/builtin.go": true, "interp/runner.go": true}
+		case "posix-expansion":
+			expected = map[string]bool{"expand/expand.go": true, "expand/param.go": true, "expand/arith.go": true, "interp/runner.go": true}
 		default:
 			return fmt.Errorf("unknown local patch %q", p.Kind)
 		}
@@ -131,7 +133,7 @@ func checkShFiles(dir string, s shSource) error {
 				return fmt.Errorf("invalid patched file %q", f)
 			}
 			seen[f] = true
-			if p.Kind == "posix-dirs-vars" {
+			if p.Kind == "posix-dirs-vars" || p.Kind == "posix-expansion" {
 				labelled[f] = true
 			}
 		}

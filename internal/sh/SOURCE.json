@@ -55,6 +55,16 @@
         "interp/runner.go"
       ],
       "reason": "S07 POSIX directory and variable semantics: cd -L/-P with CDPATH and HOME/OLDPWD diagnostics, exported PWD/OLDPWD, unset of a readonly variable failing once with status 1, and export/readonly listings."
+    },
+    {
+      "kind": "posix-expansion",
+      "files": [
+        "expand/expand.go",
+        "expand/param.go",
+        "expand/arith.go",
+        "interp/runner.go"
+      ],
+      "reason": "S08 POSIX quoting and expansion: preserve IFS empty fields and positional boundaries, UTF-8 IFS joining, escaped glob quoting, lazy parameter operator words, integer bases and errors, nonzero ternary and short-circuit arithmetic, and nonzero fatal expansion status."
     }
   ],
   "files": [
@@ -68,7 +78,8 @@
       "original": "expand/arith.go",
       "local": "expand/arith.go",
       "upstream_sha256": "92658b976163c5d294c1865a416d17336ab0d9ca8d63620d18ca19220ffd769a",
-      "local_sha256": "fc092376f88c3bba8467d4cbae652164833946beea0336bfe0db75e49e0d8d26"
+      "local_sha256": "511631be15b984febfeb317a66550ac611f5675657366326f35fd53828b51f85",
+      "patched": true
     },
     {
       "original": "expand/braces.go",
@@ -92,7 +103,8 @@
       "original": "expand/expand.go",
       "local": "expand/expand.go",
       "upstream_sha256": "b2a492becff2c868b50e63708effe99cf8eff304262e9273b35b6b74a164bd41",
-      "local_sha256": "cf02a05a1622f197b5a59b4a9daedaf4a4d09ebb64fceb682228dd842e01967e"
+      "local_sha256": "0268d8a2f301c00ed7339e1de48064a20f4bf069892cc692e83d8667e3f7099b",
+      "patched": true
     },
     {
       "original": "expand/expand_nonwindows.go",
@@ -110,7 +122,8 @@
       "original": "expand/param.go",
       "local": "expand/param.go",
       "upstream_sha256": "c14ece01815875c2f7cdc69e745e69ae8a02eb44e96d49b94a27b96976bc33c6",
-      "local_sha256": "f2fea7120baf17a8a1eb235264f5c431fb6c679f44d3c222cd0ea255257281ef"
+      "local_sha256": "37701791f0ce16565289aef26554948b5de7801fd1fe2bb4220230fc6e06dbb2",
+      "patched": true
     },
     {
       "original": "expand/valuekind_string.go",
@@ -167,7 +180,7 @@
       "original": "interp/runner.go",
       "local": "interp/runner.go",
       "upstream_sha256": "77b9521af42daff0e62270898e8d1cc0da9f3c8b5f9ece9f69bc0583bb3682e5",
-      "local_sha256": "ba1725085619fe49889f2a22b5ffb85f6ccc7107b5b575ccba5edb9a209ed42e",
+      "local_sha256": "34315a92cb5355dd902a8c21683f72f9d9e2749894bcc8a42067d2ab625fa747",
       "patched": true
     },
     {

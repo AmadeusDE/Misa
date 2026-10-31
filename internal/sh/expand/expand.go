@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/AmadeusDE/Misa/internal/sh/internal"
 	"github.com/AmadeusDE/Misa/internal/sh/pattern"
@@ -149,7 +150,8 @@ func (cfg *Config) ifsRune(r rune) bool {
 func (cfg *Config) ifsJoin(strs []string) string {
 	sep := ""
 	if cfg.ifs != "" {
-		sep = cfg.ifs[:1]
+		_, size := utf8.DecodeRuneInString(cfg.ifs)
+		sep = cfg.ifs[:size]
 	}
 	return strings.Join(strs, sep)
 }
@@ -621,6 +623,7 @@ func (cfg *Config) wordFields(wps []syntax.WordPart) ([][]fieldPart, error) {
 	fields := cfg.fieldsAlloc[:0]
 	curField := cfg.fieldAlloc[:0]
 	allowEmpty := false
+	pendingIFSWhite := false // whitespace ending an expansion after a field
 	flush := func() {
 		if len(curField) == 0 {
 			return
@@ -628,54 +631,86 @@ func (cfg *Config) wordFields(wps []syntax.WordPart) ([][]fieldPart, error) {
 		fields = append(fields, curField)
 		curField = nil
 	}
+	// IFS whitespace around a non-whitespace delimiter is part of that
+	// delimiter; unlike whitespace alone, the delimiter creates empty fields.
+	isIFSWhite := func(r rune) bool {
+		return (r == ' ' || r == '\t' || r == '\n') && cfg.ifsRune(r)
+	}
 	splitAdd := func(val string) {
-		fieldStart := -1
-		for i, r := range val {
-			if cfg.ifsRune(r) {
-				if fieldStart >= 0 { // ending a field
-					curField = append(curField, fieldPart{val: val[fieldStart:i]})
-					fieldStart = -1
-				}
-				flush()
-			} else {
-				if fieldStart < 0 { // starting a new field
-					fieldStart = i
-				}
+		start := 0
+		for i := 0; i < len(val); {
+			r, size := utf8.DecodeRuneInString(val[i:])
+			if !cfg.ifsRune(r) {
+				i += size
+				continue
 			}
+			if start < i {
+				curField = append(curField, fieldPart{val: val[start:i]})
+				pendingIFSWhite = false
+			}
+			// Consume IFS whitespace and at most one non-whitespace IFS
+			// character, then the whitespace following that character.
+			nonwhite := !isIFSWhite(r)
+			i += size
+			for i < len(val) {
+				r, size = utf8.DecodeRuneInString(val[i:])
+				if !cfg.ifsRune(r) || (!isIFSWhite(r) && nonwhite) {
+					break
+				}
+				if !isIFSWhite(r) {
+					nonwhite = true
+				}
+				i += size
+			}
+			hadField := len(curField) > 0
+			if nonwhite && !hadField && !pendingIFSWhite {
+				curField = append(curField, fieldPart{})
+			}
+			flush()
+			if nonwhite {
+				pendingIFSWhite = false
+			} else if hadField {
+				pendingIFSWhite = true
+			}
+			start = i
 		}
-		if fieldStart >= 0 { // ending a field without IFS
-			curField = append(curField, fieldPart{val: val[fieldStart:]})
+		if start < len(val) {
+			curField = append(curField, fieldPart{val: val[start:]})
+			pendingIFSWhite = false
 		}
 	}
 	for i, wp := range wps {
 		switch wp := wp.(type) {
 		case *syntax.Lit:
+			pendingIFSWhite = false
 			s := wp.Value
 			if i == 0 {
 				prefix, rest := cfg.expandUser(s, len(wps) > 1)
-				curField = append(curField, fieldPart{
-					quote: quoteSingle,
-					val:   prefix,
-				})
+				if prefix != "" {
+					curField = append(curField, fieldPart{quote: quoteSingle, val: prefix})
+				}
 				s = rest
 			}
-			if strings.Contains(s, "\\") {
-				sb := cfg.strBuilder()
-				for i := 0; i < len(s); i++ {
-					b := s[i]
-					if b == '\\' {
-						if i++; i >= len(s) {
-							sb.WriteByte(b)
-							break
-						}
-						b = s[i]
-					}
-					sb.WriteByte(b)
+			// Preserve which literal characters were escaped until after
+			// pathname expansion; escaped metacharacters are not patterns.
+			for len(s) > 0 {
+				before, after, found := strings.Cut(s, "\\")
+				if before != "" {
+					curField = append(curField, fieldPart{val: before})
 				}
-				s = sb.String()
+				if !found {
+					break
+				}
+				if after == "" {
+					curField = append(curField, fieldPart{quote: quoteSingle, val: "\\"})
+					break
+				}
+				_, size := utf8.DecodeRuneInString(after)
+				curField = append(curField, fieldPart{quote: quoteSingle, val: after[:size]})
+				s = after[size:]
 			}
-			curField = append(curField, fieldPart{val: s})
 		case *syntax.SglQuoted:
+			pendingIFSWhite = false
 			allowEmpty = true
 			fp := fieldPart{quote: quoteSingle, val: wp.Value}
 			if wp.Dollar {
@@ -684,6 +719,7 @@ func (cfg *Config) wordFields(wps []syntax.WordPart) ([][]fieldPart, error) {
 			}
 			curField = append(curField, fp)
 		case *syntax.DblQuoted:
+			pendingIFSWhite = false
 			if len(wp.Parts) == 1 {
 				pe, _ := wp.Parts[0].(*syntax.ParamExp)
 				if elems := cfg.quotedElemFields(pe); elems != nil {
@@ -709,6 +745,33 @@ func (cfg *Config) wordFields(wps []syntax.WordPart) ([][]fieldPart, error) {
 				curField = append(curField, part)
 			}
 		case *syntax.ParamExp:
+			// Unquoted positional parameters supply separate fields before splitting;
+			// joining with spaces is wrong when space is not in IFS.
+			if wp.Param != nil && (wp.Param.Value == "@" || wp.Param.Value == "*") && !wp.Length && !wp.Width && !wp.IsSet && !wp.Excl && wp.Index == nil && wp.Slice == nil && wp.Repl == nil && wp.Exp == nil {
+				for i, elem := range cfg.Env.Get("@").List {
+					if i > 0 {
+						flush()
+						pendingIFSWhite = false
+					}
+					splitAdd(elem)
+				}
+				continue
+			}
+			// The operator word carries its own quoting, so it is expanded
+			// with quote provenance rather than as a plain string.
+			if parts, ok, err := cfg.paramWordParts(wp); err != nil {
+				return nil, err
+			} else if ok {
+				for _, part := range parts {
+					if part.quote > quoteNone {
+						curField = append(curField, part)
+						pendingIFSWhite = false
+						continue
+					}
+					splitAdd(part.val)
+				}
+				continue
+			}
 			val, err := cfg.paramExp(wp)
 			if err != nil {
 				return nil, err
