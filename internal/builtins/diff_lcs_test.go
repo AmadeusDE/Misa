@@ -115,7 +115,7 @@ func TestDiffUtils(t *testing.T) {
 	})
 	t.Run("modification_time/set_time", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "file")
-		stamp := time.Unix(123456789, 123456789)
+		stamp := time.Unix(123456789, 123456789).Truncate(100 * time.Nanosecond) // NTFS ticks are 100 ns
 		if err := os.WriteFile(path, nil, 0600); err != nil {
 			t.Fatal(err)
 		}

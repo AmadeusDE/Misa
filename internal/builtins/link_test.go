@@ -45,8 +45,8 @@ func TestLnSymlinkPreservesRelativePath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if target != "./sub/src.txt" {
-		t.Errorf("symlink target = %q, want %q", target, "./sub/src.txt")
+	if want := filepath.FromSlash("./sub/src.txt"); target != want {
+		t.Errorf("symlink target = %q, want %q", target, want)
 	}
 }
 

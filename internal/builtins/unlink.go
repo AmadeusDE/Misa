@@ -4,6 +4,7 @@ package builtins
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"syscall"
 )
 
@@ -29,6 +30,12 @@ func runUnlink(ctx *Context) int {
 	path := name
 	if name != "" {
 		path = resolvePath(ctx, name)
+	}
+	if runtime.GOOS == "windows" {
+		if info, lerr := os.Lstat(path); lerr == nil && info.IsDir() {
+			fmt.Fprintf(ctx.Stderr, "unlink: cannot unlink '%s': Is a directory\n", name)
+			return 1
+		}
 	}
 	if err := syscall.Unlink(path); err != nil {
 		fmt.Fprintf(ctx.Stderr, "unlink: cannot unlink '%s': %s\n", name, fmtOsErr(&os.PathError{Op: "unlink", Path: path, Err: err}))

@@ -133,7 +133,7 @@ func runRm(ctx *Context) int {
 
 		path := resolvePath(ctx, name)
 		clean := filepath.Clean(path)
-		if clean == "/" && preserveRoot {
+		if isFilesystemRoot(clean) && preserveRoot {
 			fmt.Fprintln(ctx.Stderr, "rm: it is dangerous to operate recursively on '/'")
 			fmt.Fprintln(ctx.Stderr, "rm: use --no-preserve-root to override this failsafe")
 			st.exitCode = 1

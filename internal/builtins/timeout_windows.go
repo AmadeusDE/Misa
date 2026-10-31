@@ -16,22 +16,10 @@ var timeoutDefaultPath = filepath.Join(os.Getenv("SystemRoot"), "System32")
 func hasPathSeparator(name string) bool { return strings.ContainsAny(name, `/\`) }
 
 // executableNames expands a bare name with the PATHEXT extensions, as the
-// Windows shell does, unless it already has an extension.
+// Windows shell does, unless it already ends in one of them.
 func executableNames(ctx *Context, name string) []string {
-	if filepath.Ext(name) != "" {
-		return []string{name}
-	}
-	exts, ok := lookupEnv(ctx, "PATHEXT")
-	if !ok || exts == "" {
-		exts = ".COM;.EXE;.BAT;.CMD"
-	}
-	names := []string{}
-	for _, ext := range strings.Split(exts, ";") {
-		if ext != "" {
-			names = append(names, name+strings.ToLower(ext))
-		}
-	}
-	return names
+	exts, _ := lookupEnv(ctx, "PATHEXT")
+	return pathextNames(name, exts)
 }
 
 // isExecutableMode is true for any file: Windows keeps no execute bit, and the

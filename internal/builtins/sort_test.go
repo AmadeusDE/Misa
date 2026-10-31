@@ -162,6 +162,7 @@ func TestSortOutputNotWritableFailsFast(t *testing.T) {
 // TestSortUnreadableInputFailsWithoutCreatingOutput verifies sort checks all
 // inputs are readable before creating the -o target at all.
 func TestSortUnreadableInputFailsWithoutCreatingOutput(t *testing.T) {
+	skipOnWindows(t, "a Windows file cannot be made unreadable with a mode")
 	if os.Geteuid() == 0 {
 		t.Skip("permission checks don't apply as root")
 	}

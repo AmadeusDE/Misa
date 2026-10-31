@@ -27,6 +27,14 @@ func stripSuffix(name, suffix string) string {
 	return name
 }
 
+// baseName is filepath.Base, except that a root stays "/" on every platform.
+func baseName(p string) string {
+	if n := filepath.Base(p); n != string(filepath.Separator) {
+		return n
+	}
+	return "/"
+}
+
 func runBasename(ctx *Context) int {
 	flags, err := basenameSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
@@ -55,14 +63,14 @@ func runBasename(ctx *Context) int {
 	}
 
 	if !multi && len(flags.Operands) == 2 {
-		name := filepath.Base(flags.Operands[0])
+		name := baseName(flags.Operands[0])
 		fmt.Fprint(ctx.Stdout, stripSuffix(name, flags.Operands[1]))
 		fmt.Fprint(ctx.Stdout, terminator)
 		return 0
 	}
 
 	for _, arg := range flags.Operands {
-		name := filepath.Base(arg)
+		name := baseName(arg)
 		fmt.Fprint(ctx.Stdout, stripSuffix(name, suffix))
 		fmt.Fprint(ctx.Stdout, terminator)
 	}

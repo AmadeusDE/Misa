@@ -10,6 +10,7 @@ import (
 )
 
 func TestUUDecodeHeaderFile(t *testing.T) {
+	skipOnWindows(t, "Windows keeps no permission bits")
 	dir := t.TempDir()
 	var out, stderr bytes.Buffer
 	ctx := &Context{Dir: dir, Stdin: strings.NewReader("preamble\nbegin 600 decoded name\n#86)C\nend\n"), Stdout: &out, Stderr: &stderr}

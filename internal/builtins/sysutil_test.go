@@ -9,9 +9,9 @@ import (
 
 func TestWhichFindsExecutable(t *testing.T) {
 	dir := t.TempDir()
-	bin := filepath.Join(dir, "mytool")
+	bin := filepath.Join(dir, "mytool"+exeSuffix)
 	os.WriteFile(bin, []byte("#!/bin/sh\n"), 0755)
-	t.Setenv("PATH", dir+":"+os.Getenv("PATH"))
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	r := runBuiltin(t, "which", "mytool")
 	assertExitCode(t, r, 0)
 	assertStdoutContains(t, r, "mytool")
@@ -25,9 +25,9 @@ func TestWhichNotFound(t *testing.T) {
 func TestWhichAll(t *testing.T) {
 	dir1 := t.TempDir()
 	dir2 := t.TempDir()
-	os.WriteFile(filepath.Join(dir1, "dup"), []byte(""), 0755)
-	os.WriteFile(filepath.Join(dir2, "dup"), []byte(""), 0755)
-	t.Setenv("PATH", dir1+":"+dir2)
+	os.WriteFile(filepath.Join(dir1, "dup"+exeSuffix), []byte(""), 0755)
+	os.WriteFile(filepath.Join(dir2, "dup"+exeSuffix), []byte(""), 0755)
+	t.Setenv("PATH", dir1+string(os.PathListSeparator)+dir2)
 	r := runBuiltin(t, "which", "-a", "dup")
 	assertExitCode(t, r, 0)
 	lines := strings.Split(strings.TrimSpace(r.stdout), "\n")
@@ -44,15 +44,15 @@ func TestWhichMissingOperand(t *testing.T) {
 func TestUnameDefault(t *testing.T) {
 	r := runBuiltin(t, "uname")
 	assertExitCode(t, r, 0)
-	assertStdoutContains(t, r, "Linux")
+	assertStdoutContains(t, r, unameSysname)
 }
 
 func TestUnameAll(t *testing.T) {
 	r := runBuiltin(t, "uname", "-a")
 	assertExitCode(t, r, 0)
 	out := r.stdout
-	if !strings.Contains(out, "Linux") {
-		t.Errorf("expected Linux in output, got %q", out)
+	if !strings.Contains(out, unameSysname) {
+		t.Errorf("expected %s in output, got %q", unameSysname, out)
 	}
 	parts := strings.Fields(strings.TrimSpace(out))
 	if len(parts) < 4 {
