@@ -466,7 +466,13 @@ func (s *Spec) GenerateUsage(name string) string {
 		}
 		fmt.Fprintln(&b, left)
 	}
-	fmt.Fprintf(&b, "  -h, --help     display this help and exit\n")
+	// A command that defines -h itself (df, du: human-readable) only has
+	// --help, so the list must not advertise a short flag that is taken.
+	helpLeft := "  -h, --help"
+	if _, defined := s.byShort['h']; defined {
+		helpLeft = "      --help"
+	}
+	fmt.Fprintf(&b, "%s     display this help and exit\n", helpLeft)
 	fmt.Fprintf(&b, "      --version  output version information and exit\n")
 	return b.String()
 }

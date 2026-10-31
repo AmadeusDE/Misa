@@ -39,7 +39,7 @@ When a case starts passing, delete its line.
 2. **Missing utilities.** `utility-comparison.md` lists every utility in toybox, BusyBox and uutils
    against Misa's (2026-10-15); `builtins-coverage.md` ranks the missing ones by how many upstream
    test cases would run unchanged and how much work they are. The POSIX ones toybox and uutils both
-   have: `test`/`[`, `od`, `dd`, `df`, `install`, `chgrp`, `nohup`, `mknod`, `who`, `renice`, `ps`,
+   have: `test`/`[`, `od`, `dd`, `install`, `chgrp`, `nohup`, `mknod`, `who`, `renice`, `ps`,
    `pidof`, `xargs`, `find`, `grep`, `sed`, `tar`. `find` and `grep` should share a walker and matcher with ugh's search tool (`internal/search`, see
    `docs/plans/ughbot.md`). Each new command starts from its upstream tests.
 3. **`fetch` styling.** `fetch` writes raw ANSI to stdout. It is command output, not Misa UI, so this may be
