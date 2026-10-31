@@ -401,12 +401,11 @@ func TestPidwaitLiveChild(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("no procfs on windows")
 	}
-	sleepPath, err := exec.LookPath("sleep")
+	// The test binary in helper mode stands in for sleep(1); a multicall
+	// coreutils sleep refuses to run under an unknown argv0.
+	sleepPath, err := os.Executable()
 	if err != nil {
-		sleepPath = "/bin/sleep"
-	}
-	if _, err := os.Stat(sleepPath); err != nil {
-		t.Skipf("no sleep binary: %v", err)
+		t.Skipf("cannot locate test binary: %v", err)
 	}
 	dir := t.TempDir()
 
@@ -420,7 +419,8 @@ func TestPidwaitLiveChild(t *testing.T) {
 		if err := os.Symlink(sleepPath, link); err != nil {
 			t.Fatalf("symlink %s: %v", link, err)
 		}
-		child := exec.Command(link, seconds)
+		child := exec.Command(link)
+		child.Env = append(os.Environ(), sleepHelperEnv+"="+seconds)
 		if err := child.Start(); err != nil {
 			t.Fatalf("start %s: %v", link, err)
 		}
