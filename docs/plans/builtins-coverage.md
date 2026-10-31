@@ -110,7 +110,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `awk` | pending | 142 | awk:73 | 0 | root | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 0/73 simple new_ucmd! cases parseable by tests/uutils adapter | 4579 | – | heavy |
 | `b2sum` | – | – | coreutils:15 | 2 | – | uutils: Rust, 2/15 simple new_ucmd! cases parseable by tests/uutils adapter | – | 39 | light |
 | `basenc` | – | – | coreutils:38 | 35 | – | uutils: Rust, 35/38 simple new_ucmd! cases parseable by tests/uutils adapter | – | 95 | light |
-| `bc` | pending | 2 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 5953 | – | heavy |
 | `blkdiscard` | other | – | – | – | – | no tests | 54 | – | light |
 | `blkid` | other | 16 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 259 | – | medium |
 | `blockdev` | other | – | util-linux:5 | 5 | devices | uutils: Rust, 5/5 simple new_ucmd! cases parseable by tests/uutils adapter | 69 | 433 | medium |

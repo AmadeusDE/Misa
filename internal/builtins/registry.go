@@ -15,6 +15,9 @@ type Context struct {
 	Stderr  io.Writer
 	Stdin   io.Reader
 	Env     []string
+	// Cancel, when non-nil, is closed to ask a long-running builtin to stop.
+	// Only builtins that can stop cooperatively (bc loops) observe it.
+	Cancel <-chan struct{}
 }
 
 type Command struct {

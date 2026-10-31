@@ -94,7 +94,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `bash` |  | ✓ pending | ✓ |  |
 | `bashtop` | ✓ |  |  |  |
 | `bbconfig` |  |  | ✓ |  |
-| `bc` |  | ✓ pending | ✓ |  |
+| `bc` | ✓ | ✓ pending | ✓ |  |
 | `beep` |  |  | ✓ |  |
 | `blkdiscard` |  | ✓ other | ✓ |  |
 | `blkid` |  | ✓ other | ✓ |  |

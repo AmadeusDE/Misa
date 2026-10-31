@@ -53,6 +53,8 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 
 - **toybox** by Rob Landley et al. — 0BSD
   https://github.com/landley/toybox
+  (`internal/builtins/bc*.go` follow `toys/pending/bc.c`'s language, decimal and output rules at
+  `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb`; no code copied, see `docs/plans/bc.md`)
 
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils
