@@ -212,16 +212,8 @@ func (e *Editor) globalCmd(from, to int, args string, invert bool, hasRange bool
 	if len(args) < 1 {
 		return
 	}
-	delim := args[0]
-	parts := splitDelim(args[1:], delim)
-	if len(parts) < 1 {
-		return
-	}
-	pat := parts[0]
-	exCmd := ""
-	if len(parts) > 1 {
-		exCmd = strings.TrimSpace(parts[1])
-	}
+	pat, exCmd := cutDelim(args[1:], args[0])
+	exCmd = strings.TrimSpace(exCmd)
 	if exCmd == "" {
 		exCmd = "d"
 	}
@@ -243,13 +235,21 @@ func (e *Editor) globalCmd(from, to int, args string, invert bool, hasRange bool
 		}
 	}
 
+	pat, re, ok := e.usePattern(pat, e.ignoreCase)
+	if !ok {
+		return
+	}
 	e.saveUndo()
 	matches := 0
 	for i := to; i >= from; i-- {
 		if i >= len(e.lines) {
 			continue
 		}
-		found := e.indexOf(e.lines[i], pat) >= 0
+		_, _, found, err := re.Find(e.lines[i], 0)
+		if err != nil {
+			e.statusMsg = err.Error()
+			return
+		}
 		if found != invert {
 			e.row = i
 			e.executeCommand(fmt.Sprintf("%d%s", i+1, exCmd))

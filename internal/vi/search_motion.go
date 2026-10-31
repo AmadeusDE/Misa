@@ -1,33 +1,26 @@
 package vi
 
-import "strings"
+import (
+	"unicode/utf8"
 
-// searchMotion resolves a wrapping literal search without moving the editor.
+	"github.com/AmadeusDE/Misa/internal/vi/vipat"
+)
+
+// searchMotion resolves a wrapping pattern search without moving the editor.
 // Enumerating match starts also permits overlapping backward matches.
 func (e *Editor) searchMotion(count int, reverse bool) (motionResult, bool) {
 	if e.searchPat == "" {
 		e.statusMsg = "No previous search pattern"
 		return motionResult{}, false
 	}
-	pat := e.cleanPattern(e.searchPat)
-	if pat == "" {
-		e.statusMsg = "Pattern not found: " + e.searchPat
+	re, ok := e.compilePattern(e.searchPat)
+	if !ok {
 		return motionResult{}, false
 	}
-	var matches []pos
-	for row, line := range e.lines {
-		col := 0
-		for offset := range line {
-			suffix := line[offset:]
-			match := strings.HasPrefix(suffix, pat)
-			if e.shouldIgnoreCase(e.searchPat) {
-				_, match = foldPrefix(suffix, pat)
-			}
-			if match {
-				matches = append(matches, pos{row, col})
-			}
-			col++
-		}
+	matches, err := matchStarts(re, e.lines)
+	if err != nil {
+		e.statusMsg = err.Error()
+		return motionResult{}, false
 	}
 	if len(matches) == 0 {
 		e.statusMsg = "Pattern not found: " + e.searchPat
@@ -92,4 +85,37 @@ func (e *Editor) searchCounted(count int, reverse bool) {
 		e.row, e.col = m.row, m.col
 		e.ensureVisible()
 	}
+}
+
+// matchStarts lists every position where a match begins. A match at the end of
+// a non-empty line is placed on its last character, where the cursor can rest.
+func matchStarts(re *vipat.Regexp, lines []string) ([]pos, error) {
+	var matches []pos
+	for row, line := range lines {
+		col, at := 0, 0
+		for from := 0; from <= len(line); {
+			start, _, ok, err := re.Find(line, from)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				break
+			}
+			col += utf8.RuneCountInString(line[at:start])
+			at = start
+			p := pos{row, col}
+			if start == len(line) && col > 0 {
+				p.col--
+			}
+			if n := len(matches); n == 0 || matches[n-1] != p {
+				matches = append(matches, p)
+			}
+			if start == len(line) {
+				break
+			}
+			_, w := utf8.DecodeRuneInString(line[start:])
+			from = start + w
+		}
+	}
+	return matches, nil
 }

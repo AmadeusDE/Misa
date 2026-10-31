@@ -1,6 +1,10 @@
 package vi
 
-import tea "charm.land/bubbletea/v2"
+import (
+	"unicode/utf8"
+
+	tea "charm.land/bubbletea/v2"
+)
 
 func (e *Editor) startSearch(key string) {
 	e.searchInputDir = 1
@@ -23,12 +27,20 @@ func (e *Editor) handleSearch(msg tea.KeyPressMsg) tea.Cmd {
 	case "esc", "ctrl+[", "ctrl+c":
 		e.cancelSearch()
 	case "enter":
-		e.searchDir = e.searchInputDir
-		if e.cmdBuf != "" {
-			e.searchPat = e.cmdBuf
+		pat := e.cmdBuf
+		if e.searchInputDir == -1 {
+			pat = unescapeQuestion(pat)
 		}
 		e.cmdBuf = ""
 		e.mode = ModeNormal
+		if pat != "" {
+			if _, ok := e.compilePattern(pat); !ok {
+				e.clearCommandState()
+				return nil
+			}
+			e.searchPat = pat
+		}
+		e.searchDir = e.searchInputDir
 		count, _ := e.commandMotionCount(max(1, e.count), e.countGiven)
 		if m, ok := e.searchMotion(count, false); ok {
 			if e.pendingOp != 0 {
@@ -53,4 +65,10 @@ func (e *Editor) handleSearch(msg tea.KeyPressMsg) tea.Cmd {
 		}
 	}
 	return nil
+}
+
+// dropLastRune removes the last character, not the last byte.
+func dropLastRune(s string) string {
+	_, n := utf8.DecodeLastRuneInString(s)
+	return s[:len(s)-n]
 }

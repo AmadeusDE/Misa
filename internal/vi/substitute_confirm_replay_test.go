@@ -59,20 +59,26 @@ func TestSubstituteConfirmIdenticalPreservesRedo(t *testing.T) {
 	assertUndoF05(t, e, []string{"Xcat cat"}, true)
 }
 
-func TestSubstituteConfirmEmptyPatternTerminates(t *testing.T) {
-	for _, tc := range []struct{ name, before string }{
-		{"no prior search", ""},
-		{"prior search is not reused", "/abc<CR>"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			e := newUndoF05Editor(t, "abc\n")
-			sendUndoF05(t, e, "iZ<Esc>u"+tc.before+":s//X/gc<CR>")
-			assertUndoF05(t, e, []string{"abc"}, false)
-			if e.mode != ModeNormal || !strings.Contains(strings.ToLower(e.statusMsg), "empty") {
-				t.Errorf("empty pattern mode=%v status=%q; want normal and explicit rejection", e.mode, e.statusMsg)
-			}
-			sendUndoF05(t, e, "<C-r>")
-			assertUndoF05(t, e, []string{"Zabc"}, true)
-		})
+func TestSubstituteConfirmEmptyPatternReusesLastSearch(t *testing.T) {
+	e := newUndoF05Editor(t, "abc\n")
+	sendUndoF05(t, e, "iZ<Esc>u:s//X/gc<CR>")
+	assertUndoF05(t, e, []string{"abc"}, false)
+	if e.mode != ModeNormal || !strings.Contains(e.statusMsg, "E35") {
+		t.Errorf("no prior pattern: mode=%v status=%q; want normal and E35", e.mode, e.statusMsg)
+	}
+	sendUndoF05(t, e, "<C-r>")
+	assertUndoF05(t, e, []string{"Zabc"}, true)
+
+	e = newUndoF05Editor(t, "abc abc\n")
+	sendUndoF05(t, e, "/b<CR>:s//X/gc<CR>yy")
+	assertUndoF05(t, e, []string{"aXc aXc"}, true)
+}
+
+func TestSubstituteConfirmZeroWidthTerminates(t *testing.T) {
+	e := newUndoF05Editor(t, "abc\n")
+	sendUndoF05(t, e, ":s/x*/-/gc<CR>a")
+	assertUndoF05(t, e, []string{"-a-b-c"}, true)
+	if e.mode != ModeNormal {
+		t.Errorf("mode = %v, want normal", e.mode)
 	}
 }
