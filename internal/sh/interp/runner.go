@@ -195,6 +195,9 @@ func (r *Runner) expandErr(err error) {
 	fmt.Fprintln(r.stderr, errMsg)
 	switch {
 	case errors.As(err, &expand.UnsetParameterError{}):
+	case errors.As(err, &expand.ArithmeticNumberError{}):
+	case errMsg == "division by zero":
+		// Arithmetic expansion errors must fail the current shell command.
 	case errMsg == "invalid indirect expansion":
 		// TODO: These errors are treated as fatal by bash.
 		// Make the error type reflect that.
@@ -691,6 +694,9 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 			modes = append(modes, "-r")
 		case "nameref":
 			valType = "-n"
+		}
+		if r.declList(cm.Variant.Value, cm.Args) {
+			return
 		}
 	assignLoop:
 		for as := range r.flattenAssigns(cm.Args) {

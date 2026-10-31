@@ -1,8 +1,9 @@
-# S02 — persistent shell session API
+# Shell session — S02–S04 and S07
 
 This implements the library foundation for issue #40, on top of S01's in-tree
-mvdan/sh and F02's invocation contract. It does **not** change command dispatch,
-add `misa sh`, or claim full POSIX shell compatibility.
+mvdan/sh and F02's invocation contract. S03 adds the explicit `misa sh` CLI, S04 adds registry-aware resolution, and S07
+hardens directory and variable semantics. Existing TUI dispatch is unchanged;
+this is not a claim of full POSIX shell compatibility.
 
 ## Ownership and API
 
@@ -74,8 +75,9 @@ cannot undo process mutations performed by a supplied handler.
 S02 adds an isolated API; no existing execution surface is migrated. S03 owns
 noninteractive CLI entry points and positional parameters, S04 command resolution
 and introspection, S05 the persistent interactive worker, and S06 TUI integration.
-S07–S14 own detailed shell semantics, redirection/pipeline lifecycle, source/eval
-and aliases. S15–S18 own process-local state, traps and real job control. Existing
+S07 (below) owns directory and variable semantics, S08–S14 the remaining shell
+semantics, redirection/pipeline lifecycle, source/eval and aliases. S15–S18 own
+process-local state, traps and real job control. Existing
 editor/menu/agent/platform callers remain for S19–S21 and the S22 rollout gate.
 
 Native tests cover persistent state/status, independent sessions, unchanged
@@ -259,3 +261,183 @@ tests inject fake registry and path lookups, and the adapter tests create their
 fake executables by linking the test binary into a temporary directory, skipping
 where exec permission is unavailable. `shcli` re-runs the same paths through
 `misa sh -c`.
+
+## S07 — directory and variable semantics
+
+S07 hardens the directory and variable behaviour of the S02 session rather than
+adding an execution surface. It changes the in-tree interpreter where POSIX
+requires behaviour that was missing, and it exposes directory changes to a UI
+adapter. Everything below is covered by hermetic tests in
+`internal/shell/session` (`dirs_test.go`, `vars_test.go`) that use temporary
+directories, symlinks, explicitly empty environments and injected handlers.
+
+### `cd`
+
+`cd [-L|-P] [directory]` follows POSIX:
+
+- `-L` (the default) resolves relative operands against the logical `$PWD` and
+  removes dot-dot components textually, so `cd link; cd ..` returns to the
+  directory that holds `link`, and `cd -L link/..` names that directory.
+- `-P` resolves symlinks before and while stepping through dot-dot components,
+  so the same commands land on the physical parent.
+- `--` ends option processing; combined forms such as `-PL` are not options and
+  are treated as operands (as in POSIX `cd`, which takes a single option).
+- `cd` without an operand uses `$HOME` and fails with status 1 and
+  `cd: HOME not set` when `HOME` is unset or empty.
+- `cd -` uses `$OLDPWD`, writes the new directory, and fails with status 1 and
+  `cd: OLDPWD not set` (writing nothing) when `OLDPWD` is unset.
+- With `CDPATH` set and a relative operand whose first component is not `.` or
+  `..`, each colon-separated entry is tried (an empty entry means `.`). The
+  first directory wins, and `cd` writes the new directory unless the match came
+  from `.`. Absolute operands and operands starting with `.` or `..` never
+  search `CDPATH`.
+- A directory that does not exist, is not a directory, or is not searchable
+  fails with status 1, a diagnostic on standard error, and no state change. More
+  than one operand fails with status 2.
+- `PWD` and `OLDPWD` are updated and exported after every successful change, so
+  child commands inherit them; `PWD` is exported from session creation.
+- The session never changes the process working directory: `Dir()` is shell
+  state only, and no process environment variable is touched.
+
+### Cwd-change events
+
+`Options.OnCwdChange func(oldDir, newDir string)` is optional. Every successful
+directory change reports its old and new logical directory in the order it
+happened; the events of one submission are queued by the interpreter and
+delivered after the submission finishes, outside the run lock, so the callback
+may call `Dir()` but must not call `Run`. A failed `cd` reports nothing, `cd .`
+reports nothing, and a change inside a subshell or process substitution never
+reaches the callback because the interpreter hands its subshells no hook. S06
+can therefore mirror the shell directory into the pane without polling.
+
+### Variables and assignments
+
+- Assignment-only commands take their status from the last command
+  substitution they performed, or zero when they performed none
+  (`x=$(exit 3)` is 3, `false; x=1` is 0).
+- An assignment prefix supplies an invocation-local environment: `VAR=x cmd`
+  exports `VAR` for that command only, including interpreter builtins
+  (`HOME=/elsewhere cd`) and injected handlers, and never persists. A preceding
+  assignment of a different value is overridden for that invocation.
+- Assignment-only commands do not export their variables; `export` is required.
+- `export NAME=value` and `unset NAME` (`-v`, `-f`) work as before. Bare
+  `export`, `export -p`, `readonly` and `readonly -p` now write the matching
+  variables as `export NAME=value` / `readonly NAME=value` lines with
+  re-evaluable quoting, so `eval "$(export -p)"` round-trips.
+- A readonly variable rejects re-assignment and `unset` with status 1 and one
+  diagnostic, and keeps its value. `readonly NAME` marks a variable that does
+  not exist yet, and a later assignment to it fails.
+- Unsupported declaration options still fail with status 2
+  (`export -Z x`, `declare: invalid option`) rather than being ignored.
+
+### Known differences
+
+- A leading assignment before a declaration keyword is not parsed as a
+  declaration: `VAR=x export NAME` fails with status 2 and
+  `export: unsupported builtin` instead of persisting the assignment. POSIX
+  makes assignments before special builtins stick; that needs a parser and
+  runner change, scheduled with the remaining variable work rather than faked
+  here.
+- `export -n` (a Bash extension, not POSIX) is accepted and ignored by the
+  declaration parser instead of un-exporting.
+- The session's logical directory, not a possibly modified `$PWD`, is the base
+  for relative operands, and `OLDPWD` records the directory the shell actually
+  left. Shells differ here; using shell state keeps a forged `PWD` from
+  redirecting `cd`.
+- `cd` with `-L` verifies the textually cleaned path, so an operand whose middle
+  component does not exist (`cd missing/..`) succeeds when the cleaned path is a
+  directory. Some shells reject that form; the POSIX algorithm keeps it.
+- The interpreter bootstraps `HOME` (from the host user when the session
+  environment has none) and `UID`/`EUID`/`GID`. A session that must not see the
+  host `HOME` should `unset HOME` or supply its own value; passing `Env: []string{}`
+  avoids inheriting the rest of the process environment.
+- `readonly` output skips array variables (arrays are a Bash extension; POSIX
+  declarations are strings) and prints declared-but-unset names without a value.
+
+### Provenance
+
+The interpreter changes are a recorded Misa patch of the imported foundation:
+`internal/sh/SOURCE.json` lists the patched files (`interp/api.go`,
+`interp/builtin.go`, `interp/runner.go`) under the `posix-dirs-vars` local patch,
+`internal/sh/NOTICE` summarises them, and `internal/inventory/sh_source_test.go`
+verifies the recorded bytes and that every patched file is declared. No upstream
+test or external implementation was copied; the behaviour follows POSIX and the
+documented `cd` semantics only.
+
+## S08 — quoting and expansion contract
+
+S08 exercises the same POSIX parser and interpreter through the session API and
+`shcli.Run` (`misa sh -c`), not a host shell. The native table tests use temporary
+directories, an explicit empty `PATH`, a temporary `HOME`, injected exact-argv
+capture, or the interpreter's `printf` with an argument count and per-argument
+markers. Successful cases assert status and empty diagnostics; failure cases
+assert exact diagnostics, status, and that the command was not dispatched.
+No new registry utility, dependency, parser, execution surface, or TUI migration
+is introduced.
+
+### Tested matrix
+
+| Area | Contract and cases | Tests in `internal/shell/` |
+| --- | --- | --- |
+| Quote removal | Single/double quotes, concatenation, literal special characters, backslash inside/outside double quotes, non-special double-quoted backslashes, escaped newlines, empty quoted arguments, removal of unquoted empty expansions | `session/s08_quote_test.go` |
+| Field splitting | Unset/default/custom/empty `IFS`; leading/trailing whitespace; non-whitespace separators and adjacent empty fields; mixed separators; splitting only expansion results; adjacent expansions and literal prefixes/suffixes | `session/s08_split_test.go` |
+| Positionals | `"$@"`, `$@`, `"$*"`, `$*`; zero, empty, and spaced parameters; concatenation; unset/empty/custom `IFS`; full first UTF-8 character for quoted `$*` | `session/s08_split_test.go` |
+| Pathnames | Sorted matches, `*`/`?`/brackets, no-match retains pattern, quoted/escaped metacharacters, dotfiles, parameter/substitution-produced patterns, `set -f` and `set +f` | `session/glob_expansion_test.go` |
+| Parameters | Unset/empty/set `-`, `:-`, `=`, `:=`, `?`, `:?`, `+`, `:+`; assignment side effects; `${#x}`; shortest/longest prefix/suffix removal; unused operator words must not run assignments or substitutions; quoting inside an operator word survives (quoted defaults, quoted removal patterns) | `session/parameter_expansion_test.go` |
+| Arithmetic | Precedence, parentheses, variables, assignment, decimal/octal/hex, nonzero ternary conditions, logical short-circuit, malformed syntax, invalid numeric constants, division/remainder by zero | `session/arithmetic_expansion_test.go` |
+| Substitution | Assignment takes last substitution's status, nested quotes in `$(...)`, trailing newline removal with internal newlines preserved | `session/substitution_expansion_test.go` |
+| CLI boundary | Representative exact count/argument markers, empty args, IFS, positionals, globs, parameter operators, arithmetic, substitutions and failed expansion/lookup diagnostics through `-c` | `shcli/expansion_test.go` |
+
+### Recorded interpreter corrections
+
+The existing expansion machinery is retained. The small `posix-expansion` patch
+in `internal/sh/SOURCE.json` records changes to `expand/expand.go`,
+`expand/param.go`, `expand/arith.go`, and `interp/runner.go`:
+
+- Non-whitespace IFS delimiters preserve empty fields; adjacent IFS whitespace
+  belongs to the delimiter, including across adjacent expansion parts.
+- Unquoted `$@` and `$*` start with separate positional fields rather than
+  injecting spaces that may not be IFS delimiters. Quoted `$*` joins with the
+  first complete IFS character, not its first byte.
+- Escaped glob metacharacters retain quoting until pathname expansion, without
+  disabling adjacent unescaped metacharacters.
+- An unused parameter-operator word is not expanded, so nested assignments and
+  command substitutions do not have unwanted side effects; a used word keeps its
+  quoting, so `${x:-'a b'}` stays one field and `"${x%"b*"}"` treats the quoted
+  pattern literally.
+- Arithmetic honors nonzero truth, short-circuits `&&`/`||`, and recognizes
+  octal/hexadecimal integer constants. Invalid integer constants and division
+  by zero diagnose and stop the noninteractive submission with status 1,
+  instead of printing a diagnostic and reporting success. Invalid syntax is a
+  typed parse error with status 2; the CLI writes its source-located diagnostic.
+
+These are native regressions against the imported baseline, not tests copied
+from another implementation. The references are POSIX Shell Command Language
+[§2.2 and §2.6](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html)
+and the vendored mvdan/sh v3.13.1, revision
+`2f3f5e36d9b0f8f14c998d50aa20a28832205ae8` (BSD-3-Clause), specifically the four
+patched files above. Upstream tests were deliberately omitted by S01; all
+existing in-tree `internal/sh/...` packages and tests remain unchanged apart
+from the recorded production patches.
+
+### Deliberate limits and follow-ups
+
+- `TestS08DollarSingleQuotePOSIXParser` is a named skipped conformance case:
+  the imported older POSIX parser treats `$'a\nb'` as a literal dollar followed
+  by a single-quoted word, not ANSI-C escape quoting. That form is traditionally
+  a Bash-style extension and is standardized in POSIX.1-2024 §2.2.4; support
+  requires a separate S08 parser/dialect follow-up. No Bash parity is claimed.
+- This matrix is a tested subset, not a claim that every POSIX expansion corner
+  case or locale is conformant. Arithmetic uses the interpreter's native Go
+  `int` width and integer-only model; recursive expression-valued variables
+  (`x='1+2'; $((x))`) and arbitrary Bash arithmetic extensions are not promised,
+  because POSIX only requires integer constants. `$@`/`$*` inside an operator
+  word, arrays and `${x:offset:length}` stay Bash-extension territory.
+- `read`/`getopts` line splitting is S11: it keeps the imported `expand.ReadFields`,
+  which drops an empty field between two non-whitespace `IFS` delimiters
+  (`IFS=: read x y z` on `a::b` gives `a`, `b`, empty). Word expansion splitting
+  is the corrected one above; unifying `read` with it is follow-up work.
+- S09/S10 still own redirection and pipeline/substitution resource lifecycle;
+  S11 owns remaining control-flow and special-builtin assignment scope; S12–S14
+  own their remaining source/eval/alias semantics. S05/S06 and S15–S22 retain
+  the worker, UI, process-state, job-control, migration and rollout work.

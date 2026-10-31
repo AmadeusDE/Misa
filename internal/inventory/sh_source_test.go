@@ -31,6 +31,9 @@ type shFile struct {
 	UpstreamSHA256 string `json:"upstream_sha256"`
 	LocalSHA256    string `json:"local_sha256"`
 	Generated      bool   `json:"generated,omitempty"`
+	// Patched marks a file with local edits that no mechanical reverse patch
+	// can undo; it must be named by a declared local_patches entry.
+	Patched bool `json:"patched,omitempty"`
 }
 type shSource struct {
 	Source       string    `json:"source"`
@@ -82,7 +85,7 @@ func reversePatch(b []byte, patch []shReplacement) ([]byte, error) {
 
 // checkShFiles verifies the imported bytes and the declared reversible patches.
 func checkShFiles(dir string, s shSource) error {
-	if len(s.LocalPatches) < 1 || len(s.LocalPatches) > 4 {
+	if len(s.LocalPatches) < 1 || len(s.LocalPatches) > 6 {
 		return fmt.Errorf("invalid patches")
 	}
 	p := s.LocalPatches[0]
@@ -103,13 +106,39 @@ func checkShFiles(dir string, s shSource) error {
 			return fmt.Errorf("invalid session patch")
 		}
 	}
-	arg0Patch := len(s.LocalPatches) == 4
-	if arg0Patch {
-		p := s.LocalPatches[3]
-		if p.Kind != "session-arg0" || p.From != "" || p.To != "" || len(p.Files) != 2 || p.Files[0] != "interp/api.go" || p.Files[1] != "interp/vars.go" || p.Reason == "" {
-			return fmt.Errorf("invalid arg0 patch")
+	// Irreversible edits need a marker; reversible arg0 edits can overlap them.
+	labelled := map[string]bool{}
+	kinds := map[string]bool{}
+	arg0Patch := false
+	for _, p := range s.LocalPatches[min(3, len(s.LocalPatches)):] {
+		var expected map[string]bool
+		switch p.Kind {
+		case "session-arg0":
+			expected = map[string]bool{"interp/api.go": true, "interp/vars.go": true}
+			arg0Patch = true
+		case "posix-dirs-vars":
+			expected = map[string]bool{"interp/api.go": true, "interp/builtin.go": true, "interp/runner.go": true}
+		case "posix-expansion":
+			expected = map[string]bool{"expand/expand.go": true, "expand/param.go": true, "expand/arith.go": true, "interp/runner.go": true}
+		default:
+			return fmt.Errorf("unknown local patch %q", p.Kind)
+		}
+		if kinds[p.Kind] || p.From != "" || p.To != "" || p.Reason == "" || len(p.Files) != len(expected) {
+			return fmt.Errorf("invalid local patch %q", p.Kind)
+		}
+		kinds[p.Kind] = true
+		seen := map[string]bool{}
+		for _, f := range p.Files {
+			if !validShPath(f) || !expected[f] || seen[f] {
+				return fmt.Errorf("invalid patched file %q", f)
+			}
+			seen[f] = true
+			if p.Kind == "posix-dirs-vars" || p.Kind == "posix-expansion" {
+				labelled[f] = true
+			}
 		}
 	}
+
 	if len(s.Packages) == 0 || len(s.Omissions) == 0 {
 		return fmt.Errorf("packages and omissions must be declared")
 	}
@@ -138,6 +167,25 @@ func checkShFiles(dir string, s shSource) error {
 		}
 		if shDigest(b) != f.LocalSHA256 {
 			return fmt.Errorf("local hash mismatch: %s", f.Local)
+		}
+		if labelled[f.Local] != f.Patched {
+			return fmt.Errorf("patch marker mismatch: %s", f.Local)
+		}
+		if f.Patched && arg0Patch && f.Local == "interp/api.go" {
+			if _, err := reversePatch(b, arg0APIPatch); err != nil {
+				return err
+			}
+		}
+		if f.Patched {
+			if !labelled[f.Local] {
+				return fmt.Errorf("patched file not declared: %s", f.Local)
+			}
+			if f.UpstreamSHA256 == "" {
+				return fmt.Errorf("patched file without upstream hash: %s", f.Local)
+			}
+			// Local edits are recorded, not reversed: the checker proves the
+			// tree matches the recorded bytes and that the edit is declared.
+			continue
 		}
 		upstream := bytes.ReplaceAll(b, []byte(shNew), []byte(shOld))
 		if gofmtPatch && f.Local == "interp/os_unix.go" {
@@ -182,6 +230,11 @@ func checkShFiles(dir string, s shSource) error {
 		b, err := os.ReadFile(filepath.Join(dir, "interp", "session_status.go"))
 		if err != nil || shDigest(b) != "ebef9f14b6f9c008267d81aac77e8dc2c16e0585376b773f65a031235404deb9" {
 			return fmt.Errorf("session status file missing or modified")
+		}
+	}
+	for f := range labelled {
+		if !locals[f] {
+			return fmt.Errorf("declared patch file is not imported: %s", f)
 		}
 	}
 	if !locals["LICENSE"] {
@@ -397,7 +450,7 @@ func TestShSessionPatchChecker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b = append(b, []byte("// tampered\n")...)
+	b = bytes.Replace(b, []byte("func Arg0(value string)"), []byte("func Arg0Changed(value string)"), 1)
 	if err := os.WriteFile(api, b, 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -408,5 +461,42 @@ func TestShSessionPatchChecker(t *testing.T) {
 	}
 	if checkShFiles(dir, source) == nil {
 		t.Fatal("modified arg0 patch with updated local hash accepted")
+	}
+}
+
+func TestShLocalPatchValidation(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "sh", "SOURCE.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*shSource)
+		valid  bool
+	}{
+		{"overlapping patches", func(*shSource) {}, true},
+		{"duplicate file", func(s *shSource) { s.LocalPatches[4].Files[2] = s.LocalPatches[4].Files[0] }, false},
+		{"unknown file", func(s *shSource) { s.LocalPatches[4].Files[2] = "interp/vars.go" }, false},
+		{"unknown kind", func(s *shSource) { s.LocalPatches[4].Kind = "other" }, false},
+		{"duplicate kind", func(s *shSource) { s.LocalPatches[4] = s.LocalPatches[3] }, false},
+		{"missing marker", func(s *shSource) {
+			for i := range s.Files {
+				if s.Files[i].Local == "interp/api.go" {
+					s.Files[i].Patched = false
+				}
+			}
+		}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var s shSource
+			if err := decode(data, &s); err != nil {
+				t.Fatal(err)
+			}
+			tc.mutate(&s)
+			err := checkShFiles(filepath.Join("..", "sh"), s)
+			if (err == nil) != tc.valid {
+				t.Fatalf("checkShFiles: %v", err)
+			}
+		})
 	}
 }

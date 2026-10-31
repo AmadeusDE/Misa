@@ -49,11 +49,21 @@ func overridingUnset(pe *syntax.ParamExp) bool {
 	return false
 }
 
-func (cfg *Config) paramExp(pe *syntax.ParamExp) (string, error) {
-	oldParam := cfg.curParam
-	cfg.curParam = pe
-	defer func() { cfg.curParam = oldParam }()
+// paramValue is the value of a parameter expansion's variable, before any
+// operator such as a default or a pattern removal is applied.
+type paramValue struct {
+	name             string
+	vr               Variable
+	orig             Variable
+	index            syntax.ArithmExpr
+	str              string
+	elems            []string
+	slice            [2]int // offset and length, when pe.Slice is set
+	callVarInd       bool
+	indexAllElements bool
+}
 
+func (cfg *Config) paramValue(pe *syntax.ParamExp) (paramValue, error) {
 	name := pe.Param.Value
 	index := pe.Index
 	switch name {
@@ -72,65 +82,137 @@ func (cfg *Config) paramExp(pe *syntax.ParamExp) (string, error) {
 	default:
 		vr = cfg.Env.Get(name)
 	}
-	orig := vr
-	if n, v := vr.Resolve(cfg.Env); n != "" {
-		name, vr = n, v
+	v := paramValue{name: name, vr: vr, orig: vr, index: index}
+	if n, resolved := vr.Resolve(cfg.Env); n != "" {
+		v.name, v.vr = n, resolved
 	}
+	vr = v.vr
 	if cfg.NoUnset && !vr.IsSet() && !overridingUnset(pe) {
-		return "", UnsetParameterError{
+		return v, UnsetParameterError{
 			Node:    pe,
 			Message: "unbound variable",
 		}
 	}
 
-	var sliceOffset, sliceLen int
 	if pe.Slice != nil {
 		var err error
 		if pe.Slice.Offset != nil {
-			sliceOffset, err = Arithm(cfg, pe.Slice.Offset)
-			if err != nil {
-				return "", err
+			if v.slice[0], err = Arithm(cfg, pe.Slice.Offset); err != nil {
+				return v, err
 			}
 		}
 		if pe.Slice.Length != nil {
-			sliceLen, err = Arithm(cfg, pe.Slice.Length)
-			if err != nil {
-				return "", err
+			if v.slice[1], err = Arithm(cfg, pe.Slice.Length); err != nil {
+				return v, err
 			}
 		}
 	}
 
-	var (
-		str   string
-		elems []string
-
-		indexAllElements bool // true if var has been accessed with * or @ index
-		callVarInd       = true
-	)
-
+	v.callVarInd = true
 	switch nodeLit(index) {
 	case "@", "*":
 		switch vr.Kind {
 		case Unknown:
-			elems = nil
-			indexAllElements = true
+			v.elems = nil
+			v.indexAllElements = true
 		case Indexed:
-			indexAllElements = true
-			callVarInd = false
-			elems = cfg.sliceElems(pe, vr.List, name == "@" || name == "*")
-			str = strings.Join(elems, " ")
+			v.indexAllElements = true
+			v.callVarInd = false
+			v.elems = cfg.sliceElems(pe, vr.List, v.name == "@" || v.name == "*")
+			v.str = strings.Join(v.elems, " ")
 		}
 	}
-	if callVarInd {
+	if v.callVarInd {
 		var err error
-		str, err = cfg.varInd(vr, index)
-		if err != nil {
-			return "", err
+		if v.str, err = cfg.varInd(vr, index); err != nil {
+			return v, err
 		}
 	}
-	if !indexAllElements {
-		elems = []string{str}
+	if !v.indexAllElements {
+		v.elems = []string{v.str}
 	}
+	return v, nil
+}
+
+// paramWordOp reports whether op's word becomes the value of the expansion, so
+// that field splitting, quote removal and pathname expansion apply to it.
+func paramWordOp(op syntax.ParExpOperator) bool {
+	switch op {
+	case syntax.DefaultUnset, syntax.DefaultUnsetOrNull,
+		syntax.AssignUnset, syntax.AssignUnsetOrNull,
+		syntax.ErrorUnset, syntax.ErrorUnsetOrNull,
+		syntax.AlternateUnset, syntax.AlternateUnsetOrNull:
+		return true
+	}
+	return false
+}
+
+// paramWordUsed reports whether pe's operator word is expanded. POSIX only
+// expands the word when it is needed, and its expansion may have side effects
+// such as assignments or command substitutions.
+func (cfg *Config) paramWordUsed(pe *syntax.ParamExp, vr Variable, str string) bool {
+	switch pe.Exp.Op {
+	case syntax.AlternateUnset:
+		return vr.IsSet()
+	case syntax.AlternateUnsetOrNull:
+		return vr.IsSet() && str != ""
+	case syntax.DefaultUnset, syntax.AssignUnset, syntax.ErrorUnset:
+		return !vr.IsSet()
+	case syntax.DefaultUnsetOrNull, syntax.AssignUnsetOrNull, syntax.ErrorUnsetOrNull:
+		return !vr.IsSet() || str == ""
+	}
+	return true
+}
+
+// paramWordParts expands pe's operator word keeping its quoting, for callers
+// which perform field splitting on the result. ok is false when paramExp must
+// handle pe instead; the word's side effects are then left to it.
+func (cfg *Config) paramWordParts(pe *syntax.ParamExp) (parts []fieldPart, ok bool, err error) {
+	if pe.Exp == nil || !paramWordOp(pe.Exp.Op) ||
+		pe.Length || pe.Width || pe.IsSet || pe.Excl || pe.Slice != nil || pe.Repl != nil {
+		return nil, false, nil
+	}
+	oldParam := cfg.curParam
+	cfg.curParam = pe
+	defer func() { cfg.curParam = oldParam }()
+	v, err := cfg.paramValue(pe)
+	if err != nil {
+		return nil, false, err
+	}
+	if !cfg.paramWordUsed(pe, v.vr, v.str) {
+		return nil, false, nil
+	}
+	parts, err = cfg.wordField(pe.Exp.Word.Parts, quoteNone)
+	if err != nil {
+		return nil, false, err
+	}
+	switch pe.Exp.Op {
+	case syntax.AssignUnset, syntax.AssignUnsetOrNull:
+		if err := cfg.envSet(v.name, cfg.fieldJoin(parts)); err != nil {
+			return nil, false, err
+		}
+	case syntax.ErrorUnset, syntax.ErrorUnsetOrNull:
+		return nil, false, UnsetParameterError{
+			Node:    pe,
+			Message: cfg.fieldJoin(parts),
+		}
+	}
+	return parts, true, nil
+}
+
+func (cfg *Config) paramExp(pe *syntax.ParamExp) (string, error) {
+	oldParam := cfg.curParam
+	cfg.curParam = pe
+	defer func() { cfg.curParam = oldParam }()
+
+	v, err := cfg.paramValue(pe)
+	if err != nil {
+		return "", err
+	}
+	name, vr, orig, index := v.name, v.vr, v.orig, v.index
+	str, elems := v.str, v.elems
+	sliceOffset, sliceLen := v.slice[0], v.slice[1]
+	callVarInd := v.callVarInd
 
 	switch {
 	case pe.Length:
@@ -217,7 +299,20 @@ func (cfg *Config) paramExp(pe *syntax.ParamExp) (string, error) {
 		sb.WriteString(str[last:])
 		str = sb.String()
 	case pe.Exp != nil:
-		arg, err := Literal(cfg, pe.Exp.Word)
+		// POSIX expands the operator word only when it is needed.
+		if !cfg.paramWordUsed(pe, vr, str) {
+			return str, nil
+		}
+		var arg string
+		var err error
+		switch pe.Exp.Op {
+		case syntax.RemSmallPrefix, syntax.RemLargePrefix,
+			syntax.RemSmallSuffix, syntax.RemLargeSuffix:
+			// Quoted characters in a removal pattern are literal.
+			arg, err = Pattern(cfg, pe.Exp.Word)
+		default:
+			arg, err = Literal(cfg, pe.Exp.Word)
+		}
 		if err != nil {
 			return "", err
 		}
