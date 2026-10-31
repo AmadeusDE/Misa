@@ -76,7 +76,7 @@ func (e *Editor) repeatLastChange(count int, given bool) {
 		e.executeOperatorMotion(c.command[0], c.motion, c.count, c.countGiven)
 	} else {
 		e.count, e.countGiven = c.count, c.countGiven
-		e.handleNormal(keyFromName(c.command))
+		e.dispatchInput(inputEvent{kind: inputKey, key: keyFromName(c.command)})
 	}
 	if e.mode == ModeInsert || e.mode == ModeReplace || e.mode == ModeReplaceChar {
 		e.replayInsertInput(c.insertKeys)

@@ -218,24 +218,7 @@ func (e *Editor) playMacro(reg byte) {
 
 func (e *Editor) processKey(key string) {
 	defer e.finishEditEvent(e.row)
-	msg := keyFromName(key)
-
-	switch e.mode {
-	case ModeNormal:
-		e.handleNormal(msg)
-	case ModeInsert:
-		e.handleInsert(msg)
-	case ModeReplace:
-		e.handleReplace(msg)
-	case ModeReplaceChar:
-		e.handleReplaceChar(msg)
-	case ModeCommand:
-		e.handleCommand(msg)
-	case ModeSearch:
-		e.handleSearch(msg)
-	case ModeConfirm:
-		e.handleSubstituteConfirm(msg)
-	}
+	e.dispatchInput(inputEvent{kind: inputKey, key: keyFromName(key)})
 }
 
 // --- Put ---

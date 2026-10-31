@@ -105,6 +105,11 @@ If you press A you will be in insert mode at the end of a line.
 If you press I you will be in insert mode at the beginning of a line.
 
 If you press O you will be in insert mode on a new line above your cursor.
+
+A terminal paste inserts text literally in Normal or Insert mode; it does not
+run the pasted characters as commands. In Insert mode it belongs to the current
+insert undo unit. In a command prompt, pasted newlines do not submit the command;
+press Enter yourself when the command is ready.
 ________________________________________________________________________________
 
                                   Count Commands
