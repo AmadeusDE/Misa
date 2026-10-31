@@ -3,6 +3,7 @@ package chess
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -47,9 +48,10 @@ type Position struct {
 	V      *Variant
 	Board  []Piece
 	Turn   Color
-	EP     []int // squares the last move's pawn crossed
-	EPPawn int   // that pawn, or -1
-	Clock  int   // plies since the last capture or pawn move
+	EP     []int  // squares the last move's pawn crossed
+	EPPawn int    // that pawn, or -1
+	Clock  int    // plies since the last capture or pawn move
+	Checks [2]int // checks each side has given, for a variant with a CheckLimit
 
 	royalSq [2][]int // kept by Apply so check tests need not scan the board
 }
@@ -60,10 +62,13 @@ func NewPosition(v *Variant) *Position {
 	return p
 }
 
-// ParseFEN reads "placement [w|b] [castling]". Pieces on their setup squares
-// count as unmoved. The castling field, when given, takes rights away: "-"
-// all of them, otherwise each castle whose letter (K when the rook is on the
-// king's right, Q on its left; lower case for Black) is missing.
+// ParseFEN reads "placement [w|b] [castling] [checks]", where a variant with a
+// CheckLimit also takes a checks field anywhere after the side to move: "+2+1"
+// counts the checks White and Black have already given, and Lichess's "1+2"
+// gives the checks each side has left. Pieces on their setup squares count as
+// unmoved. The castling field, when given, takes rights away: "-" all of
+// them, otherwise each castle whose letter (K when the rook is on the king's
+// right, Q on its left; lower case for Black) is missing.
 func ParseFEN(v *Variant, fen string) (*Position, error) {
 	fields := strings.Fields(fen)
 	if len(fields) == 0 {
@@ -103,8 +108,48 @@ func ParseFEN(v *Variant, fen string) (*Position, error) {
 			}
 		}
 	}
+	if len(fields) > 3 {
+		if err := p.parseChecks(fields[3:]); err != nil {
+			return nil, err
+		}
+	}
 	p.findRoyals()
 	return p, nil
+}
+
+// parseChecks reads the optional checks field: "+n+m" counts the checks White
+// and Black have given, "n+m" the checks they have left, as Lichess writes a
+// three-check FEN. A variant without a CheckLimit ignores the field.
+func (p *Position) parseChecks(fields []string) error {
+	if p.V.CheckLimit == 0 {
+		return nil
+	}
+	for _, f := range fields {
+		if !strings.Contains(f, "+") {
+			continue
+		}
+		given := strings.HasPrefix(f, "+")
+		white, black, ok := strings.Cut(strings.TrimPrefix(f, "+"), "+")
+		nw, errW := strconv.Atoi(white)
+		nb, errB := strconv.Atoi(black)
+		if !ok || errW != nil || errB != nil || nw < 0 || nb < 0 {
+			return fmt.Errorf("checks %q is not +white+black", f)
+		}
+		limit := p.V.CheckLimit
+		if given {
+			if nw > limit || nb > limit {
+				return fmt.Errorf("checks %q: a side cannot give more than %d checks", f, limit)
+			}
+			p.Checks = [2]int{nw, nb}
+			return nil
+		}
+		if nw > limit || nb > limit {
+			return fmt.Errorf("checks %q: a side cannot have more than %d checks left", f, limit)
+		}
+		p.Checks = [2]int{limit - nw, limit - nb}
+		return nil
+	}
+	return nil
 }
 
 func (p *Position) clone() *Position {
@@ -305,6 +350,7 @@ func (p *Position) Apply(m Move) *Position {
 		q.Clock++
 		q.Turn = p.Turn.Other()
 		q.findRoyals()
+		q.countCheck()
 		return q
 	}
 	if m.Take >= 0 {
@@ -329,7 +375,16 @@ func (p *Position) Apply(m Move) *Position {
 	if v.Pieces[mover.Type-1].Royal || v.Type(p.Board[m.From]).Royal || (m.Take >= 0 && v.Type(p.Board[m.Take]).Royal) {
 		q.findRoyals()
 	}
+	q.countCheck()
 	return q
+}
+
+// countCheck records the check the side that just moved gave, which a variant
+// with a CheckLimit wins on.
+func (q *Position) countCheck() {
+	if q.V.CheckLimit > 0 && q.InCheck() {
+		q.Checks[q.Turn.Other()]++
+	}
 }
 
 // crossed lists the squares strictly between from and to on a straight line.

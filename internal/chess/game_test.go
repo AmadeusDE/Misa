@@ -205,6 +205,10 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	if got := g.match.Variant().ID; got != "grand" {
 		t.Fatalf("picker selected %s, want grand", got)
 	}
+	keys(g, "v", "t", "h", "r", "e", "e", "c", "h", "e", "c", "k", "enter")
+	if got := g.match.Variant().ID; got != "threecheck" {
+		t.Fatalf("picker selected %s, want threecheck", got)
+	}
 }
 
 func TestLettersToggle(t *testing.T) {

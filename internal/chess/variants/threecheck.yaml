@@ -1,0 +1,6 @@
+id: threecheck
+name: Three-Check
+description: Orthodox chess with a shortcut — the third check you give wins at once, the checkmating one included.
+extends: chess
+# Checks each side must give to the opponent to win at once; 0 or no field turns the rule off.
+check_limit: 3

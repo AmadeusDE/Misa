@@ -125,6 +125,12 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
   [Wikipedia](https://en.wikipedia.org/wiki/Grand_chess),
   [Chess Variants](https://www.chessvariants.com/large.dir/freeling.html).
 
+- **Three-Check** (`threecheck`): 8×8, orthodox chess where giving check
+  three times wins at once, the checkmating third check included; the usual
+  mate, stalemate, repetition and move-limit endings still apply, and if the
+  limit-th check is also mate the game is won either way. See
+  [Variant files](#variant-files) for the `check_limit` key.
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
@@ -202,6 +208,29 @@ two queens or two marshals.
 Where a variant lets a pawn decline, the prompt lists the pawn first: press its
 letter (`p`) or click it to leave the pawn as it is. Long prompt lists fall back
 to glyphs on a narrow terminal.
+
+`check_limit: N` wins the game for a side that gives check N times. It is not
+tied to any id: 0 or no field turns the rule off, `extends` inherits it, and a
+child file overrides it with a positive value (a negative one is rejected).
+Every move that leaves the opponent in check counts, including the checkmating
+one; reaching the limit outranks a checkmate or draw rule the same move would
+produce, exactly as a `goal` arrival does. For example:
+
+```yaml
+id: threecheck
+name: Three-Check
+extends: chess
+check_limit: 3
+```
+
+The header shows the checks left (`checks left: White 3, Black 0`) and
+names the winner once a side reaches the limit.
+
+A FEN for such a variant also takes a checks field anywhere after the
+side-to-move field: `+2+1` counts the checks White and Black have already
+given, while Lichess's `1+2` style gives the checks each side has left. A
+variant without a check limit ignores the field, so existing FENs are
+unchanged.
 
 ## Custom board dimensions
 

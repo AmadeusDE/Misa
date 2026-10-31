@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -52,6 +52,7 @@ type Variant struct {
 	PromotionCapturedOnly bool    // a type is available only once its setup piece is gone
 	MoveLimit             int     // moves by each side without a capture or pawn move before a draw
 	Stalemate             StalemateRule
+	CheckLimit            int   // checks a side must give to win, or 0 for no such rule
 	Goal                  []int // absolute squares whose arrival by a royal wins
 	Setup                 string
 	Source                string
@@ -107,6 +108,7 @@ type variantDef struct {
 	PromotionOptional     *bool         `yaml:"promotion_optional"`
 	PromotionCapturedOnly *bool         `yaml:"promotion_captured_only"`
 	MoveLimit             int           `yaml:"move_limit"`
+	CheckLimit            int           `yaml:"check_limit"`
 	Stalemate             StalemateRule `yaml:"stalemate"`
 	SelfCapture           *bool         `yaml:"self_capture"`
 	Goal                  []string      `yaml:"goal"`
@@ -307,6 +309,9 @@ func merge(parent, child variantDef) variantDef {
 	if child.SelfCapture != nil {
 		d.SelfCapture = child.SelfCapture
 	}
+	if child.CheckLimit != 0 {
+		d.CheckLimit = child.CheckLimit
+	}
 	if child.Goal != nil {
 		d.Goal = child.Goal
 	}
@@ -326,7 +331,8 @@ func build(d variantDef) (*Variant, error) {
 	v := &Variant{
 		ID: d.ID, Name: d.Name, Description: d.Description,
 		Files: d.Files, Ranks: d.Ranks, Setup: d.Setup, Source: d.source,
-		PromotionZone: d.PromotionZone, MoveLimit: d.MoveLimit, Stalemate: d.Stalemate,
+		PromotionZone: d.PromotionZone, MoveLimit: d.MoveLimit, CheckLimit: d.CheckLimit,
+		Stalemate:             d.Stalemate,
 		SelfCapture:           d.SelfCapture != nil && *d.SelfCapture,
 		PromotionOptional:     d.PromotionOptional != nil && *d.PromotionOptional,
 		PromotionCapturedOnly: d.PromotionCapturedOnly != nil && *d.PromotionCapturedOnly,
@@ -350,6 +356,9 @@ func build(d variantDef) (*Variant, error) {
 	// reach-table, move generation, and search costs, so keep dimensions bounded.
 	if v.Files < 1 || v.Files > 702 || v.Ranks < 1 || v.Ranks > 99 {
 		return nil, fmt.Errorf("board must be 1-702 files by 1-99 ranks, not %d×%d", v.Files, v.Ranks)
+	}
+	if v.CheckLimit < 0 {
+		return nil, fmt.Errorf("check limit must not be negative, not %d", v.CheckLimit)
 	}
 	if err := v.parseGoal(d.Goal); err != nil {
 		return nil, err

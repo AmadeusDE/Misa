@@ -14,10 +14,11 @@ const (
 	DrawRepetition
 	DrawMaterial
 	GoalWin
+	CheckWin
 )
 
 func (s Status) String() string {
-	return [...]string{"playing", "checkmate", "stalemate", "draw by the move limit", "draw by repetition", "draw: only royal pieces left", "goal reached"}[s]
+	return [...]string{"playing", "checkmate", "stalemate", "draw by the move limit", "draw by repetition", "draw: only royal pieces left", "goal reached", "check limit reached"}[s]
 }
 
 // Match is a game in progress: the positions so far, so moves can be taken
@@ -54,8 +55,8 @@ func (m *Match) Turn() Color         { return m.Position().Turn }
 func (m *Match) Over() bool          { return m.status != Playing }
 
 // Status reports how the game stands; the winner only means something when
-// the game is decisive, which a goal arrival and checkmate are, and so is a
-// stalemate under a stalemate rule that names a winner.
+// the game is decisive, which a goal arrival, a check limit and checkmate are,
+// and so is a stalemate under a stalemate rule that names a winner.
 func (m *Match) Status() (Status, Color) {
 	winner := m.Position().Turn.Other()
 	if m.status == Stalemate && m.variant.Stalemate == StalemateLoss {
@@ -65,10 +66,10 @@ func (m *Match) Status() (Status, Color) {
 }
 
 // Decisive reports whether the game ended with a winner rather than a draw:
-// a checkmate, a goal arrival, or a stalemate under whichever rule says one
-// side wins or loses it.
+// a checkmate, a goal arrival, a check limit, or a stalemate under whichever
+// rule says one side wins or loses it.
 func (m *Match) Decisive() bool {
-	return m.status == Checkmate || m.status == GoalWin ||
+	return m.status == Checkmate || m.status == GoalWin || m.status == CheckWin ||
 		m.status == Stalemate && m.variant.Stalemate != StalemateDraw
 }
 
