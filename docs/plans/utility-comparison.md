@@ -370,7 +370,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `mkfs.reiser` |  |  | ✓ |  |
 | `mkfs.vfat` |  |  | ✓ |  |
 | `mknod` |  | ✓ lsb | ✓ | ✓ coreutils |
-| `mkpasswd` |  | ✓ other | ✓ |  |
+| `mkpasswd` | ✓ | ✓ other | ✓ |  |
 | `mkswap` |  | ✓ other | ✓ |  |
 | `mktemp` | ✓ | ✓ lsb | ✓ | ✓ coreutils |
 | `modinfo` |  | ✓ other | ✓ |  |
@@ -441,7 +441,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `pwconv` |  |  |  | ✓ shadow |
 | `pwd` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `pwdx` |  | ✓ other | ✓ | ✓ procps |
-| `pwgen` |  | ✓ other |  |  |
+| `pwgen` | ✓ | ✓ other |  |  |
 | `pwunconv` |  |  |  | ✓ shadow |
 | `raidautorun` |  |  | ✓ |  |
 | `rdate` |  |  | ✓ |  |

@@ -63,6 +63,19 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 - **uutils/util-linux** by the uutils contributors — MIT (`cal`, `mcookie`, `uuidgen`)
   https://github.com/uutils/util-linux
 
+## Password Hashing
+
+`internal/pwhash` and the `mkpasswd` builtin are original Go implementations written from published
+algorithm descriptions, not ported code.
+
+- **Unix crypt using SHA-256 and SHA-512** by Ulrich Drepper — public domain: the $5$/$6$ algorithm and
+  its published test vectors
+  https://www.akkadia.org/drepper/SHA-crypt.txt
+- **md5-crypt** by Poul-Henning Kamp — public scheme description (no code copied)
+- **toybox** `toys/other/mkpasswd.c`, `lib/password.c` and `toys/other/pwgen.c` (0BSD) — CLI options,
+  salt generation conventions and the `tests/mkpasswd.test` vectors
+  https://github.com/landley/toybox
+
 ## Chess
 
 Original Go implementation; rules and notation referenced from:

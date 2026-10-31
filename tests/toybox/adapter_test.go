@@ -354,7 +354,10 @@ func parseTestFile(path string) (testSuite, error) {
 		}
 
 		if strings.HasPrefix(line, "testcmd ") {
-			if strings.Contains(line, "$1") {
+			// Skip cases that use a shell positional parameter in the command
+			// itself ($1 there would need a real shell). A literal "$1$" in the
+			// expected output is just crypt(3)'s md5-crypt prefix.
+			if args := testcmdArgs(line); strings.Contains(args, "$1") {
 				continue
 			}
 			if suite.cmdName == "chmod" && strings.Contains(line, "$U$G$O") {
@@ -1145,4 +1148,16 @@ func TestToyboxSuite(t *testing.T) {
 	}
 
 	t.Logf("Toybox tests: %d parsed from test files", totalParsed)
+}
+
+// testcmdArgs returns the command-argument field of a testcmd line, the second
+// shell word: for the mkpasswd md5 case it is "-P0 -mmd5 -S abcdefgh", so a
+// literal "$1$" in the expected crypt(3) output no longer skips the case. Lines
+// that do not tokenize return the whole line so no case is silently enabled.
+func testcmdArgs(line string) string {
+	words := shellArgRe.FindAllString(strings.TrimPrefix(line, "testcmd "), -1)
+	if len(words) < 2 {
+		return line
+	}
+	return strings.Trim(words[1], "'\"")
 }

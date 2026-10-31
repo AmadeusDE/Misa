@@ -66,7 +66,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | 37 | `fsfreeze` | 5 | – | 5 (5) | 30 | – |
 | 38 | `w` | 5 | – | 5 (5) | 33 | – |
 | 39 | `iconv` | 5 | 5 | – | 75 | – |
-| 40 | `mkpasswd` | 5 | 5 | – | 81 | – |
 | 41 | `modinfo` | 5 | 5 | – | 129 | – |
 | 42 | `renice` | 4 | 2 | 2 (2) | 51 | – |
 | 43 | `shred` | 4 | – | 31 (4) | 99 | kernel/fs, tty |
@@ -260,7 +259,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `mix` | other | – | – | – | – | no tests | 66 | – | light |
 | `mkfifo` | posix | 5 | coreutils:16 | 10 | kernel/fs | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 10/16 simple new_ucmd! cases parseable by tests/uutils adapter | 40 | 192 | light |
 | `mknod` | lsb | – | coreutils:17 | 9 | devices, kernel/fs | uutils: Rust, 9/17 simple new_ucmd! cases parseable by tests/uutils adapter | 50 | 315 | medium |
-| `mkpasswd` | other | 5 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 81 | – | light |
 | `mkswap` | other | – | – | – | – | no tests | 50 | – | light |
 | `modinfo` | other | 5 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 129 | – | light |
 | `modprobe` | pending | – | – | – | – | no tests | 547 | – | medium |
@@ -304,7 +302,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `pwck` | – | – | shadow:18 | 0 | root | uutils: Rust, 0/18 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1231 | heavy |
 | `pwconv` | – | – | shadow:13 | 0 | root | uutils: Rust, 0/13 simple new_ucmd! cases parseable by tests/uutils adapter | – | 660 | heavy |
 | `pwdx` | other | – | procps:8 | 8 | – | uutils: Rust, 8/8 simple new_ucmd! cases parseable by tests/uutils adapter | 33 | 63 | light |
-| `pwgen` | other | – | – | – | – | no tests | 74 | – | light |
 | `pwunconv` | – | – | shadow:– | – | – | no tests | – | 42 | light |
 | `readahead` | other | – | – | – | – | no tests | 28 | – | light |
 | `readelf` | other | 9 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 775 | – | heavy |

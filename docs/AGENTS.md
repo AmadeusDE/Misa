@@ -128,6 +128,10 @@ internal/
                                  — ChessGame builds the game (computer plays Black by default)
     battleship.go                `battleship [-r|--random]` — -r picks a random fleet instead of interactive
                                  placement
+    pwgen.go                     `pwgen` — random passwords from crypto/rand with rejection sampling;
+                                 toybox's -0/-A/-B/-c/-C/-n/-1/-r/-s/-v/-y options, columns on a tty
+    mkpasswd.go                  `mkpasswd [-P FD] [-m METHOD] [-S SALT] [PASSWORD] [SALT]` — crypt(3) hashes
+                                 via internal/pwhash (DES rejected, default sha512); -m help lists methods
   sshclient/                     Built-in SSH client (golang.org/x/crypto/ssh); named sshc so it never shadows OpenSSH
     client.go                    Run: dial, remote PTY + raw local terminal, exit status (remote's, or 255)
     target.go                    Destination ([user@]host, ssh://) + flags + config → address, user, identities
@@ -193,6 +197,8 @@ internal/
   pkgmanager/                    Data-driven package manager definitions (built-in + external YAML).
                                  Termux adds `pkg` when TERMUX_VERSION or a com.termux PREFIX is set.
                                  MISA_ANDROID_APP=1 hides managers with Distro set (pacman, flatpak, pkg)
+  pwhash/                        crypt(3) password hashes in pure Go — md5-crypt ($1$), SHA-256-crypt
+                                 ($5$), SHA-512-crypt ($6$, with rounds=); no cgo, no libc crypt
   sysinfo/                       System info fetching (basic + extended). Android/Termux detection:
                                  TERMUX_VERSION, PREFIX, MISA_ANDROID_APP, and getprop
                                  (ro.build.version.release, ro.product.model, ro.product.manufacturer)
