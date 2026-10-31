@@ -44,12 +44,9 @@ type regContent struct {
 }
 
 type Editor struct {
-	lines             []string
-	filename          string
+	bufferIdentity
 	alternateFilename string
 	dir               string
-	modified          bool
-	file              fileState
 
 	row, col           int
 	goalCol            int
@@ -66,17 +63,6 @@ type Editor struct {
 	shellOutput *shellOutput
 	shellEnv    []string
 	shellNext   uint64
-
-	undoStack                             []undoEntry
-	redoStack                             []undoEntry
-	revision, savedRevision, nextRevision uint64
-	editDepth                             int
-	editBefore                            undoEntry
-	editSavedLines                        []string
-	editSavedRevision                     uint64
-	editPos                               pos
-	editPosSet                            bool
-	editAuto                              bool
 
 	register []string
 	regLine  bool
@@ -118,10 +104,6 @@ type Editor struct {
 
 	jumpList []pos
 	jumpIdx  int
-
-	lineUndoRow  int
-	lineUndoText string
-	lineUndoSet  bool
 
 	lastFChar rune
 	lastFCmd  byte

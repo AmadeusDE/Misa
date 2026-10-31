@@ -68,6 +68,9 @@ func (e *Editor) executeCommand(cmd string) {
 
 	// Parse line range
 	from, to, rest, hasRange := e.parseRawRange(cmd)
+	if e.editCommand(rest, hasRange) {
+		return
+	}
 	if e.fileCommand(rest, from, to, hasRange) {
 		return
 	}
@@ -224,6 +227,10 @@ func (e *Editor) globalCmd(from, to int, args string, invert bool, hasRange bool
 	}
 
 	_, _, nested, _ := e.parseRange(exCmd)
+	if _, _, ok := parseEditCommand(nested); ok {
+		e.statusMsg = "Edit commands in global are unsupported"
+		return
+	}
 	if isCompoundShell(nested) {
 		e.statusMsg = "Shell commands in global are unsupported"
 		return
