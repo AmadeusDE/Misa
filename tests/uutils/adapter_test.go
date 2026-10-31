@@ -1585,7 +1585,7 @@ func runWithTimeout(cmd builtins.Command, ctx *builtins.Context, d time.Duration
 
 var sandboxUnsafeCmds = map[string]bool{
 	"chown": true, "chgrp": true, "chroot": true,
-	"chcon": true, "dd": true,
+	"chcon": true,
 }
 
 var sandboxUnsafeArgRe = regexp.MustCompile(
