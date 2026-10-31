@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05/H01/H02/H04/H05
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05/H01/H02/H04/H05/H03
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -79,6 +79,7 @@ without quitting Misa and preserves its register.
 | H02: word searches | `word_search_h02_replay_test.go` | `*`/`#` search forward/backward for a whole keyword; `g*`/`g#` also match within words. Punctuation is searched literally. Normal, Visual and operator searches use shared search state, including counts, wrapping, `n`/`N`, options and highlighting. |
 | H04: word text objects | `word_object_h04_replay_test.go` | Public-event fixtures cover `d`/`c`/`y` with `iw`/`aw`/`iW`/`aW`, operator × object counts, whitespace, tabs, punctuation, trailing whitespace, missing final newline, single- and multiline objects, empty lines, failed counts, named registers, Visual selection and repeated Visual extension, `ciw` followed by dot, undo/redo, a multiline register round trip, and the `!` filter-prompt handoff. These examples are not a claim of complete text-object or Visual parity. |
 | H05: paired and quoted text objects | `pair_object_h05_replay_test.go` | `i(`/`a(`/`ib`/`ab`, `i[`/`a[`, `i{`/`a{`/`iB`/`aB`, `i<`/`a<` (either delimiter works as the key) and `i"`/`a"`, `i'`/`a'`, ``i` ``/``a` `` with `d`/`c`/`y`/`>`/`<`/`!` and Visual mode. Fixtures cover nesting, counts, multiline pairs, empty objects, cursor on a delimiter, unmatched delimiters, escapes, Visual growth, registers, dot repeat and undo. |
+| H03: sentence, paragraph and structural motions | `structural_motion_h03_replay_test.go` | `{ }`, `( )`, `[[ ]] [] ][`, `[( [{ ]) ]}`, counted `H M L` and counted `|` (goal column kept by `j`/`k`), standalone and under `d`/`c`/`y`, with counts, exclusive-to-linewise rules and the jump mark. Expectations come from Vim 9.2 (`-u NONE -N -es`) used as a black-box oracle; a differential fuzz (900 cases per motion family) matched. |
 
 ### H04 word-object limits
 
@@ -435,3 +436,13 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
 `misatutor` describes counted `gg`, operator-find, `d%`, and substitution confirmation;
 the motion examples use the shared motion path. This ledger does not claim complete tutor parity.
 Broader macro, Visual, and text-object compatibility remains deferred; H04 examples are listed above.
+
+### H03 limits
+
+- nroff macros (the 'paragraphs'/'sections' options, `.IP`, `.SH`) are unsupported; sections are `{`/`}`/form feed in column 0.
+- Form-feed lines bound paragraphs and sections but not sentences.
+- `[( [{ ]) ]}` count brackets inside double quotes (Vim skips them).
+- Visual `v}`/`v{` do not include the EOL of an empty target line.
+- The exclusive-column-0 rule and the `d` linewise exception apply only to the structural motions; older F03 fixtures (`2dw`, `jdb`) differ from Vim 9.2 and are unchanged.
+- `>` indents empty lines (pre-existing). `^`/`G` on an all-blank line land on its last character, as in Vim.
+- Oracle quirks: a failed motion aborts the remaining keys of a `normal!`; `zt`/`zz`/`zb` are unreliable under `-es`, so H/M/L fixtures use `NGzt` immediately before the motion.

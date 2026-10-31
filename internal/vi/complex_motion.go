@@ -39,6 +39,8 @@ func (e *Editor) complexMotion(key string, count int, countGiven bool) (motionRe
 		return motionResult{}, false
 	}
 	switch rs[0] {
+	case '[', ']':
+		return e.bracketPrefixMotion(rs[0] == ']', rs[1], count)
 	case 'f', 'F', 't', 'T':
 		e.lastFChar, e.lastFCmd = rs[1], byte(rs[0])
 		return e.findMotion(rs[1], byte(rs[0]), count, false)

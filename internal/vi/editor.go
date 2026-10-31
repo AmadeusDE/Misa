@@ -51,6 +51,7 @@ type Editor struct {
 	row, col           int
 	goalCol            int
 	goalValid, goalEnd bool
+	inOperator         bool // an operator is resolving its motion
 	topLine            int
 	leftCol            int
 	rows               int
@@ -459,16 +460,31 @@ func (e *Editor) ensureVisible() {
 	e.ensureColumnVisible()
 }
 
-func (e *Editor) firstNonBlank(row int) int {
-	if row < 0 || row >= len(e.lines) {
-		return 0
-	}
-	for i, r := range []rune(e.lines[row]) {
+// indentEnd is the column of the first character that is not blank, or the line
+// length when the line is blank: where I inserts.
+func (e *Editor) indentEnd(row int) int {
+	runes := e.lineRunes(row)
+	for i, r := range runes {
 		if r != ' ' && r != '\t' {
 			return i
 		}
 	}
-	return 0
+	return len(runes)
+}
+
+// firstNonBlank is where ^ and the linewise motions land: the first character
+// that is not blank, or the last character of a line of blanks.
+func (e *Editor) firstNonBlank(row int) int {
+	if row < 0 || row >= len(e.lines) {
+		return 0
+	}
+	runes := []rune(e.lines[row])
+	for i, r := range runes {
+		if r != ' ' && r != '\t' {
+			return i
+		}
+	}
+	return max(len(runes)-1, 0)
 }
 
 // --- Word / Sentence / Paragraph / Section motions ---
@@ -517,167 +533,6 @@ func (e *Editor) wordEnd(count int) (int, int) {
 		}
 	}
 	return row, col
-}
-
-func (e *Editor) paragraphForward(count int) int {
-	row := e.row
-	for n := 0; n < count; n++ {
-		for row < len(e.lines)-1 && strings.TrimSpace(e.lines[row]) != "" {
-			row++
-		}
-		for row < len(e.lines)-1 && strings.TrimSpace(e.lines[row]) == "" {
-			row++
-		}
-	}
-	return row
-}
-
-func (e *Editor) paragraphBack(count int) int {
-	row := e.row
-	for n := 0; n < count; n++ {
-		if row > 0 {
-			row--
-		}
-		for row > 0 && strings.TrimSpace(e.lines[row]) == "" {
-			row--
-		}
-		for row > 0 && strings.TrimSpace(e.lines[row-1]) != "" {
-			row--
-		}
-	}
-	return row
-}
-
-func (e *Editor) sentenceForward(count int) (int, int) {
-	row, col := e.row, e.col
-	for n := 0; n < count; n++ {
-		found := false
-		for !found {
-			runes := e.lineRunes(row)
-			for col < len(runes) {
-				if runes[col] == '.' || runes[col] == '!' || runes[col] == '?' {
-					if col+1 >= len(runes) || unicode.IsSpace(runes[col+1]) {
-						col++
-						for col < len(runes) && unicode.IsSpace(runes[col]) {
-							col++
-						}
-						if col < len(runes) {
-							found = true
-							break
-						}
-					}
-				}
-				col++
-			}
-			if !found {
-				if row >= len(e.lines)-1 {
-					col = 0
-					found = true
-				} else {
-					row++
-					col = 0
-					if strings.TrimSpace(e.lines[row]) == "" {
-						for row < len(e.lines)-1 && strings.TrimSpace(e.lines[row]) == "" {
-							row++
-						}
-						col = e.firstNonBlank(row)
-						found = true
-					}
-				}
-			}
-		}
-	}
-	return row, col
-}
-
-func (e *Editor) sentenceBack(count int) (int, int) {
-	row, col := e.row, e.col
-	for n := 0; n < count; n++ {
-		if col > 0 {
-			col--
-		} else if row > 0 {
-			row--
-			r := e.lineRunes(row)
-			col = len(r) - 1
-			if col < 0 {
-				col = 0
-			}
-		}
-		found := false
-		for !found {
-			runes := e.lineRunes(row)
-			for col >= 0 {
-				if col < len(runes) && (runes[col] == '.' || runes[col] == '!' || runes[col] == '?') {
-					sc := col + 1
-					for sc < len(runes) && unicode.IsSpace(runes[sc]) {
-						sc++
-					}
-					if sc < len(runes) {
-						col = sc
-						found = true
-						break
-					}
-				}
-				col--
-			}
-			if !found {
-				if row <= 0 {
-					row, col = 0, 0
-					found = true
-				} else {
-					row--
-					if strings.TrimSpace(e.lines[row]) == "" {
-						nr := row + 1
-						if nr < len(e.lines) {
-							col = e.firstNonBlank(nr)
-							row = nr
-						} else {
-							col = 0
-						}
-						found = true
-					} else {
-						runes = e.lineRunes(row)
-						col = len(runes) - 1
-					}
-				}
-			}
-		}
-	}
-	return row, col
-}
-
-func (e *Editor) sectionForward(count int) int {
-	row := e.row
-	for n := 0; n < count; n++ {
-		row++
-		for row < len(e.lines) {
-			if strings.HasPrefix(e.lines[row], "{") {
-				break
-			}
-			row++
-		}
-		if row >= len(e.lines) {
-			row = len(e.lines) - 1
-		}
-	}
-	return row
-}
-
-func (e *Editor) sectionBack(count int) int {
-	row := e.row
-	for n := 0; n < count; n++ {
-		row--
-		for row > 0 {
-			if strings.HasPrefix(e.lines[row], "{") {
-				break
-			}
-			row--
-		}
-		if row < 0 {
-			row = 0
-		}
-	}
-	return row
 }
 
 // --- Search ---

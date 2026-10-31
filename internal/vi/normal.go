@@ -151,6 +151,9 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		if key == "$" || key == "end" {
 			e.goalValid, e.goalEnd = true, true
 		}
+		if key == "|" {
+			e.goalCol, e.goalValid = count-1, true
+		}
 		e.ensureVisible()
 		return nil
 	}
@@ -417,7 +420,7 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	case "I":
 		e.saveUndo()
-		e.col = e.firstNonBlank(e.row)
+		e.col = e.indentEnd(e.row)
 		e.mode = ModeInsert
 		e.insertEntry = "I"
 		e.insertBuf.Reset()
@@ -454,15 +457,6 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 	case "z":
 		e.pendingKey = "z"
 		return nil
-	case "[":
-		e.count, e.countGiven = count, cg
-		e.pendingKey = "["
-		return nil
-	case "]":
-		e.count, e.countGiven = count, cg
-		e.pendingKey = "]"
-		return nil
-
 	// Mode entry
 	case ":":
 		e.mode = ModeCommand

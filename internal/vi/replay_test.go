@@ -14,7 +14,7 @@ import (
 // These original fixtures target Vim 9.1 with 'nocompatible' and default
 // editing options, not Neovim defaults. New does not read user configuration;
 // fixtures do not require Vim or a vimrc. Each literal rune is one physical
-// key. Special tokens are <Esc>, <CR>, <C-r>, <BS>, <Up>, <Down>, <Left>, <Right>;
+// key. Special tokens are <Esc>, <CR>, <C-r>, <C-o>, <BS>, <Up>, <Down>, <Left>, <Right>;
 // <lt> enters a literal less-than sign.
 func replayKeys(t *testing.T, s string) []tea.KeyPressMsg {
 	t.Helper()
@@ -26,7 +26,7 @@ func replayKeys(t *testing.T, s string) []tea.KeyPressMsg {
 				t.Fatalf("unterminated key notation %q", s)
 			}
 			token := s[1:end]
-			name := map[string]string{"Esc": "esc", "CR": "enter", "C-r": "ctrl+r", "BS": "backspace", "lt": "<", "Up": "up", "Down": "down", "Left": "left", "Right": "right"}[token]
+			name := map[string]string{"Esc": "esc", "CR": "enter", "C-r": "ctrl+r", "C-o": "ctrl+o", "BS": "backspace", "lt": "<", "Up": "up", "Down": "down", "Left": "left", "Right": "right"}[token]
 			if name == "" {
 				t.Fatalf("unknown key <%s>", token)
 			}
