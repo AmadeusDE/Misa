@@ -85,21 +85,10 @@ func (e *Editor) motionDest(key string, count int, countGiven bool) (motionResul
 	case "_":
 		r := min(e.row+count-1, len(e.lines)-1)
 		return motionResult{r, e.firstNonBlank(r), rangeLinewise}, true
-	case "H":
-		r := e.topLine
-		return motionResult{r, e.firstNonBlank(r), rangeLinewise}, true
-	case "M":
-		r := e.topLine + e.height/2
-		if r >= len(e.lines) {
-			r = len(e.lines) - 1
-		}
-		return motionResult{r, e.firstNonBlank(r), rangeLinewise}, true
-	case "L":
-		r := e.topLine + e.height - 1
-		if r >= len(e.lines) {
-			r = len(e.lines) - 1
-		}
-		return motionResult{r, e.firstNonBlank(r), rangeLinewise}, true
+	case "H", "M", "L":
+		return e.screenLineMotion(key, count), true
+	case "|":
+		return e.columnMotion(count), true
 	case "+", "enter":
 		r := e.row + count
 		if r >= len(e.lines) {
@@ -112,18 +101,10 @@ func (e *Editor) motionDest(key string, count int, countGiven bool) (motionResul
 			r = 0
 		}
 		return motionResult{r, e.firstNonBlank(r), rangeLinewise}, true
-	case "{":
-		r := e.paragraphBack(count)
-		return motionResult{r, 0, rangeLinewise}, true
-	case "}":
-		r := e.paragraphForward(count)
-		return motionResult{r, 0, rangeLinewise}, true
-	case "(":
-		r, c := e.sentenceBack(count)
-		return motionResult{r, c, rangeExclusive}, true
-	case ")":
-		r, c := e.sentenceForward(count)
-		return motionResult{r, c, rangeExclusive}, true
+	case "{", "}":
+		return e.paragraphMotion(count, key == "}")
+	case "(", ")":
+		return e.sentenceMotion(count, key == ")")
 	case "G":
 		if countGiven {
 			r := count - 1

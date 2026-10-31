@@ -62,6 +62,19 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 		e.pendingKey = key
 		return nil, nil
 	}
+	if e.pendingKey == "[" || e.pendingKey == "]" {
+		prefix := e.pendingKey
+		e.pendingKey = ""
+		e.visObjValid = false
+		count, given := max(1, e.count), e.countGiven
+		e.count, e.countGiven = 0, false
+		if m, ok := e.resolveMotion(prefix+key, count, given); ok {
+			e.row, e.col = m.row, m.col
+			e.clampCursor()
+			e.ensureVisible()
+		}
+		return nil, nil
+	}
 	if e.pendingKey == "g" {
 		e.pendingKey = ""
 		e.visObjValid = false
@@ -76,8 +89,8 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return nil, nil
 	}
-	if key == "g" {
-		e.pendingKey = "g"
+	if key == "g" || key == "[" || key == "]" {
+		e.pendingKey = key
 		return nil, nil
 	}
 

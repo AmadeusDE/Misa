@@ -76,35 +76,11 @@ func (e *Editor) handlePendingKey(key string) tea.Cmd {
 			}
 		}
 
-	case "[":
-		if key == "[" {
-			count := e.count
-			if count < 1 {
-				count = 1
-			}
-			e.count = 0
-			e.countGiven = false
-			e.addJump()
-			e.row = e.sectionBack(e.motionLimit(count))
-			e.col = e.firstNonBlank(e.row)
-			e.clampCursor()
-			e.ensureVisible()
+	case "[", "]":
+		if len([]rune(key)) == 1 {
+			e.completePendingMotion(pending + key)
 		}
-
-	case "]":
-		if key == "]" {
-			count := e.count
-			if count < 1 {
-				count = 1
-			}
-			e.count = 0
-			e.countGiven = false
-			e.addJump()
-			e.row = e.sectionForward(e.motionLimit(count))
-			e.col = e.firstNonBlank(e.row)
-			e.clampCursor()
-			e.ensureVisible()
-		}
+		return nil
 
 	case "g":
 		if e.pendingOp != 0 && key != "g" && key != "e" && key != "E" && key != "*" && key != "#" {

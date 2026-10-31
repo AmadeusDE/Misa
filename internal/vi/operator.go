@@ -11,7 +11,7 @@ import (
 
 // operatorRange converts motion endpoints into ordered half-open character ranges,
 // or inclusive row ranges for linewise operations.
-func (e *Editor) operatorRange(m motionResult) (fromR, fromC, toR, toC int, linewise bool) {
+func (e *Editor) operatorRange(m motionResult, key string) (fromR, fromC, toR, toC int, linewise bool) {
 	fromR, fromC, toR, toC = e.row, e.col, m.row, m.col
 	if fromR > toR || (fromR == toR && fromC > toC) {
 		fromR, fromC, toR, toC = toR, toC, fromR, fromC
@@ -19,9 +19,9 @@ func (e *Editor) operatorRange(m motionResult) (fromR, fromC, toR, toC int, line
 	if m.kind == rangeLinewise {
 		return fromR, 0, toR, 0, true
 	}
-	if m.kind == rangeExclusive && m.row > e.row && m.col == 0 {
+	if m.kind == rangeExclusive && toC == 0 && toR > fromR && (m.row > e.row || isStructuralKey(key)) {
 		toR--
-		if fromC <= e.firstNonBlank(fromR) {
+		if e.blanksBefore(fromR, fromC) {
 			return fromR, 0, toR, 0, true
 		}
 		toC = len(e.lineRunes(toR))
@@ -88,7 +88,9 @@ func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGive
 		e.executeObjectOperator(op, key, count)
 		return
 	}
+	e.inOperator = true
 	m, ok := e.resolveMotion(key, count, countGiven)
+	e.inOperator = false
 	if !ok {
 		return
 	}
@@ -121,7 +123,7 @@ func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGive
 
 func (e *Editor) executeOperatorResult(op byte, key string, count int, m motionResult) {
 	if op == '!' {
-		fromR, _, toR, _, _ := e.operatorRange(m)
+		fromR, _, toR, _, _ := e.operatorRange(m, key)
 		e.openShellFilter(fromR, toR)
 		return
 	}
@@ -130,9 +132,12 @@ func (e *Editor) executeOperatorResult(op byte, key string, count int, m motionR
 		change := semanticChange{command: string(op), motion: key, count: count, countGiven: true, register: e.repeatRegister(), searchPat: e.searchPat, searchDir: e.searchDir}
 		defer func() { e.recordOperatorChange(change, before) }()
 	}
-	fromR, fromC, toR, toC, linewise := e.operatorRange(m)
+	fromR, fromC, toR, toC, linewise := e.operatorRange(m, key)
+	if op == 'd' && isStructuralKey(key) && !linewise && fromR < toR && e.blanksBefore(fromR, fromC) && e.blanksFrom(toR, toC) {
+		linewise = true
+	}
 	if !linewise && fromR == toR && fromC == toC {
-		if op == 'c' && (key == "$" || key == "end") {
+		if op == 'c' && (key == "$" || key == "end" || key == "|" || isStructuralKey(key)) {
 			e.saveUndo()
 			e.mode = ModeInsert
 			e.insertEntry = "c-" + key
@@ -153,6 +158,9 @@ func (e *Editor) executeOperatorResult(op byte, key string, count int, m motionR
 		e.row, e.col = fromR, fromC
 		if linewise {
 			e.col = e.firstNonBlank(fromR)
+			if m.kind == rangeExclusive {
+				e.col = m.col
+			}
 		}
 	}
 	e.goalValid, e.goalEnd = false, false

@@ -12,13 +12,17 @@ func (e *Editor) resolveMotion(key string, count int, countGiven bool) (motionRe
 
 func isMotionPrefix(key string) bool {
 	switch key {
-	case "g", "f", "F", "t", "T", "'", "`":
+	case "g", "f", "F", "t", "T", "'", "`", "[", "]":
 		return true
 	}
 	return false
 }
 
 func motionAddsJump(key string) bool {
+	switch key {
+	case "{", "}", "(", ")", "[[", "]]", "[]", "][", "[(", "[{", "])", "]}", "H", "M", "L":
+		return true
+	}
 	return key == "G" || key == "gg" || key == "%" || key == "n" || key == "N" || key == "*" || key == "#" || key == "g*" || key == "g#" ||
 		strings.HasPrefix(key, "'") || strings.HasPrefix(key, "`")
 }
