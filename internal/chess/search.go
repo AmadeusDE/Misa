@@ -102,7 +102,7 @@ func (e *Engine) Think(root *Position, past []uint64, lim Limits) Result {
 func (e *Engine) think(root *Position, past []uint64, lim Limits, policy selection, seed uint64) Result {
 	start := time.Now()
 	legal := root.Moves()
-	if len(legal) == 0 {
+	if _, over := adjudicate(root, len(legal) > 0); over {
 		return Result{}
 	}
 	best := Result{Move: legal[0], Found: true}
@@ -215,6 +215,9 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 	if e.tick() {
 		return 0
 	}
+	if o, over := adjudicate(p, true); over {
+		return o.score(p.Turn, ply)
+	}
 	hash := p.Hash()
 	if e.repeated(hash, p.Clock) || p.Clock >= 2*e.v.MoveLimit {
 		return 0
@@ -307,16 +310,11 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 		}
 	}
 	if legal == 0 {
-		if inCheck {
-			return -mateScore + ply
-		}
-		switch e.v.Stalemate {
-		case StalemateWin: // the stalemated side to move has lost
-			return -mateScore + ply
-		case StalemateLoss:
-			return mateScore - ply
-		}
-		return 0
+		// adjudicate names the winner for checkmate and for each stalemate
+		// rule; the goal cannot have been reached here, since a royal cannot
+		// arrive on a goal square and leave the mover to move.
+		o, _ := adjudicate(p, false)
+		return o.score(p.Turn, ply)
 	}
 	flag := ttExact
 	switch {
@@ -335,6 +333,9 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 func (e *Engine) quiesce(p *Position, ply, alpha, beta int) int {
 	if e.tick() {
 		return 0
+	}
+	if o, over := adjudicate(p, true); over {
+		return o.score(p.Turn, ply)
 	}
 	if ply >= maxPly-1 {
 		return e.eval.evaluate(p)
@@ -374,7 +375,8 @@ func (e *Engine) quiesce(p *Position, ply, alpha, beta int) int {
 		alpha = max(alpha, score)
 	}
 	if inCheck && legal == 0 {
-		return -mateScore + ply
+		o, _ := adjudicate(p, false)
+		return o.score(p.Turn, ply)
 	}
 	return alpha
 }

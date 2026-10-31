@@ -177,6 +177,16 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	if got := g.match.Variant().ID; got != "bigboard" {
 		t.Fatalf("picker selected %s, want bigboard", got)
 	}
+	// An initial lowercase k navigates the empty picker instead of filtering.
+	keys(g, "v", "K", "i", "n", "g", "o", "f", "t", "h", "e", "h", "i", "l", "l", "enter")
+	if got := g.match.Variant().ID; got != "kingofthehill" {
+		t.Fatalf("picker selected %s, want kingofthehill", got)
+	}
+	// Restore the big board for the rose move and undo checks below.
+	keys(g, "v", "b", "i", "g", "b", "o", "a", "r", "d", "enter")
+	if got := g.match.Variant().ID; got != "bigboard" {
+		t.Fatalf("picker selected %s, want bigboard", got)
+	}
 	clickSquare(t, g, "f1", tea.MouseLeft)
 	clickSquare(t, g, "d6", tea.MouseLeft)
 	if len(g.match.Notation()) != 1 {
@@ -390,5 +400,14 @@ func TestLevelChangeCancelsRunningSearch(t *testing.T) {
 	}
 	if len(g.match.Played()) != 1 {
 		t.Fatal("abandoned move applied")
+	}
+}
+
+func TestHeaderShowsGoalWin(t *testing.T) {
+	g := newGame(t, "kingofthehill", 100, 30)
+	g.match.Load(fen(t, g.match.Variant(), "7k/8/8/8/8/2K5/8/8 w -"))
+	g.match.Play(findMove(t, g.match.Position(), "c3", "d4"))
+	if got := g.header(); !strings.Contains(got, "goal reached, White wins") {
+		t.Errorf("header = %q", got)
 	}
 }

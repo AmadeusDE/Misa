@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -50,6 +50,7 @@ type Variant struct {
 	PromotionZone         int     // the last n ranks promote
 	MoveLimit             int     // moves by each side without a capture or pawn move before a draw
 	Stalemate             StalemateRule
+	Goal                  []int // absolute squares whose arrival by a royal wins
 	Setup                 string
 	Source                string
 
@@ -101,6 +102,7 @@ type variantDef struct {
 	MoveLimit     int           `yaml:"move_limit"`
 	Stalemate     StalemateRule `yaml:"stalemate"`
 	SelfCapture   *bool         `yaml:"self_capture"`
+	Goal          []string      `yaml:"goal"`
 
 	source string
 }
@@ -292,6 +294,9 @@ func merge(parent, child variantDef) variantDef {
 	if child.SelfCapture != nil {
 		d.SelfCapture = child.SelfCapture
 	}
+	if child.Goal != nil {
+		d.Goal = child.Goal
+	}
 	d.Pieces = slices.Clone(parent.Pieces)
 	for _, p := range child.Pieces {
 		i := slices.IndexFunc(d.Pieces, func(q pieceDef) bool { return strings.EqualFold(q.Letter, p.Letter) })
@@ -330,6 +335,9 @@ func build(d variantDef) (*Variant, error) {
 	// reach-table, move generation, and search costs, so keep dimensions bounded.
 	if v.Files < 1 || v.Files > 702 || v.Ranks < 1 || v.Ranks > 99 {
 		return nil, fmt.Errorf("board must be 1-702 files by 1-99 ranks, not %d×%d", v.Files, v.Ranks)
+	}
+	if err := v.parseGoal(d.Goal); err != nil {
+		return nil, err
 	}
 	if len(d.Pieces) == 0 || len(d.Pieces) > 255 {
 		return nil, fmt.Errorf("needs 1-255 piece types")
@@ -386,6 +394,22 @@ func buildPiece(p pieceDef) (*PieceType, error) {
 		return nil, fmt.Errorf("piece %c: glyph %q must be one cell wide", t.Letter, t.Glyph)
 	}
 	return t, nil
+}
+
+func (v *Variant) parseGoal(squares []string) error {
+	seen := make(map[int]bool, len(squares))
+	for _, name := range squares {
+		sq, err := v.ParseSquare(name)
+		if err != nil {
+			return fmt.Errorf("goal: %v", err)
+		}
+		if seen[sq] {
+			return fmt.Errorf("goal: square %s listed twice", name)
+		}
+		seen[sq] = true
+		v.Goal = append(v.Goal, sq)
+	}
+	return nil
 }
 
 func (v *Variant) parseCastle(c castleDef) (Castle, error) {

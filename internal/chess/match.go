@@ -13,10 +13,11 @@ const (
 	DrawMoveLimit
 	DrawRepetition
 	DrawMaterial
+	GoalWin
 )
 
 func (s Status) String() string {
-	return [...]string{"playing", "checkmate", "stalemate", "draw by the move limit", "draw by repetition", "draw: only royal pieces left"}[s]
+	return [...]string{"playing", "checkmate", "stalemate", "draw by the move limit", "draw by repetition", "draw: only royal pieces left", "goal reached"}[s]
 }
 
 // Match is a game in progress: the positions so far, so moves can be taken
@@ -53,7 +54,8 @@ func (m *Match) Turn() Color         { return m.Position().Turn }
 func (m *Match) Over() bool          { return m.status != Playing }
 
 // Status reports how the game stands; the winner only means something when
-// Decisive reports true (checkmate, or stalemate under a winning stalemate rule).
+// the game is decisive, which a goal arrival and checkmate are, and so is a
+// stalemate under a stalemate rule that names a winner.
 func (m *Match) Status() (Status, Color) {
 	winner := m.Position().Turn.Other()
 	if m.status == Stalemate && m.variant.Stalemate == StalemateLoss {
@@ -62,9 +64,12 @@ func (m *Match) Status() (Status, Color) {
 	return m.status, winner
 }
 
-// Decisive reports whether the game ended with a winner rather than a draw.
+// Decisive reports whether the game ended with a winner rather than a draw:
+// a checkmate, a goal arrival, or a stalemate under whichever rule says one
+// side wins or loses it.
 func (m *Match) Decisive() bool {
-	return m.status == Checkmate || m.status == Stalemate && m.variant.Stalemate != StalemateDraw
+	return m.status == Checkmate || m.status == GoalWin ||
+		m.status == Stalemate && m.variant.Stalemate != StalemateDraw
 }
 
 // Play makes a move, which must be one of Legal.
@@ -98,11 +103,11 @@ func (m *Match) refresh() {
 	p := m.Position()
 	m.legal = p.Moves()
 	m.status = Playing
+	if o, over := adjudicate(p, len(m.legal) > 0); over {
+		m.status = o.status
+		return
+	}
 	switch {
-	case len(m.legal) == 0 && p.InCheck():
-		m.status = Checkmate
-	case len(m.legal) == 0:
-		m.status = Stalemate
 	case m.repetitions() >= 3:
 		m.status = DrawRepetition
 	case p.Clock >= 2*m.variant.MoveLimit:

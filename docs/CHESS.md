@@ -112,6 +112,10 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
 - **Double Big Board** (`doublebig`): two Big Board armies per side on 32×16;
   each king castles within its own half.
 
+- **King of the Hill** (`kingofthehill`): 8×8, orthodox chess where a royal
+  reaching `d4`, `d5`, `e4` or `e5` wins at once; otherwise plain chess, so mate,
+  stalemate, repetition and move-limit endings still apply.
+
 ## During play
 
 - Arrows or `h/j/k/l`: move the cursor; space/enter or click: select/move. In a
@@ -136,6 +140,30 @@ applying obsolete results. The chosen level survives new games, variant
 changes, and hotseat, but is not persisted after quitting. Analysis after a
 computer move reports that move's score, including deliberate alternatives;
 an unanalysed legal fallback is labelled instead of showing a fabricated score.
+
+## Variant files
+
+A file with `extends: <id>` inherits every unset field from that variant and
+merges pieces by letter; `castling: []` drops inherited castling. A later file
+with an existing id replaces it. Files are read from the embedded set, then
+`chess/*.yaml` next to the binary, then `~/.config/misa/chess/`.
+
+`goal` names **absolute** squares, not White's squares: a royal piece arriving
+on any of them wins immediately, for either side, and that arrival outranks a
+checkmate or draw that the same move would otherwise produce. Unlike
+`castling`, the list is not mirrored for Black, so `kingofthehill.yaml` (which
+extends `chess`) needs only its four centre squares:
+
+```yaml
+id: kingofthehill
+name: King of the Hill
+extends: chess
+goal: [d4, d5, e4, e5]
+```
+
+Each entry accepts a square label as for `castling` (e.g. `d4`). A variant
+without `goal` has no goal squares: it is won only by checkmate and otherwise
+ends in stalemate, repetition or the move limit.
 
 ## Custom board dimensions
 

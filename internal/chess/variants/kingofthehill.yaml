@@ -1,0 +1,6 @@
+id: kingofthehill
+name: King of the Hill
+description: Orthodox chess with a shortcut — a king that reaches one of the four central squares wins at once.
+extends: chess
+# Absolute squares, not White's squares: either king arriving on one of them wins.
+goal: [d4, d5, e4, e5]
