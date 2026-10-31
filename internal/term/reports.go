@@ -4,7 +4,7 @@ import "fmt"
 
 // respond answers a terminal query on the PTY. The caller holds t.mu.
 func (t *Terminal) respond(s string) {
-	if t.ptm != nil {
+	if t.conn != nil {
 		t.enqueueReply([]byte(s))
 	}
 }

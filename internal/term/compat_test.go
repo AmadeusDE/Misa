@@ -315,7 +315,7 @@ func pipeReplies(t *testing.T, tm *Terminal) *bufio.Reader {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { r.Close(); w.Close() })
-	tm.ptm = w
+	tm.conn = writeConn{w}
 	return bufio.NewReader(r)
 }
 
