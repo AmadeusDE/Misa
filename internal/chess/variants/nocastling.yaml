@@ -1,0 +1,5 @@
+id: nocastling
+name: No-castling Chess
+description: Orthodox chess without castling.
+extends: chess
+castling: []

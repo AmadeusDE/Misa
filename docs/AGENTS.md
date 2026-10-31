@@ -317,7 +317,7 @@ internal/
   two kings, mating either wins), `pawn` pieces promote and take/are taken en passant. A pawn's long first step marks
   every crossed square for en passant. Castling entries are White's four squares, mirrored for Black. A file with
   `extends: <id>` inherits unset fields and merges pieces by letter; `castling: []` drops inherited castling. A later
-  file with an existing id replaces it. Built-ins: chess, double (Double Chess 16×12), bigboard (Betza's 16×16), doublebig (Double Big Board), amazon (queen-replacement Amazon Chess).
+  file with an existing id replaces it. Built-ins: chess, double (Double Chess 16×12), bigboard (Betza's 16×16), doublebig (Double Big Board 32×16), amazon (queen-replacement Amazon Chess), nocastling (orthodox chess without castling).
   Movement is checked by perft (`position_test.go`), so run the chess tests after touching move generation.
   The engine only uses what variants define (values, royal/pawn flags, ranks to promotion), so new pieces need at
   most a `value:`. Search runs off the UI goroutine on immutable Positions; cancel() sets the Stop flag and bumps

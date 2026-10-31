@@ -29,7 +29,9 @@ func TestBuiltinVariants(t *testing.T) {
 		{"chess", 8, 8, 6, 2},
 		{"double", 16, 12, 6, 4},
 		{"bigboard", 16, 16, 12, 2},
+		{"doublebig", 32, 16, 12, 4},
 		{"amazon", 8, 8, 7, 2},
+		{"nocastling", 8, 8, 6, 0},
 	}
 	for _, tt := range tests {
 		v := builtin(t, tt.id)
@@ -47,6 +49,39 @@ func TestExtendsOverridesPieces(t *testing.T) {
 	}
 	if v.TypeOf('Q') == 0 || v.Pieces[v.TypeOf('K')-1].Glyph != "♚" {
 		t.Error("double chess lost the inherited pieces")
+	}
+}
+
+func TestNoCastlingMoveRulesAndSearch(t *testing.T) {
+	v := builtin(t, "nocastling")
+	p := fen(t, v, "r3k2r/8/8/8/8/8/8/R3K2R w")
+	if got := destinations(p, "e1"); !slices.Equal(got, []string{"d1", "d2", "e2", "f1", "f2"}) {
+		t.Fatalf("king moves = %v", got)
+	}
+	for _, m := range p.Moves() {
+		if m.From == mustSquare(t, v, "e1") && (m.To == mustSquare(t, v, "g1") || m.To == mustSquare(t, v, "c1")) {
+			t.Fatal("castling move generated")
+		}
+	}
+	result := NewEngine(v).Think(p, nil, Limits{Depth: 1})
+	if !result.Found || !slices.Contains(p.Moves(), result.Move) {
+		t.Fatalf("search move %v is not legal", result.Move)
+	}
+}
+
+func mustSquare(t *testing.T, v *Variant, name string) int {
+	t.Helper()
+	sq, err := v.ParseSquare(name)
+	if err != nil {
+		t.Fatalf("invalid square %s", name)
+	}
+	return sq
+}
+
+func TestNoCastlingVariant(t *testing.T) {
+	v := builtin(t, "nocastling")
+	if v.Files != 8 || v.Ranks != 8 || len(v.Pieces) != 6 || len(v.Castling) != 0 {
+		t.Fatalf("unexpected variant: %+v", v)
 	}
 }
 
