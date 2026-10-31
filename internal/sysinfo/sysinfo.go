@@ -36,6 +36,9 @@ type Info struct {
 }
 
 func Fetch(cwd string) Info {
+	if info, ok := windowsFetch(cwd); ok {
+		return info
+	}
 	return Info{
 		Time:     time.Now().Format("15:04:05"),
 		CWD:      cwd,

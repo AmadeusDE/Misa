@@ -38,6 +38,9 @@ type ExtendedInfo struct {
 }
 
 func FetchExtended() ExtendedInfo {
+	if info, ok := windowsFetchExtended(); ok {
+		return info
+	}
 	var info ExtendedInfo
 	info.Title = getTitle()
 	info.OS = getOS()
@@ -64,6 +67,9 @@ func FetchExtended() ExtendedInfo {
 
 func getTitle() string {
 	user := os.Getenv("USER")
+	if user == "" && runtime.GOOS == "windows" {
+		user = os.Getenv("USERNAME")
+	}
 	if user == "" {
 		user = os.Getenv("LOGNAME")
 	}

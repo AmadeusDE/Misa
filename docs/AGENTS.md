@@ -197,7 +197,10 @@ internal/
                                  TERMUX_VERSION, PREFIX, MISA_ANDROID_APP, and getprop
                                  (ro.build.version.release, ro.product.model, ro.product.manufacturer)
                                  via __system_property_get (android && cgo) or /system/bin/getprop.
-                                 EACCES on proc files used for memory/uptime/kernel shows "—"
+                                 EACCES on proc files used for memory/uptime/kernel shows "—".
+                                Windows I03 uses registry OS/CPU, GlobalMemoryStatusEx, GetTickCount64 and
+                                logical-drive storage (F02 disk-space provider); GPU unavailable pending DXGI,
+                                shell detection is I01. Native Windows runtime validation remains outstanding.
   gitinfo/                       Git branch/dirty/ahead/behind detection
   help/                          TLDR downloading, man page parsing, markdown rendering
   launcher/                      Bubble Tea ExecProcess helper (unused: external programs run in-pane PTYs via Model.launch)
