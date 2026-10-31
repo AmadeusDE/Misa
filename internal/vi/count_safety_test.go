@@ -17,8 +17,8 @@ func TestCountSafetyReplay(t *testing.T) {
 		{name: "count delete undo redo", input: "abcd\n", keys: "2xu<C-r>", want: replayState{lines: []string{"cd"}, reg: []string{"ab"}, modified: true}},
 		// TODO(F06): the repeat closure for p/P still puts only once.
 		{name: "dot repeats put count", skip: "TODO(F06): dot does not retain put count", input: "ab\n", keys: "x3p.", want: replayState{lines: []string{"baaaaaa"}, col: 6, reg: []string{"a"}, modified: true}},
-		// TODO(F04): the operator dispatcher does not await a find target.
-		{name: "find operator composition", skip: "TODO(F04): f is not an operator motion", input: "abxc\n", keys: "dfx", want: replayState{lines: []string{"c"}, reg: []string{"abx"}, modified: true}},
+		// F04: the operator dispatcher awaits a find target.
+		{name: "find operator composition", input: "abxc\n", keys: "dfx", want: replayState{lines: []string{"c"}, reg: []string{"abx"}, modified: true}},
 	} {
 		t.Run(f.name, func(t *testing.T) { runReplayFixture(t, f) })
 	}

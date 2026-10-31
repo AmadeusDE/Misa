@@ -74,7 +74,7 @@ func (e *Editor) wordOperatorDest(count int) motionResult {
 }
 
 func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGiven bool) {
-	m, ok := e.motionDest(key, count, countGiven)
+	m, ok := e.resolveMotion(key, count, countGiven)
 	if !ok {
 		return
 	}
@@ -98,6 +98,15 @@ func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGive
 	if key == "l" || key == "right" {
 		m.col = min(e.col+count, len(e.lineRunes(e.row)))
 	}
+	e.executeOperatorResult(op, key, count, m)
+	if op == 'd' && key == "%" && !countGiven {
+		e.lastRepeat = func(ed *Editor) {
+			ed.executeOperatorMotion('d', "%", count, false)
+		}
+	}
+}
+
+func (e *Editor) executeOperatorResult(op byte, key string, count int, m motionResult) {
 	fromR, fromC, toR, toC, linewise := e.operatorRange(m)
 	if !linewise && fromR == toR && fromC == toC {
 		if op == 'c' && (key == "$" || key == "end") {

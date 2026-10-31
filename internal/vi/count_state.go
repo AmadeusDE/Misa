@@ -109,37 +109,3 @@ func (e *Editor) joinCounted(joins int) {
 	e.col = col
 	e.modified = true
 }
-
-// Search wraps, so skip complete cycles rather than truncating a valid count.
-func (e *Editor) searchCounted(count int, reverse bool) {
-	if e.searchPat == "" {
-		e.statusMsg = "No previous search pattern"
-		return
-	}
-	e.addJump()
-	seen := make(map[pos]int)
-	for i := 0; i < count; {
-		p := pos{e.row, e.col}
-		if previous, ok := seen[p]; ok {
-			cycle := i - previous
-			remaining := count - i
-			if cycle > 0 && remaining >= cycle {
-				i += (remaining / cycle) * cycle
-				continue
-			}
-		} else {
-			seen[p] = i
-		}
-		found := false
-		if reverse {
-			found = e.searchPrev()
-		} else {
-			found = e.searchNext()
-		}
-		if !found {
-			e.statusMsg = "Pattern not found: " + e.searchPat
-			return
-		}
-		i++
-	}
-}
