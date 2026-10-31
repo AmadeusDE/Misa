@@ -224,6 +224,7 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		r := e.lineRunes(e.row)
 		end := e.col + min(count, len(r)-e.col)
 		if end > e.col {
+			e.noteEdit(e.row, e.col)
 			e.deleteToReg([]string{string(r[e.col:end])}, false)
 			e.setLine(e.row, string(r[:e.col])+string(r[end:]))
 		}
@@ -712,6 +713,7 @@ func (e *Editor) playMacro(reg byte) {
 }
 
 func (e *Editor) processKey(key string) {
+	defer e.finishEditEvent(e.row)
 	msg := keyFromName(key)
 
 	switch e.mode {
@@ -757,6 +759,7 @@ func (e *Editor) doPut(before bool) {
 			}
 		}
 		if strings.Contains(text, "\n") {
+			e.noteEdit(e.row, pos)
 			parts := strings.Split(text, "\n")
 			lineRunes := e.lineRunes(e.row)
 			before := string(lineRunes[:pos])

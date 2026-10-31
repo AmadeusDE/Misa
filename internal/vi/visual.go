@@ -94,6 +94,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 		e.saveUndo()
 		if e.visual == visualLine {
 			fromR, _, toR, _ := e.visualBounds()
+			e.noteEdit(fromR, 0)
 			deleted := make([]string, 0, toR-fromR+1)
 			for i := fromR; i <= toR && i < len(e.lines); i++ {
 				deleted = append(deleted, e.lines[i])
@@ -125,6 +126,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 		e.saveUndo()
 		if e.visual == visualLine {
 			fromR, _, toR, _ := e.visualBounds()
+			e.noteEdit(fromR, 0)
 			deleted := make([]string, 0, toR-fromR+1)
 			for i := fromR; i <= toR && i < len(e.lines); i++ {
 				deleted = append(deleted, e.lines[i])

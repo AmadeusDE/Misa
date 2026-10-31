@@ -65,8 +65,7 @@ func (e *Editor) executeCommand(cmd string) {
 		e.row = 0
 		e.col = 0
 		e.topLine = 0
-		e.undoStack = nil
-		e.redoStack = nil
+		e.resetHistory()
 		e.statusMsg = "Welcome to the Misa tutor"
 		return
 	}
@@ -129,6 +128,7 @@ func (e *Editor) executeCommand(cmd string) {
 			from, to = e.row, e.row
 		}
 		e.saveUndo()
+		e.noteEdit(from, 0)
 		deleted := make([]string, 0, to-from+1)
 		for i := from; i <= to && i < len(e.lines); i++ {
 			deleted = append(deleted, e.lines[i])
@@ -348,6 +348,16 @@ func (e *Editor) substituteCmd(from, to int, cmd string, hasRange bool) {
 			newLine, count = replaceFirst(line, pat, repl, icase)
 		}
 		if count > 0 {
+			if line != newLine {
+				cleanPat := strings.ReplaceAll(strings.ReplaceAll(pat, `\(`, "("), `\)`, ")")
+				idx := strings.Index(line, cleanPat)
+				if icase {
+					idx, _ = foldIndex(line, cleanPat)
+				}
+				if idx >= 0 {
+					e.noteEdit(i, utf8.RuneCountInString(line[:idx]))
+				}
+			}
 			e.lines[i] = newLine
 			total += count
 		}
@@ -356,8 +366,6 @@ func (e *Editor) substituteCmd(from, to int, cmd string, hasRange bool) {
 		e.modified = true
 		e.statusMsg = fmt.Sprintf("%d substitution(s)", total)
 	} else {
-		e.undo()
-		e.redoStack = nil
 		e.statusMsg = "Pattern not found: " + pat
 	}
 }
