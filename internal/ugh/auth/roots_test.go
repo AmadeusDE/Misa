@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/AmadeusDE/Misa/internal/ugh/privdir"
 	"github.com/AmadeusDE/Misa/internal/ugh/roots"
 )
 
@@ -13,7 +14,7 @@ func TestOpenInExplicitRootsUsesOwnFileWithoutSecretService(t *testing.T) {
 	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "")
 	t.Setenv("HOME", t.TempDir())
 	dir := filepath.Join(t.TempDir(), "bot")
-	if err := os.Mkdir(dir, 0o700); err != nil {
+	if err := privdir.Ensure(dir); err != nil {
 		t.Fatal(err)
 	}
 	old := probeKeyring
@@ -88,20 +89,8 @@ func TestAutoFileBackendUsesTempConfig(t *testing.T) {
 	if !strings.HasPrefix(path, cfg+string(os.PathSeparator)) {
 		t.Fatalf("credentials path %s is outside the temp config dir", path)
 	}
-	stt, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if stt.Mode().Perm() != 0o600 {
-		t.Fatalf("file perm %o, want 0600", stt.Mode().Perm())
-	}
-	dir, err := os.Stat(filepath.Dir(path))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if dir.Mode().Perm() != 0o700 {
-		t.Fatalf("dir perm %o, want 0700", dir.Mode().Perm())
-	}
+	assertPrivate(t, path, false)
+	assertPrivate(t, filepath.Dir(path), true)
 	entries, err := os.ReadDir(filepath.Dir(path))
 	if err != nil {
 		t.Fatal(err)

@@ -54,6 +54,9 @@ func (keyringBackend) Save(c *Credentials) error {
 		return errors.New("auth: credentials encoding failed")
 	}
 	if err := keyring.Set(keyringService, keyringUser, string(raw)); err != nil {
+		if errors.Is(err, keyring.ErrSetDataTooBig) {
+			return errors.New("auth: credentials exceed the keyring's size limit; set [auth] store = \"file\"")
+		}
 		return errors.New("auth: keyring write failed")
 	}
 	return nil

@@ -185,18 +185,31 @@ type LoginStatus struct {
 	At       int64  `json:"at"`
 }
 
-// RuntimeDir is $XDG_RUNTIME_DIR/ugh (per-uid temp fallback), 0700.
-func RuntimeDir() string {
+// RuntimeDir is $XDG_RUNTIME_DIR/ugh (per-user private temp fallback), 0700.
+// It fails rather than return a directory that could not be made private.
+func RuntimeDir() (string, error) {
 	base := os.Getenv("XDG_RUNTIME_DIR")
 	if !filepath.IsAbs(base) {
-		base = privdir.Under(os.TempDir(), fmt.Sprintf("ugh-%d", os.Getuid()))
+		var err error
+		base, err = privdir.Under(os.TempDir(), "ugh-"+privdir.UserTag())
+		if err != nil {
+			return "", errors.New("auth: no private runtime directory")
+		}
 	}
 	dir := filepath.Join(base, AppDir)
-	_ = os.MkdirAll(dir, 0700)
-	return dir
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", errors.New("auth: cannot create runtime directory")
+	}
+	return dir, nil
 }
 
-func loginStatusPath() string { return filepath.Join(RuntimeDir(), "codex-login.json") }
+func loginStatusPath() (string, error) {
+	dir, err := RuntimeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "codex-login.json"), nil
+}
 
 // WriteLoginStatus persists the login state (no secrets ever).
 func WriteLoginStatus(st LoginStatus) error {
@@ -205,13 +218,21 @@ func WriteLoginStatus(st LoginStatus) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(loginStatusPath(), raw, 0600)
+	path, err := loginStatusPath()
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, raw, 0600)
 }
 
 // ReadLoginStatus returns the last persisted login state.
 func ReadLoginStatus() (LoginStatus, error) {
 	var st LoginStatus
-	raw, err := os.ReadFile(loginStatusPath())
+	path, err := loginStatusPath()
+	if err != nil {
+		return st, err
+	}
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return st, err
 	}
@@ -461,8 +482,11 @@ func codexExpired(c Credential) bool {
 // lockAuth takes the exclusive advisory lock used to serialize token
 // refreshes across ugh processes; the returned func releases it.
 func lockAuth(ctx context.Context) (func(), error) {
-	path := filepath.Join(RuntimeDir(), "auth.lock")
-	f, err := filelock.Open(path)
+	dir, err := RuntimeDir()
+	if err != nil {
+		return nil, errors.New("auth: cannot open refresh lock")
+	}
+	f, err := filelock.Open(filepath.Join(dir, "auth.lock"))
 	if err != nil {
 		return nil, errors.New("auth: cannot open refresh lock")
 	}

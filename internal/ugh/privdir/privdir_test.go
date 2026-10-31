@@ -37,3 +37,22 @@ func TestEnsureRefusesDirectoriesOthersControl(t *testing.T) {
 		}
 	}
 }
+
+func TestUnderFallsBackAndReportsFailure(t *testing.T) {
+	base := t.TempDir()
+	os.Mkdir(filepath.Join(base, "ugh-x"), 0o777)
+	os.Chmod(filepath.Join(base, "ugh-x"), 0o777)
+	cache := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cache)
+	dir, err := Under(base, "ugh-x")
+	if err != nil || filepath.Dir(dir) != cache {
+		t.Fatalf("Under = %q, %v; want a directory in the cache", dir, err)
+	}
+
+	blocked := filepath.Join(t.TempDir(), "cache")
+	os.WriteFile(blocked, nil, 0o600)
+	t.Setenv("XDG_CACHE_HOME", blocked)
+	if dir, err := Under(base, "ugh-x"); err == nil || dir != "" {
+		t.Fatalf("Under = %q, %v; want an error and no path", dir, err)
+	}
+}
