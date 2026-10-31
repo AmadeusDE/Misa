@@ -7,24 +7,24 @@ import "golang.org/x/sys/unix"
 // killSession SIGKILLs the session leader's process group and the PTY's
 // foreground group (a job started under it), then the leader. Without
 // /proc there is no portable way to find background groups.
-func (t *Terminal) killSession() {
+func (p *unixProc) Kill() {
 	own := unix.Getpgrp()
-	for _, pg := range []int{t.cmd.Process.Pid, t.foregroundGroup()} {
+	for _, pg := range []int{p.ID(), p.foregroundGroup()} {
 		if pg > 1 && pg != own {
 			unix.Kill(-pg, unix.SIGKILL)
 		}
 	}
-	t.cmd.Process.Kill()
+	p.cmd.Process.Kill()
 }
 
 // session is unused off Linux, where killSession can't scan for members.
-func (t *Terminal) session() int { return 0 }
+func (p *unixProc) session() int { return 0 }
 
-func (t *Terminal) foregroundGroup() int {
-	if t.ptm == nil {
+func (p *unixProc) foregroundGroup() int {
+	if p.ptm == nil {
 		return 0
 	}
-	sc, err := t.ptm.SyscallConn()
+	sc, err := p.ptm.SyscallConn()
 	if err != nil {
 		return 0
 	}

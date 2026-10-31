@@ -207,15 +207,20 @@ internal/
                                  group so ^Z stops it; SuspendOnCtrlZ for multicall builtins
   term/                          VT emulator + PTY: reader goroutine, DEC 2026 sync buffering, session-wide kill on Close.
                                  terminal.go (sessions, StartArgv/StartFunc), parser.go, screen.go, sgr.go, charset.go,
-                                 reports.go, render.go, mouse.go, input.go (async PTY writes), ptyfd.go (pollable master),
-                                 jobs.go (wait4 with WUNTRACED: Stopped/Continue)
+                                 reports.go, render.go, mouse.go, input.go (async writes to the conn).
+                                 transport.go is the portable boundary (conn, proc, optional continuer, startSpec,
+                                 ErrUnsupported); the core imports no platform syscall. transport_unix.go (PTY conn,
+                                 wait4 with WUNTRACED, StartFunc tty), ptyfd.go (pollable master), proc_linux.go /
+                                 proc_other_unix.go (session kill); transport_other.go (!unix) returns ErrUnsupported
+                                 (Windows until ConPTY, plan P02). jobs.go: Stopped/Continue via the optional capability.
+                                 fake_transport_test.go drives the core without a PTY.
                                  snapshot.go (Snapshot: cell copy for frontends; SetOSCHook for titles/OSC 52),
                                  marks.go (combining marks interned so Cell has no pointers: the GC never scans
                                  screens/scrollback — keep Cell pointer-free, a test enforces it). Scrolled-off rows
                                  move into scrollback and evicted/discarded rows are recycled (blankRow), so steady
                                  output doesn't allocate; putASCII writes plain ASCII runs in one pass.
                                  `go test -bench ProcessOutput ./internal/term/` measures parser throughput.
-                                 session_linux.go walks /proc for the PTY session on Android too
+                                 proc_linux.go walks /proc for the PTY session on Android too
                                  (GOOS=android matches linux). Unreadable pids are skipped; if /proc
                                  cannot be listed, kill falls back to the leader's process group.
                                  pidfd is preferred; a refused pidfd (Android before 12) signals by pid

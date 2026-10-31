@@ -169,9 +169,11 @@ Goal: `GOOS=windows go build -tags nough .` and `go vet` pass, and the Linux/Ope
   must be running before it's called (it always is after `StartReader`).
 - `Close` → `TerminateJobObject` + `ClosePseudoConsole`. `Resize` → `ResizePseudoConsole`.
 - `jobs_windows.go`: `Stopped()` is always false; `Continue()` returns an "unsupported" error.
-- `StartFunc` (in-process builtins): there's no tty side to hand out. Use a plain pipe pair, so builtins see a
-  non-tty. That's acceptable because multicall (`misa.exe ls …` under ConPTY) is the default `builtin_mode`;
-  document that `inprocess` mode is degraded on Windows.
+- `StartFunc` (in-process builtins): decided in P01, see "P01 delivered". The contract is a single `*os.File`
+  tty, and two unidirectional pipes cannot stand in for it (no tty metadata, no shared close, no way to
+  interrupt a blocked read). P01 returns `term.ErrUnsupported` on Windows and callers use multicall
+  (`misa.exe ls …` under ConPTY), the default `builtin_mode`. A later stream contract would hand fn a separate
+  reader and writer plus tty metadata and a cancellation, behind the same `openFuncTTY` seam.
 - Tests (`//go:build windows`): `cmd /c echo hi` output, exit codes, resize, and that `Close` kills a
   grandchild (`cmd /c start /b ping -t …`).
 - **S0 spike** (see above): log what ConPTY passes through for Misa's sequences and pick a route before W4.
@@ -618,3 +620,29 @@ Support on Windows (everything not listed behaves as on Unix):
 | `mkdir` | `-m`, `-p` | partial | read-only attribute only; parents without a descriptor walk |
 | `rm` | `-i` | partial | write protection is the read-only attribute |
 | `touch` | all | partial | change time cannot be set; 100 ns precision otherwise |
+
+## P01 delivered (#108)
+
+The transport/process boundary in `internal/term`. `go vet`/`go build` of `internal/term` now pass for
+windows/amd64 and windows/arm64, where the transport is honestly unavailable. Unix behaviour is unchanged.
+
+- `transport.go` (portable): `conn` (read/write/close plus `Resize`), `proc` (`ID`, `Status` channel, `Kill` of
+  the whole tree), the optional `continuer` capability (job control, not part of the portable minimum), and
+  `startSpec` (explicit argv, dir, env, size, `OnStop`). `ErrUnsupported` is what a platform without a
+  transport returns. This matches the F02 `builtins.Run` contract in spirit: explicit env and cwd, and
+  cancellation as `Kill`. Coordinate when #55 lands.
+- The core (`terminal.go`, `input.go`, `reports.go`, `jobs.go`, parser/screen/snapshot/render) holds a `conn` and
+  a `proc` and imports no platform syscall. It still owns the single reader goroutine (`StartReader`, DEC 2026
+  buffering), the ordered async input queue, and the exit sequence (`Finish`, `reap`, `exited`), so final output
+  is applied before exit is reported.
+- Unix (`transport_unix.go`): PTY master `conn` (`pollable`, `setWinsize` in `ptyfd.go`), `unixProc` with the
+  `Wait4(WUNTRACED)` loop (stop notification through `OnStop`, `Continue` via SIGCONT to the group), and `Kill`
+  in `proc_linux.go` (walks /proc, pidfd preferred, Android fallbacks) or `proc_other_unix.go`.
+- Windows (`transport_other.go`, `!unix`): `startProcess` and `openFuncTTY` return `ErrUnsupported`; P02 replaces
+  them with ConPTY and P03 adds job-object teardown. `Stopped` is false and `Continue` errors there, consistent
+  with `jobleader.Supported == false`.
+- `StartFunc`: decision above. Unix keeps the PTY tty; Windows returns `ErrUnsupported`.
+- Tests: `fake_transport_test.go` drives the core with no PTY (final output before exit, ordered input, resize,
+  Close idempotent with one tree kill, no job control); `boundary_unix_test.go` pins resize to the program's tty,
+  Close twice, grandchild kill, input order. Existing tests keep covering fast-exit output order, stopped/continue,
+  session kill and StartFunc.

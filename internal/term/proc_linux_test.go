@@ -72,9 +72,9 @@ func TestCloseKillsBackgroundJobsAfterTheLeaderExited(t *testing.T) {
 	// A leader that has already exited makes TIOCGSID fail. Hold the sample
 	// until then, so Close has to learn the session from the leader's stat.
 	prev := ptySession
-	ptySession = func(tm *Terminal) (int, bool) {
+	ptySession = func(pid int, _ *os.File) (int, bool) {
 		deadline := time.Now().Add(2 * time.Second)
-		for time.Now().Before(deadline) && processAlive(tm.cmd.Process.Pid) {
+		for time.Now().Before(deadline) && processAlive(pid) {
 			time.Sleep(time.Millisecond)
 		}
 		return 0, false
@@ -88,7 +88,7 @@ func TestCloseKillsBackgroundJobsAfterTheLeaderExited(t *testing.T) {
 	tm.StartReader()
 	var pid int
 	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) && (pid == 0 || processAlive(tm.cmd.Process.Pid)) {
+	for time.Now().Before(deadline) && (pid == 0 || processAlive(pid)) {
 		for _, l := range tm.PlainLines() {
 			if n, err := strconv.Atoi(strings.TrimSpace(l)); err == nil {
 				pid = n
