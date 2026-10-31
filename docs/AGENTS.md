@@ -208,9 +208,12 @@ internal/
                                  wait4 with WUNTRACED, StartFunc tty), ptyfd.go (pollable master), proc_linux.go /
                                  proc_other_unix.go (session kill). Windows: transport_windows.go launches ConPTY with
                                  Unicode argv/env/cwd, suspended job assignment before resume; conpty_windows.go owns
-                                 pipes/HPCON/job, proc_windows.go waits and kills the job (no continuer). Always Close
-                                 even after natural exit to release the retained job; bounded drain/descendant teardown
-                                 is TODO(P03), not yet runtime-proven. StartFunc remains ErrUnsupported on !unix;
+                                 HPCON/job and teardown, winpipe_windows.go is a pipe end whose close cancels blocked
+                                 I/O, proc_windows.go waits and kills the job (no continuer). Always Close even after
+                                 natural exit to release the retained job. Close: kill job, close input, close HPCON
+                                 while draining output, then cancel+close the pipes (each wait bounded). Output ends
+                                 with the leader; descendants live in the job until Close. Native teardown tests exist
+                                 (transport_teardown_windows_test.go); see the PR for what CI has run. StartFunc remains ErrUnsupported on !unix;
                                  transport_unsupported.go handles !unix && !windows. winlaunch.go and ownership.go have
                                  Linux-run pure-logic tests; transport_native*_windows_test.go needs a Windows host.
                                  jobs.go: Stopped/Continue via the optional capability; fake_transport_test.go drives

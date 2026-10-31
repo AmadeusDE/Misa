@@ -22,9 +22,9 @@ func (p *windowsProc) wait() {
 		}
 	}
 	windows.CloseHandle(p.process)
-	// Closing the pseudoconsole allows its output pipe to reach EOF; the
-	// reader must continue draining while ClosePseudoConsole runs.
-	// TODO(P03): coordinate leader exit with live console descendants.
+	// The output pipe reaches EOF only once the pseudoconsole is closed, so
+	// output ends with the leader. Descendants it left behind stay in the job
+	// until Close kills them. The reader keeps draining while the close runs.
 	go p.conn.closeConsole()
 	p.status <- int(code)
 }
