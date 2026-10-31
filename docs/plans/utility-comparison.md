@@ -454,7 +454,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `reboot` |  | ✓ other | ✓ |  |
 | `reformime` |  |  | ✓ |  |
 | `remove-shell` |  |  | ✓ |  |
-| `rename` |  |  |  | ✓ util-linux |
+| `rename` | ✓ |  |  | ✓ util-linux |
 | `renice` |  | ✓ posix | ✓ | ✓ bsdutils, ✓ util-linux |
 | `reset` |  | ✓ other | ✓ |  |
 | `resize` |  |  | ✓ |  |
@@ -512,7 +512,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `sha512sum` | ✓ | ✓ lsb | ✓ | ✓ coreutils |
 | `shift` |  | ✓ pending |  |  |
 | `showkey` |  |  | ✓ |  |
-| `shred` |  | ✓ other | ✓ | ✓ coreutils |
+| `shred` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `shuf` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `skill` |  |  |  | ✓ procps |
 | `slabtop` |  |  |  | ✓ procps |

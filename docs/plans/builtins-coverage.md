@@ -309,7 +309,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `readahead` | other | – | – | – | – | no tests | 28 | – | light |
 | `readelf` | other | 9 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 775 | – | heavy |
 | `reboot` | other | – | – | – | – | no tests | 46 | – | light |
-| `rename` | – | – | util-linux:60 | 5 | root | uutils: Rust, 5/60 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1071 | heavy |
 | `renice` | posix | 2 | bsdutils:1, util-linux:1 | 2 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 2/2 simple new_ucmd! cases parseable by tests/uutils adapter | 51 | 66 | light |
 | `reset` | other | – | – | – | – | no tests | 31 | – | light |
 | `restorecon` | android | – | – | – | – | no tests | 46 | – | medium |
@@ -330,7 +329,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `sha224sum` | lsb | 8 | coreutils:8 | 2 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 2/8 simple new_ucmd! cases parseable by tests/uutils adapter | 142 | 12 | light |
 | `sha384sum` | lsb | 8 | coreutils:8 | 2 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 2/8 simple new_ucmd! cases parseable by tests/uutils adapter | 142 | 12 | light |
 | `sha3sum` | other | 8 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 105 | – | light |
-| `shred` | other | – | coreutils:31 | 4 | kernel/fs, tty | uutils: Rust, 4/31 simple new_ucmd! cases parseable by tests/uutils adapter | 99 | 916 | light |
 | `shuf` | other | – | coreutils:78 | 64 | – | uutils: Rust, 64/78 simple new_ucmd! cases parseable by tests/uutils adapter | 63 | 905 | light |
 | `skill` | – | – | procps:1 | 1 | – | uutils: Rust, 1/1 simple new_ucmd! cases parseable by tests/uutils adapter | – | 99 | light |
 | `slabtop` | – | – | procps:6 | 4 | root | uutils: Rust, 4/6 simple new_ucmd! cases parseable by tests/uutils adapter | – | 518 | heavy |

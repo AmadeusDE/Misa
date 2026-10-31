@@ -18,6 +18,7 @@ rmdir/test_rmdir_nonempty_directory_with_parents_0_L82  # rmdir: error message w
 seq/test_equalize_widths_corner_cases_L1124  # seq -w with a hex operand: GNU's padding quirk isn't reproduced
 seq/test_equalize_widths_corner_cases_1_L1129  # seq -w with a hex operand: GNU's padding quirk isn't reproduced
 seq/test_equalize_widths_corner_cases_2_L1144  # seq -w with a hex operand: GNU's padding quirk isn't reproduced
+shred/test_random_source_regular_file_0_L282  # adapter: the Rust byte-vector setup writes an empty source_long, so the pass aborts with EOF
 shuf/test_gnu_compat_range_repeat_0_L960  # shuf: --random-source and seeded output don't match uutils' generator
 shuf/test_gnu_compat_from_file_0_L1011  # shuf: --random-source and seeded output don't match uutils' generator
 shuf/test_gnu_compat_limited_from_file_0_L1028  # shuf: --random-source and seeded output don't match uutils' generator
