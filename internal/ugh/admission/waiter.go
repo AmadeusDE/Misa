@@ -5,28 +5,26 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 )
 
 type registeredWaiter struct {
 	id          string
 	path        string
-	fd          int
+	fd          *os.File
 	req         Request
 	requestedAt time.Time
 }
 
 func (w *registeredWaiter) cleanup() {
-	if w.fd >= 0 {
+	if w.fd != nil {
 		_ = unlock(w.fd)
 		_ = closeFd(w.fd)
-		w.fd = -1
+		w.fd = nil
 	}
 	if w.path != "" {
 		_ = os.Remove(w.path)
@@ -67,9 +65,8 @@ func registerRootWaiter(waitersDir string, req Request) (*registeredWaiter, erro
 	}
 
 	raw, _ := json.Marshal(info)
-	_ = syscall.Ftruncate(fd, 0)
-	_, _ = syscall.Seek(fd, 0, io.SeekStart)
-	_, _ = syscall.Write(fd, raw)
+	_ = fd.Truncate(0)
+	_, _ = fd.WriteAt(raw, 0)
 
 	return &registeredWaiter{
 		id:          waiterID,
@@ -81,7 +78,7 @@ func registerRootWaiter(waitersDir string, req Request) (*registeredWaiter, erro
 }
 
 // cleanAndListWaiters cleans up any dead waiter registrations and returns active live root waiters.
-// A waiter is confirmed dead if an exclusive nonblocking flock on its lock file succeeds.
+// A waiter is confirmed dead if an exclusive nonblocking lock on its lock file succeeds.
 func cleanAndListWaiters(waitersDir string) ([]WaiterDiagnostics, error) {
 	entries, err := os.ReadDir(waitersDir)
 	if err != nil {

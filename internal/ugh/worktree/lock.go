@@ -8,14 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
-	"time"
+
+	"github.com/AmadeusDE/Misa/internal/filelock"
 )
 
 // RepoLock holds an advisory file lock on a repository's Git common directory.
 type RepoLock struct {
 	mu   sync.Mutex
-	fd   int
+	file *os.File
 	path string
 }
 
@@ -26,14 +26,14 @@ func (l *RepoLock) Unlock() error {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.fd < 0 {
+	if l.file == nil {
 		return nil
 	}
 	defer func() {
-		_ = syscall.Close(l.fd)
-		l.fd = -1
+		_ = l.file.Close()
+		l.file = nil
 	}()
-	return syscall.Flock(l.fd, syscall.LOCK_UN)
+	return filelock.Unlock(l.file)
 }
 
 // FindGitCommonDir determines the shared Git common directory for dir.
@@ -88,9 +88,8 @@ func FindGitCommonDir(ctx context.Context, dir string) (string, error) {
 }
 
 // LockRepo serializes worktree lifecycle and integration operations across processes
-// using an OS advisory flock on a lock file in the shared Git common directory.
-// The file descriptor is explicitly opened with O_CLOEXEC and CloseOnExec to prevent
-// leaking lock descriptors into spawned child processes.
+// using an OS advisory lock on a file in the shared Git common directory.
+// The lock file is not inherited by spawned child processes.
 func LockRepo(ctx context.Context, gitCommonDir string) (*RepoLock, error) {
 	if gitCommonDir == "" {
 		return nil, errors.New("git common directory required for lock")
@@ -100,40 +99,18 @@ func LockRepo(ctx context.Context, gitCommonDir string) (*RepoLock, error) {
 	}
 
 	lockPath := filepath.Join(gitCommonDir, "ugh-worktree.lock")
-	fd, err := syscall.Open(lockPath, syscall.O_CREAT|syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0o600)
+	f, err := filelock.Open(lockPath)
 	if err != nil {
 		return nil, fmt.Errorf("open worktree lock %s: %w", lockPath, err)
 	}
-	syscall.CloseOnExec(fd)
-
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			_ = syscall.Close(fd)
-			return nil, ctx.Err()
-		default:
+	if err := filelock.Lock(ctx, f); err != nil {
+		_ = f.Close()
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, err
 		}
-
-		err = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
-		if err == nil {
-			return &RepoLock{fd: fd, path: lockPath}, nil
-		}
-
-		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
-			_ = syscall.Close(fd)
-			return nil, fmt.Errorf("flock %s: %w", lockPath, err)
-		}
-
-		select {
-		case <-ctx.Done():
-			_ = syscall.Close(fd)
-			return nil, ctx.Err()
-		case <-ticker.C:
-		}
+		return nil, fmt.Errorf("lock %s: %w", lockPath, err)
 	}
+	return &RepoLock{file: f, path: lockPath}, nil
 }
 
 // WithRepoLock executes fn while holding the shared repository lock.

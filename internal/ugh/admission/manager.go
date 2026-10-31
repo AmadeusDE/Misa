@@ -6,16 +6,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/AmadeusDE/Misa/internal/ugh/privdir"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
+
+	"github.com/AmadeusDE/Misa/internal/ugh/privdir"
 )
 
 var safeAccountRe = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
@@ -178,9 +177,8 @@ func (m *Manager) claimSlotLocked(slotsDir string, slotIndex int, req Request, b
 	}
 
 	raw, _ := json.Marshal(diag)
-	_ = syscall.Ftruncate(fd, 0)
-	_, _ = syscall.Seek(fd, 0, io.SeekStart)
-	_, _ = syscall.Write(fd, raw)
+	_ = fd.Truncate(0)
+	_, _ = fd.WriteAt(raw, 0)
 
 	return &slotHandle{
 		manager:     m,
@@ -424,7 +422,7 @@ type slotHandle struct {
 	accountID   string
 	bucket      BucketKind
 	slotIndex   int
-	fd          int
+	fd          *os.File
 	diagnostics SlotDiagnostics
 	closed      bool
 	mu          sync.Mutex
@@ -438,10 +436,10 @@ func (h *slotHandle) Close() error {
 	}
 	h.closed = true
 	var err error
-	if h.fd >= 0 {
+	if h.fd != nil {
 		_ = unlock(h.fd)
 		err = closeFd(h.fd)
-		h.fd = -1
+		h.fd = nil
 	}
 	return err
 }

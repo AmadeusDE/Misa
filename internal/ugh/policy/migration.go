@@ -2,6 +2,7 @@ package policy
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -11,8 +12,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"syscall"
 
+	"github.com/AmadeusDE/Misa/internal/filelock"
 	"github.com/AmadeusDE/Misa/internal/ugh/config"
 	"github.com/BurntSushi/toml"
 )
@@ -228,15 +229,15 @@ func MigrateConfig(cfg *config.Config, path string) ([]string, error) {
 	} else if err != nil {
 		return warnings, err
 	}
-	lock, err := os.OpenFile(path+".migration.lock", os.O_CREATE|os.O_RDWR, 0600)
+	lock, err := filelock.Open(path + ".migration.lock")
 	if err != nil {
 		return warnings, err
 	}
 	defer lock.Close()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+	if err := filelock.Lock(context.Background(), lock); err != nil {
 		return warnings, err
 	}
-	defer syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	defer filelock.Unlock(lock)
 	original, err := os.ReadFile(path)
 	if err != nil {
 		return warnings, err

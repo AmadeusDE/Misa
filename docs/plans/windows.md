@@ -7,6 +7,37 @@ Misa needs before its Windows build can include the agent. The measurements belo
 added since then (`internal/webui`'s file lock, `internal/ughbot`, `internal/ugh/confine`) needs the same
 treatment. ughbot is out of scope for the Windows port (it is not redefined as Linux-only: it also builds for the BSDs and macOS).
 
+## A01 implemented in worktree
+
+A01 is stacked on F01 PR https://github.com/AmadeusDE/Misa/pull/111. No A01 PR exists yet.
+
+- Added `internal/filelock`, a lower-level reusable file-based exclusive process-lock package; it has no
+  imports from ugh or webui. `Open` uses no-follow semantics for the final path component and returns a
+  non-inheritable `*os.File`; `TryLock`, context-aware `Lock(ctx)` and `Unlock` operate on it, and the
+  caller closes the file.
+- Unix continues to use `flock` unchanged. Windows uses `LockFileEx`/`UnlockFileEx` on the reserved byte
+  interval `[1<<62, (1<<62)+1)`, leaving diagnostic JSON reads unblocked. `Lock(ctx)` polls with
+  exponential backoff from 5ms to 100ms and supports exclusive locks only.
+- Migrated only ugh admission, worktree, policy and auth lock call sites. `internal/webui` is unchanged
+  (Unix `flock`, non-Unix no-op stub): W01 must reuse `internal/filelock`, not depend on ugh.
+- Windows-native tests were written and cross-compiled, not executed (there is no Windows host here).
+  This does not enable the agent on Windows: auth's Unix credential `Stat_t`/`O_NOFOLLOW` handling (A02)
+  and worktree `syscall.Kill` process-group liveness (A05) remain deliberately unchanged, so those full
+  packages still do not compile for Windows.
+- Follow-ups: A02 storage/DACL/reparse-point parents; A05 process identity/lifetime; W01 web lock
+  migration; F02–F04 root build blockers; F05/R02 native gates and evidence. No CI changes are part of
+  A01.
+
+### A01 verification
+
+Linux `CGO_ENABLED=0`: full tests and vet, plus `nough` and `nogui noweb` builds passed. Touched-package
+vet passed for Darwin, FreeBSD, OpenBSD and Android arm64 (`CGO_ENABLED=0`). Touched-package race tests
+passed on Linux with `CGO_ENABLED=1` (required by Go's race detector, not by the implementation).
+Windows amd64 vet and arm64 library/test cross-compilation passed for filelock, admission and policy;
+the test-only `internal/ugh` dependency checks also cross-compiled. Auth and worktree cross-checks remain
+blocked by A02/A05 as above. The reduced Windows root build still fails in lscore/sysinfo/procmon,
+sshclient and term (F02–F04/P01); this task does not claim a buildable Windows application.
+
 # Part 1: Misa
 
 ## Goal
@@ -386,14 +417,7 @@ Already fine:
 
 ## Decisions
 
-- **UD1. One file-lock helper, `internal/ugh/flock`.** It has `Lock`, `TryLock` and `Unlock` on `*os.File`:
-  `flock(2)` on Unix, `LockFileEx`/`UnlockFileEx` on Windows. All four call sites use it, and the raw-fd code
-  moves to `*os.File` (`Truncate`, `Seek`, `Write`, `Close`), which is portable without per-OS files.
-  - **Windows locks are mandatory byte-range locks.** Locking the file's contents would make other processes'
-    reads of a slot's diagnostics JSON fail. Lock one byte far past EOF (offset `1<<62`, length 1) instead,
-    which gives flock-like advisory behaviour.
-  - `TryLock` maps `ERROR_LOCK_VIOLATION`/`ERROR_IO_PENDING` to the existing "locked" errors
-    (`isLockedError`).
+- **UD1 (superseded for its wrapper/API design by A01).** The original plan called for `internal/ugh/flock`; A01 instead provides the shared lower-level `internal/filelock` API. The call-site fd-to-`*os.File` migration remains applicable. Windows uses the reserved diagnostic-safe byte range described in "A01 implemented in worktree".
 - **UD2. Private files: ownership and ACL instead of mode bits.** On Unix, `auth/file.go` checks 0700/0600
   and uid ownership. On Windows (`private_windows.go`):
   - check that the owner SID (`GetNamedSecurityInfo(OWNER_SECURITY_INFORMATION)`) is the current user's token
@@ -456,8 +480,7 @@ Already fine:
 
 ### UW0. Compile for Windows
 
-- UD1 (`internal/ugh/flock`, fd → `*os.File`), UD9, and `bash_windows.go` as a stub that reports "no shell
-  available on Windows yet" (replaced in UW2).
+- A01 implements UD1's locking and fd-to-`*os.File` migration via the shared `internal/filelock` package. UD9 and `bash_windows.go` as a stub that reports "no shell available on Windows yet" remain work for the later agent tasks (replaced in UW2).
 - UD2 for `auth/file.go`, enough to compile (`owned_windows.go` with the SID check; the ACL creation is UW1).
 - Retag worktree `process.go` into `process_unix.go` + `process_windows.go` (UD6).
 - Gate: `GOOS=windows go vet ./...` and `GOOS=windows GOARCH=arm64 go build ./cmd/ugh` pass. Add both to

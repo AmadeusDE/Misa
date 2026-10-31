@@ -25,6 +25,7 @@ func TestDependencyDirection(t *testing.T) {
 		module + "internal/builtins":  {"internal/ugh/", "internal/ughbot"},
 		module + "internal/webui":     {"internal/ui", "internal/gui", "internal/ugh", "internal/ughbot"},
 		module + "internal/termkeys":  {"internal/ui", "internal/gui", "internal/ugh", "internal/ughbot"},
+		module + "internal/filelock":  {"internal/ugh", "internal/ughbot", "internal/webui", "internal/ui", "internal/gui"},
 		module + "internal/lscore":    {"internal/ugh/", "internal/ughbot"},
 	}
 	for pattern, banned := range forbidden {
