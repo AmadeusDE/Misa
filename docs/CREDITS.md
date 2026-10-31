@@ -152,10 +152,17 @@ Original Go implementation; rules and notation referenced from:
 - **qr** by The Go Authors — BSD-3-Clause
   https://github.com/rsc/qr
 
-## Find (U06)
+## Find (U06–U07)
 
 `find` references Toybox by Rob Landley and the Toybox contributors
 (https://github.com/landley/toybox), specifically `toys/posix/find.c` and the verbatim
 `tests/toybox/find.test`, pinned to Toybox commit
 `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb` (0BSD); the test license is
 `tests/toybox/LICENSE`. Toybox does not supply the regex extension baseline.
+
+U07 execution action semantics also reference **uutils/findutils** contributors — MIT,
+`src/find/matchers/exec.rs` (Copyright 2017 Google Inc.) and `src/find/matchers/delete.rs`
+(copyright Arcterus <arcterus@mail.com>) at commit `d71f3242b0bc3b21bb311f04b23ae62e5f3fed67`:
+https://github.com/uutils/findutils/blob/d71f3242b0bc3b21bb311f04b23ae62e5f3fed67/src/find/matchers/exec.rs
+In particular, `;` replaces all literal `{}` substrings, unlike the pinned Toybox behavior.
+https://github.com/uutils/findutils/blob/d71f3242b0bc3b21bb311f04b23ae62e5f3fed67/src/find/matchers/delete.rs

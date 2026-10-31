@@ -22,13 +22,6 @@ sed/getdelim_with_nested_[:blah:]  # adapter: backslashes inside double quotes a
 sed/-z  # adapter: backslashes inside double quotes are dropped
 sed/\n_with_empty_capture  # adapter: backslashes inside double quotes are dropped
 # Pinned find.test case numbers, in source order.
-find/13  # find -type f -user -exec: command execution deferred to U07
-find/14  # find -type l -newer -exec: command execution deferred to U07
-find/15  # find -exec true: command execution deferred to U07
-find/16  # find -exec false: command execution deferred to U07; empty output alone is misleading
-find/23  # unterminated -exec: U07 execution syntax is deferred, so this does not test its parser
-find/24  # find -exec {} +: batched execution deferred to U07
-find/33  # find -iname ... -exec echo: command execution deferred to U07
 find/51  # one slash: depends on host /etc/passwd, not a disposable fixture
 find/58  # strlower edge case: depends on upstream utf8locale and non-C Unicode case folding
 find/31  # -lname: symlink-target glob predicate is not implemented

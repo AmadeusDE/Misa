@@ -22,6 +22,8 @@ type Options struct {
 	MaxDepth      *int   // nil means unlimited
 	SameDevice    bool   // do not descend onto another device
 	DanglingLinks bool   // report missing symlink targets as links
+	LiteralPaths  bool   // preserve dot components when resolving paths against Base
+	ValidateDirs  bool   // detect changed directories before descent and postorder callbacks (not race-proof)
 }
 
 // Entry is one visited file. Path is the root joined with the names below
@@ -33,6 +35,10 @@ type Entry struct {
 	Info  fs.FileInfo
 	Depth int
 	Err   error
+	// Validate checks directory ancestors against their original identities. It is
+	// advisory, not an atomic guarantee against concurrent filesystem changes.
+	// Components preceding the walk root are not tracked.
+	Validate func() error
 }
 
 // SkipDir returned for a directory prunes it; for anything else it is
@@ -75,10 +81,37 @@ type walker struct {
 	ancestors []fileID
 	rootID    fileID
 	hasRootID bool
+	dirs      []dirIdentity
+}
+
+type dirIdentity struct {
+	path string
+	info fs.FileInfo
+}
+
+var ErrChanged = errors.New("directory changed during traversal")
+
+func (w *walker) validateDirs() error { return w.validateIdentities(w.dirs) }
+
+func (w *walker) validateIdentities(dirs []dirIdentity) error {
+	for _, d := range dirs {
+		current, err := os.Lstat(w.fsPath(d.path))
+		if err != nil {
+			return err
+		}
+		if !current.IsDir() || !os.SameFile(current, d.info) {
+			return ErrChanged
+		}
+	}
+	return nil
 }
 
 func (w *walker) visit(path string, info fs.FileInfo, depth int) error {
 	id, hasID := idOf(info)
+	if w.opt.ValidateDirs && info.IsDir() {
+		w.dirs = append(w.dirs, dirIdentity{path, info})
+		defer func() { w.dirs = w.dirs[:len(w.dirs)-1] }()
+	}
 	if info.IsDir() && (hasID && slices.Contains(w.ancestors, id) || !hasID && depth > maxDepth) {
 		return w.report(path, info, depth, ErrLoop)
 	}
@@ -90,6 +123,11 @@ func (w *walker) visit(path string, info fs.FileInfo, depth int) error {
 	if (w.opt.MaxDepth != nil && depth >= *w.opt.MaxDepth) ||
 		(w.opt.SameDevice && depth > 0 && hasID && w.hasRootID && !sameDevice(id, w.rootID)) {
 		if w.opt.PostOrder {
+			if w.opt.ValidateDirs {
+				if err := w.validateDirs(); err != nil {
+					return w.report(path, info, depth, err)
+				}
+			}
 			return skipped(w.call(Entry{Path: path, Info: info, Depth: depth}))
 		}
 		return nil
@@ -98,6 +136,11 @@ func (w *walker) visit(path string, info fs.FileInfo, depth int) error {
 		w.ancestors = append(w.ancestors, id)
 		defer func() { w.ancestors = w.ancestors[:len(w.ancestors)-1] }()
 	}
+	if w.opt.ValidateDirs {
+		if err := w.validateDirs(); err != nil {
+			return w.report(path, info, depth, err)
+		}
+	}
 	entries, err := os.ReadDir(w.fsPath(path))
 	if err != nil {
 		if err := w.report(path, info, depth, err); err != nil {
@@ -105,6 +148,11 @@ func (w *walker) visit(path string, info fs.FileInfo, depth int) error {
 		}
 	}
 	for _, d := range entries {
+		if w.opt.ValidateDirs {
+			if err := w.validateDirs(); err != nil {
+				return w.report(path, info, depth, err)
+			}
+		}
 		child := join(path, d.Name())
 		childInfo, err := w.childInfo(child, d)
 		if err != nil {
@@ -117,6 +165,11 @@ func (w *walker) visit(path string, info fs.FileInfo, depth int) error {
 		}
 	}
 	if w.opt.PostOrder {
+		if w.opt.ValidateDirs {
+			if err := w.validateDirs(); err != nil {
+				return w.report(path, info, depth, err)
+			}
+		}
 		return skipped(w.call(Entry{Path: path, Info: info, Depth: depth}))
 	}
 	return nil
@@ -145,6 +198,10 @@ func (w *walker) call(e Entry) error {
 	if err := w.ctx.Err(); err != nil {
 		return err
 	}
+	if w.opt.ValidateDirs {
+		dirs := append([]dirIdentity(nil), w.dirs...)
+		e.Validate = func() error { return w.validateIdentities(dirs) }
+	}
 	return w.fn(e)
 }
 
@@ -164,6 +221,12 @@ func (w *walker) fsPath(path string) string {
 	}
 	if w.opt.Base == "" {
 		return path
+	}
+	if w.opt.LiteralPaths {
+		if strings.HasSuffix(w.opt.Base, string(filepath.Separator)) {
+			return w.opt.Base + path
+		}
+		return w.opt.Base + string(filepath.Separator) + path
 	}
 	return filepath.Join(w.opt.Base, path)
 }

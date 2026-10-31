@@ -4,3 +4,10 @@ each file names its source in its header. License texts: ../../THIRD_PARTY_NOTIC
 find (U06): Toybox toys/posix/find.c and tests/find.test, commit
 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb, 0BSD; the verbatim test is
 in ../../tests/toybox/find.test, with its license alongside it.
+
+find (U07): execution action semantics reference uutils/findutils
+src/find/matchers/exec.rs (Copyright 2017 Google Inc.) and
+src/find/matchers/delete.rs (copyright Arcterus <arcterus@mail.com>), commit d71f3242b0bc3b21bb311f04b23ae62e5f3fed67,
+MIT: https://github.com/uutils/findutils/blob/d71f3242b0bc3b21bb311f04b23ae62e5f3fed67/src/find/matchers/exec.rs
+https://github.com/uutils/findutils/blob/d71f3242b0bc3b21bb311f04b23ae62e5f3fed67/src/find/matchers/delete.rs
+The Toybox find.c and test reference above also applies to U07.
