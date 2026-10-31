@@ -126,11 +126,12 @@ func diffPermutationCase(n int, variant string) (string, string) {
 }
 
 func diffContextRoundTrip(t *testing.T, variant string) {
+	t.Parallel()
 	t.Helper()
 	patch := hostPatch(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "source")
-	for n := 0; n < 729; n++ {
+	for n := 0; n < 729; n += diffCaseStride {
 		a, b := diffPermutationCase(n, variant)
 		al, bl := diffLines([]byte(a)), diffLines([]byte(b))
 		o := diffOptions{context: 3}

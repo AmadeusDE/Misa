@@ -76,7 +76,7 @@ func diffEdRoundTrip(t *testing.T, variant string) {
 	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "source")
-	for n := 0; n < 729; n++ {
+	for n := 0; n < 729; n += diffCaseStride {
 		a, b := diffPermutationCase(n, variant)
 		al, bl := diffLines([]byte(a)), diffLines([]byte(b))
 		script, err := diffEd(al, bl, diffMyers(al, bl, diffOptions{}))

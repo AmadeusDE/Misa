@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -14,11 +15,32 @@ func resolvePath(ctx *Context, path string) string {
 	if filepath.IsAbs(path) {
 		return path
 	}
+	if rooted, ok := rootedOnVolume(ctx.Dir, path, runtime.GOOS == "windows"); ok {
+		return rooted
+	}
 	resolved := filepath.Join(ctx.Dir, path)
-	if strings.HasSuffix(path, "/") && !strings.HasSuffix(resolved, "/") {
-		resolved += "/"
+	if path != "" && strings.ContainsRune(pathSeps, rune(path[len(path)-1])) && !strings.HasSuffix(resolved, string(os.PathSeparator)) {
+		resolved += string(os.PathSeparator)
 	}
 	return resolved
+}
+
+// rootedOnVolume places a Windows path that has a root but no volume (\x or
+// /x) on the volume of dir, as Windows itself does. It reports false for
+// every other path and always off Windows.
+func rootedOnVolume(dir, path string, windows bool) (string, bool) {
+	if !windows {
+		return "", false
+	}
+	vol, rest := splitVolume(path, true)
+	if vol != "" || !strings.HasPrefix(rest, "/") {
+		return "", false
+	}
+	dvol, _ := splitVolume(dir, true)
+	if dvol == "" {
+		return "", false
+	}
+	return filepath.Clean(dvol + path), true
 }
 
 func parseOctalMode(s string) (os.FileMode, error) {
@@ -145,6 +167,9 @@ func dirIsNonEmpty(path string) bool {
 }
 
 func fmtOsErr(err error) string {
+	if text, ok := platformErrText(err); ok {
+		return text
+	}
 	if os.IsNotExist(err) {
 		msg := err.Error()
 		if strings.Contains(msg, "not a directory") {

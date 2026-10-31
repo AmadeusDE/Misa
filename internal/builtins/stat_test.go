@@ -34,6 +34,7 @@ func TestStatFormatName(t *testing.T) {
 }
 
 func TestStatFormatPerms(t *testing.T) {
+	skipOnWindows(t, "Windows keeps no permission bits")
 	dir := t.TempDir()
 	p := writeFile(t, dir, "file.txt", "data")
 	os.Chmod(p, 0644)

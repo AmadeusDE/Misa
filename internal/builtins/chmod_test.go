@@ -7,6 +7,7 @@ import (
 )
 
 func TestChmodOctal(t *testing.T) {
+	skipOnWindows(t, "Windows keeps no permission bits beyond read-only (windowsLimits chmod)")
 	dir := t.TempDir()
 	writeFile(t, dir, "file.txt", "data")
 	r := runBuiltinIn(t, dir, "chmod", "755", "file.txt")
@@ -18,6 +19,7 @@ func TestChmodOctal(t *testing.T) {
 }
 
 func TestChmodSymbolicAdd(t *testing.T) {
+	skipOnWindows(t, "Windows keeps no permission bits beyond read-only (windowsLimits chmod)")
 	dir := t.TempDir()
 	p := writeFile(t, dir, "file.txt", "data")
 	os.Chmod(p, 0644)
@@ -30,6 +32,7 @@ func TestChmodSymbolicAdd(t *testing.T) {
 }
 
 func TestChmodSymbolicRemove(t *testing.T) {
+	skipOnWindows(t, "Windows keeps no permission bits beyond read-only (windowsLimits chmod)")
 	dir := t.TempDir()
 	p := writeFile(t, dir, "file.txt", "data")
 	os.Chmod(p, 0755)
@@ -54,6 +57,7 @@ func TestChmodSymbolicSet(t *testing.T) {
 }
 
 func TestChmodRecursive(t *testing.T) {
+	skipOnWindows(t, "Windows keeps no permission bits beyond read-only (windowsLimits chmod)")
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "sub"), 0755)
 	p := writeFile(t, dir, "sub/file.txt", "data")

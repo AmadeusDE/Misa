@@ -170,6 +170,7 @@ func TestSplitGuardInput(t *testing.T) {
 
 func TestSplitWriteError(t *testing.T) {
 	t.Run("write error handling", func(t *testing.T) {
+		skipOnWindows(t, "a Windows directory cannot be made unwritable with a mode")
 		tmpdir := t.TempDir()
 
 		// Create a read-only directory to cause write error

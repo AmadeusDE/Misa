@@ -44,15 +44,15 @@ func TestWhichMissingOperand(t *testing.T) {
 func TestUnameDefault(t *testing.T) {
 	r := runBuiltin(t, "uname")
 	assertExitCode(t, r, 0)
-	assertStdoutContains(t, r, "Linux")
+	assertStdoutContains(t, r, unameSysname)
 }
 
 func TestUnameAll(t *testing.T) {
 	r := runBuiltin(t, "uname", "-a")
 	assertExitCode(t, r, 0)
 	out := r.stdout
-	if !strings.Contains(out, "Linux") {
-		t.Errorf("expected Linux in output, got %q", out)
+	if !strings.Contains(out, unameSysname) {
+		t.Errorf("expected %s in output, got %q", unameSysname, out)
 	}
 	parts := strings.Fields(strings.TrimSpace(out))
 	if len(parts) < 4 {

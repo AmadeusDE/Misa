@@ -22,7 +22,7 @@ func TestDiffDirectories(t *testing.T) {
 	}
 	var out, errout bytes.Buffer
 	code := diffRun(&Context{Dir: d, Args: []string{"-r", "left", "right"}, Stdin: strings.NewReader(""), Stdout: &out, Stderr: &errout})
-	want := "Only in left: only\ndiff -r left/sub/f right/sub/f\n1c1\n< old\n---\n> new\n"
+	want := "Only in left: only\ndiff -r " + filepath.FromSlash("left/sub/f right/sub/f") + "\n1c1\n< old\n---\n> new\n"
 	if code != 1 || out.String() != want || errout.Len() != 0 {
 		t.Fatalf("%d %q %q", code, out.String(), errout.String())
 	}

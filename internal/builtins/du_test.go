@@ -186,6 +186,7 @@ func TestDuInodes(t *testing.T) {
 }
 
 func TestDuInaccessibleDirStillReportsOwnSize(t *testing.T) {
+	skipOnWindows(t, "a Windows directory cannot be made unreadable with a mode")
 	if os.Geteuid() == 0 {
 		t.Skip("permission checks don't apply as root")
 	}

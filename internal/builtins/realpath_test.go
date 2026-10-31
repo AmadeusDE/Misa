@@ -30,9 +30,11 @@ func TestRealpathNonexistent(t *testing.T) {
 }
 
 func TestRealpathCanonMissing(t *testing.T) {
-	r := runBuiltin(t, "realpath", "-m", "/no/such/path")
+	dir := t.TempDir()
+	r := runBuiltinIn(t, dir, "realpath", "-m", "/no/such/path")
 	assertExitCode(t, r, 0)
-	assertStdout(t, r, "/no/such/path\n")
+	// A rooted path stays on the volume of the working directory.
+	assertStdout(t, r, filepath.VolumeName(dir)+filepath.FromSlash("/no/such/path")+"\n")
 }
 
 func TestReadlinkSymlink(t *testing.T) {

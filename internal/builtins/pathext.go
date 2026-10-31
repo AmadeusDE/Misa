@@ -1,6 +1,7 @@
 package builtins
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -33,4 +34,10 @@ func pathextNames(name, pathext string) []string {
 		names[i] = name + e
 	}
 	return names
+}
+
+// isFilesystemRoot reports whether a cleaned path names the root of a volume.
+func isFilesystemRoot(clean string) bool {
+	rest := clean[len(filepath.VolumeName(clean)):]
+	return len(rest) == 1 && os.IsPathSeparator(rest[0])
 }

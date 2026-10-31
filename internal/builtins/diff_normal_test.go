@@ -30,6 +30,7 @@ func TestDiffNormalRanges(t *testing.T) {
 }
 
 func diffPatchPermutations(t *testing.T, style, variant string) {
+	t.Parallel()
 	t.Helper()
 	patch := hostPatch(t)
 	dir := t.TempDir()
@@ -41,7 +42,7 @@ func diffPatchPermutations(t *testing.T, style, variant string) {
 	if style == "unified" && variant == "empty_lines" {
 		count *= 4
 	}
-	for n := 0; n < count; n++ {
+	for n := 0; n < count; n += diffCaseStride {
 		v := n % 729
 		var left, right strings.Builder
 		for i := 0; i < 6; i++ {

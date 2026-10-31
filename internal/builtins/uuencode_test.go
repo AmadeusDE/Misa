@@ -10,6 +10,7 @@ import (
 )
 
 func TestUUEncodeFileMode(t *testing.T) {
+	skipOnWindows(t, "Windows keeps no permission bits")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "input")
 	if err := os.WriteFile(path, []byte("abc"), 0751); err != nil {

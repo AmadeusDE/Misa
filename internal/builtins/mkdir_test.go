@@ -48,6 +48,7 @@ func TestMkdirMissingOperand(t *testing.T) {
 }
 
 func TestMkdirMode(t *testing.T) {
+	skipOnWindows(t, "Windows keeps no permission bits (windowsLimits mkdir -m)")
 	dir := t.TempDir()
 	r := runBuiltinIn(t, dir, "mkdir", "-m", "700", "restricted")
 	assertExitCode(t, r, 0)

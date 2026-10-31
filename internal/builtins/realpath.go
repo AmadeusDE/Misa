@@ -43,6 +43,9 @@ func joinRawPath(dir, rel string) string {
 	if rel == "" {
 		return dir
 	}
+	if rooted, ok := rootedOnVolume(dir, rel, runtime.GOOS == "windows"); ok {
+		return rooted
+	}
 	return strings.TrimRight(dir, pathSeps) + string(os.PathSeparator) + rel
 }
 
