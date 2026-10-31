@@ -1,3 +1,5 @@
+//go:build unix
+
 // Package wayland is a minimal pure-Go client for the Wayland wire protocol:
 // a socket, object ids, and the argument encoding. Interfaces are plain
 // opcodes at the call sites, as in the protocol XML.

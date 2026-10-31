@@ -1,11 +1,5 @@
 //go:build unix
 
-// Package jobleader runs one command the way an interactive shell runs a job.
-// The leader holds the terminal's session and puts the command in its own
-// foreground process group. A program alone in its session cannot stop on ^Z
-// (the kernel drops SIGTSTP for orphaned process groups); under a leader it
-// can, and the leader then stops itself so whoever watches the session (Misa)
-// sees the suspension, and resumes the job when it is continued.
 package jobleader
 
 import (
@@ -19,8 +13,8 @@ import (
 	"github.com/charmbracelet/x/term"
 )
 
-// Flag selects leader mode on the Misa binary: misa --job-leader cmd args...
-const Flag = "--job-leader"
+// Supported reports that ^Z suspension works on this platform.
+const Supported = true
 
 // Run starts argv as the foreground job and returns its shell exit status.
 func Run(argv []string) int {

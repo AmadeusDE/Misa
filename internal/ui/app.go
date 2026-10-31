@@ -20,6 +20,7 @@ import (
 	"github.com/AmadeusDE/Misa/internal/companion"
 	"github.com/AmadeusDE/Misa/internal/config"
 	"github.com/AmadeusDE/Misa/internal/gradle"
+	"github.com/AmadeusDE/Misa/internal/jobleader"
 	"github.com/AmadeusDE/Misa/internal/justfile"
 	"github.com/AmadeusDE/Misa/internal/launcher"
 	mkf "github.com/AmadeusDE/Misa/internal/makefile"
@@ -220,7 +221,7 @@ func New(dir string) *Model {
 		aliases:          cfg.Aliases,
 		autorun:          cfg.Autorun,
 		builtinMode:      cfg.BuiltinMode,
-		jobControl:       config.BoolDefault(cfg.JobControl, true),
+		jobControl:       jobleader.Supported && config.BoolDefault(cfg.JobControl, true),
 		startInShell:     cfg.StartInShell,
 		disableMinishell: cfg.DisableMinishell,
 		historySearch:    config.BoolDefault(cfg.HistorySearch, true),
