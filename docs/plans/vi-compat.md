@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/T01
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/T01
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -6,6 +6,9 @@ compatibility. The editor uses the same `Editor.Update` event path standalone an
 ## Behavioral baseline and provenance
 
 The reference profile is **Vim 9.1 defaults with `nocompatible`**, without user configuration.
+For F07 file round trips the specification profile additionally uses `nofixendofline`:
+Misa preserves a missing final newline rather than applying Vim's default `fixendofline`.
+This describes the reference profile, not an implemented option command.
 Neovim differences are notes, not alternate expectations: notably Neovim defaults `Y` to `y$`,
 whereas Vim defaults `Y` to `yy`. This task does not change `Y`.
 
@@ -16,7 +19,9 @@ black-box checks of counted till repeats used Debian Vim 9.1.1230 (`-u NONE -U N
 default `cpoptions`); normal tests do not run it. F05 behavior references Vim 9.1 `nocompatible`
 documentation for `undo`, `undo-blocks`, `U`, `:w`, and `modified` only. F06 uses the same
 reference profile and documentation for `.`, `repeat.txt`, `r`, `R`, and Replace-mode Backspace
-as specifications only; no external code was used. Existing Toybox/vis attribution in
+as specifications only; no external code was used. F07 likewise uses Vim 9.1 documentation for
+`fileformat`, `endofline`, `fixendofline`, `:w`, and `backupcopy` as specifications only, with
+`nofixendofline` as noted above. Existing Toybox/vis attribution in
 `internal/vi/NOTICE` remains unchanged.
 
 ## Replay fixtures (F01)
@@ -36,8 +41,8 @@ Notation:
 
 A fixture asserts the complete logical buffer (a slice of lines without file terminators), zero-based
 cursor `(row, col)` in runes, mode, unnamed register contents and linewise flag, dirty flag, and
-`Editor.Quit`. Characterwise registers can contain embedded newlines. File newline/encoding fidelity
-is separate F07 work; the `:wq` smoke test additionally asserts exact saved bytes. Standalone wrapper
+`Editor.Quit`. Characterwise registers can contain embedded newlines. F07 covers file newline handling;
+the `:wq` smoke test additionally asserts exact saved bytes. Standalone wrapper
 coverage asserts the emitted `tea.QuitMsg`; mux coverage asserts editor exit returns to the same pane
 without quitting Misa and preserves its register.
 
@@ -60,7 +65,27 @@ without quitting Misa and preserves its register.
 | F05: edit transactions and saved identity | `undo_f05_replay_test.go`, `undo_f05_transaction_test.go`, `undo_entry_test.go`, `internal/ui/editor_undo_regression_test.go` | Insert through Escape (including Backspace, newline, counts) and `cw` change form single undo units; clean quit after undo to the saved revision is checked standalone and in a mux pane. No-op/failing commands, yanks, and motions do not create history or clear redo; a committed real new edit clears redo. |
 | F06: semantic dot repeat and count overrides | `repeat_operator_f06_test.go`, `repeat_interactions_f06_test.go`, `insert_replace_f06_test.go` | Repeats semantic operator/change, put, insert and Replace-mode edits; explicit dot counts override the stored count. Yank does not replace the repeatable change. A no-op does not replace the prior repeat. |
 | F06: insert/Replace behavior and repeat transactions | `insert_replace_f06_test.go`, `repeat_entry_test.go`, `internal/ui/editor_repeat_regression_test.go` | Insert and Replace streams (including Backspace) repeat; `r<CR>` is supported. Each dot execution is one undo transaction; repeated insert/Replace cursor placement and standalone/mux entry paths are covered. |
+| F07: file safety (done) | `file*_f07_test.go`, `internal/ui/editor_file_f07_test.go`, `internal/ui/editor_file_regression_test.go` | Load errors, newline preservation, safe writes and external-change guards; scope and limitations below. |
 | T01: substitute confirmation (done) | `substitute_confirm_test.go`, `substitute_confirm_replay_test.go`, `substitute_confirm_edges_test.go`, `substitute_entry_test.go`, `internal/ui/editor_substitute_regression_test.go` | Public-event fixtures for decisions, ranges, global matches, Unicode, cursor/highlight/prompt, counts, undo/redo, no-op history, dot/register preservation, macro playback, and standalone/mux resize and return. |
+
+### F07 file round trips and safety
+
+Opening a nonexistent path (ENOENT) creates a `[New]` buffer. Other read errors are displayed,
+and a normal `:w` is refused after a read failure unless forced with `:w!`. All-CRLF input uses
+DOS line endings; mixed line endings use Unix format and retain the CR characters as text. The
+final-newline state and empty files are preserved; new buffers default to a final newline. This
+is existing UTF-8 text handling, not a promise to round-trip arbitrary binary data. No
+`fileformat` or `endofline` option commands are added.
+
+Normal regular files are saved by a same-directory temporary file and rename, preserving modes.
+A file with no write permission bits requires `:w!`; forcing does not bypass OS permission checks.
+Symlinks, hardlinked files and files with a different owner or group are written in place to preserve inode metadata;
+these writes are **not atomic**. A snapshot of modification time, size and file identity detects
+external changes and requires a forced write (`:w!`, `:wq!` or `:x!`) to override the guard.
+A failed save retains the dirty state and saved revision. These guards are not a substitute for
+coordination with other writers: same-inode edits restoring both size and mtime are undetectable,
+and another writer can race the check. Atomic rename is not a crash-recovery or durability guarantee;
+ACLs and extended attributes are not preserved by replacement writes.
 
 ### T01 scope and limits
 
@@ -145,7 +170,9 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
   F08. Dot repeats the last real change semantically, with an explicit count overriding the stored
   count; no-op commands and yanks do not replace that repeat. `r<CR>` is supported. Each dot execution
   is one undo transaction.
-- **T05:** `:e`/`:e!` is not implemented. The reload-command fixture remains skipped as `TODO(T05)`;
+- **T02:** Range writes and `:w newname` identity semantics are not implemented by F07;
+  legacy behavior remains pending T02.
+- **T05:** A future `:edit` read failure must preserve the current buffer. `:e`/`:e!` is not implemented. The reload-command fixture remains skipped as `TODO(T05)`;
   F05 tests the internal buffer-history reset boundary only. This reset establishes a fresh clean
   revision and clears undo, redo, and line-restore state; file loading/protection stays in T05.
 

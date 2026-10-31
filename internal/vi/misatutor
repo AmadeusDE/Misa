@@ -416,6 +416,19 @@ Counts work everywhere: 3dw deletes 3 words, d3w also deletes 3 words,
 2d3w deletes 6 words.
 ________________________________________________________________________________
 
+                              File Safety
+
+A missing file opens as a new buffer. If a file cannot be read, the error is
+shown and saving requires :w!; check the path before forcing a write. If the
+file changed outside the editor, a normal save is refused. Review the change
+before using :w!, :wq!, or :x! to overwrite it. A failed save keeps your edits
+marked as unsaved.
+
+Line endings and the presence or absence of a final newline are preserved.
+Ordinary files use a temporary file and rename; links and files owned by
+another user are written in place, so those saves are not atomic.
+________________________________________________________________________________
+
                               Quick Reference
 
 Normal mode:

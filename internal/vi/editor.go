@@ -4,8 +4,6 @@ package vi
 import (
 	_ "embed"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -49,6 +47,7 @@ type Editor struct {
 	lines    []string
 	filename string
 	modified bool
+	file     fileState
 
 	row, col           int
 	goalCol            int
@@ -148,33 +147,6 @@ func runBuiltin(ctx *builtins.Context) int {
 		return 1
 	}
 	return 0
-}
-
-func New(filename, dir string) *Editor {
-	e := &Editor{
-		lines:     []string{""},
-		searchDir: 1,
-		regs:      make(map[byte]*regContent),
-		marks:     make(map[byte]pos),
-		abbrevs:   make(map[string]string),
-	}
-	if filename != "" {
-		if !filepath.IsAbs(filename) {
-			filename = filepath.Join(dir, filename)
-		}
-		e.filename = filename
-		if data, err := os.ReadFile(filename); err == nil {
-			text := strings.ReplaceAll(string(data), "\r\n", "\n")
-			e.lines = strings.Split(text, "\n")
-			if len(e.lines) > 1 && e.lines[len(e.lines)-1] == "" {
-				e.lines = e.lines[:len(e.lines)-1]
-			}
-			if len(e.lines) == 0 {
-				e.lines = []string{""}
-			}
-		}
-	}
-	return e
 }
 
 func (e *Editor) Resize(w, h int) {
@@ -907,24 +879,6 @@ func (e *Editor) deleteToReg(text []string, isLine bool) {
 	} else {
 		e.regs['-'] = &regContent{text: text, isLine: isLine}
 	}
-}
-
-// --- File I/O ---
-
-func (e *Editor) save() error {
-	if e.filename == "" {
-		return fmt.Errorf("no filename")
-	}
-	content := strings.Join(e.lines, "\n") + "\n"
-	dir := filepath.Dir(e.filename)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(e.filename, []byte(content), 0o644); err != nil {
-		return err
-	}
-	e.savedEdit()
-	return nil
 }
 
 // --- Command Mode ---

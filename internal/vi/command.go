@@ -60,6 +60,7 @@ func (e *Editor) executeCommand(cmd string) {
 			e.lines = []string{""}
 		}
 		e.filename = ""
+		e.file = fileState{eol: true}
 		e.modified = false
 		e.row = 0
 		e.col = 0
@@ -81,27 +82,19 @@ func (e *Editor) executeCommand(cmd string) {
 		e.Quit = true
 	case rest == "q!":
 		e.Quit = true
-	case rest == "w":
-		if err := e.save(); err != nil {
-			e.statusMsg = err.Error()
-		} else {
-			e.statusMsg = fmt.Sprintf("\"%s\" %dL written", filepath.Base(e.filename), len(e.lines))
+	case rest == "w" || rest == "w!":
+		e.writeCommand(rest == "w!", false)
+	case rest == "wq" || rest == "x" || rest == "wq!" || rest == "x!":
+		e.writeCommand(strings.HasSuffix(rest, "!"), true)
+	case strings.HasPrefix(rest, "w ") || strings.HasPrefix(rest, "w! "):
+		force := strings.HasPrefix(rest, "w! ")
+		name := strings.TrimSpace(strings.TrimPrefix(rest, "w"))
+		if force {
+			name = strings.TrimSpace(strings.TrimPrefix(name, "!"))
 		}
-	case rest == "wq" || rest == "x":
-		if err := e.save(); err != nil {
-			e.statusMsg = err.Error()
-		} else {
-			e.Quit = true
-		}
-	case strings.HasPrefix(rest, "w "):
-		name := strings.TrimSpace(rest[2:])
 		if name != "" {
 			e.filename = name
-			if err := e.save(); err != nil {
-				e.statusMsg = err.Error()
-			} else {
-				e.statusMsg = fmt.Sprintf("\"%s\" %dL written", filepath.Base(e.filename), len(e.lines))
-			}
+			e.writeCommand(force, false)
 		}
 	case strings.HasPrefix(rest, "r "):
 		e.readCmd(strings.TrimSpace(rest[2:]))
