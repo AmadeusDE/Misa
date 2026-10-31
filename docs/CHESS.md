@@ -207,10 +207,43 @@ either, since a lone king can still reach the eighth rank.
   [Lichess](https://lichess.org/variant/horde),
   [Wikipedia: Dunsany's chess](https://en.wikipedia.org/wiki/Dunsany%27s_chess).
 
+- **Fog of War** (`fog`): 8×8 king-capture chess where each side sees only its
+  own pieces and the squares they can reach. There is no check or checkmate and
+  capturing the enemy king wins (see [Fog of War](#fog-of-war)).
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
 earlier variant replaces it.
+
+### Fog of War
+
+The bundled `fog` variant enables fog with `fog: true`. Fog is an inherited YAML
+boolean like other variant settings: omit it to inherit the parent's value, or
+set `fog: false` to turn it off in a child variant. For example:
+
+```yaml
+id: myfog
+name: My Fog Variant
+extends: chess
+fog: true
+```
+
+A side sees all of its own occupied squares, plus every square its own pieces
+can legally move to or capture on. This includes pawn forward squares and an
+en-passant target when available, but not empty pawn capture diagonals. In
+variants with royal pieces, moves that expose a royal to attack are excluded.
+Enemy pieces are shown only when they occupy a visible square; hidden pieces
+are not shown as markers and their last-seen positions are not remembered. In a
+computer game the human always sees their own side's view. In hotseat play the
+view follows the side to move.
+
+Fog uses king-capture rules rather than checkmate: there is no check, moving
+into attack is legal, and capturing the enemy king wins. Castling is allowed
+through attacked squares; en passant and promotion work as usual. The computer
+searches the complete position, including pieces hidden from the human player.
+It therefore has full information and does not play as a genuinely fog-limited
+opponent.
 
 ### Xiangqi
 

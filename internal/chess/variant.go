@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml", "crazyhouse.yaml", "xiangqi.yaml", "horde.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml", "crazyhouse.yaml", "xiangqi.yaml", "horde.yaml", "fog.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -27,7 +27,7 @@ type PieceType struct {
 	Name            string
 	Betza           string
 	Glyph           string // one terminal cell; the letter is used when empty
-	Royal           bool   // may not be left attacked, and castles
+	Royal           bool   // may not be left attacked; goals and check limits count royals
 	Pawn            bool   // promotes, takes and is taken en passant, resets the move clock
 	DropForbidRanks []int  // side-relative ranks on which this piece cannot be dropped
 	Demote          uint8  // original type of a promoted piece, or 0
@@ -76,6 +76,7 @@ type Variant struct {
 	GoalReplyDraw         bool       // the first side's goal arrival is drawn when the other can arrive in reply
 	ForcedCapture         bool       // a legal capture may not be declined
 	InverseMaterial       bool       // the evaluation prefers having fewer, less valuable pieces
+	Fog                   bool       // show only the squares a side can see; the rules lose checks
 	Explosion             *Explosion // captures explode, destroying nearby non-immune pieces
 	Extinction            []uint8    // loss when no pieces of any listed type remain
 	Setup                 string
@@ -160,8 +161,8 @@ type variantDef struct {
 	Promotion     []string    `yaml:"promotion"`
 	PromotionZone int         `yaml:"promotion_zone"`
 	// The two promotion rules are pointers so an inheriting variant can tell
-	// "unset" (keep the parent's) from "false". no_checks and goal_reply_draw
-	// are pointers for the same reason.
+	// "unset" (keep the parent's) from "false". no_checks, goal_reply_draw and
+	// fog are pointers for the same reason.
 	PromotionOptional     *bool          `yaml:"promotion_optional"`
 	PromotionCapturedOnly *bool          `yaml:"promotion_captured_only"`
 	PawnDoubleRanks       []int          `yaml:"double_step_ranks"`
@@ -174,6 +175,7 @@ type variantDef struct {
 	NoChecks              *bool          `yaml:"no_checks"`
 	GoalReplyDraw         *bool          `yaml:"goal_reply_draw"`
 	ForcedCapture         *bool          `yaml:"forced_capture"`
+	Fog                   *bool          `yaml:"fog"`
 	Material              string         `yaml:"material"`
 	Explosion             *explosionDef  `yaml:"explosion"`
 	Extinction            *extinctionDef `yaml:"extinction"`
@@ -390,6 +392,9 @@ func merge(parent, child variantDef) variantDef {
 	if child.CheckLimit != 0 {
 		d.CheckLimit = child.CheckLimit
 	}
+	if child.Fog != nil {
+		d.Fog = child.Fog
+	}
 	if child.Goal != nil {
 		d.Goal = child.Goal
 	}
@@ -445,6 +450,9 @@ func build(d variantDef) (*Variant, error) {
 	}
 	if d.Drops != nil {
 		v.Drops = *d.Drops
+	}
+	if d.Fog != nil {
+		v.Fog = *d.Fog
 	}
 	if v.Name == "" {
 		v.Name = v.ID

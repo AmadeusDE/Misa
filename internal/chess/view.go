@@ -17,6 +17,7 @@ const (
 var (
 	lightSq   = lipgloss.Color("#a89984")
 	darkSq    = lipgloss.Color("#665c54")
+	fogSq     = lipgloss.Color("#3c3836")
 	cursorBg  = lipgloss.Color("#d65d0e")
 	selectBg  = lipgloss.Color("#458588")
 	lastBg    = lipgloss.Color("#98971a")
@@ -64,7 +65,8 @@ func (g *Game) layout() layout {
 		l.pocketW = max(lipgloss.Width(g.pocketText(White)), lipgloss.Width(g.pocketText(Black)))
 		width += 2 + l.pocketW
 	}
-	if width+2+panelWidth <= g.width {
+	// Fog hides the move list: it would name squares the player cannot see.
+	if !v.Fog && width+2+panelWidth <= g.width {
 		l.panel = true
 		width += 2 + panelWidth
 	}
@@ -313,7 +315,7 @@ func (g *Game) header() string {
 	switch st {
 	case Playing:
 		turn := m.Turn().String() + " to move"
-		if m.Position().InCheck() {
+		if !m.Variant().Fog && m.Position().InCheck() {
 			turn += " · check"
 		}
 		if g.thinking {
@@ -327,6 +329,9 @@ func (g *Game) header() string {
 	case Checkmate:
 		return name + " · checkmate, " + winner.String() + " wins"
 	case ExtinctionWin:
+		if m.Variant().Fog {
+			return name + " · king captured, " + winner.String() + " wins"
+		}
 		return name + " · extinction, " + winner.String() + " wins"
 	case GoalWin:
 		return name + " · goal reached, " + winner.String() + " wins"
@@ -347,6 +352,10 @@ func (g *Game) board(l layout) string {
 	hints := g.hints()
 	checked := g.checkedRoyals()
 	last := g.lastMove()
+	var visible []bool
+	if v.Fog {
+		visible = g.match.Position().Visible(g.perspective())
+	}
 	rows := make([]string, l.rows)
 	var sb strings.Builder
 	for row := range l.rows {
@@ -354,7 +363,7 @@ func (g *Game) board(l layout) string {
 		for col := range l.cols {
 			x, y := g.boardXY(col, row)
 			sq := v.Square(x, y)
-			sb.WriteString(g.square(sq, x, y, l.cw, hints, checked[sq], last))
+			sb.WriteString(g.square(sq, x, y, l.cw, hints, checked[sq], last, visible))
 		}
 		rows[row] = sb.String() + strings.Repeat(" ", l.pad)
 	}
@@ -362,7 +371,7 @@ func (g *Game) board(l layout) string {
 	switch {
 	case g.match.Over():
 		border = borderOver
-	case g.match.Position().InCheck():
+	case !v.Fog && g.match.Position().InCheck():
 		border = borderCheck
 	}
 	grid := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(border).Render(strings.Join(rows, "\n"))
@@ -428,6 +437,9 @@ func (g *Game) hints() map[int]hint {
 }
 
 func (g *Game) checkedRoyals() map[int]bool {
+	if g.match.Variant().Fog {
+		return nil
+	}
 	p := g.match.Position()
 	out := map[int]bool{}
 	for _, sq := range p.Royals(p.Turn) {
@@ -439,6 +451,9 @@ func (g *Game) checkedRoyals() map[int]bool {
 }
 
 func (g *Game) lastMove() map[int]bool {
+	if g.match.Variant().Fog {
+		return nil
+	}
 	played := g.match.Played()
 	if len(played) == 0 {
 		return nil
@@ -447,20 +462,24 @@ func (g *Game) lastMove() map[int]bool {
 	return map[int]bool{mv.From: true, mv.To: true}
 }
 
-func (g *Game) square(sq, x, y, cw int, hints map[int]hint, checked bool, last map[int]bool) string {
+func (g *Game) square(sq, x, y, cw int, hints map[int]hint, checked bool, last map[int]bool, visible []bool) string {
 	p := g.match.Position()
 	bg := darkSq
 	if (x+y)%2 == 1 {
 		bg = lightSq
+	}
+	hidden := visible != nil && !visible[sq]
+	if hidden {
+		bg = fogSq
 	}
 	switch {
 	case x == g.cx && y == g.cy && !g.match.Over():
 		bg = cursorBg
 	case sq == g.sel:
 		bg = selectBg
-	case checked:
+	case !hidden && checked:
 		bg = checkBg
-	case hints[sq] == hintCapture:
+	case !hidden && hints[sq] == hintCapture:
 		bg = captureBg
 	case hints[sq] == hintMove && p.Board[sq].Type != 0 && sq != g.sel:
 		bg = selectBg
@@ -468,9 +487,9 @@ func (g *Game) square(sq, x, y, cw int, hints map[int]hint, checked bool, last m
 		bg = lastBg
 	}
 	text, st := " ", dotSt
-	if pc := p.Board[sq]; pc.Type != 0 {
+	if pc := p.Board[sq]; pc.Type != 0 && !hidden {
 		text, st = g.glyph(p.V.Type(pc), pc.Color), pieceFg[pc.Color]
-	} else if hints[sq] == hintMove {
+	} else if !hidden && hints[sq] == hintMove {
 		text = "•"
 	}
 	if cw == 3 {
@@ -493,6 +512,9 @@ func (g *Game) glyph(t *PieceType, c Color) string {
 
 // panel lists the moves so far in numbered pairs, newest at the bottom.
 func (g *Game) panel(height int) []string {
+	if g.match.Variant().Fog {
+		return make([]string, height)
+	}
 	notation := g.match.Notation()
 	var rows []string
 	for i := 0; i < len(notation); i += 2 {
@@ -559,7 +581,7 @@ func (g *Game) status() string {
 			text = "Choose its own square again to pass"
 		}
 	default:
-		if n := g.match.Notation(); len(n) > 0 {
+		if n := g.match.Notation(); !g.match.Variant().Fog && len(n) > 0 {
 			text = "Last move: " + n[len(n)-1]
 		}
 		if g.match.Over() {

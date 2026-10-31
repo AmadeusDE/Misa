@@ -193,6 +193,11 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	if got := g.match.Variant().ID; got != "xiangqi" {
 		t.Fatalf("picker selected %s, want xiangqi", got)
 	}
+	// Fog of War is in the list as well; its name filters to it.
+	keys(g, "v", "f", "o", "g", "enter")
+	if got := g.match.Variant().ID; got != "fog" {
+		t.Fatalf("picker selected %s, want fog", got)
+	}
 	// Horde is another entry; its name is unique in the list, so a filter
 	// starting with "h" reaches it the same way.
 	keys(g, "v", "h", "o", "r", "enter")
