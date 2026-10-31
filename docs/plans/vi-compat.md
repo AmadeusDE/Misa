@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F09/G01/T01/T02/T03/T04/T05
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -75,6 +75,20 @@ without quitting Misa and preserves its register.
 | T01: substitute confirmation (done) | `substitute_confirm_test.go`, `substitute_confirm_replay_test.go`, `substitute_confirm_edges_test.go`, `substitute_entry_test.go`, `internal/ui/editor_substitute_regression_test.go` | Public-event fixtures for decisions, ranges, global matches, Unicode, cursor/highlight/prompt, counts, undo/redo, no-op history, dot/register preservation, macro playback, and standalone/mux resize and return. |
 | F09: bounded viewport and display cells (done) | `internal/vi/layout_test.go`, `display_f09_test.go`, `internal/ui/editor_display_regression_test.go` | One line-to-cells layout (`layout.go`) behind rendering, cursor, Visual/confirm highlights and `j`/`k`; scope below. |
 | G01: Vim pattern subset (done) | `internal/vi/vipat/*_test.go`, `pattern_g01_replay_test.go`, `pattern_entry_g01_test.go`, `substitute_line_test.go`, `internal/ui/editor_pattern_regression_test.go` | One parser/matcher (`vipat`) behind `/`, `?`, `n`/`N`, operator searches, `:s` (including `c`), `:g` and `:v`; scope below. |
+
+### F08 input and paste contract
+
+Normal-mode paste inserts literal text at the cursor and returns to Normal mode as one undoable
+change; it does not replace dot or record macro keystrokes. Insert/Replace paste is literal, normalizes
+CR and CRLF to LF, and participates in insert undo and dot repeat. Command/search paste flattens
+newlines to spaces and removes other control characters without submitting. Visual, confirmation and
+single-character Replace paste are ignored. Multi-rune IME commits are processed in order. Typed
+and replayed keys share mode dispatch; terminal Ctrl-I and Tab are indistinguishable. Full macro
+recording/playback remains H09, and broader command-line editing remains T07.
+
+Original coverage: `internal/vi/input_f08_test.go` and `internal/ui/editor_input_f08_test.go`
+exercise public event routing, literal paste, repeat, undo and embedded mux delivery. Vim v9.1.0000
+is the behavioral reference, not a claim of complete paste or input-method compatibility.
 
 ### F07 file round trips and safety
 

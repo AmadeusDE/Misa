@@ -170,27 +170,10 @@ func (e *Editor) Update(msg tea.Msg) (cmd tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
-		e.statusMsg = ""
-		if e.visual != visualNone && e.mode == ModeNormal {
-			e.updateVisual(msg)
-			return nil
-		}
-		switch e.mode {
-		case ModeNormal:
-			return e.handleNormal(msg)
-		case ModeInsert:
-			return e.handleInsert(msg)
-		case ModeReplace:
-			return e.handleReplace(msg)
-		case ModeReplaceChar:
-			return e.handleReplaceChar(msg)
-		case ModeCommand:
-			return e.handleCommand(msg)
-		case ModeSearch:
-			return e.handleSearch(msg)
-		case ModeConfirm:
-			e.handleSubstituteConfirm(msg)
-		}
+		return e.dispatchInput(inputEvent{kind: inputKey, key: msg})
+	case tea.PasteMsg:
+		return e.dispatchInput(inputEvent{kind: inputPaste, text: msg.Content})
+
 	}
 	return nil
 }

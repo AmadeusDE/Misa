@@ -354,7 +354,7 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 
 	case "ctrl+o":
 		e.jumpBack()
-	case "ctrl+i":
+	case "tab":
 		e.jumpForward()
 
 	// Macros

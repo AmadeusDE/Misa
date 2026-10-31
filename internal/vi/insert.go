@@ -5,7 +5,14 @@ import tea "charm.land/bubbletea/v2"
 // insertKeys preserves editing actions, not just their resulting text.
 func insertKeys(text string) []string {
 	var keys []string
-	for _, ch := range text {
+	runes := []rune(text)
+	for i := 0; i < len(runes); i++ {
+		ch := runes[i]
+		if ch == 0 && i+1 < len(runes) {
+			i++
+			keys = append(keys, "\x00"+string(runes[i]))
+			continue
+		}
 		switch ch {
 		case '\b':
 			keys = append(keys, "backspace")
@@ -17,6 +24,7 @@ func insertKeys(text string) []string {
 			keys = append(keys, string(ch))
 		}
 	}
+
 	return keys
 }
 
@@ -24,13 +32,15 @@ func insertKeys(text string) []string {
 // position. Entry and Escape are owned by the semantic repeat dispatcher.
 func (e *Editor) replayInsertInput(keys []string) {
 	for _, key := range keys {
-		switch e.mode {
-		case ModeReplace:
-			e.handleReplace(keyFromName(key))
-		case ModeReplaceChar:
-			e.handleReplaceChar(keyFromName(key))
-		case ModeInsert:
-			e.handleInsert(keyFromName(key))
+		if len(key) > 1 && key[0] == 0 {
+			r := []rune(key[1:])
+			if len(r) == 1 {
+				e.dispatchInput(inputEvent{kind: inputText, text: string(r[0])})
+			}
+			continue
+		}
+		if e.mode == ModeInsert || e.mode == ModeReplace || e.mode == ModeReplaceChar {
+			e.dispatchInput(inputEvent{kind: inputKey, key: keyFromName(key)})
 		}
 	}
 }
