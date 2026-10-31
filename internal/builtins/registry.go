@@ -1,8 +1,10 @@
 package builtins
 
 import (
+	"context"
 	"io"
 	"sort"
+	"time"
 )
 
 type Context struct {
@@ -15,6 +17,10 @@ type Context struct {
 	Stderr  io.Writer
 	Stdin   io.Reader
 	Env     []string
+
+	// Optional invocation-local services. Nil preserves existing callers.
+	Clock        func() time.Time
+	Cancellation context.Context
 }
 
 type Command struct {

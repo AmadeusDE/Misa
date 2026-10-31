@@ -181,3 +181,31 @@ func TestWalkCancel(t *testing.T) {
 		t.Errorf("err = %v after %d entries, want context.Canceled after 1", err, n)
 	}
 }
+
+func TestPostOrderDepthAndDangling(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "d"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "d", "f"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("missing", filepath.Join(dir, "link")); err != nil {
+		t.Skip(err)
+	}
+	max := 1
+	var got []string
+	err := Walk(context.Background(), ".", Options{Base: dir, FollowLinks: true, DanglingLinks: true, PostOrder: true, MaxDepth: &max}, func(e Entry) error {
+		if e.Err != nil {
+			t.Error(e.Err)
+		}
+		got = append(got, e.Path)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, []string{"./d", "./link", "."}) {
+		t.Fatalf("got %v", got)
+	}
+}
