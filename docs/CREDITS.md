@@ -63,6 +63,11 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 - **uutils/util-linux** by the uutils contributors — MIT (`cal`, `mcookie`, `uuidgen`)
   https://github.com/uutils/util-linux
 
+**Process wrappers, pinned revisions.** `nohup` follows toybox `toys/posix/nohup.c` and `renice` follows
+`toys/posix/renice.c`, `setsid` follows `toys/other/setsid.c`, all at toybox commit
+6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb (0BSD); `nohup` also follows uutils/coreutils `src/uu/nohup` at commit
+fee61ff5d4f87e0f912a52e639942b5f7ad58663 (MIT). `setpgid` is Misa-specific (no upstream equivalent).
+
 ## Chess
 
 Original Go implementation; rules and notation referenced from:

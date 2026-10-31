@@ -16,6 +16,9 @@ func TestMain(m *testing.M) {
 	if len(os.Args) > 1 && os.Args[1] == proceffect.Flag {
 		os.Exit(builtinexec.ProcessEffect(os.Args[2:]))
 	}
+	if len(os.Args) > 1 && os.Args[1] == "--process-target-helper" {
+		os.Exit(processTargetHelper(os.Args[2:]))
+	}
 	os.Setenv("TZ", "UTC")
 	time.Local = time.UTC
 	for _, k := range []string{"LC_ALL", "LC_CTYPE", "LC_COLLATE", "LC_MESSAGES", "LC_TIME", "LC_NUMERIC"} {

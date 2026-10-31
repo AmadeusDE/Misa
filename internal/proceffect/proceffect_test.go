@@ -250,3 +250,42 @@ func TestUnregisteredHost(t *testing.T) {
 		t.Fatalf("%v: %s", err, output)
 	}
 }
+
+func TestReniceTargets(t *testing.T) {
+	// The helper's own pid is a valid target: the child reniced it instead of
+	// the parent, so the assertion is about status and diagnostics only.
+	before, err := Niceness()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	status := Renice(context.Background(), ReniceRequest{Priority: 1, Which: syscall.PRIO_PROCESS, IDs: []int{1 << 22}},
+		Invocation{Stderr: &stderr})
+	if status != 1 || !strings.Contains(stderr.String(), "renice: setpriority 4194304: ") {
+		t.Fatalf("status %d stderr %q", status, stderr.String())
+	}
+	if after, err := Niceness(); err != nil || after != before {
+		t.Fatalf("parent priority %d -> %d (%v)", before, after, err)
+	}
+}
+
+func TestIgnoreHupSurvivesExec(t *testing.T) {
+	dir := t.TempDir()
+	var stderr bytes.Buffer
+	status := Run(context.Background(), Request{
+		DispatchOnly: true, IgnoreHup: true,
+		Argv: []string{"sh", "-c", `kill -HUP $$; echo alive`},
+	}, Invocation{Dir: dir, Env: []string{"PATH=" + testShellPath()}, Stderr: &stderr})
+	if status != 0 {
+		t.Fatalf("status %d stderr %q", status, stderr.String())
+	}
+	// Without IgnoreHup the same command dies from the default disposition.
+	stderr.Reset()
+	status = Run(context.Background(), Request{
+		DispatchOnly: true,
+		Argv:         []string{"sh", "-c", `kill -HUP $$; echo alive`},
+	}, Invocation{Dir: dir, Env: []string{"PATH=" + testShellPath()}, Stderr: &stderr})
+	if status != 128+1 {
+		t.Fatalf("control status %d stderr %q", status, stderr.String())
+	}
+}

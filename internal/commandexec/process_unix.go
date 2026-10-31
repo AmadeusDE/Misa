@@ -61,7 +61,12 @@ func Start(ctx context.Context, name string, inv Invocation, opt Options) (*Proc
 	cmd.Args = append([]string{argv0}, inv.Args...)
 	cmd.Dir = inv.Dir
 	cmd.Env = inv.Env
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: !opt.ShareGroup}
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: !opt.ShareGroup && !opt.Setsid,
+		Setsid:  opt.Setsid,
+		Setctty: opt.Setsid && opt.Setctty,
+		Ctty:    0,
+	}
 	var start, wait []*os.File
 	var outputs []<-chan struct{}
 	var writeMu sync.Mutex
