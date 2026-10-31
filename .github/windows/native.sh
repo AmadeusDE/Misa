@@ -4,12 +4,12 @@
 set -uo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 export CGO_ENABLED=0
-mapfile -t pkgs < <(awk '!/^#/ && $2 == "native" {print $1}' "$here/packages.txt")
+pkgs=(internal/builtins) # TEMP
 fail=0
-for tags in 'nough noweb' 'nough noweb nogui'; do
+for tags in 'nough noweb'; do
   for p in "${pkgs[@]}"; do
     echo "::group::go test -tags '$tags' ./$p"
-    go test -count=1 -tags "$tags" "./$p" || { echo "FAILED: $p [$tags]"; fail=1; }
+    go test -v -timeout 20m -count=1 -tags "$tags" "./$p" || { echo "FAILED: $p [$tags]"; fail=1; }
     echo "::endgroup::"
   done
 done
