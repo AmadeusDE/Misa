@@ -7,6 +7,35 @@ as a multicall binary (`misa ls`) or in-process (`builtin_mode: inprocess`) on s
 Never copy code from GNU coreutils or other GPL projects. Code adapted from permissive projects needs a source
 comment, a `docs/CREDITS.md` entry and, for substantial pieces, a package `NOTICE`.
 
+## U32 — `tar` create/list baseline
+
+`tar -c` creates archives and `tar -t` lists them, using the invocation-local cwd (never a process-wide
+`chdir`) and no external archive tools. Supported options are `-f FILE` (default `-`: stdout for creation,
+stdin for listing), `-v`, positional/repeated `-C DIR`, repeated `--exclude PATTERN`, repeated
+`-T FILE`/`--files-from FILE` (`-` reads names from stdin), `--null`, `-h`/`--dereference`,
+`--numeric-owner`, and numeric-only `--owner ID`/`--group ID`. Traditional `tar cf FILE ...` syntax is
+also accepted. `-tO` still lists names, as in Toybox; `-cO` is rejected.
+
+Creation handles regular files, directories, modes, symbolic links and cross-directory hard links
+(Unix device/inode identity), traversing each source in sorted `internal/walk` order. Symlinks are stored
+without following unless `-h` is given. Writing uses USTAR where possible and PAX for long names/large
+values; reading accepts USTAR, PAX and GNU long-name records. Stored create names are normalized to
+relative paths (including removal of leading `./`); link targets themselves are preserved. Subsecond
+mtime precision is omitted to permit USTAR headers. Exclude globs match path suffixes/components,
+including across slashes, and excluded directories are pruned. List operands select a member or its
+descendants. Files-from records are literal names, not options; `--null` selects NUL-delimited records.
+
+Success is status 0; invalid options, archive/stream failures, missing selections and partial source
+failures return 2. Unreadable source files are diagnosed and later sources are still archived. A source
+read failure after its header has been emitted terminates creation because that stream cannot be
+repaired. Caller-owned streams are not closed. This is a baseline, not a claim of full tar parity.
+
+Extraction (`-x`), compression (`-z`/`-j`/`-J`/`-a`) and related options are deferred to **U33** and fail
+explicitly with status 2; there is no host-tool fallback. Sparse creation, special-file creation,
+transforms, name-based ownership overrides and other unlisted options are not implemented. **U34**
+will add cpio using the shared archive foundation. Toybox adapter skips record unsupported fixtures,
+byte-exact header differences and U33 cases explicitly rather than claiming the full suite passes.
+
 ## Known failures
 
 Cases Misa doesn't pass are listed with a reason in `tests/toybox/known_failures.txt` and

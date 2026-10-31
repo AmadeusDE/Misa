@@ -1,0 +1,4 @@
+This package's tar behavior and tests were informed by Toybox tar.c and
+ tar.test, pinned at commit 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb.
+Toybox tar.c: Copyright 2014 Ashwini Kumar <ak.ashwini81@gmail.com>.
+Toybox is distributed under the Zero-Clause BSD license (0BSD).

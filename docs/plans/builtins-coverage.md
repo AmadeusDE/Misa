@@ -348,7 +348,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `sync` | lsb | – | coreutils:17 | 13 | – | uutils: Rust, 13/17 simple new_ucmd! cases parseable by tests/uutils adapter | 23 | 312 | light |
 | `sysctl` | other | – | procps:9 | 9 | – | uutils: Rust, 9/9 simple new_ucmd! cases parseable by tests/uutils adapter | 149 | 257 | light |
 | `syslogd` | pending | – | – | – | – | no tests | 556 | – | medium |
-| `tar` | posix | 83 | tar:63 | 11 | devices, kernel/fs, root | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 11/63 simple new_ucmd! cases parseable by tests/uutils adapter | 1221 | 1410 | heavy |
 | `taskset` | other | 20 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 228 | – | medium |
 | `tcpsvd` | pending | – | – | – | – | no tests | 395 | – | medium |
 | `telnet` | pending | – | – | – | – | no tests | 271 | – | medium |

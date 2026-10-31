@@ -1112,6 +1112,11 @@ func TestToyboxSuite(t *testing.T) {
 			continue
 		}
 
+		// tar has shell setup and helper functions the generic adapter cannot
+		// replay safely. TestToyboxTarSuite handles it without host tar fallback.
+		if e.Name() == "tar.test" {
+			continue
+		}
 		path := filepath.Join(testDir, e.Name())
 		suite, err := parseTestFile(path)
 		if err != nil {
