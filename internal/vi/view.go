@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 )
@@ -39,6 +40,8 @@ func (e *Editor) View() string {
 	b.WriteByte('\n')
 
 	switch e.mode {
+	case ModeConfirm:
+		b.WriteString(e.confirm.prompt())
 	case ModeCommand:
 		b.WriteString(":" + e.cmdBuf)
 	case ModeSearch:
@@ -69,7 +72,16 @@ func (e *Editor) renderTextLine(lineIdx int) string {
 		fromR, fromC, toR, toC = e.visualBounds()
 	}
 
+	matchFrom, matchTo := 0, 0
+	if e.mode == ModeConfirm && lineIdx == e.confirm.row {
+		line := e.lines[lineIdx]
+		matchFrom = utf8.RuneCountInString(line[:e.confirm.start])
+		matchTo = utf8.RuneCountInString(line[:e.confirm.end])
+	}
 	isSelected := func(row, col int) bool {
+		if col >= matchFrom && col < matchTo {
+			return true
+		}
 		if !inVisual {
 			return false
 		}

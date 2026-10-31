@@ -60,6 +60,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "esc", "ctrl+c", "ctrl+[":
+		e.saveVisualMarks()
 		e.visual = visualNone
 		return nil, nil
 
@@ -323,6 +324,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return nil, nil
 
 	case ":":
+		e.saveVisualMarks()
 		fromR, _, toR, _ := e.visualBounds()
 		e.visual = visualNone
 		e.mode = ModeCommand
@@ -392,4 +394,10 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return nil, nil
+}
+
+func (e *Editor) saveVisualMarks() {
+	fromR, fromC, toR, toC := e.visualBounds()
+	e.marks['<'] = pos{fromR, fromC}
+	e.marks['>'] = pos{toR, toC}
 }

@@ -233,6 +233,8 @@ func (e *Editor) processKey(key string) {
 		e.handleCommand(msg)
 	case ModeSearch:
 		e.handleSearch(msg)
+	case ModeConfirm:
+		e.handleSubstituteConfirm(msg)
 	}
 }
 
