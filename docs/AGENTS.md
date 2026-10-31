@@ -66,7 +66,7 @@ Dependency direction (enforced by `internal/ugh/deps_test.go`): Misa libraries <
 
 ```
 main.go                          Entry point — starts Bubble Tea program; `--gui`/`misa-gui` opens the Wayland window,
-                                 `--ssh`/`misa-ssh` opens it running sshc; `--web`/`--web-admin` serve it in a browser (main_web.go, `-tags noweb` stub); guiCommand resolves builtins not on PATH
+                                 `--ssh`/`misa-ssh` opens it running sshc; `--web`/`--web-admin` serve it in a browser (main_web.go, `-tags noweb` stub); `sh` runs a script noninteractively and `--install-sh` links the sh aliases (main_sh.go); guiCommand resolves builtins not on PATH
 main_gui.go main_nogui.go        runGUI, or its `-tags nogui` stub
 internal/
   ugh/                           ugh agent harness merged in (agent, tools, llm, perm, policy, session, ughtui, …); cmd/ugh is its CLI
@@ -78,6 +78,10 @@ internal/
                                  add_repo approval, clones in state_dir/repos, code_grants table), sched (cron + at times),
                                  api/client (HTTP over the unix socket), ledger (reserve/settle spend caps),
                                  tui (Bots/Chat/Approvals/Routines/Repos/Cost/Status/Devices; bot-manager preset), webhost (browser terminal)
+  shell/
+    session/                     Serialized POSIX parser/runner with persistent state; execution is injected
+    sessionbuiltins/             Opt-in adapter to F02's builtin/external dispatcher
+    shcli/                       `misa sh`: noninteractive -c, script file and stdin entry point
   ui/
     app.go                       Root model, screen dispatch, menu navigation, shell input
     statusbar.go                 Three-column header: distro ASCII | info items | anime ASCII
@@ -289,7 +293,7 @@ internal/
 - **Mouse support**: Enabled via the root view's `MouseMode` (hover events included). The root converts Bubble Tea's mouse messages once (`fromTea`) into `mouseMsg` (Mouse + `Action`: press/release/motion), which handlers and pane coordinate translation use; `toTea` turns it back for embedded agents. Helpers in `mouse.go`. Click to select/activate list items, scroll wheel on lists/viewports, click mux bar tags to switch, click panes to focus. Hovering focuses the pane under the pointer unless `focus_follows_mouse: false` in mux.yaml. Bare hovers that don't move focus reuse the last root frame (`muxFrame`), so mouse handlers must not change the view on button-less motion. Each screen handler has a `mouseMsg` case. Mux root translates absolute coords to pane-relative coords for nested Misa panes.
 - **Shell aliases**: Defined in config.yaml `aliases:` map or at runtime via `alias name=value`. Expanded in `expandAlias()` before command dispatch. `unalias name` removes.
 - **Autorun**: Config `autorun:` list of commands executed on startup in `Init()`.
-- **Shell session library**: `internal/shell/session` owns a serialized POSIX parser/runner and persistent state independently of Bubble Tea. Execution is injected; its default rejects unresolved commands. Opt-in `internal/shell/sessionbuiltins` adapts F02's executor, retaining its documented safety limitations. No TUI or CLI routing is migrated by S02; see `docs/plans/shell-session.md`.
+- **Shell session CLI**: `internal/shell/session` owns a serialized POSIX parser/runner and persistent state independently of Bubble Tea; execution is injected and its default handler rejects unresolved commands. Opt-in `internal/shell/sessionbuiltins` adapts F02's executor, retaining its documented safety limitations. `internal/shell/shcli` runs the noninteractive forms (`misa sh -c`, script file, stdin) through them and F06 `commandexec`, never through a host `/bin/sh`; `misa --install-sh DIR` opts in to `sh`/`misa-sh` argv0 aliases while plain `misa` and `--install DIR` stay unchanged. Interactive mode and TUI wiring remain S05/S06; see `docs/plans/shell-session.md`.
 - **Command dispatch**: `planCommand()` runs plain commands without `/bin/sh`. Builtins re-exec the binary as a multicall (`misa <builtin> args`) by default; `builtin_mode: inprocess` in config.yaml runs them on a goroutine attached to a PTY (busybox-style, for systems without a shell). Only input with shell syntax (`needsShell`) goes through `sh -c`.
 - **Job control**: Each command runs in its own PTY session. External programs run under `misa --job-leader` (config `job_control`, default on) so ^Z stops them; multicall builtins stop themselves on SIGTSTP. A stopped foreground terminal becomes a `job` and the prompt returns; `jobs`/`fg`/`bg` are handled in `handleBuiltinCmd`. Job terminals keep their single `waitTermUpdate` subscription, so never start a second one on `fg`. Panes and Misa's exit close jobs (`closeTerminals`/`Shutdown`), since a stopped process ignores the hangup.
 - **Pane message routing**: Commands from a nested pane are wrapped with `routeTo(owner, cmd)` so their results (`paneMsg`) update the pane that started them, not the focused one. Bubble Tea's own messages (clipboard, colour queries, quit) pass through unwrapped so the program carries them out.

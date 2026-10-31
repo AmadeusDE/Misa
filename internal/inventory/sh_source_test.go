@@ -54,9 +54,35 @@ func validShPath(p string) bool {
 	return p != "" && p != "." && !strings.HasPrefix(p, "/") && path.Clean(p) == p && p != ".." && !strings.HasPrefix(p, "../") && !strings.Contains(p, `\`)
 }
 
+type shReplacement struct {
+	added, original string
+	count           int
+}
+
+var arg0APIPatch = []shReplacement{
+	{"\tfilename string // only if Node was a File\n\targ0     string\n\targ0Set  bool\n", "\tfilename string // only if Node was a File\n", 1},
+	{"// Arg0 sets the shell's $0 independently of the source file name, including\n// when value is empty. Without this option the interpreter uses its default.\nfunc Arg0(value string) RunnerOption {\n\treturn func(r *Runner) error {\n\t\tr.arg0, r.arg0Set = value, true\n\t\treturn nil\n\t}\n}\n\n", "", 1},
+	{"\t\targ0:           r.arg0,\n\t\targ0Set:        r.arg0Set,\n", "", 2},
+}
+
+var arg0VarsPatch = []shReplacement{
+	{"\t\tif r.arg0Set {\n\t\t\tvr.Str = r.arg0\n\t\t} else if r.filename != \"\" {\n", "\t\tif r.filename != \"\" {\n", 1},
+}
+
+// reversePatch removes a declared local patch, recovering the upstream bytes.
+func reversePatch(b []byte, patch []shReplacement) ([]byte, error) {
+	for _, r := range patch {
+		if bytes.Count(b, []byte(r.added)) != r.count {
+			return nil, fmt.Errorf("patch does not match local file: %q", r.added)
+		}
+		b = bytes.Replace(b, []byte(r.added), []byte(r.original), r.count)
+	}
+	return b, nil
+}
+
 // checkShFiles verifies the imported bytes and the declared reversible patches.
 func checkShFiles(dir string, s shSource) error {
-	if len(s.LocalPatches) < 1 || len(s.LocalPatches) > 3 {
+	if len(s.LocalPatches) < 1 || len(s.LocalPatches) > 4 {
 		return fmt.Errorf("invalid patches")
 	}
 	p := s.LocalPatches[0]
@@ -70,11 +96,18 @@ func checkShFiles(dir string, s shSource) error {
 			return fmt.Errorf("invalid gofmt patch")
 		}
 	}
-	sessionPatch := len(s.LocalPatches) == 3
+	sessionPatch := len(s.LocalPatches) >= 3
 	if sessionPatch {
 		p := s.LocalPatches[2]
 		if p.Kind != "session-support" || p.From != "" || p.To != "" || len(p.Files) != 2 || p.Files[0] != "syntax/parser.go" || p.Files[1] != "interp/session_status.go" || p.Reason == "" {
 			return fmt.Errorf("invalid session patch")
+		}
+	}
+	arg0Patch := len(s.LocalPatches) == 4
+	if arg0Patch {
+		p := s.LocalPatches[3]
+		if p.Kind != "session-arg0" || p.From != "" || p.To != "" || len(p.Files) != 2 || p.Files[0] != "interp/api.go" || p.Files[1] != "interp/vars.go" || p.Reason == "" {
+			return fmt.Errorf("invalid arg0 patch")
 		}
 	}
 	if len(s.Packages) == 0 || len(s.Omissions) == 0 {
@@ -128,6 +161,18 @@ func checkShFiles(dir string, s shSource) error {
 				return fmt.Errorf("invalid POSIX declaration patch")
 			}
 			upstream = bytes.Replace(upstream, []byte(patched), []byte(original), 1)
+		}
+		if arg0Patch {
+			var err error
+			switch f.Local {
+			case "interp/api.go":
+				upstream, err = reversePatch(upstream, arg0APIPatch)
+			case "interp/vars.go":
+				upstream, err = reversePatch(upstream, arg0VarsPatch)
+			}
+			if err != nil {
+				return err
+			}
 		}
 		if shDigest(upstream) != f.UpstreamSHA256 {
 			return fmt.Errorf("upstream hash mismatch: %s", f.Local)
@@ -342,5 +387,26 @@ func TestShSessionPatchChecker(t *testing.T) {
 	}
 	if checkShFiles(dir, source) == nil {
 		t.Fatal("modified parser with updated local hash accepted")
+	}
+	if err := decode(data, &source); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.WriteFile(parser, b[:len(b)-len("// tampered\n")], 0644)
+	api := filepath.Join(dir, "interp", "api.go")
+	b, err = os.ReadFile(api)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b = append(b, []byte("// tampered\n")...)
+	if err := os.WriteFile(api, b, 0644); err != nil {
+		t.Fatal(err)
+	}
+	for i := range source.Files {
+		if source.Files[i].Local == "interp/api.go" {
+			source.Files[i].LocalSHA256 = shDigest(b)
+		}
+	}
+	if checkShFiles(dir, source) == nil {
+		t.Fatal("modified arg0 patch with updated local hash accepted")
 	}
 }

@@ -46,6 +46,8 @@ func main() {
 	}
 
 	switch name {
+	case "sh", "misa-sh":
+		os.Exit(runShell(name, os.Args[1:]))
 	case "misa-gui":
 		os.Exit(startGUI(os.Args[1:]))
 	case "misa-ssh":
@@ -60,6 +62,10 @@ func main() {
 
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
+		case "sh":
+			os.Exit(runShell("sh", os.Args[2:]))
+		case "--install-sh":
+			os.Exit(installShellLinks(os.Args[0], os.Args[2:], os.Stderr))
 		case "--install":
 			os.Exit(builtins.InstallLinks(os.Args[0], os.Args[2:], os.Stderr))
 		case "--gui":

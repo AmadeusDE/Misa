@@ -35,6 +35,14 @@ func New(o Options) (*Session, error) {
 		env = slices.Clone(env)
 	}
 	s := &Session{parser: syntax.NewParser(syntax.Variant(syntax.LangPOSIX))}
+	arg0 := func(r *interp.Runner) error {
+		if o.Arg0 != nil {
+			return interp.Arg0(*o.Arg0)(r)
+		}
+		return nil
+	}
+	params := append(slices.Clone(o.ShellOptions), "--")
+	params = append(params, o.Args...)
 	// Dir is validated before attaching input, so constructor errors do not
 	// consume a caller-owned reader.
 	stdio := func(r *interp.Runner) error {
@@ -56,7 +64,7 @@ func New(o Options) (*Session, error) {
 	if handler == nil {
 		handler = func(context.Context, Invocation) int { return 127 }
 	}
-	r, err := interp.New(interp.Dir(o.Dir), interp.Env(expand.ListEnviron(env...)), stdio, interp.ExecHandler(func(ctx context.Context, args []string) error {
+	r, err := interp.New(interp.Dir(o.Dir), interp.Env(expand.ListEnviron(env...)), arg0, interp.Params(params...), stdio, interp.ExecHandler(func(ctx context.Context, args []string) error {
 		hc := interp.HandlerCtx(ctx)
 		if hc.Stdin == nil {
 			hc.Stdin = strings.NewReader("")
@@ -96,6 +104,12 @@ func exported(env expand.Environ) []string {
 
 // Run parses all source before executing it. Runs on the same session serialize.
 func (s *Session) Run(ctx context.Context, src string) Result {
+	return s.RunFile(ctx, "", src)
+}
+
+// RunFile parses source under name for diagnostics, then executes it with the
+// session's independent Arg0. Runs on the same session serialize.
+func (s *Session) RunFile(ctx context.Context, name, src string) Result {
 	s.runMu.Lock()
 	defer s.runMu.Unlock()
 	s.mu.Lock()
@@ -110,9 +124,10 @@ func (s *Session) Run(ctx context.Context, src string) Result {
 	if err := ctx.Err(); err != nil {
 		return s.canceled(err)
 	}
-	file, err := s.parser.Parse(strings.NewReader(src), "")
+	file, err := s.parser.Parse(strings.NewReader(src), name)
 	if err != nil {
 		se := syntaxError(err)
+		se.Name = name
 		return Result{Status: 2, ParseError: se, Err: se}
 	}
 	if err := ctx.Err(); err != nil {
@@ -148,11 +163,16 @@ func (s *Session) canceled(err error) Result {
 func syntaxError(err error) *SyntaxErr {
 	var p syntax.ParseError
 	if errors.As(err, &p) {
-		return &SyntaxErr{p.Pos.Offset(), p.Pos.Line(), p.Pos.Col(), p.Text}
+		return &SyntaxErr{Offset: p.Pos.Offset(), Line: p.Pos.Line(), Column: p.Pos.Col(), Message: p.Text}
 	}
 	var l syntax.LangError
 	if errors.As(err, &l) {
-		return &SyntaxErr{l.Pos.Offset(), l.Pos.Line(), l.Pos.Col(), l.Error()}
+		message := l.Error()
+		if l.Filename != "" {
+			message = strings.TrimPrefix(message, l.Filename+":")
+		}
+		message = strings.TrimPrefix(message, l.Pos.String()+": ")
+		return &SyntaxErr{Offset: l.Pos.Offset(), Line: l.Pos.Line(), Column: l.Pos.Col(), Message: message}
 	}
 	return &SyntaxErr{Message: err.Error()}
 }
