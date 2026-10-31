@@ -12,7 +12,10 @@ import (
 
 func init() { Register(Command{Name: "sha3sum", Run: runSha3sum}) }
 
-func runSha3sum(ctx *Context) int {
+func runSha3sum(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	spec, _ := ParseSpec("bSa:")
 	flags, err := spec.ParseArgs(ctx.Args)
 	if err != nil {
@@ -41,7 +44,7 @@ func runSha3sum(ctx *Context) int {
 		var file *os.File
 		if name != "-" {
 			file, err = os.Open(resolvePath(ctx, name))
-			input = file
+			input = ContextReader(ctx.CancellationContext(), file)
 		} else if input == nil {
 			err = fmt.Errorf("stdin not available")
 		} else {

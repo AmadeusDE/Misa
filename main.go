@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -145,8 +144,8 @@ func runStandalone(name string, args []string) int {
 		return 1
 	}
 
-	// TODO(F05): bridge signals only after all standalone builtins honor cancellation.
-	cancelCtx := context.Background()
+	cancelCtx, stopSignals := standaloneBuiltinContext(name)
+	defer stopSignals()
 	width, height, _ := term.GetSize(int(os.Stdout.Fd()))
 	ctx := &builtins.Context{
 		Ctx:       cancelCtx,

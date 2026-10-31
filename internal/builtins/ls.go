@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/x/term"
 
@@ -139,11 +140,11 @@ func validTimeStyle(v string) bool {
 	return false
 }
 
-func terminalSupportsColor() bool {
-	if os.Getenv("COLORTERM") != "" {
+func terminalSupportsColor(ctx *Context) bool {
+	if ctx.Getenv("COLORTERM") != "" {
 		return true
 	}
-	termEnv := os.Getenv("TERM")
+	termEnv := ctx.Getenv("TERM")
 	return termEnv != "" && termEnv != "dumb"
 }
 
@@ -235,7 +236,7 @@ func runLs(ctx *Context) int {
 	if colorMode == "auto" && !isStdoutTTY(ctx) {
 		noColor = true
 	}
-	if !terminalSupportsColor() {
+	if !terminalSupportsColor(ctx) {
 		noColor = true
 	}
 
@@ -425,6 +426,7 @@ func runLs(ctx *Context) int {
 	}
 
 	formatOpts := lscore.FormatOpts{
+		LSColors:        ctx.Getenv("LS_COLORS"),
 		Long:            long,
 		OnePerLine:      onePerLine,
 		Tree:            isTree,
@@ -535,6 +537,7 @@ func runLs(ctx *Context) int {
 			fo.Table = true
 		}
 
+		lsLocalTimes(fileEntries, ctx.Location())
 		lscore.Format(ctx.Stdout, fileEntries, fo, width)
 		printedAny = true
 
@@ -623,6 +626,7 @@ func listFormatDir(ctx *Context, absPath string, dispPath string, collectOpts ls
 		fo.Table = true
 	}
 
+	lsLocalTimes(files, ctx.Location())
 	lscore.Format(ctx.Stdout, files, fo, width)
 
 	if fo.Dereference && (fo.Inode || fo.ShowBlocks) {
@@ -698,14 +702,14 @@ func resolveSize(ctx *Context) (int, int) {
 		}
 	}
 	if w <= 0 {
-		if cols := os.Getenv("COLUMNS"); cols != "" {
+		if cols := ctx.Getenv("COLUMNS"); cols != "" {
 			if n, err := strconv.Atoi(cols); err == nil && n > 0 {
 				w = n
 			}
 		}
 	}
 	if h <= 0 {
-		if lines := os.Getenv("LINES"); lines != "" {
+		if lines := ctx.Getenv("LINES"); lines != "" {
 			if n, err := strconv.Atoi(lines); err == nil && n > 0 {
 				h = n
 			}
@@ -718,4 +722,10 @@ func resolveSize(ctx *Context) (int, int) {
 		h = 24
 	}
 	return w, h
+}
+
+func lsLocalTimes(files []*lscore.FileInfo, loc *time.Location) {
+	for _, fi := range files {
+		fi.ModTime = fi.ModTime.In(loc)
+	}
 }

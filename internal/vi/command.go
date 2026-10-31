@@ -497,6 +497,7 @@ func (e *Editor) readCmd(arg string) {
 			return
 		}
 		cmd := exec.Command("sh", "-c", shellCmd)
+		cmd.Env = e.env
 		if e.filename != "" {
 			cmd.Dir = filepath.Dir(e.filename)
 		}
@@ -541,6 +542,7 @@ func (e *Editor) shellCmd(cmd string) {
 		return
 	}
 	c := exec.Command("sh", "-c", cmd)
+	c.Env = e.env
 	if e.filename != "" {
 		c.Dir = filepath.Dir(e.filename)
 	}
@@ -558,6 +560,7 @@ func (e *Editor) filterRange(from, to int, cmd string) {
 	}
 	input := strings.Join(e.lines[from:to+1], "\n") + "\n"
 	c := exec.Command("sh", "-c", cmd)
+	c.Env = e.env
 	c.Stdin = strings.NewReader(input)
 	if e.filename != "" {
 		c.Dir = filepath.Dir(e.filename)

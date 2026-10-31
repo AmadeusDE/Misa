@@ -4,12 +4,14 @@ package builtins
 import (
 	"fmt"
 	"io"
-	"os"
 )
 
 func init() { Register(Command{Name: "sum", Run: runSum}) }
 
-func runSum(ctx *Context) int {
+func runSum(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	spec, _ := ParseSpec("rs(sysv)")
 	flags, err := spec.ParseArgs(ctx.Args)
 	if err != nil {
@@ -33,7 +35,7 @@ func runSum(ctx *Context) int {
 				data, err = io.ReadAll(ctx.Stdin)
 			}
 		} else {
-			data, err = os.ReadFile(resolvePath(ctx, name))
+			data, err = ReadFileContext(ctx.CancellationContext(), resolvePath(ctx, name))
 		}
 		if err != nil {
 			fmt.Fprintf(ctx.Stderr, "sum: %s: %s\n", name, fmtOsErr(err))

@@ -60,7 +60,7 @@ func runLn(ctx *Context) int {
 		backupSuffix = s
 		hasSuffix = true
 	}
-	suffix := lnBackupSuffix(backupSuffix, hasSuffix)
+	suffix := lnBackupSuffix(ctx, backupSuffix, hasSuffix)
 
 	targetDir := ""
 	if td, ok := flags.String("t"); ok {
@@ -217,9 +217,9 @@ func resolveSymlinksBestEffort(path string) string {
 	return path
 }
 
-func lnBackupSuffix(explicit string, hasExplicit bool) string {
+func lnBackupSuffix(ctx *Context, explicit string, hasExplicit bool) string {
 	suffix := "~"
-	if env := os.Getenv("SIMPLE_BACKUP_SUFFIX"); env != "" && !strings.Contains(env, "/") {
+	if env := ctx.Getenv("SIMPLE_BACKUP_SUFFIX"); env != "" && !strings.Contains(env, "/") {
 		suffix = env
 	}
 	if hasExplicit && explicit != "" && !strings.Contains(explicit, "/") {

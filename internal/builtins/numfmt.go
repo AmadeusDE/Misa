@@ -41,7 +41,13 @@ func numfmtChoice(value string, choices ...string) (string, bool) {
 	return found, found != ""
 }
 
-func runNumfmt(ctx *Context) int {
+func runNumfmt(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	fail := func(err error) int { fmt.Fprintf(ctx.Stderr, "numfmt: %s\n", err); return 1 }
 	spec, _ := ParseSpec("(from):(to):(from-unit):(to-unit):(round):(invalid):(format):(padding):(header):?(field):d(delimiter):(suffix):(unit-separator):z(zero-terminated)(grouping)(debug)")
 	args, err := spec.ParseArgs(ctx.Args)
