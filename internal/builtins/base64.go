@@ -75,7 +75,7 @@ func baseEncReadFiles(ctx *Context, cmdName string, files []string) ([]byte, boo
 			fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", cmdName, f, fmtOsErr(openErr))
 			return nil, false
 		}
-		data, readErr := io.ReadAll(fh)
+		data, readErr := io.ReadAll(ContextReader(ctx.CancellationContext(), fh))
 		fh.Close()
 		if readErr != nil {
 			fmt.Fprintf(ctx.Stderr, "%s: read error: %s\n", cmdName, fmtOsErr(readErr))
@@ -86,7 +86,10 @@ func baseEncReadFiles(ctx *Context, cmdName string, files []string) ([]byte, boo
 	return input, true
 }
 
-func runBase64(ctx *Context) int {
+func runBase64(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	args := normBaseEncArgs(ctx.Args)
 	flags, err := base64SpecParsed.ParseArgs(args)
 	if err != nil {

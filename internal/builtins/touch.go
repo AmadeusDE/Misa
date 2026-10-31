@@ -35,7 +35,7 @@ func runTouch(ctx *Context) int {
 		return 0
 	}
 
-	posixlyCorrect := os.Getenv("POSIXLY_CORRECT") != ""
+	posixlyCorrect := ctx.Getenv("POSIXLY_CORRECT") != ""
 
 	_, hasT := flags.String("t")
 	_, hasD := flags.String("d")
@@ -45,7 +45,7 @@ func runTouch(ctx *Context) int {
 	operands := flags.Operands
 	if posixlyCorrect && !hasT && !hasD && !hasR && len(operands) >= 2 {
 		if len(operands[0]) == 8 && isObsolescentDate(operands[0]) {
-			t, err := parseObsolescentDate(operands[0])
+			t, err := parseObsolescentDateIn(operands[0], ctx.Location())
 			if err == nil {
 				obsolescentStamp = &t
 				operands = operands[1:]
@@ -92,7 +92,7 @@ func runTouch(ctx *Context) int {
 
 	if tStr, ok := flags.String("t"); ok {
 		var parseErr error
-		stamp, parseErr = parseTouchT(tStr)
+		stamp, parseErr = parseTouchTIn(tStr, ctx.Location())
 		if parseErr != nil {
 			fmt.Fprintf(ctx.Stderr, "touch: invalid date format '%s'\n", tStr)
 			return 1
@@ -102,7 +102,7 @@ func runTouch(ctx *Context) int {
 
 	if dStr, ok := flags.String("d"); ok {
 		var parseErr error
-		stamp, parseErr = parseTouchD(dStr, stamp)
+		stamp, parseErr = parseTouchDIn(dStr, stamp, ctx.Location())
 		if parseErr != nil {
 			fmt.Fprintf(ctx.Stderr, "touch: invalid date format '%s'\n", dStr)
 			return 1
@@ -199,10 +199,10 @@ func isObsolescentDate(s string) bool {
 	return true
 }
 
-func parseObsolescentDate(s string) (time.Time, error) {
-	now := time.Now()
+func parseObsolescentDateIn(s string, loc *time.Location) (time.Time, error) {
+	now := time.Now().In(loc)
 	if len(s) == 8 { // MMDDhhmm
-		return time.ParseInLocation("200601021504", fmt.Sprintf("%d%s", now.Year(), s), time.Local)
+		return time.ParseInLocation("200601021504", fmt.Sprintf("%d%s", now.Year(), s), loc)
 	}
 	// 10 digits: MMDDhhmmYY
 	mmddhhmm := s[:8]
@@ -211,7 +211,7 @@ func parseObsolescentDate(s string) (time.Time, error) {
 	if yy >= 69 {
 		cc = 1900
 	}
-	return time.ParseInLocation("200601021504", fmt.Sprintf("%d%s", cc+yy, mmddhhmm), time.Local)
+	return time.ParseInLocation("200601021504", fmt.Sprintf("%d%s", cc+yy, mmddhhmm), loc)
 }
 
 func touchChtimes(ctx *Context, name, path string, atime, mtime time.Time, noFollow bool, specifyTimes bool) error {
@@ -255,7 +255,7 @@ func touchChtimes(ctx *Context, name, path string, atime, mtime time.Time, noFol
 	return err
 }
 
-func parseTouchT(s string) (time.Time, error) {
+func parseTouchTIn(s string, loc *time.Location) (time.Time, error) {
 	base := s
 	secs := "00"
 	if dot := strings.IndexByte(s, '.'); dot >= 0 {
@@ -275,7 +275,7 @@ func parseTouchT(s string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("invalid seconds")
 	}
 
-	now := time.Now()
+	now := time.Now().In(loc)
 	var layout, input string
 
 	switch len(base) {
@@ -292,7 +292,7 @@ func parseTouchT(s string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("unrecognized format")
 	}
 
-	t, err := time.ParseInLocation(layout, input, time.Local)
+	t, err := time.ParseInLocation(layout, input, loc)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -309,11 +309,13 @@ func parseTouchT(s string) (time.Time, error) {
 	return t, nil
 }
 
-func parseTouchD(s string, base time.Time) (time.Time, error) {
+func parseTouchDIn(s string, base time.Time, loc *time.Location) (time.Time, error) {
 	s = strings.TrimSpace(s)
 	if base.IsZero() {
-		base = time.Now()
+		base = time.Now().In(loc)
 	}
+
+	base = base.In(loc)
 
 	if strings.HasPrefix(s, "@") {
 		sec, err := strconv.ParseInt(s[1:], 10, 64)
@@ -376,10 +378,10 @@ func parseTouchD(s string, base time.Time) (time.Time, error) {
 
 	sNorm := strings.Replace(s, "T", " ", 1)
 	for _, layout := range layouts {
-		if t, err := time.ParseInLocation(layout, s, time.Local); err == nil {
+		if t, err := time.ParseInLocation(layout, s, loc); err == nil {
 			return t, nil
 		}
-		if t, err := time.ParseInLocation(layout, sNorm, time.Local); err == nil {
+		if t, err := time.ParseInLocation(layout, sNorm, loc); err == nil {
 			return t, nil
 		}
 	}

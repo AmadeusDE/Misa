@@ -47,7 +47,13 @@ func nlShouldNumber(line, mode string, re *regexp.Regexp) bool {
 	}
 }
 
-func runNl(ctx *Context) int {
+func runNl(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	flags, err := nlSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "nl:", err)
@@ -187,7 +193,7 @@ func runNl(ctx *Context) int {
 			r = f
 		}
 
-		sc := bufio.NewScanner(r)
+		sc := bufio.NewScanner(ContextReader(ctx.CancellationContext(), r))
 		sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		for sc.Scan() {
 			line := sc.Text()
@@ -202,7 +208,9 @@ func runNl(ctx *Context) int {
 						nextLineNumWouldOverflow = false // Reset overflow flag when counter resets
 					}
 					blankCount = 0
-					fmt.Fprintln(ctx.Stdout)
+					if _, err := fmt.Fprintln(ctx.Stdout); err != nil {
+						return 1
+					}
 					continue
 				}
 				if line == bodyDelim {
@@ -213,7 +221,9 @@ func runNl(ctx *Context) int {
 						nextLineNumWouldOverflow = false // Reset overflow flag when counter resets
 					}
 					blankCount = 0
-					fmt.Fprintln(ctx.Stdout)
+					if _, err := fmt.Fprintln(ctx.Stdout); err != nil {
+						return 1
+					}
 					continue
 				}
 				if line == footerDelim {
@@ -224,7 +234,9 @@ func runNl(ctx *Context) int {
 						nextLineNumWouldOverflow = false // Reset overflow flag when counter resets
 					}
 					blankCount = 0
-					fmt.Fprintln(ctx.Stdout)
+					if _, err := fmt.Fprintln(ctx.Stdout); err != nil {
+						return 1
+					}
 					continue
 				}
 			}
@@ -263,7 +275,9 @@ func runNl(ctx *Context) int {
 				default:
 					numStr = fmt.Sprintf("%*d", int(width), lineNum)
 				}
-				fmt.Fprintf(ctx.Stdout, "%s%s%s\n", numStr, sep, line)
+				if _, err := fmt.Fprintf(ctx.Stdout, "%s%s%s\n", numStr, sep, line); err != nil {
+					return 1
+				}
 
 				// Check if next increment would overflow
 				var wouldOverflow bool
@@ -280,7 +294,9 @@ func runNl(ctx *Context) int {
 				lineNum += increment
 			} else {
 				blank := int(width) + len(sep)
-				fmt.Fprintf(ctx.Stdout, "%*s%s\n", blank, "", line)
+				if _, err := fmt.Fprintf(ctx.Stdout, "%*s%s\n", blank, "", line); err != nil {
+					return 1
+				}
 			}
 		}
 		if err := sc.Err(); err != nil {

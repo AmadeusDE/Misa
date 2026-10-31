@@ -124,6 +124,13 @@ internal/
                                  -o FIELDS[:width][=title] -p -u -U -g -G -t -k/--sort -w). Unsupported options
                                  (-M -n -O -P -s -T -Z, thread listing) fail as unknown options instead of
                                  pretending to work
+    pidof.go killall.go pidwait.go
+                                 `pidof` (-s -o PID[,PID|A-B|%PPID] -x), `killall` (-SIGNAL|-s SIG -l -i -q -v -w)
+                                 and `pidwait` (-f -x -u USER) over internal/proc snapshots: Toybox name
+                                 matching (comm, argv0/exe basename), killall never signals itself, pidwait
+                                 polls with a seam-able interval and treats a changed start time as PID reuse
+    pwdx.go                      `pwdx PID...` — `<root>/PID/cwd` per operand, Toybox-style per-pid error
+                                 lines on stdout, exit 1 when a lookup fails
     man.go install.go util.go    Misc helpers
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
@@ -141,10 +148,10 @@ internal/
                                  keyboard-interactive, password
     escape.go resize.go          `~.` disconnect / `~~`; SIGWINCH plus polling (in-process panes get no SIGWINCH)
     prompt.go                    Terminal prompts read byte-wise so typed-ahead input still reaches the remote
-  proc/                         Process snapshots for `ps`: /proc/<pid> parsing (stat, status, cmdline, exe, the
-                                 raw dev_t TTY and its name) from a configurable proc root so tests can use
-                                 fixtures. Disappearing processes are skipped and denied fields come back empty
-                                 (never an error). proc_linux.go covers Linux and Android; elsewhere (BSD, macOS)
+  proc/                         Process snapshots for `ps`, `pidof`, `killall` and `pidwait`: /proc/<pid>
+                                 parsing (stat, status, cmdline, exe, the raw dev_t TTY and its name) from a
+                                 configurable proc root so tests can use fixtures. Disappearing processes are
+                                 skipped and denied fields come back empty (never an error). proc_linux.go covers Linux and Android; elsewhere (BSD, macOS)
                                  ErrUnsupported until a sysctl backend exists
   lscore/                        ls formatting engine — colors, icons, git status, sorting
   mines/                         Minesweeper clone: board.go (rules, first reveal always safe, flood fill, chording),
@@ -291,7 +298,7 @@ internal/
 - **Config search order**: next to executable → `~/.config/misa/`. Same for companion, mux, fetch and gui configs. Never the working directory: a cloned repo must not be able to supply `autorun:` or aliases.
 - **Config `*bool` pattern**: `BoolDefault()`/`BoolPtr()` helpers for settings that default to true.
 - **Configurable colors**: All colors configurable via `colors:` (info items) and `ui:` (prompt, divider, ghost, etc.) in config.yaml. Defaults are gruvbox.
-- **Builtins**: Register via `init()` with `Register(Command{...})`; use `Spec`/`ParseArgs` for options. Read invocation-local environment through `Context.Environ`/`LookupEnv`/`Getenv`, and use `CancellationContext()` for cooperative work. Respect the provided streams, cwd and TTY metadata; nested execution uses the injected `Exec` rather than importing a shell. Nil environment inherits; non-nil empty means empty. Do not assume legacy process-environment or priority mutations are safe concurrently. See `docs/plans/invocation.md` for `Run`, status mapping and F03–F06 limitations.
+- **Builtins**: Register via `init()` with `Register(Command{...})`; use `Spec`/`ParseArgs` for options. Read invocation-local environment through `Context.Environ`/`LookupEnv`/`Getenv`, and use `CancellationContext()` for cooperative work; long-running loops must observe it and stop on stream errors. Respect the provided streams, cwd and TTY metadata; nested execution uses the injected `Exec` rather than importing a shell. Nil environment inherits; non-nil empty means empty. Do not assume legacy process-environment or priority mutations are safe concurrently. See `docs/plans/invocation.md` for `Run`, status mapping and F03–F06 limitations.
 - **History format**: Zsh-style (`: timestamp:0;command`). Import from bash/zsh is read-only — never writes to external history files. Entries without timestamps (bash imports) sort to the front.
 - **Companion setup**: Moods, pronouns, call terms, prefixes, items/parts, emotes, kemonos, modifiers. Thirsty unlocks NSFW `{part}` (original mommy: milk, cock, cum, mouth); otherwise `{part}` uses SFW items. Modifiers can add combo lines when other modifiers are also selected. Texts load from embedded yaml under `internal/companion/data/`.
 - **Root view**: `Model.View()` returns a `tea.View` (alt screen, `MouseModeAllMotion`) only for the root; panes compose through `render() string`.

@@ -9,8 +9,8 @@ from their own repositories and carry their own licenses (see `go.mod` and `docs
 | [uutils/coreutils](https://github.com/uutils/coreutils) | The Rust test suite and fixtures under `tests/uutils/testdata/` (copied); behaviour of several builtins in `internal/builtins/` (headers say "adapted from uutils coreutils"). | MIT |
 | [uutils/diffutils](https://github.com/uutils/diffutils) | Tests ported in `tests/diffutils/`; `internal/builtins/cmp*.go` and `diff*.go` follow its source. | MIT |
 | [uutils/util-linux](https://github.com/uutils/util-linux) | Behaviour of `cal`, `mcookie`, `uuidgen` in `internal/builtins/`. | MIT |
-| [uutils/procps](https://github.com/uutils/procps) | Behaviour, header and column names of `ps` in `internal/builtins/`. | MIT |
-| [toybox](https://github.com/landley/toybox) | Test files under `tests/toybox/` (copied); the vi command set (`internal/vi`); behaviour of several builtins, including `ps`. | 0BSD |
+| [uutils/procps](https://github.com/uutils/procps) | Behaviour, header and column names of `ps`, and behaviour of `pidof`, `pidwait` and `pwdx` in `internal/builtins/`. | MIT |
+| [toybox](https://github.com/landley/toybox) | Test files under `tests/toybox/` (copied); the vi command set (`internal/vi`); behaviour of several builtins, including `ps`, `pidof`, `killall` and `pwdx`. | 0BSD |
 | [vis](https://github.com/martanne/vis) | Editing logic in `internal/vi` (see `internal/vi/NOTICE`). | ISC |
 | [neofetch](https://github.com/dylanaraps/neofetch) | Distro ASCII art in `internal/ascii/distro/neofetch/`. | MIT |
 | [pfetch](https://github.com/dylanaraps/pfetch) | Distro ASCII art in `internal/ascii/distro/pfetch/`. | MIT |

@@ -55,6 +55,13 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
   https://github.com/landley/toybox
   The `ps` built-in follows `toys/posix/ps.c` at commit 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb (option set,
   field table, the default/`-f`/`-l` layouts, stat parsing and TTY naming).
+  The `pidof` built-in follows `toys/lsb/pidof.c` and the `names_to_pid()` helper in `lib/lib.c` at the same
+  commit (option set, comm/argv0/exe name matching, the `-o` omit list, single-line output).
+  The `killall` built-in follows `toys/lsb/killall.c` at the same commit (option set, `-SIGNAL` handling,
+  name matching through `names_to_pid()`, `-l`/`-i`/`-q`/`-v`/`-w` behaviour and message wording).
+  The `pwdx` built-in follows `toys/other/pwdx.c` at the same commit (`/proc/PID/cwd` per operand, `<pid>:
+  <error>` lines, exit 1 when a lookup fails). Deliberate divergence: Misa keeps Toybox's error lines on
+  stdout where uutils/procps writes them to stderr.
 
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils
@@ -65,9 +72,12 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 - **uutils/util-linux** by the uutils contributors — MIT (`cal`, `mcookie`, `uuidgen`)
   https://github.com/uutils/util-linux
 
-- **uutils/procps** by the uutils contributors — MIT (`ps` header and column names, selection behaviour)
+- **uutils/procps** by the uutils contributors — MIT (`ps` header and column names, selection behaviour;
+  `pidof`/`pidwait` matching and option sets; `pwdx` per-pid message text)
   https://github.com/uutils/procps
-  Follows `tests/by-util/test_ps.rs` and `src/uu/ps` at commit e697667b3f758803e38d8ab4c8f912171beca602.
+  Follows `tests/by-util/test_ps.rs` and `src/uu/ps` at commit e697667b3f758803e38d8ab4c8f912171beca602,
+  `tests/by-util/test_pidof.rs`, `tests/by-util/test_pidwait.rs`, `tests/by-util/test_pwdx.rs`,
+  `src/uu/pidof`, `src/uu/pidwait` and `src/uu/pgrep/src/process_matcher.rs` at the same commit.
 
 ## Chess
 
