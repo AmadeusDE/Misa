@@ -10,8 +10,7 @@ import (
 // expectations were confirmed by black-box replay of the same keystrokes in a
 // stock vi-compatible editor and then written down as independent fixtures; no
 // editor source was consulted and none is needed to run these tests. Cases
-// where that editor's newer releases search forward for a pair the cursor is
-// not inside follow the H05 specification instead and are written by hand
+// that depend on keys continuing after a failure are written by hand
 // (see docs/plans/vi-compat.md).
 
 func TestPairObjectsH05(t *testing.T) {
@@ -150,19 +149,43 @@ func TestPairObjectsH05(t *testing.T) {
 		{name: "yank cursor moves multiline pair", input: "x (\n  foo\n  bar\n)\n", keys: "jjyi(", want: replayState{lines: []string{"x (", "  foo", "  bar", ")"}, row: 1, reg: []string{"  foo", "  bar"}, linewise: true}},
 		{name: "yank cursor moves single pair", input: "a (b c) d\n", keys: "fcyi(", want: replayState{lines: []string{"a (b c) d"}, col: 3, reg: []string{"b c"}}},
 		{name: "yank around cursor", input: "a (b c) d\n", keys: "fcya(", want: replayState{lines: []string{"a (b c) d"}, col: 2, reg: []string{"(b c)"}}},
-		// --- hand-written: the cursor is not inside any pair, so the command fails ---
-		{name: "cursor before pair fails", input: "a (b)\n", keys: "di(", want: replayState{lines: []string{"a (b)"}}},
-		{name: "cursor before pair fails for change", input: "a (b)\n", keys: "ci(", want: replayState{lines: []string{"a (b)"}}},
-		{name: "cursor before multiline pair fails", input: "x (\n  foo\n)\ny\n", keys: "di(", want: replayState{lines: []string{"x (", "  foo", ")", "y"}}},
-		{name: "failure keeps the register", input: "abc (d)\n", keys: "yiwdi(", want: replayState{lines: []string{"abc (d)"}, reg: []string{"abc"}}},
-		{name: "failure does not swallow the next key", input: "a (b)\n", keys: "di(x", want: replayState{lines: []string{" (b)"}, reg: []string{"a"}, modified: true}},
+		// --- forward search: outside every pair the next pair is used; failures ---
+		{name: "fwd same line", input: "a (b) c\n", keys: "di(", want: replayState{lines: []string{"a () c"}, col: 3, reg: []string{"b"}, modified: true}},
+		{name: "fwd skip nested picks first", input: "a (b) (c)\n", keys: "di(", want: replayState{lines: []string{"a () (c)"}, col: 3, reg: []string{"b"}, modified: true}},
+		{name: "fwd after pair fails", input: "(b) a\n", keys: "$di(", want: replayState{lines: []string{"(b) a"}, col: 4}},
+		{name: "fwd next line", input: "a\n(b)\n", keys: "di(", want: replayState{lines: []string{"a", "()"}, row: 1, col: 1, reg: []string{"b"}, modified: true}},
+		{name: "fwd next line far", input: "a\nx\n(b)\n", keys: "di(", want: replayState{lines: []string{"a", "x", "()"}, row: 2, col: 1, reg: []string{"b"}, modified: true}},
+		{name: "fwd around", input: "a (b) c\n", keys: "da(", want: replayState{lines: []string{"a  c"}, col: 2, reg: []string{"(b)"}, modified: true}},
+		{name: "fwd change", input: "a (b) c\n", keys: "ci(X<Esc>", want: replayState{lines: []string{"a (X) c"}, col: 3, reg: []string{"b"}, modified: true}},
+		{name: "fwd count 2", input: "a ((b)) c\n", keys: "d2i(", want: replayState{lines: []string{"a (()) c"}, col: 4, reg: []string{"b"}, modified: true}},
+		{name: "fwd count with sibling", input: "a (b) (c)\n", keys: "d2i(", want: replayState{lines: []string{"a (b) (c)"}}},
+		{name: "fwd on square", input: "a [b] c\n", keys: "di[", want: replayState{lines: []string{"a [] c"}, col: 3, reg: []string{"b"}, modified: true}},
+		{name: "fwd other kind only", input: "a [b] (c)\n", keys: "di(", want: replayState{lines: []string{"a [b] ()"}, col: 7, reg: []string{"c"}, modified: true}},
+		{name: "fwd visual", input: "a (b) c\n", keys: "vi(y", want: replayState{lines: []string{"a (b) c"}, col: 3, reg: []string{"b"}}},
+		{name: "fwd visual around", input: "a (b) c\n", keys: "va(y", want: replayState{lines: []string{"a (b) c"}, col: 2, reg: []string{"(b)"}}},
+		{name: "fwd cursor between pairs", input: "(a) x (b)\n", keys: "fxdi(", want: replayState{lines: []string{"(a) x ()"}, col: 7, reg: []string{"b"}, modified: true}},
+		{name: "fwd cursor between pairs nested", input: "((a) x (b))\n", keys: "fxdi(", want: replayState{lines: []string{"()"}, col: 1, reg: []string{"(a) x (b)"}, modified: true}},
+		{name: "fwd yank", input: "a (b) c\n", keys: "yi(", want: replayState{lines: []string{"a (b) c"}, col: 3, reg: []string{"b"}}},
+		{name: "fwd unmatched open fwd", input: "a (b c\n", keys: "di(", want: replayState{lines: []string{"a (b c"}}},
+		{name: "fwd multiline open", input: "a (\n  b\n)\n", keys: "di(", want: replayState{lines: []string{"a (", ")"}, row: 1, reg: []string{"  b"}, linewise: true, modified: true}},
+		{name: "fwd later line only after 2", input: "a\nx (b)\n", keys: "di(", want: replayState{lines: []string{"a", "x ()"}, row: 1, col: 3, reg: []string{"b"}, modified: true}},
+		{name: "fwd unmatched first then pair", input: "a (b (c)\n", keys: "di(", want: replayState{lines: []string{"a (b (c)"}}},
+		{name: "fwd count 3 inward", input: "a (((b))) c\n", keys: "d3i(", want: replayState{lines: []string{"a ((())) c"}, col: 5, reg: []string{"b"}, modified: true}},
+		{name: "fwd count 2 inward not first child", input: "a ((x)(b)) c\n", keys: "d2i(", want: replayState{lines: []string{"a (()(b)) c"}, col: 4, reg: []string{"x"}, modified: true}},
+		{name: "fwd count 2 deeper", input: "a (x (y)) c\n", keys: "d2i(", want: replayState{lines: []string{"a (x ()) c"}, col: 6, reg: []string{"y"}, modified: true}},
+		{name: "fwd close only before", input: "a ) (b)\n", keys: "di(", want: replayState{lines: []string{"a ) (b)"}}},
+		{name: "fwd cursor on close of earlier line", input: "(a)\nx\n", keys: "jdi(", want: replayState{lines: []string{"(a)", "x"}, row: 1}},
+		{name: "fwd cursor mid line later pair same line", input: "x a (b)\n", keys: "lldi(", want: replayState{lines: []string{"x a ()"}, col: 5, reg: []string{"b"}, modified: true}},
+		{name: "no pair ahead fails", input: "abc\n", keys: "di(", want: replayState{lines: []string{"abc"}}},
+		{name: "failure keeps the register", input: "abc\n", keys: "yiwdi(", want: replayState{lines: []string{"abc"}, reg: []string{"abc"}}},
+		{name: "failure does not swallow the next key", input: "abc\n", keys: "di(x", want: replayState{lines: []string{"bc"}, reg: []string{"a"}, modified: true}},
+		{name: "failed dot keeps the previous change", input: "(a) b\n", keys: "di(fb.", want: replayState{lines: []string{"() b"}, col: 3, reg: []string{"a"}, modified: true}},
+		{name: "visual with no pair ahead keeps selection", input: "a b\n", keys: "vi(y", want: replayState{lines: []string{"a b"}, reg: []string{"a"}}},
 		{name: "unknown object key cancels the operator", input: "a (b)\n", keys: "fbdizx", want: replayState{lines: []string{"a ()"}, col: 3, reg: []string{"b"}, modified: true}},
-		{name: "failed dot keeps the previous change", input: "(a) b (c)\n", keys: "di(fb.", want: replayState{lines: []string{"() b (c)"}, col: 3, reg: []string{"a"}, modified: true}},
 
 		// --- hand-written: Visual failures leave the selection alone and later keys still run ---
 		{name: "visual repeated beyond outermost keeps selection", input: "(a (b c) d)\n", keys: "fbvi(i(i(y", want: replayState{lines: []string{"(a (b c) d)"}, col: 1, reg: []string{"a (b c) d"}}},
 		{name: "visual empty pair keeps selection", input: "x ()\n", keys: "f(vi(y", want: replayState{lines: []string{"x ()"}, col: 2, reg: []string{"("}}},
-		{name: "visual outside pair keeps selection", input: "a (b) c\n", keys: "vi(y", want: replayState{lines: []string{"a (b) c"}, reg: []string{"a"}}},
 		{name: "visual motion extends from the object start", input: "a (b c) d\n", keys: "fbvi(ly", want: replayState{lines: []string{"a (b c) d"}, col: 3, reg: []string{"b c)"}}},
 
 		{name: "pair with multibyte text", input: "é (λ μ) ü\n", keys: "fλdi(", want: replayState{lines: []string{"é () ü"}, col: 3, reg: []string{"λ μ"}, modified: true}},

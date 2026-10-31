@@ -107,7 +107,7 @@ Pairs and quotes share the H04 dispatch (`isTextObjectKey`, `executeObjectOperat
 `i`/`a` prefix). Scanners are `pair_object.go` and `quote_object.go`; the dispatch is
 `delim_object.go`. Neither needs a language parser.
 
-Behaviour that matches Vim: a count picks the n-th enclosing pair; a cursor on either delimiter
+Behaviour that matches Vim: a cursor outside every pair uses the next pair after it (across lines; a count walks inwards, and a closing delimiter or unmatched opener found first fails with no change and no bell, since Misa has none); a count picks the n-th enclosing pair; a cursor on either delimiter
 uses that pair; `i(` on a pair whose delimiters sit on their own lines is linewise, and is
 charwise when text shares a line with a delimiter; an empty pair makes `di(`/`yi(` a no-op (the
 cursor moves between the delimiters) and `ci(` inserts there; quotes are line-local, a quote
@@ -121,10 +121,6 @@ multiline pair includes the final line break.
 
 Known divergences:
 
-- A cursor that is not inside any pair makes the command fail and change nothing. Misa has no
-  audible bell, so the failure is silent and the pending operator is dropped. Recent Vim 9.1/9.2
-  builds instead search forward for the next pair on or after the cursor; Misa follows the H05
-  specification and the older behaviour, so `di(` on the `a` of `a (b)` does nothing.
 - Delimiters are counted by kind only. Brackets inside quotes or comments count, so `f("a)", b)`
   with the cursor on `b` fails where Vim's quote heuristics may skip the `)`.
 - A failed command does not discard the keys typed after it: a script or `.` replay continues,
@@ -133,8 +129,8 @@ Known divergences:
 - A Visual `i(`/`i"` that finds nothing larger (or an empty pair) leaves the selection unchanged.
 - `>i(` on an empty pair indents nothing, and `<`/`>` over a charwise multi-line object shift
   every line the object touches.
-- Fixtures were checked against Vim 9.2 run as a black-box oracle (`vim -u NONE -N -es`) except
-  where the divergence above applies; the cases that differ are written by hand. No Vim source,
+- Fixtures were generated from Vim 9.2 run as a black-box oracle (`vim -u NONE -N -es`); the
+  failure and Visual cases that depend on keys continuing after a failure are written by hand. No Vim source,
   documentation text or tests were read or copied.
 
 ### F08 input and paste contract

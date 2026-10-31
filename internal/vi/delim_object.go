@@ -57,7 +57,7 @@ func (e *Editor) delimSpan(d delimObject, around bool, at textPos, count int) (t
 		from, to, ok := quoteObject(e.lineRunes(at.row), at.col, d.open, mode)
 		return textSpan{from: textPos{at.row, from}, to: textPos{at.row, to}}, ok
 	}
-	p, ok := e.nthPair(at, d, count)
+	p, ok := e.pairFor(at, d, count)
 	if !ok {
 		return textSpan{}, false
 	}
@@ -153,7 +153,7 @@ func (e *Editor) visualDelimObject(key string, count int) {
 // visualPair finds the pair object for a Visual selection [from, to).
 func (e *Editor) visualPair(d delimObject, around bool, count int, from, to textPos, trivial bool) (textPos, textPos, bool) {
 	if trivial {
-		p, ok := e.nthPair(from, d, count)
+		p, ok := e.pairFor(from, d, count)
 		if !ok {
 			return from, to, false
 		}

@@ -6,7 +6,7 @@ package vi
 // other kinds, quotes and comments are plain text. This keeps the scan free of
 // any language rules. The cursor is inside a pair when an unmatched opening
 // delimiter lies before it and its match lies after it; a cursor on either
-// delimiter belongs to that pair. A count selects the n-th enclosing pair.
+// delimiter belongs to that pair. A count selects the n-th enclosing pair. Outside every pair the next pair after the cursor is used.
 //
 // The inner object excludes the delimiters. When the opening delimiter ends
 // its line the object starts on the next line, and when the closing delimiter
@@ -100,6 +100,52 @@ func (e *Editor) nthPair(at textPos, d delimObject, n int) (pairAt, bool) {
 		if open, ok = e.unmatchedOpen(open, d); !ok {
 			return pairAt{}, false
 		}
+	}
+	close, ok := e.matchingClose(open, d)
+	return pairAt{open, close}, ok
+}
+
+// nextDelimiter finds the first opening or closing delimiter at or after p,
+// crossing line breaks.
+func (e *Editor) nextDelimiter(p textPos, d delimObject) (textPos, bool) {
+	for row := p.row; row < len(e.lines); row++ {
+		runes := e.lineRunes(row)
+		from := 0
+		if row == p.row {
+			from = p.col
+		}
+		for col := from; col < len(runes); col++ {
+			if runes[col] == d.open || runes[col] == d.close {
+				return textPos{row, col}, true
+			}
+		}
+	}
+	return p, false
+}
+
+// pairFor finds the pair an object at the cursor refers to. Inside a pair that
+// is the n-th enclosing pair. Outside every pair it is the next pair after the
+// cursor, which may be on a later line; a count then walks inwards, taking the
+// next pair opened inside the previous one. Reaching a closing delimiter first
+// or an opening one with no match fails.
+func (e *Editor) pairFor(at textPos, d delimObject, n int) (pairAt, bool) {
+	if _, inside := e.unmatchedOpen(at, d); inside {
+		return e.nthPair(at, d, n)
+	}
+	if r, _ := e.runeAt(at); r == d.open || r == d.close {
+		return e.nthPair(at, d, n)
+	}
+	from := at
+	var open textPos
+	for i := 0; i < n; i++ {
+		var ok bool
+		if open, ok = e.nextDelimiter(from, d); !ok {
+			return pairAt{}, false
+		}
+		if r, _ := e.runeAt(open); r != d.open {
+			return pairAt{}, false
+		}
+		from = textPos{open.row, open.col + 1}
 	}
 	close, ok := e.matchingClose(open, d)
 	return pairAt{open, close}, ok
