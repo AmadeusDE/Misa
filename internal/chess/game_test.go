@@ -190,13 +190,13 @@ func TestCycleVariantAndUndo(t *testing.T) {
 		}
 	}
 	// V wraps to the last built-in variant and walks back through the same order,
-	// so the newest additions (capablanca, nocastling, amazon) come first.
+	// so the newest additions (berolina, capablanca, nocastling, amazon) come first.
 	keys(g, "V")
-	if g.match.Variant().ID != "capablanca" {
+	if g.match.Variant().ID != "berolina" {
 		t.Fatalf("V wrapped to %s", g.match.Variant().ID)
 	}
 	keys(g, "V")
-	if g.match.Variant().ID != "nocastling" {
+	if g.match.Variant().ID != "capablanca" {
 		t.Fatalf("V went to %s", g.match.Variant().ID)
 	}
 	for step := 3; step <= len(variants)-1; step++ {

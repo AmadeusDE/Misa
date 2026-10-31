@@ -1,0 +1,6 @@
+id: berolina
+name: Berolina Chess
+description: Orthodox chess with Berolina pawns, which move diagonally and capture straight forward.
+extends: chess
+pieces:
+  - {letter: P, name: Pawn, betza: mfFcfWifmnA, pawn: true, glyph: ♟, value: 100}
