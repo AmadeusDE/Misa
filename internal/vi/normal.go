@@ -100,6 +100,12 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 	e.count = 0
 	e.countGiven = false
 
+	if e.pendingOp != 0 && (key == "i" || key == "a") {
+		e.count, e.countGiven = count, cg
+		e.pendingKey = key
+		return nil
+	}
+
 	// Multi-key motions retain the operator, count, and register until resolved.
 	if isMotionPrefix(key) {
 		e.count, e.countGiven = count, cg
@@ -429,11 +435,13 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 
 	// Visual mode
 	case "v":
+		e.visObjValid = false
 		e.visual = visualChar
 		e.visRow = e.row
 		e.visCol = e.col
 		return nil
 	case "V":
+		e.visObjValid = false
 		e.visual = visualLine
 		e.visRow = e.row
 		e.visCol = e.col

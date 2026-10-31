@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05/H01/H02
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05/H01/H02/H04
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -77,6 +77,28 @@ without quitting Misa and preserves its register.
 | G01: Vim pattern subset (done) | `internal/vi/vipat/*_test.go`, `pattern_g01_replay_test.go`, `pattern_entry_g01_test.go`, `substitute_line_test.go`, `internal/ui/editor_pattern_regression_test.go` | One parser/matcher (`vipat`) behind `/`, `?`, `n`/`N`, operator searches, `:s` (including `c`), `:g` and `:v`; scope below. |
 | H01: WORD motions | `word_h01_replay_test.go` | `W`/`B`/`E` move by whitespace-delimited WORDs; operator forms use the same motion path, including `dW`/`cW`/`dE`. Counts and line-boundary behavior are covered. |
 | H02: word searches | `word_search_h02_replay_test.go` | `*`/`#` search forward/backward for a whole keyword; `g*`/`g#` also match within words. Punctuation is searched literally. Normal, Visual and operator searches use shared search state, including counts, wrapping, `n`/`N`, options and highlighting. |
+| H04: word text objects | `word_object_h04_replay_test.go` | Public-event fixtures cover `d`/`c`/`y` with `iw`/`aw`/`iW`/`aW`, operator × object counts, whitespace, tabs, punctuation, trailing whitespace, missing final newline, single- and multiline objects, empty lines, failed counts, named registers, Visual selection and repeated Visual extension, `ciw` followed by dot, undo/redo, a multiline register round trip, and the `!` filter-prompt handoff. These examples are not a claim of complete text-object or Visual parity. |
+
+### H04 word-object limits
+
+`iw`, `aw`, `iW`, and `aW` share one object scanner for operator and Visual dispatch.
+`d`, `c`, and `y` route to characterwise and linewise operations; `>` and `<` route to the
+existing indent operators, and `!` opens the existing range-filter prompt without creating an
+edit. The fixtures assert the `d`/`c`/`y` and `!` paths; no dedicated H04 fixture pins `>iw`
+or `<aw` results. Paired, quoted, prose, and tag objects remain H05–H06; broader Visual
+parity is H07, and numbered-register or Visual dot-repeat behavior is not claimed beyond the
+single `ciw`-then-dot case above.
+
+Known divergence: a counted object that reaches an empty line stops there and treats the empty
+line as satisfying the count. Vim instead fails some counted `aw` objects in that situation, so
+for example `3daw` over a two-word buffer that contains an empty line covers the buffer in Misa
+while Vim leaves it unchanged. Aligning counted `aw` at empty lines with Vim is a follow-up; the
+editor does not emulate Vim internals to get there.
+
+H04 expectations were checked against Vim 9.0.1378 (`vim.tiny`, `-Nu NONE`, `nocompatible`
+defaults) for the same keystrokes. That is the reference for these objects; it does not revise
+the project-wide baseline elsewhere in this ledger. No Vim is required to run the fixtures, and
+no external editor code or prose was copied.
 
 ### F08 input and paste contract
 
@@ -364,7 +386,8 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
 - **F05:** Undo behavior is limited to the model and cases above; it is not full Vim undo parity.
   In particular, arrow-driven insert undo breaks and full Vim cursor/deleted-line/indent heuristics
   are not claimed.
-- **F06:** Visual-mode and text-object dot repeat are deferred (H07/H04). Numbered-register
+- **F06:** Visual-mode dot repeat and broader text-object repeat parity remain deferred (H07/H04);
+  `ciw` followed by dot is covered by the H04 fixture above. Numbered-register
   auto-advance on dot (for example, `"1p` followed by `.` selecting `"2`) is TODO(H08). Macro behavior
   is unchanged and not certified. Arrow-driven input expansion and related behavior are unchanged; see
   F08. Dot repeats the last real change semantically, with an explicit count overriding the stored
@@ -378,4 +401,4 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
 
 `misatutor` describes counted `gg`, operator-find, `d%`, and substitution confirmation;
 the motion examples use the shared motion path. This ledger does not claim complete tutor parity.
-Broader macro and text-object compatibility remains deferred.
+Broader macro, Visual, and text-object compatibility remains deferred; H04 examples are listed above.

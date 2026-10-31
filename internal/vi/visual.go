@@ -9,6 +9,9 @@ import (
 )
 
 func (e *Editor) visualBounds() (fromRow, fromCol, toRow, toCol int) {
+	if e.visObjValid && e.visual != visualLine {
+		return e.visualObjectBounds()
+	}
 	fromRow, fromCol = e.visRow, e.visCol
 	toRow, toCol = e.row, e.col
 	if fromRow > toRow || (fromRow == toRow && fromCol > toCol) {
@@ -39,8 +42,27 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	key := typedKey(keyMsg)
 
+	if e.pendingKey == "i" || e.pendingKey == "a" {
+		prefix := e.pendingKey
+		e.pendingKey = ""
+		if key == "esc" || key == "ctrl+c" || key == "ctrl+[" {
+			e.count, e.countGiven = 0, false
+			return nil, nil
+		}
+		count := max(1, e.count)
+		e.count, e.countGiven = 0, false
+		if key == "w" || key == "W" {
+			e.visualObject(prefix+key, count)
+		}
+		return nil, nil
+	}
+	if key == "i" || key == "a" {
+		e.pendingKey = key
+		return nil, nil
+	}
 	if e.pendingKey == "g" {
 		e.pendingKey = ""
+		e.visObjValid = false
 		count := max(1, e.count)
 		e.count, e.countGiven = 0, false
 		if key == "e" || key == "E" || key == "*" || key == "#" {
@@ -79,13 +101,16 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch key {
 	case "esc", "ctrl+c", "ctrl+[":
 		e.saveVisualMarks()
+		e.visObjValid = false
 		e.visual = visualNone
 		return nil, nil
 
 	case "v":
 		if e.visual == visualChar {
+			e.visObjValid = false
 			e.visual = visualNone
 		} else {
+			e.visObjValid = false
 			e.visual = visualChar
 			e.visRow = e.row
 			e.visCol = e.col
@@ -94,8 +119,10 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case "V":
 		if e.visual == visualLine {
+			e.visObjValid = false
 			e.visual = visualNone
 		} else {
+			e.visObjValid = false
 			e.visual = visualLine
 			e.visRow = e.row
 			e.visCol = e.col
@@ -103,6 +130,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return nil, nil
 
 	case "o":
+		e.visObjValid = false
 		e.visRow, e.row = e.row, e.visRow
 		e.visCol, e.col = e.col, e.visCol
 		e.clampCursor()
@@ -129,13 +157,14 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			e.col = e.firstNonBlank(e.row)
 		} else {
-			fromR, fromC, toR, toC := e.visualBounds()
-			text := e.extractText(fromR, fromC, toR, toC+1)
+			fromR, fromC, toR, toC, _ := e.visualHalfOpen()
+			text := e.extractText(fromR, fromC, toR, toC)
 			e.deleteToReg([]string{text}, false)
-			e.deleteRange(fromR, fromC, toR, toC+1)
+			e.deleteRange(fromR, fromC, toR, toC)
 			e.row = fromR
 			e.col = fromC
 		}
+		e.visObjValid = false
 		e.visual = visualNone
 		e.clampCursor()
 		e.ensureVisible()
@@ -160,13 +189,14 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			e.row = fromR
 			e.col = 0
 		} else {
-			fromR, fromC, toR, toC := e.visualBounds()
-			text := e.extractText(fromR, fromC, toR, toC+1)
+			fromR, fromC, toR, toC, _ := e.visualHalfOpen()
+			text := e.extractText(fromR, fromC, toR, toC)
 			e.deleteToReg([]string{text}, false)
-			e.deleteRange(fromR, fromC, toR, toC+1)
+			e.deleteRange(fromR, fromC, toR, toC)
 			e.row = fromR
 			e.col = fromC
 		}
+		e.visObjValid = false
 		e.visual = visualNone
 		e.mode = ModeInsert
 		e.insertEntry = "c-v"
@@ -184,11 +214,12 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			e.yankToReg(yanked, true)
 			e.statusMsg = fmt.Sprintf("%d lines yanked", len(yanked))
 		} else {
-			fromR, fromC, toR, toC := e.visualBounds()
-			text := e.extractText(fromR, fromC, toR, toC+1)
+			fromR, fromC, toR, toC, _ := e.visualHalfOpen()
+			text := e.extractText(fromR, fromC, toR, toC)
 			e.yankToReg([]string{text}, false)
 		}
 		e.row, e.col, _, _ = e.visualBounds()
+		e.visObjValid = false
 		e.visual = visualNone
 		e.clampCursor()
 		return nil, nil
@@ -200,6 +231,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			e.lines[i] = "\t" + e.lines[i]
 		}
 		e.modified = true
+		e.visObjValid = false
 		e.visual = visualNone
 		e.row = fromR
 		e.col = e.firstNonBlank(fromR)
@@ -222,6 +254,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		e.modified = true
+		e.visObjValid = false
 		e.visual = visualNone
 		e.row = fromR
 		e.col = e.firstNonBlank(fromR)
@@ -264,6 +297,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		e.modified = true
+		e.visObjValid = false
 		e.visual = visualNone
 		e.clampCursor()
 		return nil, nil
@@ -277,6 +311,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 				e.doJoinLine(e.row)
 			}
 		}
+		e.visObjValid = false
 		e.visual = visualNone
 		e.clampCursor()
 		return nil, nil
@@ -306,6 +341,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		e.modified = true
+		e.visObjValid = false
 		e.visual = visualNone
 		return nil, nil
 
@@ -334,18 +370,21 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		e.modified = true
+		e.visObjValid = false
 		e.visual = visualNone
 		return nil, nil
 
 	case ":":
 		e.saveVisualMarks()
 		fromR, _, toR, _ := e.visualBounds()
+		e.visObjValid = false
 		e.visual = visualNone
 		e.mode = ModeCommand
 		e.cmdBuf = fmt.Sprintf("%d,%d", fromR+1, toR+1)
 		return nil, nil
 
 	default:
+		e.visObjValid = false
 		if m, ok := e.resolveMotion(key, count, cg); ok {
 			e.row = m.row
 			e.col = m.col

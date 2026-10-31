@@ -84,6 +84,10 @@ func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGive
 	defer func() { e.recordOperatorChange(change, before) }()
 	change.findChar, change.findCmd = e.lastFChar, e.lastFCmd
 	change.searchPat, change.searchDir = e.searchPat, e.searchDir
+	if key == "iw" || key == "aw" || key == "iW" || key == "aW" {
+		e.executeObjectOperator(op, key, count)
+		return
+	}
 	m, ok := e.resolveMotion(key, count, countGiven)
 	if !ok {
 		return
@@ -229,8 +233,10 @@ func (e *Editor) applyLineOp(op byte, fromR, toR int, motionKey string, count in
 }
 
 func (e *Editor) applyCharOp(op byte, fromR, fromC, toR, toC int, motionKey string, count int) {
-	text := e.extractText(fromR, fromC, toR, toC)
+	e.applyCharOpText(op, fromR, fromC, toR, toC, motionKey, count, e.extractText(fromR, fromC, toR, toC))
+}
 
+func (e *Editor) applyCharOpText(op byte, fromR, fromC, toR, toC int, motionKey string, count int, text string) {
 	switch op {
 	case 'd':
 		e.deleteToReg([]string{text}, false)
