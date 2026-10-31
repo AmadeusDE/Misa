@@ -74,6 +74,7 @@ main.go                          Entry point — starts Bubble Tea program; `--g
 main_gui.go main_nogui.go        runGUI, or its `-tags nogui` stub
 internal/
   filelock/                      Reusable file-based exclusive process locks; lower-level library with no imports from ugh or webui
+  ugh/privdir/                   Private per-user directories: 0700 + owner on Unix; on Windows created with a protected user-only DACL and validated by handle (no reparse points)
   ugh/                           ugh agent harness merged in (agent, tools, llm, perm, policy, session, ughtui, …); cmd/ugh is its CLI
   ughbot/                        ughbot daemon (docs/ughbot/DEPLOY.md); cmd/ughbot is its CLI:
                                  config (ughbot.toml, capabilities decide a bot's tools), store (SQLite: bot defs, mail with

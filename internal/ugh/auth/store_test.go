@@ -123,8 +123,9 @@ func TestMaskKey(t *testing.T) {
 }
 
 func TestOpenBackendSelection(t *testing.T) {
-	old := probeKeyring
-	defer func() { probeKeyring = old }()
+	old, oldPref := probeKeyring, filePreferred
+	defer func() { probeKeyring, filePreferred = old, oldPref }()
+	filePreferred = false
 	path := filepath.Join(t.TempDir(), AppDir, FileName)
 
 	probeKeyring = func() error { return errors.New("no secret service") }

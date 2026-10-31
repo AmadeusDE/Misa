@@ -7,6 +7,40 @@ Misa needs before its Windows build can include the agent. The measurements belo
 added since then (`internal/webui`'s file lock, `internal/ughbot`, `internal/ugh/confine`) needs the same
 treatment. ughbot is out of scope for the Windows port (it is not redefined as Linux-only: it also builds for the BSDs and macOS).
 
+## A02 implemented: private directories and credential storage
+
+Stacked on A01 (PR #125). Part of #108.
+
+- `internal/ugh/privdir` on Windows creates a directory with `CreateDirectory` and a security descriptor given
+  at creation: owner is the current user's SID, DACL is protected (no inheritance) with one access-allowed
+  ACE for that SID, inheritable to children (`O:<sid>D:P(A;OICI;FA;;;<sid>)`). Nothing is created and fixed
+  up afterwards. SYSTEM is not granted (it reaches the object through its privileges anyway); validation
+  tolerates a SYSTEM ACE and nothing else.
+- Validation (`Ensure`, `Verify`, `OpenVerified`) opens the final component with
+  `FILE_FLAG_OPEN_REPARSE_POINT` and checks the handle, not the path: no reparse point at all (symlink,
+  junction, mount point), the expected kind (directory or file), owner equals the user SID, the DACL
+  exists and is protected, and every access-allowed ACE names the user or SYSTEM. Deny ACEs are ignored;
+  unknown ACE types are refused. Inherit-only grants to others are refused (children would inherit them).
+  Ancestors are not checked: `%LOCALAPPDATA%` and OneDrive-redirected folders are legitimate reparse points.
+- `privdir.Under` and `auth.RuntimeDir` return an error instead of a path that failed validation; the
+  admission manager fails every operation with `ErrStorageUnavailable` when it has no private base.
+  Shared directory names use `privdir.UserTag()` (uid on Unix, SID on Windows).
+- `auth` splits its storage into `file_unix.go` (unchanged modes and `O_NOFOLLOW`) and `file_windows.go`
+  (protected temp file created with the descriptor, `MoveFileEx(REPLACE_EXISTING|WRITE_THROUGH)`, no
+  directory fsync).
+- Credential decision: protected files, not Credential Manager. go-keyring on Windows uses wincred and
+  rejects blobs over 2560 bytes, and ugh stores the whole credential document as one entry.
+  `TestOAuthRecordSizeVersusWincredCap` measures it: a Codex record with a 2 KiB access token serializes
+  to 2300 bytes, 2.4 KB tokens to 2652, 4 KiB tokens to 4348, and codex plus two API keys to 2580. So
+  `auto` prefers the file on Windows (`prefer_windows.go`); an explicit `keyring` store reports the limit
+  instead of failing opaquely. Chunking was rejected: it needs multi-entry transactions and recovery for
+  no benefit over a validated private file.
+- Not testable on a hosted runner: a second user (another user's directory, or access by a second account)
+  and a wrong owner set through real ownership transfer. Wrong owner, Everyone, Users, Authenticated Users,
+  Administrators, inherit-only grants, unprotected and NULL DACLs are checked against synthetic descriptors
+  built from SDDL (`TestCheckDescriptor`); Everyone is also added to real objects with `SetNamedSecurityInfo`.
+- Follow-ups: `roots` still resolves config from `HOME`/`XDG_CONFIG_HOME` (no `%APPDATA%`); A05 for worktree.
+
 ## A01 implemented in worktree
 
 A01 is stacked on F01 PR https://github.com/AmadeusDE/Misa/pull/111. No A01 PR exists yet.

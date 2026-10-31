@@ -120,12 +120,7 @@ func AtomicReplace(path string, data []byte) error {
 	if err := os.Rename(f.Name(), path); err != nil {
 		return err
 	}
-	d, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	defer d.Close()
-	return d.Sync()
+	return syncDir(filepath.Dir(path))
 }
 
 // BackupOriginal never overwrites the first pre-migration backup.
