@@ -56,18 +56,25 @@ func validShPath(p string) bool {
 
 // checkShFiles verifies the imported bytes and the declared reversible patches.
 func checkShFiles(dir string, s shSource) error {
-	if len(s.LocalPatches) < 1 || len(s.LocalPatches) > 2 {
+	if len(s.LocalPatches) < 1 || len(s.LocalPatches) > 3 {
 		return fmt.Errorf("invalid patches")
 	}
 	p := s.LocalPatches[0]
 	if p.Kind != "import-path-rewrite" || p.From != shOld || p.To != shNew || len(p.Files) != 0 || p.Reason != "" {
 		return fmt.Errorf("patch must be exactly the approved import-path rewrite")
 	}
-	gofmtPatch := len(s.LocalPatches) == 2
+	gofmtPatch := len(s.LocalPatches) >= 2
 	if gofmtPatch {
 		p := s.LocalPatches[1]
 		if p.Kind != "gofmt" || p.From != "" || p.To != "" || len(p.Files) != 1 || p.Files[0] != "interp/os_unix.go" || p.Reason == "" {
 			return fmt.Errorf("invalid gofmt patch")
+		}
+	}
+	sessionPatch := len(s.LocalPatches) == 3
+	if sessionPatch {
+		p := s.LocalPatches[2]
+		if p.Kind != "session-support" || p.From != "" || p.To != "" || len(p.Files) != 2 || p.Files[0] != "syntax/parser.go" || p.Files[1] != "interp/session_status.go" || p.Reason == "" {
+			return fmt.Errorf("invalid session patch")
 		}
 	}
 	if len(s.Packages) == 0 || len(s.Omissions) == 0 {
@@ -110,8 +117,26 @@ func checkShFiles(dir string, s shSource) error {
 				return fmt.Errorf("reverse gofmt %s: %w", f.Local, err)
 			}
 		}
+		if sessionPatch && f.Local == "syntax/parser.go" {
+			patched := `case "export", "readonly":
+			if p.lang.in(LangPOSIX | langBashLike | LangMirBSDKorn | LangZsh) {
+				p.declClause(s)
+			}
+		case "local", "typeset", "nameref":`
+			original := `case "local", "export", "readonly", "typeset", "nameref":`
+			if bytes.Count(upstream, []byte(patched)) != 1 {
+				return fmt.Errorf("invalid POSIX declaration patch")
+			}
+			upstream = bytes.Replace(upstream, []byte(patched), []byte(original), 1)
+		}
 		if shDigest(upstream) != f.UpstreamSHA256 {
 			return fmt.Errorf("upstream hash mismatch: %s", f.Local)
+		}
+	}
+	if sessionPatch {
+		b, err := os.ReadFile(filepath.Join(dir, "interp", "session_status.go"))
+		if err != nil || shDigest(b) != "ebef9f14b6f9c008267d81aac77e8dc2c16e0585376b773f65a031235404deb9" {
+			return fmt.Errorf("session status file missing or modified")
 		}
 	}
 	if !locals["LICENSE"] {
@@ -138,6 +163,16 @@ func checkShFiles(dir string, s shSource) error {
 		rel, err := filepath.Rel(dir, p)
 		if err != nil {
 			return err
+		}
+		if sessionPatch && filepath.ToSlash(rel) == "interp/session_status.go" {
+			b, err := os.ReadFile(p)
+			if err != nil {
+				return err
+			}
+			if shDigest(b) != "ebef9f14b6f9c008267d81aac77e8dc2c16e0585376b773f65a031235404deb9" {
+				return fmt.Errorf("session status file mismatch")
+			}
+			return nil
 		}
 		if !locals[filepath.ToSlash(rel)] {
 			return fmt.Errorf("unlisted Go file: %s", rel)
@@ -247,5 +282,65 @@ func TestShGofmtPatchChecker(t *testing.T) {
 		if err := checkShFiles(dir, s); err == nil {
 			t.Fatal("tampering with updated local hash accepted")
 		}
+	}
+}
+
+func TestShSessionPatchChecker(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "sh", "SOURCE.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source shSource
+	if err := decode(data, &source); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	for _, f := range source.Files {
+		b, err := os.ReadFile(filepath.Join("..", "sh", filepath.FromSlash(f.Local)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		target := filepath.Join(dir, filepath.FromSlash(f.Local))
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(target, b, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	status := filepath.Join(dir, "interp", "session_status.go")
+	b, err := os.ReadFile(filepath.Join("..", "sh", "interp", "session_status.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(status, b, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkShFiles(dir, source); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(status, append(bytes.Clone(b), '\n'), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if checkShFiles(dir, source) == nil {
+		t.Fatal("modified session extension accepted")
+	}
+	_ = os.WriteFile(status, b, 0644)
+	parser := filepath.Join(dir, "syntax", "parser.go")
+	b, err = os.ReadFile(parser)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b = append(b, []byte("// tampered\n")...)
+	if err := os.WriteFile(parser, b, 0644); err != nil {
+		t.Fatal(err)
+	}
+	for i := range source.Files {
+		if source.Files[i].Local == "syntax/parser.go" {
+			source.Files[i].LocalSHA256 = shDigest(b)
+		}
+	}
+	if checkShFiles(dir, source) == nil {
+		t.Fatal("modified parser with updated local hash accepted")
 	}
 }

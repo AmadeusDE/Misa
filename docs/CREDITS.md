@@ -93,7 +93,7 @@ Original Go implementation; rules and notation referenced from:
 - **mvdan/sh** by Daniel Martí and contributors — BSD-3-Clause
   https://github.com/mvdan/sh
 
-  In-tree foundation (v3.13.1, revision `2f3f5e36d9b0f8f14c998d50aa20a28832205ae8`) for `internal/sh/{syntax,expand,interp,pattern,fileutil}` and required internal helpers; exact file provenance and local changes are documented in `internal/sh/SOURCE.json`.
+  In-tree foundation (v3.13.1, revision `2f3f5e36d9b0f8f14c998d50aa20a28832205ae8`) for `internal/sh/{syntax,expand,interp,pattern,fileutil}` and required internal helpers; exact file provenance and local changes are documented in `internal/sh/SOURCE.json`. S02 adds a traceable POSIX declaration-parsing correction and a Misa-authored session status extension; see `internal/sh/NOTICE`.
 
 ## Go Libraries
 
