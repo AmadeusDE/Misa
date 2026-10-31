@@ -44,3 +44,4 @@ wc/test_total_auto_L572  # wc: column widths differ from uutils for single files
 wc/test_total_auto_1_L576  # wc: column widths differ from uutils for single files and totals
 wc/test_total_never_L620  # wc: column widths differ from uutils for single files and totals
 wc/test_args_override_1_L847  # wc: column widths differ from uutils for single files and totals
+install/test_install_mode_failing_0_L337  # install: -m 999 is reported as an invalid mode, not uutils' Rust integer-parse text

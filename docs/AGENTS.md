@@ -121,6 +121,7 @@ internal/
     rm.go mkdir.go touch.go      File operations
     chmod.go chown.go link.go    Permissions and links
     chgrp.go                     Group ownership — shares chown.go's traversal
+    install_cmd.go install_copy.go  `install` (-d/-D/-m/-o/-g/-p/-t/-T/-v, atomic replace; -s rejected)
     tail.go proc.go sysutil.go   System utilities
     man.go install.go util.go    Misc helpers
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)

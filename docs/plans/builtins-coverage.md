@@ -217,7 +217,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `init` | pending | – | – | – | – | no tests | 513 | – | medium |
 | `inotifyd` | other | – | – | – | – | no tests | 125 | – | light |
 | `insmod` | other | – | – | – | – | no tests | 46 | – | light |
-| `install` | posix | 5 | coreutils:125 | 2 | kernel/fs, root | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 2/125 simple new_ucmd! cases parseable by tests/uutils adapter | 544 | 1750 | heavy |
 | `ionice` | other | – | – | – | – | no tests | 94 | – | light |
 | `iorenice` | other | – | – | – | – | no tests | 94 | – | light |
 | `iotop` | posix | – | – | – | – | no tests | 2004 | – | heavy |

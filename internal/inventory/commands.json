@@ -180,6 +180,21 @@
       ]
     },
     {
+      "name": "chgrp",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/chgrp.go",
+        "internal/builtins/ownership.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox chgrp/chown (0BSD, toys/posix/chgrp.c) and uutils coreutils chgrp (MIT, src/uu/chgrp) at the pinned revisions in sources.json; source revision not established",
+      "tests": [
+        "tests/native/chgrp_test.go",
+        "internal/builtins/chgrp_test.go"
+      ]
+    },
+    {
       "name": "chmod",
       "kind": "builtin",
       "sources": [
@@ -578,6 +593,22 @@
         "tests/toybox/id.test",
         "tests/uutils/testdata/tests/by-util/test_id.rs",
         "internal/builtins/id_test.go"
+      ]
+    },
+    {
+      "name": "install",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/install_cmd.go",
+        "internal/builtins/install_copy.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox install (0BSD, toys/posix/cp.c) and uutils coreutils install (MIT, src/uu/install) at the pinned revisions in sources.json; source revision not established",
+      "tests": [
+        "tests/toybox/install.test",
+        "tests/native/install_test.go",
+        "internal/builtins/install_test.go"
       ]
     },
     {

@@ -287,7 +287,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `init` |  | ✓ pending | ✓ |  |
 | `inotifyd` |  | ✓ other | ✓ |  |
 | `insmod` |  | ✓ other | ✓ |  |
-| `install` |  | ✓ posix | ✓ | ✓ coreutils |
+| `install` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `ionice` |  | ✓ other | ✓ |  |
 | `iorenice` |  | ✓ other |  |  |
 | `iostat` |  |  | ✓ |  |

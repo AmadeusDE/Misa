@@ -1,4 +1,4 @@
-// Ownership traversal shared by chown and chgrp.
+// Ownership traversal shared by chown, chgrp and install.
 //
 // One walker covers every -R case: symlink policy is decided per entry instead
 // of by picking filepath.WalkDir or a hand-written recursion. Behaviour adapted
@@ -12,13 +12,16 @@
 // used to abandon the rest of the tree, and even exited 0 when the operand
 // itself was missing); -v names files as walked ("d/f") rather than by resolved
 // path; and a symlink that cannot be dereferenced reports the chown/chgrp call's
-// error instead of the pre-stat's.
+// error instead of the pre-stat's. install shares the spec parsers below and does
+// its own single-file apply, since it never walks a tree.
 package builtins
 
 import (
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"syscall"
 )
 
@@ -223,6 +226,25 @@ func (w *ownershipWalk) lookup(path string, dereference bool) (os.FileInfo, bool
 		return nil, true
 	}
 	return info, true
+}
+
+// parseUserSpec maps a USER operand to a uid the way parseGroupSpec maps a
+// GROUP to a gid: digits are a numeric uid, anything else must be a user name.
+// An empty spec leaves the owner alone (-1).
+func parseUserSpec(spec string) (int, error) {
+	if spec == "" {
+		return -1, nil
+	}
+	if allDigits(spec) {
+		if n, err := strconv.Atoi(spec); err == nil {
+			return n, nil
+		}
+	} else if u, err := user.Lookup(spec); err == nil {
+		if n, err := strconv.Atoi(u.Uid); err == nil {
+			return n, nil
+		}
+	}
+	return -1, fmt.Errorf("invalid user: '%s'", spec)
 }
 
 // ownershipDiffers reports whether the ids in st differ from the requested

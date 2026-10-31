@@ -190,7 +190,9 @@ func statFormatIn(format, name string, info os.FileInfo, st *syscall.Stat_t, loc
 		case 'f':
 			fmt.Fprintf(&out, "%x", uint32(st.Mode))
 		case 'a':
-			fmt.Fprintf(&out, "%o", info.Mode().Perm())
+			// %a is the octal mode as chmod takes it, so it keeps the
+			// setuid/setgid/sticky digits (%o of Perm alone drops them).
+			fmt.Fprintf(&out, "%o", uint32(st.Mode)&07777)
 		case 'A':
 			out.WriteString(info.Mode().String())
 		case 'F':
