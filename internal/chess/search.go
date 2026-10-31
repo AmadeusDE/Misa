@@ -247,10 +247,11 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 		}
 	}
 
-	// A null move can invent or hide an immediate explosion threat, and it is
-	// no shortcut where captures are compulsory, material is inverted, the side
-	// has no royal left, or a pocket can change the position without a move.
-	if allowNull && e.v.Explosion == nil && !e.v.ForcedCapture && !e.v.InverseMaterial && !e.v.Drops && len(p.royalSq[p.Turn]) > 0 && !inCheck && depth >= 3 && beta < mateScore-maxPly && e.hasPieces(p) {
+	// A null move can invent or hide an immediate explosion or extinction
+	// threat, and it is no shortcut where captures are compulsory, material is
+	// inverted, the side has no royal left, or a pocket can change the position
+	// without a move.
+	if allowNull && e.v.Explosion == nil && len(e.v.Extinction) == 0 && !e.v.ForcedCapture && !e.v.InverseMaterial && !e.v.Drops && len(p.royalSq[p.Turn]) > 0 && !inCheck && depth >= 3 && beta < mateScore-maxPly && e.hasPieces(p) {
 		r := 2
 		if depth >= 6 {
 			r = 3
@@ -341,6 +342,12 @@ func (e *Engine) quiesce(p *Position, ply, alpha, beta int) int {
 	}
 	if ply >= maxPly-1 {
 		return e.eval.evaluate(p)
+	}
+	// A royal-less side can be stalemated without being in check; stand pat
+	// must not turn that draw into a material evaluation.
+	if len(p.royalSq[p.Turn]) == 0 && len(p.Moves()) == 0 {
+		o, _ := adjudicate(p, false)
+		return o.score(p.Turn, ply)
 	}
 	inCheck := p.InCheck()
 	// In compulsory-capture and no-royal games stand-pat can conceal a win

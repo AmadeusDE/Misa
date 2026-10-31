@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml", "crazyhouse.yaml", "xiangqi.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml", "crazyhouse.yaml", "xiangqi.yaml", "horde.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -63,6 +63,8 @@ type Variant struct {
 	Pieces                []*PieceType
 	Castling              []Castle
 	Promotion             []uint8 // piece types a pawn may become
+	PawnDoubleRanks       []int   // side-relative 1-based ranks; nil keeps Betza rules
+	EPExemptRanks         []int   // side-relative ranks whose double steps do not allow en passant
 	PromotionZone         int     // the last n ranks promote
 	PromotionOptional     bool    // a pawn may decline to promote inside the zone
 	PromotionCapturedOnly bool    // a type is available only once its setup piece is gone
@@ -162,6 +164,8 @@ type variantDef struct {
 	// are pointers for the same reason.
 	PromotionOptional     *bool          `yaml:"promotion_optional"`
 	PromotionCapturedOnly *bool          `yaml:"promotion_captured_only"`
+	PawnDoubleRanks       []int          `yaml:"double_step_ranks"`
+	EPExemptRanks         []int          `yaml:"ep_exempt_ranks"`
 	MoveLimit             int            `yaml:"move_limit"`
 	CheckLimit            int            `yaml:"check_limit"`
 	Stalemate             StalemateRule  `yaml:"stalemate"`
@@ -359,6 +363,12 @@ func merge(parent, child variantDef) variantDef {
 	if child.Promotion != nil {
 		d.Promotion = child.Promotion
 	}
+	if child.PawnDoubleRanks != nil {
+		d.PawnDoubleRanks = child.PawnDoubleRanks
+	}
+	if child.EPExemptRanks != nil {
+		d.EPExemptRanks = child.EPExemptRanks
+	}
 	if child.PromotionZone != 0 {
 		d.PromotionZone = child.PromotionZone
 	}
@@ -459,6 +469,17 @@ func build(d variantDef) (*Variant, error) {
 	if v.CheckLimit < 0 {
 		return nil, fmt.Errorf("check limit must not be negative, not %d", v.CheckLimit)
 	}
+	for name, ranks := range map[string][]int{"double_step_ranks": d.PawnDoubleRanks, "ep_exempt_ranks": d.EPExemptRanks} {
+		seen := map[int]bool{}
+		for _, rank := range ranks {
+			if rank < 1 || rank > v.Ranks || seen[rank] {
+				return nil, fmt.Errorf("%s: invalid or duplicate rank %d", name, rank)
+			}
+			seen[rank] = true
+		}
+	}
+	v.PawnDoubleRanks = slices.Clone(d.PawnDoubleRanks)
+	v.EPExemptRanks = slices.Clone(d.EPExemptRanks)
 	if err := v.parseGoal(d.Goal); err != nil {
 		return nil, err
 	}

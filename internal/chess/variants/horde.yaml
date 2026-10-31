@@ -1,0 +1,9 @@
+id: horde
+name: Horde
+description: White's kingless horde must checkmate Black; Black wins by capturing the entire horde.
+extends: chess
+setup: rnbqkbnr/pppppppp/8/1PP2PP1/PPPPPPPP/PPPPPPPP/PPPPPPPP/PPPPPPPP
+extinction: all
+# Ranks are side-relative: Black's second rank is rank 7.
+double_step_ranks: [1, 2]
+ep_exempt_ranks: [1]
