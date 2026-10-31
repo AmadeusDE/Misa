@@ -155,6 +155,24 @@ func (p *Position) generate(tactical bool) []Move {
 	v := p.V
 	var moves []Move
 	seen := make([]bool, v.Size())
+	// Captured-only promotion compares the board with the setup, so count the
+	// side's pieces once instead of per promoting pawn.
+	capturedOnly := v.PromotionCapturedOnly && len(v.Promotion) > 0
+	var own []int32 // only allocated when the rule is on
+	if capturedOnly {
+		own = make([]int32, len(v.Pieces)+1)
+		for _, pc := range p.Board {
+			if pc.Type != 0 && pc.Color == p.Turn {
+				own[pc.Type]++
+			}
+		}
+	}
+	// available reports whether the side to move may still promote to promo:
+	// fewer of it stand on the board than the setup holds. Attacks never look
+	// at this, so an unavailable promotion leaves a pawn's threats intact.
+	available := func(promo uint8) bool {
+		return !capturedOnly || int(own[promo]) < v.startCount(p.Turn, promo)
+	}
 	for from, pc := range p.Board {
 		if pc.Type == 0 || pc.Color != p.Turn {
 			continue
@@ -162,15 +180,25 @@ func (p *Position) generate(tactical bool) []Move {
 		t := v.Type(pc)
 		clear(seen)
 		add := func(to, take int) {
-			promotes := t.Pawn && to != from && p.promotes(to) && len(v.Promotion) > 0
-			if seen[to] || (tactical && take < 0 && !promotes) {
+			if seen[to] {
 				return
 			}
 			seen[to] = true
-			if promotes {
+			if t.Pawn && to != from && p.promotes(to) && len(v.Promotion) > 0 {
 				for _, promo := range v.Promotion {
-					moves = append(moves, Move{From: from, To: to, Take: take, Promote: promo, Castle: -1})
+					if available(promo) {
+						moves = append(moves, Move{From: from, To: to, Take: take, Promote: promo, Castle: -1})
+					}
 				}
+				// Promotion is mandatory on the final rank and wherever the
+				// variant does not let a pawn decline it; with nothing left to
+				// promote to the pawn simply cannot enter the square.
+				if !v.PromotionOptional || p.lastRank(to) {
+					return
+				}
+				// Optional inside the zone: arriving as a pawn is a move too.
+			}
+			if tactical && take < 0 {
 				return
 			}
 			moves = append(moves, Move{From: from, To: to, Take: take, Castle: -1})
@@ -206,6 +234,16 @@ func (p *Position) generate(tactical bool) []Move {
 
 func (p *Position) enPassant(sq int) bool {
 	return p.EPPawn >= 0 && slices.Contains(p.EP, sq)
+}
+
+// lastRank reports whether sq is on the side to move's final rank, where a
+// promoting pawn has no alternative.
+func (p *Position) lastRank(sq int) bool {
+	_, y := p.V.XY(sq)
+	if p.Turn == White {
+		return y == p.V.Ranks-1
+	}
+	return y == 0
 }
 
 func (p *Position) promotes(sq int) bool {

@@ -184,12 +184,39 @@ func (g *Game) promotionKey(k string) {
 	if len(k) != 1 {
 		return
 	}
+	c := upper(k[0])
+	v := g.match.Variant()
 	for _, mv := range g.promo {
-		if g.match.Variant().Pieces[mv.Promote-1].Letter == upper(k[0]) {
+		if mv.Promote != 0 && v.Pieces[mv.Promote-1].Letter == c {
 			g.play(mv)
 			return
 		}
 	}
+	// Staying a pawn has no piece type of its own, so the pawn's letter picks
+	// it, just as the glyph it wears in the prompt suggests.
+	if keep, ok := g.keepMove(); ok && g.moverLetter(keep.From) == c {
+		g.play(keep)
+	}
+}
+
+// keepMove reports the choice that leaves the pawn as it is, for variants
+// where promotion is optional.
+func (g *Game) keepMove() (Move, bool) {
+	for _, mv := range g.promo {
+		if mv.Promote == 0 {
+			return mv, true
+		}
+	}
+	return Move{}, false
+}
+
+// moverLetter is the letter of the piece on sq, or 0 for an empty square.
+func (g *Game) moverLetter(sq int) byte {
+	pc := g.match.Position().Board[sq]
+	if pc.Type == 0 {
+		return 0
+	}
+	return g.match.Variant().Type(pc).Letter
 }
 
 func (g *Game) click(m tea.Mouse) {
@@ -237,8 +264,8 @@ func (g *Game) activate(sq int) {
 	}
 	if g.sel >= 0 {
 		if moves := g.movesBetween(g.sel, sq); len(moves) > 0 {
-			if len(moves) > 1 && moves[0].Promote != 0 {
-				g.promo = moves
+			if choices := promotionChoices(moves); len(choices) > 1 {
+				g.promo = choices
 				return
 			}
 			g.play(moves[0])
@@ -260,6 +287,28 @@ func (g *Game) movesBetween(from, to int) []Move {
 		if mv.From == from && (to < 0 || mv.To == to) {
 			out = append(out, mv)
 		}
+	}
+	return out
+}
+
+// promotionChoices reduces the moves between two squares to one per promotion
+// result: a variant that lets a pawn stay a pawn lists the plain move alongside
+// the promoted ones, and only the distinct outcomes are worth offering.
+func promotionChoices(moves []Move) []Move {
+	out := make([]Move, 0, len(moves))
+	var seen [256]bool
+	for _, mv := range moves {
+		if seen[mv.Promote] {
+			continue
+		}
+		seen[mv.Promote] = true
+		out = append(out, mv)
+	}
+	// Staying a pawn comes first: it is the plain move, the others add a piece.
+	if i := slices.IndexFunc(out, func(mv Move) bool { return mv.Promote == 0 }); i > 0 {
+		keep := out[i]
+		copy(out[1:i+1], out[:i])
+		out[0] = keep
 	}
 	return out
 }

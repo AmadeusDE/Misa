@@ -66,6 +66,9 @@ func TestOpeningMoveCounts(t *testing.T) {
 		// Pawns 16 × 6; knights 4; unicorns 2 (c3, n3); elephants 4 (alfil leaps);
 		// superknight 8; archbishop 2; chancellor 2; rose 11.
 		{"bigboard", 129},
+		// Pawns 10 × 2; rooks 9 each (a step up, then along the first rank);
+		// knights 3; bishops 2; queen 3; king 3; marshal 5; cardinal 6.
+		{"grand", 65},
 	}
 	for _, tt := range tests {
 		p := NewPosition(builtin(t, tt.id))

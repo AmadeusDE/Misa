@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -48,14 +48,17 @@ type Variant struct {
 	Castling              []Castle
 	Promotion             []uint8 // piece types a pawn may become
 	PromotionZone         int     // the last n ranks promote
+	PromotionOptional     bool    // a pawn may decline to promote inside the zone
+	PromotionCapturedOnly bool    // a type is available only once its setup piece is gone
 	MoveLimit             int     // moves by each side without a capture or pawn move before a draw
 	Stalemate             StalemateRule
 	Goal                  []int // absolute squares whose arrival by a royal wins
 	Setup                 string
 	Source                string
 
-	start   []Piece
-	zobrist zobrist
+	start       []Piece
+	startPieces [2][]int // per side, how many of each type the setup holds
+	zobrist     zobrist
 }
 
 type pieceDef struct {
@@ -88,21 +91,25 @@ const (
 // variantDef is a variant file. With extends, unset fields come from the named
 // variant and pieces add to or replace (by letter) the parent's.
 type variantDef struct {
-	ID            string        `yaml:"id"`
-	Name          string        `yaml:"name"`
-	Description   string        `yaml:"description"`
-	Extends       string        `yaml:"extends"`
-	Files         int           `yaml:"files"`
-	Ranks         int           `yaml:"ranks"`
-	Pieces        []pieceDef    `yaml:"pieces"`
-	Setup         string        `yaml:"setup"`
-	Castling      []castleDef   `yaml:"castling"`
-	Promotion     []string      `yaml:"promotion"`
-	PromotionZone int           `yaml:"promotion_zone"`
-	MoveLimit     int           `yaml:"move_limit"`
-	Stalemate     StalemateRule `yaml:"stalemate"`
-	SelfCapture   *bool         `yaml:"self_capture"`
-	Goal          []string      `yaml:"goal"`
+	ID            string      `yaml:"id"`
+	Name          string      `yaml:"name"`
+	Description   string      `yaml:"description"`
+	Extends       string      `yaml:"extends"`
+	Files         int         `yaml:"files"`
+	Ranks         int         `yaml:"ranks"`
+	Pieces        []pieceDef  `yaml:"pieces"`
+	Setup         string      `yaml:"setup"`
+	Castling      []castleDef `yaml:"castling"`
+	Promotion     []string    `yaml:"promotion"`
+	PromotionZone int         `yaml:"promotion_zone"`
+	// The two promotion rules are pointers so an inheriting variant can tell
+	// "unset" (keep the parent's) from "false".
+	PromotionOptional     *bool         `yaml:"promotion_optional"`
+	PromotionCapturedOnly *bool         `yaml:"promotion_captured_only"`
+	MoveLimit             int           `yaml:"move_limit"`
+	Stalemate             StalemateRule `yaml:"stalemate"`
+	SelfCapture           *bool         `yaml:"self_capture"`
+	Goal                  []string      `yaml:"goal"`
 
 	source string
 }
@@ -285,6 +292,12 @@ func merge(parent, child variantDef) variantDef {
 	if child.PromotionZone != 0 {
 		d.PromotionZone = child.PromotionZone
 	}
+	if child.PromotionOptional != nil {
+		d.PromotionOptional = child.PromotionOptional
+	}
+	if child.PromotionCapturedOnly != nil {
+		d.PromotionCapturedOnly = child.PromotionCapturedOnly
+	}
 	if child.MoveLimit != 0 {
 		d.MoveLimit = child.MoveLimit
 	}
@@ -313,8 +326,10 @@ func build(d variantDef) (*Variant, error) {
 	v := &Variant{
 		ID: d.ID, Name: d.Name, Description: d.Description,
 		Files: d.Files, Ranks: d.Ranks, Setup: d.Setup, Source: d.source,
-		SelfCapture:   d.SelfCapture != nil && *d.SelfCapture,
 		PromotionZone: d.PromotionZone, MoveLimit: d.MoveLimit, Stalemate: d.Stalemate,
+		SelfCapture:           d.SelfCapture != nil && *d.SelfCapture,
+		PromotionOptional:     d.PromotionOptional != nil && *d.PromotionOptional,
+		PromotionCapturedOnly: d.PromotionCapturedOnly != nil && *d.PromotionCapturedOnly,
 	}
 	if v.Name == "" {
 		v.Name = v.ID
@@ -357,6 +372,7 @@ func build(d variantDef) (*Variant, error) {
 		return nil, fmt.Errorf("setup: %v", err)
 	}
 	v.start = start
+	v.countStart()
 	for _, c := range d.Castling {
 		castle, err := v.parseCastle(c)
 		if err != nil {
@@ -431,6 +447,27 @@ func (v *Variant) parseCastle(c castleDef) (Castle, error) {
 		return Castle{}, fmt.Errorf("king and rook on the same square %s", c.King)
 	}
 	return Castle{sq[0], sq[1], sq[2], sq[3]}, nil
+}
+
+// countStart records how many of each piece type each side's setup holds.
+// Captured-only promotion compares the board against it.
+func (v *Variant) countStart() {
+	for _, c := range []Color{White, Black} {
+		v.startPieces[c] = make([]int, len(v.Pieces)+1)
+	}
+	for _, pc := range v.start {
+		if pc.Type != 0 {
+			v.startPieces[pc.Color][pc.Type]++
+		}
+	}
+}
+
+// startCount returns how many of type t side c has in the variant's setup.
+func (v *Variant) startCount(c Color, t uint8) int {
+	if c > Black || int(t) >= len(v.startPieces[c]) {
+		return 0
+	}
+	return v.startPieces[c][t]
 }
 
 func (v *Variant) setPromotion(letters []string) error {
