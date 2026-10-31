@@ -1,23 +1,17 @@
 # uutils cases Misa does not pass yet. Each line: <command>/<case>  # reason
 # They are skipped; MISA_KNOWN_FAILURES=1 runs them. Remove a line once it passes.
-dd/test_block_sync_1_L1263  # dd: cbs=/conv=block are unsupported (U17)
-dd/test_block_sync_L1256  # dd: cbs=/conv=block are unsupported (U17)
 dd/test_bytes_suffix_3_L1456  # dd: seek= on a non-seekable output is an error, not zero padding
 dd/test_bytes_suffix_4_L1461  # dd: seek= on a non-seekable output is an error, not zero padding
 dd/test_bytes_suffix_recursive_3_L1486  # dd: seek= on a non-seekable output is an error, not zero padding
 dd/test_bytes_suffix_recursive_4_L1491  # dd: seek= on a non-seekable output is an error, not zero padding
-dd/test_count_bytes_with_expanding_block_conv_0_L2285  # dd: conv=block is unsupported (U17)
-dd/test_iflag_direct_read_uses_aligned_buffer_0_L1856  # dd: iflag=direct is unsupported
-dd/test_iflag_directory_fails_when_file_is_piped_via_std_in_L1893  # dd: iflag=directory is unsupported
-dd/test_noatime_does_not_update_infile_atime_0_L365  # dd: iflag=noatime is unsupported
-dd/test_noatime_does_not_update_ofile_atime_0_L385  # dd: iflag=noatime is unsupported
-dd/test_nocache_eof_0_L2074  # dd: iflag=oflag=nocache is unsupported
-dd/test_nocache_file_0_L1647  # dd: iflag=nocache is unsupported
-dd/test_nocache_stdin_error_0_L1626  # dd: iflag=nocache is unsupported
+dd/test_iflag_directory_fails_when_file_is_piped_via_std_in_L1893  # adapter: pipes stdin through a reader, so dd sees no descriptor to check (a real pipe fails with ENOTDIR)
+dd/test_noatime_does_not_update_infile_atime_0_L365  # dd: iflag=noatime needs credentials the test does not set up; open(2) may refuse it
+dd/test_noatime_does_not_update_ofile_atime_0_L385  # dd: iflag=noatime needs credentials the test does not set up; open(2) may refuse it
+dd/test_nocache_eof_0_L2074  # dd: iflag=oflag=nocache is unsupported (U17 leaves the cache advice out)
+dd/test_nocache_file_0_L1647  # dd: iflag=nocache is unsupported (U17 leaves the cache advice out)
+dd/test_nocache_stdin_error_0_L1626  # dd: iflag=nocache is unsupported (U17 leaves the cache advice out)
 dd/test_seek_bytes_L714  # dd: seek= on a non-seekable output is an error, not zero padding
 dd/test_self_transfer_0_L653  # adapter: the fixture name comes from a function-local let binding
-dd/test_truncated_record_1_L1239  # dd: conv=block is unsupported (U17)
-dd/test_truncated_record_L1233  # dd: conv=block is unsupported (U17)
 dd/test_zero_multiplier_warning_2_L12  # dd: a 0x prefix is hexadecimal (toybox), not a zero multiplier
 dd/test_zero_multiplier_warning_3_L19  # dd: a 0x prefix is hexadecimal (toybox), not a zero multiplier
 dd/test_zero_multiplier_warning_4_L26  # dd: a 0x prefix is hexadecimal (toybox), not a zero multiplier

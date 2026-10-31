@@ -123,6 +123,10 @@ internal/
     man.go install.go util.go    Misc helpers
     dd.go dd_parse.go dd_size.go dd_copy.go dd_status.go
                                  `dd` — operands, size suffixes/x products, the block copy loop, the records summary
+    dd_conv.go dd_tables.go      `dd` conv= — swab, ucase/lcase, block/unblock with cbs=, the EBCDIC/IBM tables, conv=sparse
+    dd_progress.go               `dd` status=progress — the periodic transfer line
+    dd_flags.go dd_openflags_*.go dd_fcntl_*.go
+                                 `dd` iflag=/oflag= platform flags: per-GOOS open(2) bits, fcntl on inherited streams
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
     mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game
