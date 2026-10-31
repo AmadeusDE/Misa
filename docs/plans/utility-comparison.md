@@ -320,7 +320,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `loadfont` |  |  | ✓ |  |
 | `loadkmap` |  |  | ✓ |  |
 | `local` |  | ✓ pending |  |  |
-| `locate` |  |  |  | ✓ findutils |
+| `locate` | ✓ |  |  | ✓ findutils |
 | `log` |  | ✓ android |  |  |
 | `logger` |  | ✓ posix | ✓ |  |
 | `login` |  | ✓ other | ✓ | ✓ login, ✓ shadow |
@@ -615,7 +615,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `unshare` |  | ✓ other | ✓ |  |
 | `unxz` |  |  | ✓ |  |
 | `unzip` |  |  | ✓ |  |
-| `updatedb` |  |  |  | ✓ findutils |
+| `updatedb` | ✓ |  |  | ✓ findutils |
 | `uptime` |  | ✓ other | ✓ | ✓ coreutils |
 | `useradd` |  | ✓ pending |  | ✓ shadow |
 | `userdel` |  | ✓ pending |  | ✓ shadow |

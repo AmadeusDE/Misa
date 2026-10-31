@@ -235,7 +235,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `link` | posix | 4 | coreutils:8 | 2 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 2/8 simple new_ucmd! cases parseable by tests/uutils adapter | 25 | 57 | light |
 | `linux32` | other | – | – | – | – | no tests | 24 | – | light |
 | `load_policy` | android | – | – | – | – | no tests | 31 | – | medium |
-| `locate` | – | – | findutils:27 | 0 | – | uutils: Rust, 0/27 simple new_ucmd! cases parseable by tests/uutils adapter | – | – | medium |
 | `log` | android | – | – | – | – | no tests | 70 | – | medium |
 | `logger` | posix | – | – | – | – | no tests | 98 | – | light |
 | `login` | other | – | login:–, shadow:11 | 0 | root, tty | uutils: Rust, 0/11 simple new_ucmd! cases parseable by tests/uutils adapter | 137 | 28 | medium |
@@ -371,7 +370,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `unix2dos` | other | – | – | – | – | no tests | 76 | – | light |
 | `unlink` | posix | – | coreutils:7 | 2 | – | uutils: Rust, 2/7 simple new_ucmd! cases parseable by tests/uutils adapter | 24 | 50 | light |
 | `unshare` | other | – | – | – | – | no tests | 166 | – | light |
-| `updatedb` | – | – | findutils:27 | 0 | – | uutils: Rust, 0/27 simple new_ucmd! cases parseable by tests/uutils adapter | – | – | medium |
 | `uptime` | other | 2 | coreutils:16 | 11 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 11/16 simple new_ucmd! cases parseable by tests/uutils adapter | 79 | 394 | light |
 | `useradd` | pending | 14 | shadow:34 | 0 | root | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 0/34 simple new_ucmd! cases parseable by tests/uutils adapter | 159 | 2462 | medium |
 | `userdel` | pending | – | shadow:16 | 0 | root | uutils: Rust, 0/16 simple new_ucmd! cases parseable by tests/uutils adapter | 114 | 621 | medium |
