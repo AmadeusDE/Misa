@@ -178,6 +178,7 @@ func TestOriginalEmotesAndLove(t *testing.T) {
 func TestWriteSetupWritesResponses(t *testing.T) {
 	cfg := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfg)
+	t.Setenv("AppData", cfg) // os.UserConfigDir on Windows
 	dir := filepath.Join(cfg, "misa")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)

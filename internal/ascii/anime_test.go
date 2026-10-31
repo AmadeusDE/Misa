@@ -11,6 +11,7 @@ func withAnimeDir(t *testing.T, files map[string]string) {
 	t.Helper()
 	cfg := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfg)
+	t.Setenv("AppData", cfg) // os.UserConfigDir on Windows
 	if files == nil {
 		return
 	}

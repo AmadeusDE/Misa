@@ -9,6 +9,7 @@ import (
 func TestConfigIgnoresWorkingDirectory(t *testing.T) {
 	cfg := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfg)
+	t.Setenv("AppData", cfg) // os.UserConfigDir on Windows
 	cwd := t.TempDir()
 	t.Chdir(cwd)
 	for _, name := range []string{"config.yaml", "mux.yaml", "fetch.yaml", "gui.yaml"} {
