@@ -153,7 +153,10 @@ func fixturePaths(root string) ([]string, error) {
 			if d.IsDir() {
 				return nil
 			}
-			if base == "tests/uutils/testdata" || path.Ext(rel) == ".test" || rel == "tests/toybox/LICENSE" {
+			// Copied upstream fixtures under tests/toybox/files/ are inventoried too:
+			// only reviewed, pinned bytes belong there.
+			if base == "tests/uutils/testdata" || path.Ext(rel) == ".test" || rel == "tests/toybox/LICENSE" ||
+				strings.HasPrefix(rel, "tests/toybox/files/") {
 				paths = append(paths, rel)
 			}
 			return nil

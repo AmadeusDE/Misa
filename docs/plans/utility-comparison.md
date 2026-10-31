@@ -205,7 +205,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `fetch` | ✓ |  |  |  |
 | `fgconsole` |  |  | ✓ |  |
 | `fgrep` |  | ✓ posix | ✓ |  |
-| `file` |  | ✓ posix |  |  |
+| `file` | ✓ | ✓ posix |  |  |
 | `find` |  | ✓ posix | ✓ | ✓ findutils |
 | `findfs` |  |  | ✓ |  |
 | `fix` | ✓ |  |  |  |
@@ -449,7 +449,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `rdate` |  |  | ✓ |  |
 | `rdev` |  |  | ✓ |  |
 | `readahead` |  | ✓ other | ✓ |  |
-| `readelf` |  | ✓ other |  |  |
+| `readelf` | ✓ | ✓ other |  |  |
 | `readlink` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `readprofile` |  |  | ✓ |  |
 | `realpath` | ✓ | ✓ other | ✓ | ✓ coreutils |

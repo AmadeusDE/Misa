@@ -24,7 +24,9 @@ Grouped by cause:
 - **Filesystem-dependent**: `du` block counts differ on btrfs and zfs (toybox, 10 cases). Run these on ext4
   or tmpfs, or compare apparent sizes.
 - **Test adapter gaps**: multi-line setup loops in toybox `chmod` cases; `mv -i` cases that reuse files
-  from earlier cases.
+  from earlier cases; toybox `file` cases that take a symlink target from `$(readlink …)` in a variable
+  assignment, and the `test_line` helper calls (`tar`, `7z`, the ELF note fixtures), which the adapter
+  does not expand into cases (the native `tests/native/file_fixtures_test.go` covers those expectations).
 - **Others**: `cp` mode of a symlinked destination, `ln -sf a a` should fail, `env =BLAH`, `mv` keeping hard
   links across a directory move, `touch -t` inside a DST gap.
 

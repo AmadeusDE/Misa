@@ -465,6 +465,20 @@
       "tests": []
     },
     {
+      "name": "file",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/file.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox file.c (0BSD) at 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb, including lib/elf.c arch tables and lib/lib.c is_tar_header.",
+      "tests": [
+        "internal/builtins/file_test.go",
+        "tests/toybox/file.test"
+      ]
+    },
+    {
       "name": "fmt",
       "kind": "builtin",
       "sources": [
@@ -943,6 +957,20 @@
         "tests/toybox/pwd.test",
         "tests/uutils/testdata/tests/by-util/test_pwd.rs",
         "internal/builtins/pwd_test.go"
+      ]
+    },
+    {
+      "name": "readelf",
+      "kind": "builtin",
+      "sources": [
+        "internal/builtins/readelf.go"
+      ],
+      "build": "all",
+      "capability": "unaudited",
+      "provenance": "Behaviour adapted from toybox readelf.c (0BSD) at 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb, including lib/elf.c arch tables.",
+      "tests": [
+        "internal/builtins/readelf_test.go",
+        "tests/toybox/readelf.test"
       ]
     },
     {

@@ -161,7 +161,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `fallocate` | other | 3 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 33 | – | light |
 | `fdisk` | pending | – | – | – | – | no tests | 1557 | – | heavy |
 | `fgrep` | posix | – | – | – | – | no tests | 548 | – | medium |
-| `file` | posix | 25 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 549 | – | medium |
 | `find` | posix | 58 | findutils:87 | 0 | kernel/fs, network, root, tty | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 0/87 simple new_ucmd! cases parseable by tests/uutils adapter | 730 | – | heavy |
 | `flock` | other | – | – | – | – | no tests | 39 | – | light |
 | `free` | other | – | procps:12 | 12 | – | uutils: Rust, 12/12 simple new_ucmd! cases parseable by tests/uutils adapter | 58 | 641 | light |
@@ -309,7 +308,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `pwgen` | other | – | – | – | – | no tests | 74 | – | light |
 | `pwunconv` | – | – | shadow:– | – | – | no tests | – | 42 | light |
 | `readahead` | other | – | – | – | – | no tests | 28 | – | light |
-| `readelf` | other | 9 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 775 | – | heavy |
 | `reboot` | other | – | – | – | – | no tests | 46 | – | light |
 | `rename` | – | – | util-linux:60 | 5 | root | uutils: Rust, 5/60 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1071 | heavy |
 | `renice` | posix | 2 | bsdutils:1, util-linux:1 | 2 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 2/2 simple new_ucmd! cases parseable by tests/uutils adapter | 51 | 66 | light |

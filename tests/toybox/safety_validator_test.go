@@ -165,6 +165,9 @@ func validateSetup(log []setupEvent, line int) error {
 // Avoid inherited shell startup hooks and PATH components from fixtures.
 func toyEnvironment(dir string, vars map[string]string) []string {
 	env := []string{"PATH=" + binDir, "HOME=" + dir, "TMPDIR=" + dir, "LC_ALL=C"}
+	if fixtureDir != "" {
+		env = append(env, "FILES="+fixtureDir)
+	}
 	for k, v := range vars {
 		switch k {
 		case "PATH", "HOME", "TMPDIR", "BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "CDPATH", "IFS":
