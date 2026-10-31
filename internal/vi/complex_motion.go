@@ -6,6 +6,8 @@ func (e *Editor) complexMotion(key string, count int, countGiven bool) (motionRe
 		count = 1
 	}
 	switch key {
+	case "*", "#", "g*", "g#":
+		return e.wordSearchMotion(key, count)
 	case "n", "N":
 		e.searchHighlightSuppressed = false
 		return e.searchMotion(count, key == "N")

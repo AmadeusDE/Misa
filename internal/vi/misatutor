@@ -184,6 +184,11 @@ After a search:
 n repeats the search in the same direction.
 N repeats the search in the opposite direction.
 
+* and # search forward and backward for the word at the cursor. They match
+whole words; g* and g# also match the same text inside a longer word.
+These searches become the last search, so n and N repeat them. A count before
+one of these commands selects a later match.
+
 Patterns use Vim syntax (default "magic"): . matches any character, * repeats,
 \+ \= \{n,m} repeat, ^ and $ anchor, \( \) group, \| alternates, [a-z] is a
 collection, \d \w \s are classes, \< and \> mark word edges. \v makes most
@@ -517,6 +522,7 @@ Normal mode:
   U             undo line
   .             repeat last change
   /  ?          search forward / backward
+  * # g* g#     search for word under cursor
   n N           next / previous match
   %             bracket match
   f F t T       find char on line

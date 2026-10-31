@@ -100,12 +100,12 @@ func (e *Editor) handlePendingKey(key string) tea.Cmd {
 		}
 
 	case "g":
-		if e.pendingOp != 0 && key != "g" && key != "e" && key != "E" {
+		if e.pendingOp != 0 && key != "g" && key != "e" && key != "E" && key != "*" && key != "#" {
 			e.clearCommandState()
 			return nil
 		}
 		switch key {
-		case "g", "e", "E":
+		case "g", "e", "E", "*", "#":
 			e.completePendingMotion("g" + key)
 		case "d":
 			// gd - go to local declaration (just go to first occurrence of word under cursor)
