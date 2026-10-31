@@ -52,6 +52,8 @@ type Editor struct {
 	goalCol            int
 	goalValid, goalEnd bool
 	topLine            int
+	leftCol            int
+	rows               int
 	width              int
 	height             int
 
@@ -139,6 +141,7 @@ func runBuiltin(ctx *builtins.Context) int {
 
 func (e *Editor) Resize(w, h int) {
 	e.width = w
+	e.rows = h
 	e.height = h - 2
 	if e.height < 1 {
 		e.height = 1
@@ -460,6 +463,7 @@ func (e *Editor) ensureVisible() {
 	if e.topLine < 0 {
 		e.topLine = 0
 	}
+	e.ensureColumnVisible()
 }
 
 func (e *Editor) firstNonBlank(row int) int {

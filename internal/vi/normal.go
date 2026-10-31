@@ -132,9 +132,9 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		if key == "j" || key == "k" || key == "up" || key == "down" {
 			if !e.goalValid {
-				e.goalCol, e.goalValid = e.col, true
+				e.goalCol, e.goalValid = e.cursorVCol()-1, true
 			}
-			m.col = e.goalCol
+			m.col = e.rowLayout(m.row).runeAt(e.goalCol)
 			if e.goalEnd {
 				m.col = len(e.lineRunes(m.row)) - 1
 			}

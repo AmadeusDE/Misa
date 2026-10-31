@@ -169,6 +169,8 @@ internal/
     vipat/                       Vim search-pattern subset (own parser + bounded backtracking matcher, leftmost-first;
                                  \v \m \M \V modes; unsupported Vim constructs are errors, not literals). Shared by
                                  `/` `?` `n` `N`, `:s` (and its `c` confirmation) and `:g`/`:v`
+    layout.go                    Line → display cells (tabs, wide, combining, control, invalid bytes): rune index ↔ column,
+                                 cursor cells, clipped `window` render; view.go draws through it, `leftCol` scrolls sideways
     replay_test.go               Public-event behavioral fixture helper; original tutor/count regression fixtures
                                  and compatibility baseline: docs/plans/vi-compat.md
   ascii/                         ASCII art loading (embedded + external dirs). Android and Termux art

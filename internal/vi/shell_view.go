@@ -74,7 +74,7 @@ func (e *Editor) shellOutputLines() []string {
 
 func (e *Editor) shellOutputKey(msg tea.KeyPressMsg) {
 	lines := e.shellOutputLines()
-	page := max(1, e.height+1)
+	page := max(1, e.viewRows()-1)
 	switch typedKey(msg) {
 	case "enter":
 		e.shellOutput = nil
@@ -97,10 +97,10 @@ func (e *Editor) shellOutputKey(msg tea.KeyPressMsg) {
 
 func (e *Editor) renderShellOutput() string {
 	lines := e.shellOutputLines()
-	page := max(1, e.height+1)
+	page := max(1, e.viewRows()-1)
 	e.shellOutput.top = max(0, min(e.shellOutput.top, max(0, len(lines)-page)))
 	var b strings.Builder
-	for i := 0; i < page; i++ {
+	for i := 0; i < page && e.viewRows() > 1; i++ {
 		if n := e.shellOutput.top + i; n < len(lines) {
 			b.WriteString(lines[n])
 		}
