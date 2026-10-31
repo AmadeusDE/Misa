@@ -433,7 +433,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `printenv` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `printf` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `prlimit` |  | ✓ posix |  |  |
-| `ps` |  | ✓ posix | ✓ | ✓ procps |
+| `ps` | ✓ | ✓ posix | ✓ | ✓ procps |
 | `pscan` |  |  | ✓ |  |
 | `pstree` |  |  | ✓ |  |
 | `ptx` |  |  |  | ✓ coreutils |

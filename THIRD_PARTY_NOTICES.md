@@ -9,7 +9,8 @@ from their own repositories and carry their own licenses (see `go.mod` and `docs
 | [uutils/coreutils](https://github.com/uutils/coreutils) | The Rust test suite and fixtures under `tests/uutils/testdata/` (copied); behaviour of several builtins in `internal/builtins/` (headers say "adapted from uutils coreutils"). | MIT |
 | [uutils/diffutils](https://github.com/uutils/diffutils) | Tests ported in `tests/diffutils/`; `internal/builtins/cmp*.go` and `diff*.go` follow its source. | MIT |
 | [uutils/util-linux](https://github.com/uutils/util-linux) | Behaviour of `cal`, `mcookie`, `uuidgen` in `internal/builtins/`. | MIT |
-| [toybox](https://github.com/landley/toybox) | Test files under `tests/toybox/` (copied); the vi command set (`internal/vi`); behaviour of several builtins. | 0BSD |
+| [uutils/procps](https://github.com/uutils/procps) | Behaviour, header and column names of `ps` in `internal/builtins/`. | MIT |
+| [toybox](https://github.com/landley/toybox) | Test files under `tests/toybox/` (copied); the vi command set (`internal/vi`); behaviour of several builtins, including `ps`. | 0BSD |
 | [vis](https://github.com/martanne/vis) | Editing logic in `internal/vi` (see `internal/vi/NOTICE`). | ISC |
 | [neofetch](https://github.com/dylanaraps/neofetch) | Distro ASCII art in `internal/ascii/distro/neofetch/`. | MIT |
 | [pfetch](https://github.com/dylanaraps/pfetch) | Distro ASCII art in `internal/ascii/distro/pfetch/`. | MIT |
@@ -93,6 +94,40 @@ DEALINGS IN THE SOFTWARE.
 ## uutils/util-linux
 
 https://github.com/uutils/util-linux
+
+License: MIT
+
+Copyright (c) 2024 uutils
+
+```
+MIT License
+
+Copyright (c) 2024 uutils
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+## uutils/procps
+
+https://github.com/uutils/procps
 
 License: MIT
 
