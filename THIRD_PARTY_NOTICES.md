@@ -10,6 +10,7 @@ from their own repositories and carry their own licenses (see `go.mod` and `docs
 | [uutils/diffutils](https://github.com/uutils/diffutils) | Tests ported in `tests/diffutils/`; `internal/builtins/cmp*.go` and `diff*.go` follow its source. | MIT |
 | [uutils/util-linux](https://github.com/uutils/util-linux) | Behaviour of `cal`, `mcookie`, `uuidgen` in `internal/builtins/`. | MIT |
 | [toybox](https://github.com/landley/toybox) | Test files under `tests/toybox/` (copied); the vi command set (`internal/vi`); behaviour of several builtins. | 0BSD |
+| [Unix crypt using SHA-256 and SHA-512](https://www.akkadia.org/drepper/SHA-crypt.txt) (Ulrich Drepper) | The $5$/$6$ hash algorithm and its published test vectors behind `internal/pwhash`; original Go code, no text copied. | public domain |
 | [vis](https://github.com/martanne/vis) | Editing logic in `internal/vi` (see `internal/vi/NOTICE`). | ISC |
 | [neofetch](https://github.com/dylanaraps/neofetch) | Distro ASCII art in `internal/ascii/distro/neofetch/`. | MIT |
 | [pfetch](https://github.com/dylanaraps/pfetch) | Distro ASCII art in `internal/ascii/distro/pfetch/`. | MIT |
