@@ -21,11 +21,18 @@ func (v *Variant) buildReach() {
 					table[v.offsetIndex(dx, dy)] = true
 				}
 			}
-			for _, comp := range t.moves {
-				if comp.Capture {
-					markComponent(v, comp, mark)
+			markMoves := func(moves []Component) {
+				for _, comp := range moves {
+					if comp.Capture {
+						markComponent(v, comp, mark)
+					}
 				}
 			}
+			markMoves(t.moves)
+			for _, z := range t.moveZones {
+				markMoves(z.moves)
+			}
+			markMoves(t.royalAttack)
 			t.reach[c] = table
 		}
 	}
@@ -66,6 +73,11 @@ func markComponent(v *Variant, comp Component, mark func(dx, dy int)) {
 
 // anyAttacked reports whether a piece of side by could capture on any of sqs.
 func (p *Position) anyAttacked(sqs []int, by Color) bool {
+	return p.attacked(sqs, by, false)
+}
+
+// attacked treats targets as hypothetical enemy royals when royalTargets is set.
+func (p *Position) attacked(sqs []int, by Color, royalTargets bool) bool {
 	if len(sqs) == 0 {
 		return false
 	}
@@ -78,19 +90,36 @@ func (p *Position) anyAttacked(sqs []int, by Color) bool {
 		if !t.mightReach(v, from, sqs, by) {
 			continue
 		}
-		for i := range t.moves {
-			comp := &t.moves[i]
-			if !comp.Capture || (comp.Initial && pc.Moved) {
-				continue
+		attack := func(moves []Component, royalOnly bool) bool {
+			for i := range moves {
+				comp := &moves[i]
+				if !comp.Capture || (comp.Initial && pc.Moved) {
+					continue
+				}
+				hit := false
+				p.walk(from, comp, by, func(to int) bool {
+					if !slices.Contains(sqs, to) {
+						return true
+					}
+					if royalOnly {
+						target := p.Board[to]
+						if !royalTargets && (target.Type == 0 || target.Color == by || !v.Type(target).Royal) {
+							return true
+						}
+					} else if !t.allows(v, to, by) {
+						return true
+					}
+					hit = true
+					return false
+				})
+				if hit {
+					return true
+				}
 			}
-			hit := false
-			p.walk(from, comp, by, func(to int) bool {
-				hit = slices.Contains(sqs, to)
-				return !hit
-			})
-			if hit {
-				return true
-			}
+			return false
+		}
+		if attack(t.movesAt(v, from, by), false) || attack(t.royalAttack, true) {
+			return true
 		}
 	}
 	return false

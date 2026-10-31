@@ -247,6 +247,11 @@ func (p *Position) generate(tactical bool) []Move {
 		clear(seen)
 		add := func(to, take int) {
 			promotes := t.Pawn && to != from && p.promotes(to) && len(v.Promotion) > 0
+			// A piece confined to a region (a general in its palace, an
+			// elephant that may not cross the river) cannot enter to at all.
+			if !t.allows(v, to, pc.Color) {
+				return
+			}
 			if seen[to] != 0 {
 				// A move and an en-passant component can reach the same empty
 				// square. The capture takes precedence over the quiet move.
@@ -277,8 +282,9 @@ func (p *Position) generate(tactical bool) []Move {
 			}
 			moves = append(moves, Move{From: from, To: to, Take: take, Castle: -1})
 		}
-		for i := range t.moves {
-			comp := &t.moves[i]
+		components := t.movesAt(v, from, pc.Color)
+		for i := range components {
+			comp := &components[i]
 			if comp.Initial && pc.Moved {
 				continue
 			}
@@ -342,6 +348,9 @@ func (p *Position) castles() []Move {
 		c := r.castle
 		k, rook := p.Board[c.King], p.Board[c.Rook]
 		if k.Type == 0 || rook.Type == 0 || k.Color != p.Turn || rook.Color != p.Turn || k.Moved || rook.Moved || !v.Type(k).Royal {
+			continue
+		}
+		if !v.Type(k).allows(v, c.KingTo, p.Turn) || !v.Type(rook).allows(v, c.RookTo, p.Turn) {
 			continue
 		}
 		lo := min(c.King, c.Rook, c.KingTo, c.RookTo)

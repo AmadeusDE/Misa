@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml", "crazyhouse.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml", "crazyhouse.yaml", "xiangqi.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -33,6 +33,9 @@ type PieceType struct {
 	Demote          uint8  // original type of a promoted piece, or 0
 	Value           int    // centipawns for the computer player; estimated when the file leaves it out
 
+	zone        []bool
+	moveZones   []moveZone
+	royalAttack []Component
 	moves       []Component
 	tracksMoved bool
 	reach       [2]reachTable
@@ -84,15 +87,18 @@ type Variant struct {
 }
 
 type pieceDef struct {
-	Letter          string `yaml:"letter"`
-	Name            string `yaml:"name"`
-	Betza           string `yaml:"betza"`
-	Glyph           string `yaml:"glyph"`
-	Royal           bool   `yaml:"royal"`
-	Pawn            bool   `yaml:"pawn"`
-	Value           int    `yaml:"value"`
-	DropForbidRanks []int  `yaml:"drop_forbid_ranks"`
-	Demote          string `yaml:"demote"`
+	Letter          string        `yaml:"letter"`
+	Name            string        `yaml:"name"`
+	Betza           string        `yaml:"betza"`
+	Glyph           string        `yaml:"glyph"`
+	Royal           bool          `yaml:"royal"`
+	Pawn            bool          `yaml:"pawn"`
+	Value           int           `yaml:"value"`
+	DropForbidRanks []int         `yaml:"drop_forbid_ranks"`
+	Demote          string        `yaml:"demote"`
+	Zone            []string      `yaml:"zone"`
+	MoveZones       []moveZoneDef `yaml:"move_zones"`
+	RoyalAttack     *string       `yaml:"royal_attack"`
 }
 
 type castleDef struct {
@@ -473,6 +479,9 @@ func build(d variantDef) (*Variant, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := v.buildZones(t, p); err != nil {
+			return nil, fmt.Errorf("piece %c: %v", t.Letter, err)
+		}
 		if v.TypeOf(t.Letter) != 0 {
 			return nil, fmt.Errorf("piece letter %c used twice", t.Letter)
 		}
@@ -696,7 +705,10 @@ func (v *Variant) setPromotion(letters []string) error {
 // positions apart: pieces with first-move-only moves, and castling pieces.
 func (v *Variant) markTrackedPieces() {
 	for _, t := range v.Pieces {
-		t.tracksMoved = t.Royal || slices.ContainsFunc(t.moves, func(c Component) bool { return c.Initial })
+		t.tracksMoved = t.Royal || slices.ContainsFunc(t.moves, func(c Component) bool { return c.Initial }) || slices.ContainsFunc(t.royalAttack, func(c Component) bool { return c.Initial })
+		for _, z := range t.moveZones {
+			t.tracksMoved = t.tracksMoved || slices.ContainsFunc(z.moves, func(c Component) bool { return c.Initial })
+		}
 	}
 	for _, c := range v.Castling {
 		if c.RookSide != "" {
