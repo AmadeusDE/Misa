@@ -31,7 +31,7 @@ internal/pkgmanager native
 internal/procmon compile # reads /proc; no Windows reader yet
 internal/sshclient native
 internal/sysinfo native
-internal/term compile # no ConPTY until P02 (#121)
+internal/term compile # no ConPTY until P02 (#121); older tests assume sh and a Unix PTY and TestStartArgvIsArgvNotShell panics; native -run Native tests arrive with P03 (#132)
 internal/termkeys native
 internal/thefuck native
 internal/ui compile # terminal-backed tests fail and one panics until ConPTY (P02)
