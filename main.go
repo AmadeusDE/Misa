@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -20,7 +21,7 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == jobleader.Flag {
 		os.Exit(jobleader.Run(os.Args[2:]))
 	}
-	name := filepath.Base(os.Args[0])
+	name := programName(os.Args[0])
 
 	if name == "busybox" {
 		if len(os.Args) > 1 {
@@ -153,4 +154,15 @@ func runStandalone(name string, args []string) int {
 
 	cmd, _ := builtins.Lookup(name)
 	return cmd.Run(ctx)
+}
+
+// programName is the multicall name: the base name, without the .exe suffix Windows adds.
+func programName(arg0 string) string {
+	name := filepath.Base(arg0)
+	if runtime.GOOS == "windows" {
+		if strings.EqualFold(filepath.Ext(name), ".exe") {
+			name = strings.TrimSuffix(name, filepath.Ext(name))
+		}
+	}
+	return name
 }

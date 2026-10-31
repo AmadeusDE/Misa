@@ -219,7 +219,7 @@ func TestMenuLaunchReturnsToMenuThroughRoot(t *testing.T) {
 	m.addMuxPane()
 	p := m.activePane()
 	p.misa.screen = screenMenu
-	cmd := routeTo(p.misa, p.misa.launch("/bin/sh", "-c", "exit 3"))
+	cmd := routeTo(p.misa, p.misa.launch(helperArgv(t, "status", "", "3")...))
 	pumpRootUntilExit(t, m, cmd)
 	if p.misa.screen != screenMenu || p.misa.menuLaunch {
 		t.Errorf("screen=%v menuLaunch=%v, want back at menu", p.misa.screen, p.misa.menuLaunch)
@@ -353,7 +353,7 @@ func TestMouseLaunchedCommandReturnsToMenu(t *testing.T) {
 	p.misa.inputMode = false
 	p.misa.resize()
 	p.misa.mainList.SetItems([]list.Item{menuItem{title: "run", action: func(n *Model) tea.Cmd {
-		return n.launch("/bin/sh", "-c", "exit 0")
+		return n.launch(helperArgv(t, "status", "", "0")...)
 	}}})
 	p.misa.mainList.Select(0)
 	dx, dy := m.muxContentOffset()

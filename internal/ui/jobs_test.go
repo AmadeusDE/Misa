@@ -32,6 +32,7 @@ func pumpUntil(t *testing.T, m *Model, cmd tea.Cmd, what string, cond func() boo
 
 func shellWithStoppingCommand(t *testing.T) (*Model, tea.Cmd) {
 	t.Helper()
+	skipOnWindows(t, "stopped jobs need SIGSTOP and /bin/sh; jobleader.Supported is false")
 	m := New(t.TempDir())
 	m.nestedMode = true
 	m.width, m.height = 80, 24

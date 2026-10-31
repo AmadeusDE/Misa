@@ -32,7 +32,7 @@ func TestMenuLaunchRunsInPaneAndReturnsToMenu(t *testing.T) {
 	m := New(t.TempDir())
 	m.nestedMode = true
 	m.width, m.height = 80, 24
-	cmd := m.launch("/bin/sh", "-c", "printf launched; exit 3")
+	cmd := m.launch(helperArgv(t, "status", "launched", "3")...)
 	if cmd == nil || m.terminal == nil || m.screen != screenShell {
 		t.Fatalf("launch did not start an in-pane terminal (screen=%v)", m.screen)
 	}
@@ -49,7 +49,10 @@ func TestRenderWhileReaderRuns(t *testing.T) {
 	m := New(t.TempDir())
 	m.nestedMode = true
 	m.width, m.height = 80, 24
-	cmd := m.launch("/bin/sh", "-c", `printf '\033[?1049h'; seq 1 200000`)
+	cmd := m.launch(helperArgv(t, "flood", "200000")...)
+	if cmd == nil {
+		t.Fatalf("launch did not start a terminal (status=%q)", m.shellBuffer)
+	}
 	deadline := time.After(20 * time.Second)
 	for {
 		done := make(chan tea.Msg, 1)
