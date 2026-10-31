@@ -135,7 +135,7 @@ func TestKillallMatchRules(t *testing.T) {
 	}
 }
 
-// killallTestChild is one sleep(1) child the test spawned under a unique name.
+// killallTestChild is one sleep-like child (the test binary in helper mode) the test spawned under a unique name.
 type killallTestChild struct {
 	name string
 	cmd  *exec.Cmd
@@ -169,19 +169,17 @@ func killallStartSleep(t *testing.T, duration string) killallTestChild {
 	if runtime.GOOS == "windows" {
 		t.Skip("killall needs unix signals")
 	}
-	bin, err := exec.LookPath("sleep")
+	bin, err := os.Executable()
 	if err != nil {
-		if _, statErr := os.Stat("/bin/sleep"); statErr != nil {
-			t.Skip("sleep(1) is not available")
-		}
-		bin = "/bin/sleep"
+		t.Skipf("cannot locate test binary: %v", err)
 	}
 	name := fmt.Sprintf("misa-u27-killall-%d-%d", os.Getpid(), killallTestCounter.Add(1))
 	link := filepath.Join(t.TempDir(), name)
 	if err := os.Symlink(bin, link); err != nil {
 		t.Skipf("cannot symlink %s: %v", bin, err)
 	}
-	cmd := exec.Command(link, duration)
+	cmd := exec.Command(link)
+	cmd.Env = append(os.Environ(), sleepHelperEnv+"="+duration)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start %s: %v", link, err)
 	}
