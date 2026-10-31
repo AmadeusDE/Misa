@@ -141,7 +141,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `crond` |  | ✓ pending | ✓ |  |
 | `crontab` |  | ✓ pending | ✓ |  |
 | `cryptpw` |  |  | ✓ |  |
-| `csplit` |  | ✓ pending |  | ✓ coreutils |
+| `csplit` | ✓ | ✓ pending |  | ✓ coreutils |
 | `ctrlaltdel` |  |  |  | ✓ util-linux |
 | `cttyhack` |  |  | ✓ |  |
 | `cut` | ✓ | ✓ posix | ✓ | ✓ coreutils |
