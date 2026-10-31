@@ -76,9 +76,16 @@ func (e *Editor) searchAt(pat string, forward bool) bool {
 }
 func (e *Editor) searchForward(pat string) bool  { return e.searchAt(pat, true) }
 func (e *Editor) searchBackward(pat string) bool { return e.searchAt(pat, false) }
-func (e *Editor) searchNext() bool               { return e.searchAt(e.searchPat, e.searchDir == 1) }
-func (e *Editor) searchPrev() bool               { return e.searchAt(e.searchPat, e.searchDir != 1) }
+func (e *Editor) searchNext() bool {
+	e.searchHighlightSuppressed = false
+	return e.searchAt(e.searchPat, e.searchDir == 1)
+}
+func (e *Editor) searchPrev() bool {
+	e.searchHighlightSuppressed = false
+	return e.searchAt(e.searchPat, e.searchDir != 1)
+}
 func (e *Editor) searchCounted(count int, reverse bool) {
+	e.searchHighlightSuppressed = false
 	m, ok := e.searchMotion(count, reverse)
 	if ok {
 		e.addJump()

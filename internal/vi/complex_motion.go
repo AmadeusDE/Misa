@@ -7,6 +7,7 @@ func (e *Editor) complexMotion(key string, count int, countGiven bool) (motionRe
 	}
 	switch key {
 	case "n", "N":
+		e.searchHighlightSuppressed = false
 		return e.searchMotion(count, key == "N")
 	case "%":
 		if countGiven {

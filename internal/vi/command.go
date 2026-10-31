@@ -31,8 +31,13 @@ func (e *Editor) executeCommand(cmd string) {
 	}
 
 	// :set commands
-	if strings.HasPrefix(cmd, "set ") || cmd == "set" {
+	if cmd == "set" || strings.HasPrefix(cmd, "set ") || strings.HasPrefix(cmd, "set\t") {
 		e.setCmd(cmd)
+		return
+	}
+
+	if len(cmd) >= len("noh") && strings.HasPrefix("nohlsearch", cmd) {
+		e.searchHighlightSuppressed = true
 		return
 	}
 
@@ -260,42 +265,6 @@ func (e *Editor) globalCmd(from, to int, args string, invert bool, hasRange bool
 		e.statusMsg = "Pattern not found: " + pat
 	} else {
 		e.statusMsg = fmt.Sprintf("%d lines affected", matches)
-	}
-}
-
-func (e *Editor) setCmd(cmd string) {
-	args := strings.TrimSpace(strings.TrimPrefix(cmd, "set"))
-	if args == "" {
-		var flags []string
-		if e.ignoreCase {
-			flags = append(flags, "ignorecase")
-		} else {
-			flags = append(flags, "noignorecase")
-		}
-		e.statusMsg = strings.Join(flags, " ")
-		return
-	}
-	for _, arg := range strings.Fields(args) {
-		switch arg {
-		case "ic", "ignorecase":
-			e.ignoreCase = true
-			e.statusMsg = "ignorecase on"
-		case "noic", "noignorecase":
-			e.ignoreCase = false
-			e.statusMsg = "noignorecase"
-		case "hls", "hlsearch":
-			e.statusMsg = "hlsearch on"
-		case "nohls", "nohlsearch":
-			e.statusMsg = "nohlsearch"
-		case "is", "incsearch":
-			e.statusMsg = "incsearch on"
-		case "nois", "noincsearch":
-			e.statusMsg = "noincsearch"
-		case "nocp", "nocompatible":
-			e.statusMsg = "nocompatible"
-		default:
-			e.statusMsg = "Unknown option: " + arg
-		}
 	}
 }
 
