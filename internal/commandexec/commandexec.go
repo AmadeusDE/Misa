@@ -13,6 +13,14 @@ import (
 	"time"
 )
 
+// Result describes the final status of a process. Status uses the same shell
+// conventions as Wait, including context cancellation overrides. Signaled reports
+// whether the child actually died from a signal, even if Status was overridden.
+type Result struct {
+	Status   int
+	Signaled bool
+}
+
 type Invocation struct {
 	Dir            string
 	Env            []string

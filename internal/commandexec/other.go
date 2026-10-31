@@ -31,6 +31,7 @@ type Process struct{}
 
 func (*Process) Done() <-chan struct{}        { c := make(chan struct{}); close(c); return c }
 func (*Process) Wait() int                    { return 125 }
+func (*Process) WaitResult() Result           { return Result{Status: 125} }
 func (*Process) Signal(os.Signal, bool) error { return errors.New("commandexec: unsupported") }
 func Start(context.Context, string, Invocation, Options) (*Process, error) {
 	return nil, errors.New("commandexec: unsupported")

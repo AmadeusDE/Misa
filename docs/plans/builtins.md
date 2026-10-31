@@ -59,6 +59,30 @@ follow-up. See `invocation.md` for execution and isolation boundaries. The Toybo
 adapter passes 51 of 58 cases, with seven exclusions retained; this note makes no broader
 parity claim.
 
+## Parallel xargs (U08–U09)
+
+`xargs` retains U08 tokenization, batching (`-n`, `-s`, `-L`, `-I`), delimiter
+(`-0`, `-d`) and empty-input (`-r`) behavior. U09 adds `-P N` bounded concurrent
+execution; the default is one worker, and `-P 0` means unlimited subject to a
+256-command safety cap. Tests assert maximum concurrency, not execution order.
+Output is streamed, not grouped per child: children may interleave output as the
+OS permits; writes to non-file Go writers are synchronized per Write.
+
+Ordinary failures aggregate to 123. A child exit of 255 stops new launches and
+waits for running children, returning 124. Signal termination returns 125;
+cannot-run/not-found returns 126/127. Context cancellation also cancels and reaps
+running children. Oversized environment/argv combinations fail with
+`argument list too long` and status 1. Direct external children distinguish
+ordinary high exit codes from signals and launch errors; the legacy integer-only
+injected executor and builtin helper still have that ambiguity (F06 follow-up).
+See `invocation.md` for precedence and stream ownership details.
+
+`find ... -print0 | xargs -0 ...` preserves names containing spaces, newlines,
+quotes and backslashes without shell interpolation. Supply `--` to a child that
+needs it for leading-dash names. Native integration tests exercise both builtin
+execution and a live NUL-delimited producer/consumer pipe. `-p`/`-o` remain
+unsupported; full shell pipeline execution and job ownership remain S09/S17.
+
 ## Next
 
 1. **Safe in-process use.** `builtin_mode: inprocess` runs built-ins on goroutines in one process, so
@@ -70,7 +94,7 @@ parity claim.
    against Misa's (2026-10-15); `builtins-coverage.md` ranks the missing ones by how many upstream
    test cases would run unchanged and how much work they are. The POSIX ones toybox and uutils both
    have: `test`/`[`, `od`, `dd`, `df`, `install`, `chgrp`, `nohup`, `mknod`, `who`, `renice`, `ps`,
-   `pidof`, `xargs`, `sed`, `tar`. `find` and `grep` should share a walker and matcher with ugh's search tool (`internal/search`, see
+   `pidof`, `sed`, `tar`. `find` and `grep` should share a walker and matcher with ugh's search tool (`internal/search`, see
    `docs/plans/ughbot.md`). Each new command starts from its upstream tests.
 3. **`fetch` styling.** `fetch` writes raw ANSI to stdout. It is command output, not Misa UI, so this may be
    fine; if it stays, say so in the file, otherwise move it to lipgloss.

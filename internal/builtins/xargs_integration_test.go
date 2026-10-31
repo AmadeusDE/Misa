@@ -222,15 +222,14 @@ func TestXargsIntegrationLivePipeline(t *testing.T) {
 	}
 }
 
-// The integer-only executor cannot distinguish ordinary exits from launch
-// failures or signal deaths. Lock in its documented status convention here;
-// ordinary exits in these ranges are therefore indistinguishable from them.
+// Direct external launches distinguish ordinary high exits from signal deaths
+// and launch errors. Injected integer-only executors retain their legacy mapping.
 func TestXargsIntegrationExternalHighExitStatuses(t *testing.T) {
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tc := range []struct{ status, want int }{{126, 126}, {127, 127}, {130, 125}, {200, 125}} {
+	for _, tc := range []struct{ status, want int }{{126, 123}, {127, 123}, {130, 123}, {200, 123}, {255, 124}} {
 		t.Run(strconv.Itoa(tc.status), func(t *testing.T) {
 			var stderr bytes.Buffer
 			inv := &Context{Dir: t.TempDir(), Env: []string{"MISA_XARGS_CHILD=yes", fmt.Sprintf("MISA_XARGS_EXIT=%d", tc.status)}, Args: []string{exe, "-test.run=^TestXargsIntegrationExternalHelper$"}, Stdin: strings.NewReader("item"), Stderr: &stderr}
