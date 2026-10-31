@@ -361,7 +361,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `tload` | – | – | procps:1 | 1 | – | uutils: Rust, 1/1 simple new_ucmd! cases parseable by tests/uutils adapter | – | 289 | light |
 | `traceroute` | pending | – | – | – | – | no tests | 634 | – | heavy |
 | `traceroute6` | pending | – | – | – | – | no tests | 634 | – | heavy |
-| `ts` | other | – | – | – | – | no tests | 54 | – | light |
 | `tunctl` | net | – | – | – | – | no tests | 53 | – | medium |
 | `uclampset` | other | – | – | – | – | no tests | 89 | – | light |
 | `ucsicontrol` | other | – | – | – | – | no tests | 685 | – | heavy |
