@@ -550,7 +550,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `syslogd` |  | ✓ pending | ✓ |  |
 | `tac` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `tail` | ✓ | ✓ posix | ✓ | ✓ coreutils |
-| `tar` |  | ✓ posix | ✓ | ✓ tar |
+| `tar` | ✓ | ✓ posix | ✓ | ✓ tar |
 | `taskset` |  | ✓ other | ✓ |  |
 | `tc` |  |  | ✓ |  |
 | `tcpsvd` |  | ✓ pending | ✓ |  |

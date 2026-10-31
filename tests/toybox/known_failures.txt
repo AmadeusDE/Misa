@@ -21,3 +21,82 @@ grep/backref  # adapter: backslashes inside double quotes are dropped
 sed/getdelim_with_nested_[:blah:]  # adapter: backslashes inside double quotes are dropped
 sed/-z  # adapter: backslashes inside double quotes are dropped
 sed/\n_with_empty_capture  # adapter: backslashes inside double quotes are dropped
+
+# Toybox tar: dedicated adapter only runs explicitly adapted cases.
+tar/store_file  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/pass_file  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/-T_newline  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/-T_null  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/empty_-T_creates_empty_tarball  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/specify_UID,_fetch_GID  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/fetch_UID,_specify_GID  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/huge_values  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/pass_mtime  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/adjust_mode  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/store_dir  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/pass_dir  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/store_file_in_dir  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/store_dir_and_dir/file  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/pass_dir/file  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/tar_C  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/store_hardlink  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/create_dir/fifo  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/create_long_fname  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/create_symlink  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/create_hardlink_to_symlink  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/create_long_symlink  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/create_long->long  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/pass_absolute_symlink  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/pass_broken_symlink  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/pass_broken_absolute_symlink  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/pass_/dev/null  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/--absolute-names  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/autodetect_gzip  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/autodetect_xz  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/manually_specify_bz2  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/-I_gzip_c  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/-I_gzip_t  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/character_special  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/block_special  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/ownership  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/symlink_out_of_cwd  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/extract_dir/file_from_tar  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/extract_dir/file_from_tgz_(autodetect)  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/cat_tgz_|_extract_dir/file_(autodetect)  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/extract_dir/file_from_tbz2_(autodetect)  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/cat_tbz_|_extract_dir/file_(autodetect)  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/autodetect_falls_back_to_gzip_-d_when_no_zcat  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/sparse_without_overflow  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/sparse_single_overflow  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/sparse_double_overflow  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/sparse_extract  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/sparse_tvf  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/sparse_extract_hole_at_end  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/extract_obsolete_sparse_format  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/exclude  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/replace_dir_with_file  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/create_..dotsdir  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/pass_..dotsdir  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/--strip  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/xform_S  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/xform_flags=rh_starts_with_all_disabled  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/xform_flags=rHhsS_toggles  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/xform_flags=_is_not_a_delta_from_previous  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/xform_H  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/xform_R  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/xform_path  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/xform_trailing_slash_special_case  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/xform_extract_all  # adapter: upstream TT helper lists transformed names; not adapted
+tar/xform_extract_S  # adapter: upstream TT helper lists transformed names; not adapted
+tar/xform_extract_H  # adapter: upstream TT helper lists transformed names; not adapted
+tar/xform_extract_R  # adapter: upstream TT helper lists transformed names; not adapted
+tar/-P  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/without_-P  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/wildcards_do_not_affect_creation_cmdline_args  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/creation_--exclude_--no-wildcards  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/creation_--wildcards_--exclude  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/tsort  # adapter: upstream shell fixtures, helper functions or byte-exact Toybox headers not adapted
+tar/honor_umask  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/extract_changes_directory_permissions  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/-p_overrides_umask  # U33: extraction/compression or associated fixtures not supported by this adapter
+tar/./file_bug  # tar: creation normalizes away the leading ./, unlike Toybox

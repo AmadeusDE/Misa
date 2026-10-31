@@ -151,3 +151,13 @@ Original Go implementation; rules and notation referenced from:
 
 - **qr** by The Go Authors — BSD-3-Clause
   https://github.com/rsc/qr
+
+## Tar builtin and archive foundation
+
+- Original Go `internal/archive/tarx` and `internal/builtins/tar*.go` implementations informed by
+  **Toybox tar**, by the Toybox contributors — 0BSD:
+  [toys/posix/tar.c](https://github.com/landley/toybox/blob/6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb/toys/posix/tar.c)
+  and [tests/tar.test](https://github.com/landley/toybox/blob/6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb/tests/tar.test),
+  commit `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb`. The test script is copied unchanged in
+  `tests/toybox/tar.test`; its dedicated Go adapter explicitly identifies adapted cases and unsupported
+  fixtures. No uutils code was consulted.
