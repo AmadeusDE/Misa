@@ -146,37 +146,11 @@ Goal: `GOOS=windows go build -tags nough .` and `go vet` pass, and the Linux/Ope
 
 ### W1. ConPTY sessions in `internal/term`
 
-- Refactor `Terminal.ptm *os.File` / `cmd *exec.Cmd` into a small platform interface. Unix behaviour stays
-  exactly as it is:
-  ```go
-  type ptyConn interface { io.Reader; io.Writer; Close() error; Resize(rows, cols int) error }
-  ```
-  plus a `proc` with `Wait() int`, `Kill()`, `Pid()`. `StartReader`, `drainInput`, `Resize` and `Close` go
-  through these.
-- `pty_windows.go`, `StartArgv`:
-  1. two `CreatePipe` pairs and `CreatePseudoConsole(size, inRead, outWrite, 0)`
-  2. `NewProcThreadAttributeList(1)` + `Update(PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, hpc)`
-  3. `CreateProcessW` with `EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED`, the
-     command line built with `windows.ComposeCommandLine`, argv[0] resolved by `exec.LookPath` (PATHEXT), and
-     `TERM=xterm-256color`/`COLORTERM=truecolor` in the environment block
-  4. `AssignProcessToJobObject`, then `ResumeThread`. Assigning before resuming means no grandchild can
-     escape the job.
-  5. close the ConPTY-side pipe ends in the parent.
-- **Exit detection differs from Unix:** the output pipe does not break when the child exits, only when
-  `ClosePseudoConsole` runs. So a goroutine waits on the process handle, records the exit code, then calls
-  `ClosePseudoConsole`. That flushes the last output, the reader sees EOF, and `Finish`/`reap`/`exited` run in
-  the existing order. `ClosePseudoConsole` can block until output is drained on older builds, so the reader
-  must be running before it's called (it always is after `StartReader`).
-- `Close` → `TerminateJobObject` + `ClosePseudoConsole`. `Resize` → `ResizePseudoConsole`.
-- `jobs_windows.go`: `Stopped()` is always false; `Continue()` returns an "unsupported" error.
-- `StartFunc` (in-process builtins): decided in P01, see "P01 delivered". The contract is a single `*os.File`
-  tty, and two unidirectional pipes cannot stand in for it (no tty metadata, no shared close, no way to
-  interrupt a blocked read). P01 returns `term.ErrUnsupported` on Windows and callers use multicall
-  (`misa.exe ls …` under ConPTY), the default `builtin_mode`. A later stream contract would hand fn a separate
-  reader and writer plus tty metadata and a cancellation, behind the same `openFuncTTY` seam.
-- Tests (`//go:build windows`): `cmd /c echo hi` output, exit codes, resize, and that `Close` kills a
-  grandchild (`cmd /c start /b ping -t …`).
-- **S0 spike** (see above): log what ConPTY passes through for Misa's sequences and pick a route before W4.
+Superseded by #108 P01–P04; see the delivered sections below for the actual interface and P02 scope.
+P01 provides the transport boundary; P02 implements native launch/read/write/resize and suspended job
+assignment. P03 owns bounded teardown, complete drain and descendant/nested-job proof. P04 owns the
+protocol-fidelity probe before full Misa nesting is enabled. Tests use the native Go test executable,
+not `cmd`/`ping` scripts. `StartFunc` remains unsupported on Windows; use multicall.
 
 ### W2. Split `internal/gui` into core + backends (on Linux, no behaviour change)
 
@@ -421,9 +395,9 @@ Already fine:
   The tool description names the shell actually in use, so the model knows whether `ls`/`grep` exist.
   `$UGH_SCRATCH` is unchanged. The description's "/tmp" wording becomes "the system temp directory".
 - **UD5. Process trees: job objects instead of process groups.** Replace `Setpgid` + `kill(-pgid)`:
-  - the shell starts `CREATE_SUSPENDED`, is assigned to a fresh job and resumed (raw `CreateProcess`, or
-    `exec.Cmd` + `SysProcAttr.CreationFlags` with assignment right after start; the latter has a small race,
-    acceptable since the shell spawns nothing that fast)
+  - the shell starts `CREATE_SUSPENDED`, is assigned to a fresh job and only then resumed using native
+    process/thread handles. Assign-after-start is never acceptable: children can escape the job before
+    assignment. #108 P02 implements this ordering for terminals; A04 owns the agent adapter.
   - cancel/timeout → `TerminateJobObject`
   - `groupAlive` → `QueryInformationJobObject(JobObjectBasicAccountingInformation).ActiveProcesses > 0`
   - no `KILL_ON_JOB_CLOSE`, so background jobs of a finished command survive, as they do on Unix
@@ -431,8 +405,9 @@ Already fine:
   - `isPIDAlive`: `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` + `GetExitCodeProcess` (`STILL_ACTIVE`, then
     a wait with timeout 0 to rule out a real exit code of 259)
   - start-time identity: `GetProcessTimes` creation time replaces `/proc/<pid>/stat` starttime
-  - a job object doesn't outlive the ugh process that holds its handle, so a group can't be tracked across
-    processes: when a command leaves processes running, record their pids
+  - historical proposal, superseded by #108 A05: a job without kill-on-close can outlive its last handle
+    while processes remain. Durable background ownership needs explicit validation; a one-time PID list
+    misses later descendants. The old proposal was to record their pids
     (`JobObjectBasicProcessIdList`) in `ActivePIDs` with creation times, and leave `ActiveGroups` empty on
     Windows
   - the cwd scan is skipped, the same path as a Unix system without `/proc`
@@ -566,11 +541,94 @@ windows/amd64 and windows/arm64, where the transport is honestly unavailable. Un
 - Unix (`transport_unix.go`): PTY master `conn` (`pollable`, `setWinsize` in `ptyfd.go`), `unixProc` with the
   `Wait4(WUNTRACED)` loop (stop notification through `OnStop`, `Continue` via SIGCONT to the group), and `Kill`
   in `proc_linux.go` (walks /proc, pidfd preferred, Android fallbacks) or `proc_other_unix.go`.
-- Windows (`transport_other.go`, `!unix`): `startProcess` and `openFuncTTY` return `ErrUnsupported`; P02 replaces
-  them with ConPTY and P03 adds job-object teardown. `Stopped` is false and `Continue` errors there, consistent
-  with `jobleader.Supported == false`.
+- At P01, Windows used the `transport_other.go` (`!unix`) unsupported stub. P02 below replaces only
+  `startProcess` with ConPTY; `openFuncTTY` still returns `ErrUnsupported`. `Stopped` is false and `Continue`
+  errors there, consistent with `jobleader.Supported == false`.
 - `StartFunc`: decision above. Unix keeps the PTY tty; Windows returns `ErrUnsupported`.
 - Tests: `fake_transport_test.go` drives the core with no PTY (final output before exit, ordered input, resize,
   Close idempotent with one tree kill, no job control); `boundary_unix_test.go` pins resize to the program's tty,
   Close twice, grandchild kill, input order. Existing tests keep covering fast-exit output order, stopped/continue,
   session kill and StartFunc.
+
+## P02 implemented (#108; stacked on P01 PR #114 and F01 PR #111)
+
+Native launch/read/write/resize in `internal/term`; no GUI wiring or application-wide Windows support
+claim. The reduced root application still needs F02–F04. No new module dependencies or external
+implementation code: the bindings use the existing `golang.org/x/sys/windows` v0.48.0 and system DLLs.
+Microsoft Learn's [pseudoconsole session specification](https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session),
+[process creation flags](https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags),
+[job objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects), and
+[C runtime argument rules](https://learn.microsoft.com/en-us/cpp/c-language/parsing-c-command-line-arguments)
+are API specifications, not imported source code.
+
+### Supported transport behavior
+
+- `conpty_windows.go` calls `CreatePseudoConsole`, `ResizePseudoConsole`, and `ClosePseudoConsole` through
+  lazy kernel32 procedures. x/sys already wraps these APIs, but explicit availability checks provide a
+  wrapped `ErrUnsupported` when they are missing. API availability is not a tested Windows minimum-version
+  promise. Dimensions must be positive signed 16-bit values.
+- `transport_windows.go` creates synchronous input/output pipes and a `STARTUPINFOEX` pseudoconsole
+  attribute. `CreateProcess` uses explicit application, Unicode command line/environment/cwd and
+  `EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED`. The child is assigned to
+  a fresh kill-on-close job **before** `ResumeThread`. Assignment/resume failure terminates the suspended
+  child; startup ownership bookkeeping unwinds resources in reverse order.
+- The connection owns both host pipe ends, HPCON and the job; the process waiter owns the child process
+  handle. The waiter obtains the native exit code with `WaitForSingleObject`/`GetExitCodeProcess` and starts
+  pseudoconsole close independently so the reader can drain toward EOF. `Kill` uses `TerminateJobObject`,
+  including after leader exit while the connection remains open. There is no Windows `continuer`.
+- **Explicit Close contract:** callers must close every successful connection/Terminal, even after natural
+  exit, to release the retained job and pipe handles. There is no finalizer-based job cleanup. Close is
+  idempotent, terminates/closes the kill-on-close job and pipes, and shares pseudoconsole disposal with the waiter.
+  It is not yet a proven bounded/drain-preserving teardown protocol (P03).
+- `StartFunc` still returns `ErrUnsupported`: a synchronous pipe pair cannot satisfy its single tty-file
+  contract. `StartCommand` still means `sh -c`; P02 does not silently replace shell semantics (I01).
+
+### Deliberate executable/environment policy
+
+Portable `winlaunch.go` helpers are tested on Linux. Arguments preserve spaces, empty strings, Unicode,
+quotes and trailing backslashes under C-runtime quoting rules; embedded NULs are rejected. Environment
+names are case-insensitive, last-wins, sorted by folded UTF-16 code units, and encoded as a double-NUL
+terminated Unicode block, including empty blocks and `=C:=...` drive entries. Nil `startSpec.Env` inherits
+the host; an explicit empty environment stays empty. Empty cwd uses the host cwd; ordinary relative cwd
+is made absolute before launch, but drive-relative cwd such as `C:work` is rejected.
+
+Resolution uses **the child's** PATH/PATHEXT, not `exec.LookPath` or CreateProcess's implicit search. Relative
+PATH entries are relative to child cwd; empty entries are ignored (no implicit cwd search). One surrounding
+quote pair on a PATH entry is stripped; no shell interpretation occurs. Explicit relative paths, drive-rooted
+paths and UNC paths are supported. A rooted `\foo` uses the child's cwd drive. Explicit drive-relative
+executable paths such as `C:foo` are rejected rather than consulting hidden per-drive state. Invalid or
+drive-relative PATH entries are skipped so later valid directories can resolve; if lookup fails the error
+identifies skipped entries. Explicit extensions must be `.exe` or
+`.com`; extensionless names use only those PATHEXT entries (default `.exe;.com` when PATHEXT is absent).
+Direct `.bat`/`.cmd` launches return an error naming I01; explicit `cmd.exe /c script.cmd` is still a native
+executable invocation. Other executable formats and shell policies belong to I01.
+
+### Evidence and remaining gates
+
+- Portable quoting/env/resolution/ownership table tests execute on Linux; existing Unix transport tests
+  remain unchanged. Windows-only tests re-exec the Go test binary to inspect exact argv, duplicate env/cwd,
+  nonzero exit status, large ordered output, input and console dimensions, plus repeated Close and absence
+  of job suspension/StartFunc support. They use no shell scripts or installed host tools.
+- Windows amd64/arm64 libraries and tests are cross-built/vetted only. **No native Windows tests have been
+  executed here.** There is no Windows host, and this change does not add a CI job. F05/R02 must supply native
+  evidence, including oldest-supported OS and arm64 coverage, before advertising support.
+- **TODO(P03):** prove bounded cleanup (including close-before-reader and full input/output buffers), full
+  trailing output ordering, startup-failure handle/process cleanup, nested-job assignment failure and
+  descendant lifetimes. Closing HPCON on leader exit may affect surviving console descendants even though
+  their job stays owned until Close; no background-survival guarantee is claimed. P03 must resolve that
+  lifecycle. P04 measures VT/protocol fidelity; G01–G03 supply the frontend; I01 owns shell resolution and
+  I06 full Misa nesting. A04/A05 have separate agent cancellation/background policies.
+
+### Implementation-worktree checks (Linux host)
+
+Passed: `gofmt -l .` (empty), `go vet ./...`, builds with `nough` and `nogui noweb`,
+`env -u OPENROUTER_API_KEY go test ./internal/term` and `go test ./...`, and the term race test.
+The builds/tests/vet used `CGO_ENABLED=0` except Go's Linux race instrumentation, which requires cgo.
+Term-only vet passed for Windows amd64, Darwin, FreeBSD, OpenBSD and Android arm64 (cgo off);
+Windows arm64 library build and both architectures' test compilation passed. These are not native
+Windows runtime results.
+
+`GOOS=windows GOARCH=amd64 go build -tags 'nough noweb' .` still fails outside `term`:
+`lscore` (`syscall.Stat_t`, `statTimes`), `sysinfo` (`Statfs_t`, `Statfs`, `getMountSpace`),
+`procmon` (Unix signal table), and `sshclient` (`SIGWINCH`). F02–F04 remain the reduced-root build gate.
+No commits, workflow edits, module changes or new implementation PR are part of this worktree task.
