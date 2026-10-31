@@ -2,7 +2,7 @@
 
 Status: draft, now tracked by #108, whose task IDs (F01–R02) supersede the W/UW numbering below where they differ.
 The gui core/backend split (W2, shared with Android A2) has landed; the Win32 backend is not started. #108 F01
-(package selection and the jobleader boundary) and F02 (metadata boundary) are delivered, see "F01 delivered" and "F02 delivered". Part 1 is Misa (phases W0–W6); part 2 is ugh (phases UW0–UW4), which
+(package selection and the jobleader boundary), F02 (metadata boundary), and I03 (Windows sysinfo) are delivered; see their sections below. Part 1 is Misa (phases W0–W6); part 2 is ugh (phases UW0–UW4), which
 Misa needs before its Windows build can include the agent. The measurements below are from 2026-10-13; code
 added since then (`internal/webui`'s file lock, `internal/ughbot`, `internal/ugh/confine`) needs the same
 treatment. ughbot is out of scope for the Windows port (it is not redefined as Linux-only: it also builds for the BSDs and macOS).
@@ -287,13 +287,9 @@ PATH; the non-fontconfig path searches `$PREFIX/share/fonts` and `/system/fonts`
 
 ### W5. Remaining subsystems (milestone M-c)
 
-- **sysinfo:**
-  - OS from the registry (`CurrentVersion`: ProductName, DisplayVersion, CurrentBuildNumber, UBR). Build ≥
-    22000 is Windows 11 even though ProductName says 10. That also picks the distro art.
-  - CPU from `HARDWARE\DESCRIPTION\System\CentralProcessor\0`.
-  - memory `GlobalMemoryStatusEx`, uptime `GetTickCount64`, disks `GetLogicalDrives` +
-    `GetDiskFreeSpaceExW`, GPU via `EnumDisplayDevicesW`, shell from the parent process
-    (`CreateToolhelp32Snapshot`).
+- **sysinfo (I03 delivered; F02 was the disk-space prerequisite):** registry OS and CPU, Windows memory,
+  uptime and logical-drive storage providers. GPU is unavailable pending future DXGI work; shell detection
+  remains I01. Native Windows validation is still outstanding; see "I03 delivered" below.
 - **procmon:**
   - process list `CreateToolhelp32Snapshot`; CPU% from `GetProcessTimes` deltas over `GetSystemTimes`;
     memory `K32GetProcessMemoryInfo`
@@ -574,3 +570,13 @@ vet for `windows/amd64` and `windows/arm64`. Unix (Android included) output is u
   F03/F04 (`internal/builtins`: `Stat_t`, signals in `util.go`, `Umask`, `Mkfifo`, `Getpriority`, and so on
   across `arch`, `chown`, `cp`, `du`, `mkdir`, `mv`, `nice`, `proc`, `rm`, `split`, `stat`, `sysutil`,
   `touch`, `truncate`, `umask`, `util`).
+
+## I03 delivered (#108)
+
+Windows sysinfo providers build on F02's `GetDiskFreeSpaceEx` disk-space boundary. The Windows provider reads
+OS version from `RtlGetVersion` and edition details and CPU from the registry (including Windows 11 client detection by build number), memory from
+`GlobalMemoryStatusEx`, uptime from `GetTickCount64`, and storage from logical drives. Terminal identification
+uses environment hints. Unavailable data remains unavailable rather than being fabricated.
+
+GPU information is unavailable; a future DXGI provider is needed. Shell detection is I01, not I03. Native
+Windows runtime behavior has not yet been validated; cross-compilation and portable tests do not establish it.
