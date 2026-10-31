@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AmadeusDE/Misa/internal/sh/syntax"
 	"github.com/AmadeusDE/Misa/internal/ugh/llm"
-	"mvdan.cc/sh/v3/syntax"
 )
 
 const criticalStart = "[Pinned critical state — retained by the harness, not the summarizer]\n" +

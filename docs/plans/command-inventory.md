@@ -144,7 +144,7 @@ These entries are exposed through the UI rather than the builtin command registr
 | Name | URL | Revision | License | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
 | landley/toybox | https://github.com/landley/toybox | 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb | 0BSD | approved | Pinned research reference; per-file and fixture provenance must be reviewed before reuse. |
-| mvdan/sh | https://github.com/mvdan/sh | e96ef1dae52c71e86cf87eb594cb4917fa49aaba | BSD-3-Clause | approved | Pinned research reference; per-file and fixture provenance must be reviewed before reuse. Research also separately inspected installed module v3.13.1; import revision not yet selected. |
+| mvdan/sh | https://github.com/mvdan/sh | e96ef1dae52c71e86cf87eb594cb4917fa49aaba | BSD-3-Clause | approved | Pinned research reference remains e96ef1da; S01 imports v3.13.1 to preserve existing parser behavior after both revisions passed targeted regressions. See docs/plans/mvdan-import.md. |
 | uutils/acl | https://github.com/uutils/acl | af3feeda769cb55fe37d16f0acf2e77c685eed8d | MIT | approved | Pinned research reference; per-file and fixture provenance must be reviewed before reuse. |
 | uutils/awk | https://github.com/uutils/awk |  | Apache-2.0 (research metadata) | excluded | Excluded from issue #40 reference set: research reports Apache-2.0 repository metadata; no pinned revision. |
 | uutils/bsdutils | https://github.com/uutils/bsdutils | 3ba11da4ddf49141b2266cec1f956f79db84d3b3 | MIT | approved | Pinned research reference; per-file and fixture provenance must be reviewed before reuse. |

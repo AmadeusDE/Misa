@@ -22,6 +22,15 @@ from their own repositories and carry their own licenses (see `go.mod` and `docs
 | [libxkbcommon (xkbcommon-keysyms.h, from X11 keysymdef.h)](https://github.com/xkbcommon/libxkbcommon) | Keysym names and Unicode mappings in `internal/xkb/keysyms.txt`. | MIT/X11 |
 | [Wayland (wayland.xml)](https://gitlab.freedesktop.org/wayland/wayland) | Opcodes and message layouts in `internal/wayland` and `internal/gui` follow the protocol XML. | MIT |
 | [gobox pkg/args](https://github.com/mveety/gobox) | The option parser in `internal/builtins/args.go`. | 0BSD |
+| [mvdan/sh](https://github.com/mvdan/sh/tree/2f3f5e36d9b0f8f14c998d50aa20a28832205ae8) | In-tree foundation for `internal/sh/{syntax,expand,interp,pattern,fileutil}` and required internal helpers; exact per-file provenance is in `internal/sh/SOURCE.json`. | BSD-3-Clause |
+
+---
+
+## mvdan/sh (in-tree foundation)
+
+https://github.com/mvdan/sh/tree/2f3f5e36d9b0f8f14c998d50aa20a28832205ae8 (v3.13.1)
+
+Used in `internal/sh/{syntax,expand,interp,pattern,fileutil}` and required internal helpers. Copyright (c) 2016, Daniel Martí. All rights reserved. Upstream source is from the mvdan/sh contributors; file-level provenance, omissions, and the local import-path rewrite are documented in `internal/sh/SOURCE.json`. The source is distributed under the BSD 3-Clause License; full license text is in [`internal/sh/LICENSE`](internal/sh/LICENSE).
 
 ---
 

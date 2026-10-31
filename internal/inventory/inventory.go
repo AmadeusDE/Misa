@@ -39,12 +39,14 @@ type UIOnly struct {
 }
 
 type Source struct {
-	Name     string `json:"name"`
-	URL      string `json:"url"`
-	Revision string `json:"revision"`
-	License  string `json:"license"`
-	Status   string `json:"status"`
-	Notes    string `json:"notes"`
+	Name           string `json:"name"`
+	URL            string `json:"url"`
+	Revision       string `json:"revision"`
+	License        string `json:"license"`
+	Status         string `json:"status"`
+	Notes          string `json:"notes"`
+	ImportRevision string `json:"import_revision,omitempty"`
+	SourceMap      string `json:"source_map,omitempty"`
 }
 
 // Load decodes the embedded data and returns entries sorted by name.

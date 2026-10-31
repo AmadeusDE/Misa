@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"mvdan.cc/sh/v3/syntax"
+	"github.com/AmadeusDE/Misa/internal/sh/syntax"
 )
 
 // GitCommand describes a parsed and classified Git invocation.
