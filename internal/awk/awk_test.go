@@ -472,37 +472,36 @@ func TestVariablesAndFiles(t *testing.T) {
 	})
 }
 
-func TestUnsupported(t *testing.T) {
-	cases := []struct{ name, prog, feature string }{
-		{"array index", `BEGIN { a[1] = 2 }`, "arrays"},
-		{"in operator", `BEGIN { if (1 in a) print }`, "arrays"},
-		{"for in", `BEGIN { for (k in a) print k }`, "arrays"},
-		{"delete", `BEGIN { delete a }`, "arrays"},
-		{"function", `function f(x) { return x } BEGIN { }`, "user-defined functions"},
-		{"func keyword", `func f(x) { return x }`, "user-defined functions"},
-		{"call undefined", `BEGIN { f(1) }`, "user-defined functions"},
-		{"return", `BEGIN { return 1 }`, "user-defined functions"},
-		{"getline", `BEGIN { getline }`, "getline"},
-		{"getline var file", `BEGIN { getline x < "f" }`, "getline"},
-		{"pipe getline", `BEGIN { "date" | getline }`, "pipes"},
-		{"print pipe", `BEGIN { print "x" | "cat" }`, "pipes"},
-		{"print redirect", `BEGIN { print "x" > "f" }`, "output redirection"},
-		{"print append", `BEGIN { print "x" >> "f" }`, "output redirection"},
-		{"printf redirect", `BEGIN { printf("x") > "f" }`, "output redirection"},
-		{"split", `BEGIN { split("a b", p) }`, "split"},
-		{"close", `BEGIN { close("f") }`, "close"},
-		{"system", `BEGIN { system("true") }`, "system"},
-		{"fflush", `BEGIN { fflush() }`, "fflush"},
-		{"group in", `BEGIN { if ((1,2) in a) print }`, "arrays"},
+func TestUnsupportedExtensions(t *testing.T) {
+	cases := []struct{ name, prog, want string }{
+		{"BEGINFILE", `BEGINFILE { print FILENAME }`, "BEGINFILE"},
+		{"ENDFILE", `ENDFILE { }`, "ENDFILE"},
+		{"gensub", `BEGIN { x = gensub(/a/, "b", "g", "aaa") }`, "gensub"},
+		{"strftime", `BEGIN { print strftime("%Y") }`, "strftime"},
+		{"systime", `BEGIN { print systime() }`, "systime"},
+		{"bit and", `BEGIN { print and(5, 3) }`, "and"},
+		{"asort", `BEGIN { asort(a) }`, "asort"},
+		{"typeof", `BEGIN { typeof(a) }`, "typeof"},
+		{"PROCINFO", `BEGIN { print PROCINFO["pid"] }`, "PROCINFO"},
+		{"IGNORECASE", `BEGIN { IGNORECASE = 1 }`, "IGNORECASE"},
+		{"RT", `{ print RT }`, "RT"},
+		{"FIELDWIDTHS", `BEGIN { FIELDWIDTHS = "2 3" }`, "FIELDWIDTHS"},
+		{"FPAT", `BEGIN { FPAT = "[a-z]+" }`, "FPAT"},
+		{"include", `@include "lib.awk"`, "@-directives"},
+		{"unicode escape", `BEGIN { print "\u00e9" }`, `\u escapes`},
+		{"switch", `BEGIN { switch (1) { case 1: print } }`, "switch"},
+		{"array of arrays", `BEGIN { a[1][2] = 3 }`, "arrays of arrays"},
+		{"coprocess", `BEGIN { print "x" |& "cat" }`, "two-way pipes"},
+		{"inet", `BEGIN { print "x" > "/inet/tcp/0/localhost/80" }`, "network files"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			r := awkRun(t, c.prog, "")
+			r := awkRun(t, c.prog, "x\n")
 			if r.status != 2 || r.out != "" {
-				t.Fatalf("status %d out %q", r.status, r.out)
+				t.Fatalf("status %d out %q err %q", r.status, r.out, r.err)
 			}
-			if !strings.Contains(r.err, c.feature) || !strings.Contains(r.err, "not supported") && !strings.Contains(r.err, "undefined function") {
-				t.Fatalf("stderr %q does not name %q", r.err, c.feature)
+			if !strings.Contains(r.err, c.want) || !strings.Contains(r.err, "not supported") && !strings.Contains(r.err, "not implemented") {
+				t.Fatalf("stderr %q does not reject %q", r.err, c.want)
 			}
 		})
 	}
@@ -513,7 +512,8 @@ func TestSyntaxErrors(t *testing.T) {
 		`BEGIN {`, `BEGIN { print ( }`, `{ print 1 +`, `BEGIN { x = }`, `BEGIN`, `BEGIN { "abc }`,
 		`BEGIN { print /abc }`, `BEGIN { break }`, `BEGIN { continue }`, `BEGIN { print (1,2) 3 }`,
 		`BEGIN { substr("a") }`, `BEGIN { sub(/a/, "b", "c") }`, `BEGIN { x = 1 = 2 }`, `BEGIN { @ }`,
-		`BEGIN { print 1 2 3 }}`, `BEGIN { if }`, `BEGIN { rand(1) }`,
+		`BEGIN { print 1 2 3 }}`, `BEGIN { if }`, `BEGIN { rand(1) }`, `BEGIN { return 1 }`, `function f(a, a) { }`, `function f() { } function f() { }`,
+		`BEGIN { f(1) }`, `function f(a) { } BEGIN { f(1, 2) }`, `BEGIN { split("a", 1) }`, `function sub(a) { }`,
 	} {
 		r := awkRun(t, prog, "")
 		if r.status != 2 || r.out != "" || !strings.HasPrefix(r.err, "awk: ") {

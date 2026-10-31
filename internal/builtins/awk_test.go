@@ -65,10 +65,10 @@ func TestAwkSyntaxError(t *testing.T) {
 }
 
 func TestAwkUnsupportedNamesFeature(t *testing.T) {
-	r := runBuiltin(t, "awk", "BEGIN { a[1] = 1 }")
+	r := runBuiltin(t, "awk", `BEGIN { x = gensub(/a/, "b", "g", "aaa") }`)
 	assertExitCode(t, r, 2)
-	if !strings.Contains(r.stderr, "arrays") {
-		t.Fatalf("stderr %q does not name arrays", r.stderr)
+	if !strings.Contains(r.stderr, "gensub") {
+		t.Fatalf("stderr %q does not name gensub", r.stderr)
 	}
 }
 

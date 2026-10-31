@@ -42,6 +42,11 @@ func (in *interp) call(c *callExpr) Value {
 			in.ensureRecord()
 			return num(float64(in.count(in.r.rec)))
 		}
+		if v, ok := args[0].(*varRef); ok {
+			if a := in.peekArray(v); a != nil {
+				return num(float64(a.len()))
+			}
+		}
 		return num(float64(in.count(in.eval(args[0]).text(in.convfmt))))
 	case "substr":
 		return in.substr(args)
@@ -72,6 +77,14 @@ func (in *interp) call(c *callExpr) Value {
 		return in.srand(args)
 	case "match":
 		return in.match(args)
+	case "split":
+		return in.split(args)
+	case "close":
+		return num(float64(in.closeNamed(in.eval(args[0]).text(in.convfmt))))
+	case "system":
+		return in.system(in.eval(args[0]).text(in.convfmt))
+	case "fflush":
+		return in.fflush(args)
 	}
 	return in.substitute(c)
 }

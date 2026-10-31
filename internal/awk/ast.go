@@ -16,12 +16,14 @@ const (
 	vRSTART
 	vRLENGTH
 	vARGC
+	vARGV
+	vENVIRON
 	numSpecial
 )
 
 var specialNames = [numSpecial]string{
 	"NF", "NR", "FNR", "FS", "OFS", "ORS", "RS", "FILENAME", "SUBSEP",
-	"CONVFMT", "OFMT", "RSTART", "RLENGTH", "ARGC",
+	"CONVFMT", "OFMT", "RSTART", "RLENGTH", "ARGC", "ARGV", "ENVIRON",
 }
 
 type expr interface{}
@@ -31,8 +33,9 @@ type (
 	strLit   struct{ v Value }
 	regexLit struct{ src string }
 	varRef   struct {
-		idx  int
-		name string
+		idx   int
+		name  string
+		local bool // idx is a parameter slot of the running function
 	}
 	fieldRef  struct{ index expr }
 	groupExpr struct{ items []expr }
@@ -70,6 +73,27 @@ type (
 		name string
 		args []expr
 	}
+	userCall struct {
+		name string
+		args []expr
+		fn   *funcDef
+		line int
+	}
+	indexExpr struct {
+		arr  *varRef
+		subs []expr
+	}
+	inExpr struct {
+		arr  *varRef
+		subs []expr
+	}
+	// getlineExpr reads from the main input (src nil), a file (src) or a
+	// command (src with cmd).
+	getlineExpr struct {
+		lv  expr
+		src expr
+		cmd bool
+	}
 )
 
 type stmt interface{}
@@ -79,9 +103,20 @@ type (
 	printStmt struct {
 		args   []expr
 		printf bool
+		redir  tokKind // tGT, tAppend, tPipe, or 0
+		dest   expr
 	}
-	blockStmt struct{ list []stmt }
-	ifStmt    struct {
+	deleteStmt struct {
+		arr  *varRef
+		subs []expr // nil deletes the whole array
+	}
+	forInStmt struct {
+		v, arr *varRef
+		body   stmt
+	}
+	returnStmt struct{ e expr }
+	blockStmt  struct{ list []stmt }
+	ifStmt     struct {
 		cond      expr
 		then, els stmt
 	}
@@ -106,6 +141,12 @@ type (
 	exitStmt     struct{ e expr }
 )
 
+type funcDef struct {
+	name   string
+	params []string
+	body   []stmt
+}
+
 // rule is a pattern-action pair. A nil action prints the record; a nil
 // pattern matches every record; r2 is the end of a range pattern.
 type rule struct {
@@ -121,6 +162,7 @@ type Program struct {
 	begins [][]stmt
 	ends   [][]stmt
 	rules  []*rule
+	funcs  map[string]*funcDef
 	vars   map[string]int
 	nvars  int
 }

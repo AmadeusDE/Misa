@@ -9,6 +9,10 @@ type parser struct {
 	noGT    bool
 	groupAt int
 	loops   int
+	params  map[string]int // parameters of the function being parsed
+	inFunc  bool
+	funcs   map[string]*funcDef
+	calls   []*userCall
 }
 
 // Parse compiles AWK source into a Program.
@@ -17,7 +21,7 @@ func Parse(src string) (prog *Program, err error) {
 	if err != nil {
 		return nil, err
 	}
-	p := &parser{toks: toks, vars: map[string]int{}, groupAt: -1}
+	p := &parser{toks: toks, vars: map[string]int{}, groupAt: -1, funcs: map[string]*funcDef{}}
 	for i, n := range specialNames {
 		p.vars[n] = i
 	}
@@ -31,6 +35,8 @@ func Parse(src string) (prog *Program, err error) {
 		}
 	}()
 	prog = p.program()
+	p.resolveCalls()
+	prog.funcs = p.funcs
 	prog.vars, prog.nvars = p.vars, len(p.vars)
 	return prog, nil
 }
@@ -58,15 +64,6 @@ func (p *parser) fail(msg string) {
 
 func (p *parser) failUnexpected() {
 	t := p.tok()
-	switch {
-	case t.kind == tPipe:
-		panic(unsupported(t.line, "pipes (| command)", "deferred to the AWK language completion task"))
-	case t.kind == tAppend:
-		panic(unsupported(t.line, "output redirection (>>)", "deferred to the AWK language completion task"))
-	case t.kind == tGT && p.noGT:
-		panic(unsupported(t.line, "output redirection (>)", "deferred to the AWK language completion task"))
-	}
-	p.unsupportedKeyword()
 	switch t.kind {
 	case tEOF:
 		p.fail("syntax error at end of program")
@@ -81,24 +78,6 @@ func tokenText(t token) string {
 		return t.text
 	}
 	return fmt.Sprint(t.kind)
-}
-
-// unsupportedKeyword rejects the language features that are not implemented yet.
-func (p *parser) unsupportedKeyword() {
-	t := p.tok()
-	if t.kind != tKeyword {
-		return
-	}
-	switch t.text {
-	case "function", "func":
-		panic(unsupported(t.line, "user-defined functions", "deferred to the AWK language completion task"))
-	case "return":
-		panic(unsupported(t.line, "return (user-defined functions)", "deferred to the AWK language completion task"))
-	case "delete", "in":
-		panic(unsupported(t.line, "arrays ("+t.text+")", "deferred to the AWK language completion task"))
-	case "getline":
-		panic(unsupported(t.line, "getline", "deferred to the AWK language completion task"))
-	}
 }
 
 func (p *parser) expect(k tokKind) token {
@@ -120,7 +99,29 @@ func (p *parser) skipTerminators() {
 	}
 }
 
+// gawkVars are special variables of gawk that this awk does not implement;
+// using one is an error rather than a plain variable that never does anything.
+var gawkVars = map[string]bool{
+	"PROCINFO": true, "IGNORECASE": true, "RT": true, "FIELDWIDTHS": true, "FPAT": true,
+	"ERRNO": true, "ARGIND": true, "BINMODE": true, "FUNCTAB": true, "SYMTAB": true,
+	"LINT": true, "TEXTDOMAIN": true, "BEGINFILE": true, "ENDFILE": true,
+}
+
+// gawkFuncs are gawk functions that are rejected by name when no program
+// function defines them.
+var gawkFuncs = map[string]bool{
+	"and": true, "or": true, "xor": true, "compl": true, "lshift": true, "rshift": true,
+	"gensub": true, "strftime": true, "systime": true, "mktime": true, "asort": true,
+	"asorti": true, "patsplit": true, "strtonum": true, "isarray": true, "typeof": true,
+}
+
 func (p *parser) variable(name string) *varRef {
+	if gawkVars[name] {
+		p.fail(name + " is a gawk extension and is not supported")
+	}
+	if i, ok := p.params[name]; ok {
+		return &varRef{idx: i, name: name, local: true}
+	}
 	i, ok := p.vars[name]
 	if !ok {
 		i = len(p.vars)
@@ -149,13 +150,71 @@ func (p *parser) item(prog *Program) {
 		prog.ends = append(prog.ends, p.action())
 	case p.is(tLbrace):
 		prog.rules = append(prog.rules, &rule{action: p.action()})
+	case p.isKeyword("function"), p.isKeyword("func"):
+		p.funcDef()
 	default:
 		prog.rules = append(prog.rules, p.patternRule())
 	}
 }
 
+func (p *parser) funcDef() {
+	p.advance()
+	t := p.tok()
+	if t.kind == tBuiltin {
+		p.fail("cannot redefine the built-in function " + t.text)
+	}
+	if t.kind != tName && t.kind != tFuncName {
+		p.failUnexpected()
+	}
+	p.advance()
+	if _, dup := p.funcs[t.text]; dup {
+		p.fail("function " + t.text + " is defined twice")
+	}
+	fn := &funcDef{name: t.text}
+	p.expect(tLparen)
+	params := map[string]int{}
+	p.skipNewlines()
+	for !p.is(tRparen) {
+		pt := p.expect(tName)
+		if _, dup := params[pt.text]; dup || pt.text == fn.name {
+			p.fail("duplicate parameter " + pt.text + " in function " + fn.name)
+		}
+		params[pt.text] = len(fn.params)
+		fn.params = append(fn.params, pt.text)
+		p.skipNewlines()
+		if !p.is(tComma) {
+			break
+		}
+		p.advance()
+		p.skipNewlines()
+	}
+	p.expect(tRparen)
+	p.skipNewlines()
+	p.funcs[fn.name] = fn
+	p.params, p.inFunc = params, true
+	savedLoops := p.loops
+	p.loops = 0
+	fn.body = p.action()
+	p.loops = savedLoops
+	p.params, p.inFunc = nil, false
+}
+
+func (p *parser) resolveCalls() {
+	for _, c := range p.calls {
+		fn, ok := p.funcs[c.name]
+		switch {
+		case !ok && gawkFuncs[c.name]:
+			panic(unsupported(c.line, "gawk function "+c.name+"()", "not implemented"))
+		case !ok:
+			panic(&Error{Line: c.line, Msg: "call to undefined function " + c.name})
+		case len(c.args) > len(fn.params):
+			panic(&Error{Line: c.line, Msg: fmt.Sprintf("function %s called with %d arguments, accepts only %d", c.name, len(c.args), len(fn.params))})
+		}
+		c.fn = fn
+	}
+}
+
 func (p *parser) patternRule() *rule {
-	p.unsupportedKeyword()
 	r := &rule{pattern: p.expression()}
 	if p.is(tComma) {
 		p.advance()
@@ -197,6 +256,8 @@ func (p *parser) statement() stmt {
 	case t.kind == tSemi:
 		p.advance()
 		return &blockStmt{}
+	case t.kind == tName && t.text == "switch" && p.toks[p.pos+1].kind == tLparen:
+		panic(unsupported(t.line, "switch (gawk)", "use if/else"))
 	case t.kind == tKeyword:
 		switch t.text {
 		case "if":
@@ -278,8 +339,15 @@ func (p *parser) doStatement() stmt {
 func (p *parser) forStatement() stmt {
 	p.advance()
 	p.expect(tLparen)
-	if p.is(tName) && p.toks[p.pos+1].kind == tKeyword && p.toks[p.pos+1].text == "in" {
-		panic(unsupported(p.tok().line, "arrays (for (x in array))", "deferred to the AWK language completion task"))
+	if p.isForIn() {
+		v := p.variable(p.advance().text)
+		p.advance()
+		s := &forInStmt{v: v, arr: p.variable(p.advance().text)}
+		p.expect(tRparen)
+		p.loops++
+		s.body = p.body()
+		p.loops--
+		return s
 	}
 	s := &forStmt{}
 	if !p.is(tSemi) {
@@ -300,6 +368,12 @@ func (p *parser) forStatement() stmt {
 	s.body = p.body()
 	p.loops--
 	return s
+}
+
+func (p *parser) isForIn() bool {
+	t := p.toks[p.pos:]
+	return len(t) > 3 && t[0].kind == tName && t[1].kind == tKeyword && t[1].text == "in" &&
+		t[2].kind == tName && t[3].kind == tRparen
 }
 
 func (p *parser) simple() stmt {
@@ -323,6 +397,18 @@ func (p *parser) simple() stmt {
 				return &breakStmt{}
 			}
 			return &continueStmt{}
+		case "delete":
+			return p.deleteStatement()
+		case "return":
+			p.advance()
+			if !p.inFunc {
+				p.fail("return outside a function")
+			}
+			s := &returnStmt{}
+			if !p.is(tSemi) && !p.is(tNewline) && !p.is(tRbrace) && !p.is(tEOF) {
+				s.e = p.expression()
+			}
+			return s
 		case "exit":
 			p.advance()
 			s := &exitStmt{}
@@ -331,9 +417,38 @@ func (p *parser) simple() stmt {
 			}
 			return s
 		}
-		p.unsupportedKeyword()
 	}
 	return &exprStmt{e: p.expression()}
+}
+
+func (p *parser) deleteStatement() stmt {
+	p.advance()
+	s := &deleteStmt{arr: p.variable(p.expect(tName).text)}
+	if p.is(tLbracket) {
+		p.advance()
+		s.subs = p.subscripts()
+	}
+	return s
+}
+
+// subscripts parses the expressions of a[...] up to and including ].
+func (p *parser) subscripts() []expr {
+	saved := p.noGT
+	p.noGT = false
+	defer func() { p.noGT = saved }()
+	var subs []expr
+	p.skipNewlines()
+	for {
+		subs = append(subs, p.expression())
+		p.skipNewlines()
+		if !p.is(tComma) {
+			break
+		}
+		p.advance()
+		p.skipNewlines()
+	}
+	p.expect(tRbracket)
+	return subs
 }
 
 func (p *parser) printStatement() stmt {
@@ -356,6 +471,10 @@ func (p *parser) printStatement() stmt {
 		if _, ok := a.(*groupExpr); ok {
 			p.fail("syntax error: unexpected expression list")
 		}
+	}
+	if p.is(tGT) || p.is(tAppend) || p.is(tPipe) {
+		s.redir = p.advance().kind
+		s.dest = p.concat()
 	}
 	if !p.endsPrintArgs() || p.is(tGT) || p.is(tAppend) || p.is(tPipe) {
 		p.failUnexpected()
@@ -384,7 +503,7 @@ func firstGroup(args []expr) (*groupExpr, bool) {
 
 func isLvalue(e expr) bool {
 	switch e.(type) {
-	case *varRef, *fieldRef:
+	case *varRef, *fieldRef, *indexExpr:
 		return true
 	}
 	return false
@@ -432,11 +551,25 @@ func (p *parser) or() expr {
 }
 
 func (p *parser) and() expr {
-	l := p.match()
+	l := p.inOp()
 	for p.is(tAnd) {
 		p.advance()
 		p.skipNewlines()
-		l = &andExpr{l: l, r: p.match()}
+		l = &andExpr{l: l, r: p.inOp()}
+	}
+	return l
+}
+
+func (p *parser) inOp() expr {
+	l := p.match()
+	for p.isKeyword("in") {
+		p.advance()
+		arr := p.variable(p.expect(tName).text)
+		subs := []expr{l}
+		if g, ok := l.(*groupExpr); ok {
+			subs = g.items
+		}
+		l = &inExpr{arr: arr, subs: subs}
 	}
 	return l
 }
@@ -447,14 +580,16 @@ func (p *parser) match() expr {
 		neg := p.advance().kind == tNoMatch
 		l = &matchExpr{negate: neg, l: l, r: p.comparison()}
 	}
-	if p.isKeyword("in") {
-		p.unsupportedKeyword()
-	}
 	return l
 }
 
 func (p *parser) comparison() expr {
 	l := p.concat()
+	for p.is(tPipe) && p.toks[p.pos+1].kind == tKeyword && p.toks[p.pos+1].text == "getline" {
+		p.advance()
+		p.advance()
+		l = &getlineExpr{lv: p.optLvalue(), src: l, cmd: true}
+	}
 	switch p.tok().kind {
 	case tLT, tLe, tEq, tNe, tGe:
 	case tGT:
@@ -566,16 +701,61 @@ func (p *parser) primary() expr {
 	case tName:
 		p.advance()
 		if p.is(tLbracket) {
-			panic(unsupported(t.line, "arrays ("+t.text+"[...])", "deferred to the AWK language completion task"))
+			p.advance()
+			e := &indexExpr{arr: p.variable(t.text), subs: p.subscripts()}
+			if p.is(tLbracket) {
+				panic(unsupported(t.line, "arrays of arrays (a[i][j])", "use a[i,j]"))
+			}
+			return e
 		}
 		return p.variable(t.text)
 	case tFuncName:
-		panic(&Error{Line: t.line, Msg: fmt.Sprintf("call to undefined function %s (user-defined functions are not supported yet)", t.text)})
+		return p.userCall()
+	case tKeyword:
+		if t.text == "getline" {
+			p.advance()
+			g := &getlineExpr{lv: p.optLvalue()}
+			if p.is(tLT) {
+				p.advance()
+				g.src = p.postfix()
+			}
+			return g
+		}
 	case tBuiltin:
 		return p.builtinCall()
 	}
 	p.failUnexpected()
 	return nil
+}
+
+// optLvalue parses the variable or field that follows getline, if any.
+func (p *parser) optLvalue() expr {
+	if p.is(tName) || p.is(tDollar) {
+		return p.primary()
+	}
+	return nil
+}
+
+func (p *parser) userCall() expr {
+	t := p.advance()
+	c := &userCall{name: t.text, line: t.line}
+	p.expect(tLparen)
+	saved := p.noGT
+	p.noGT = false
+	p.skipNewlines()
+	for !p.is(tRparen) {
+		c.args = append(c.args, p.expression())
+		p.skipNewlines()
+		if !p.is(tComma) {
+			break
+		}
+		p.advance()
+		p.skipNewlines()
+	}
+	p.noGT = saved
+	p.expect(tRparen)
+	p.calls = append(p.calls, c)
+	return c
 }
 
 func (p *parser) fieldIndex() expr {
@@ -602,18 +782,15 @@ func (p *parser) parenthesized() expr {
 			p.skipNewlines()
 			items = append(items, p.expression())
 		}
-		if open != p.groupAt {
-			if p.is(tRparen) && p.toks[p.pos+1].kind == tKeyword && p.toks[p.pos+1].text == "in" {
-				panic(unsupported(p.tok().line, "arrays ((i, j) in array)", "deferred to the AWK language completion task"))
-			}
+		followedByIn := p.is(tRparen) && p.toks[p.pos+1].kind == tKeyword && p.toks[p.pos+1].text == "in"
+		if open != p.groupAt && !followedByIn {
 			p.fail("syntax error: unexpected expression list")
 		}
 		e = &groupExpr{items: items}
 	}
 	p.noGT = saved
 	p.expect(tRparen)
-	if _, ok := e.(*groupExpr); ok && !p.endsPrintArgs() {
-		p.unsupportedKeyword()
+	if _, ok := e.(*groupExpr); ok && !p.endsPrintArgs() && !p.isKeyword("in") {
 		p.fail("syntax error: unexpected expression list")
 	}
 	return e
@@ -626,6 +803,7 @@ var builtinArity = map[string]arity{
 	"tolower": {1, 1}, "toupper": {1, 1}, "int": {1, 1}, "sqrt": {1, 1}, "exp": {1, 1},
 	"log": {1, 1}, "sin": {1, 1}, "cos": {1, 1}, "atan2": {2, 2}, "rand": {0, 0},
 	"srand": {0, 1}, "match": {2, 2}, "sub": {2, 3}, "gsub": {2, 3},
+	"split": {2, 3}, "close": {1, 1}, "system": {1, 1}, "fflush": {0, 1},
 }
 
 func (p *parser) builtinCall() expr {
@@ -658,6 +836,11 @@ func (p *parser) builtinCall() expr {
 	p.expect(tRparen)
 	if len(call.args) < ar.min || (ar.max >= 0 && len(call.args) > ar.max) {
 		panic(&Error{Line: t.line, Msg: fmt.Sprintf("wrong number of arguments to %s", t.text)})
+	}
+	if t.text == "split" {
+		if _, ok := call.args[1].(*varRef); !ok {
+			panic(&Error{Line: t.line, Msg: "split: second argument must be an array name"})
+		}
 	}
 	if t.text == "sub" || t.text == "gsub" {
 		if len(call.args) == 3 && !isLvalue(call.args[2]) {

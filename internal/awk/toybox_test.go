@@ -3,7 +3,8 @@ package awk
 // Cases adapted from Toybox tests/awk.test (0BSD), checkout
 // b7ec52ac35e075caffca5d330995d44e8dbfc8c3; the roadmap pins
 // 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb. Only cases inside the U41 scope
-// are included: no arrays, getline, redirection, split or bit functions.
+// are included; bit functions and the locale fixtures are not. The array,
+// split, getline, redirection and ARGV cases (U42) are in toybox_lang_test.go.
 // Expected output is Toybox's, except where noted.
 
 import "testing"
