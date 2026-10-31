@@ -4,7 +4,7 @@ package auth
 // copy-and-trim of old/internal/auth/{codex_flow,oauth_primitives,codex}.go.
 // The strict JSON/surrogate/journal machinery is gone; the browser callback
 // still accepts extra provider parameters (e.g. RFC 9207 iss) and ignores
-// them. Refresh takes an exclusive flock on $XDG_RUNTIME_DIR/ugh/auth.lock,
+// them. Refresh takes an exclusive advisory lock on $XDG_RUNTIME_DIR/ugh/auth.lock,
 // re-reads the store under the lock, refreshes only when the stored token is
 // expired, and persists rotated tokens before they are used (§3.1). Pi's
 // codex credential is never imported implicitly; this flow is independent.
@@ -17,7 +17,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/AmadeusDE/Misa/internal/ugh/privdir"
 	"io"
 	"net"
 	"net/http"
@@ -26,8 +25,10 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
+
+	"github.com/AmadeusDE/Misa/internal/filelock"
+	"github.com/AmadeusDE/Misa/internal/ugh/privdir"
 )
 
 const (
@@ -375,7 +376,7 @@ func deviceCode(m map[string]any) string {
 }
 
 // CodexTokens returns a valid access token + account id for the codex API.
-// Expired credentials are refreshed under an exclusive flock on
+// Expired credentials are refreshed under an exclusive advisory lock on
 // $XDG_RUNTIME_DIR/ugh/auth.lock: the store is re-read under the lock, the
 // refresh happens only if the token is still expired (another process may
 // have refreshed already), and rotated tokens are persisted before use.
@@ -461,22 +462,23 @@ func codexExpired(c Credential) bool {
 // refreshes across ugh processes; the returned func releases it.
 func lockAuth(ctx context.Context) (func(), error) {
 	path := filepath.Join(RuntimeDir(), "auth.lock")
-	fd, err := syscall.Open(path, syscall.O_CREAT|syscall.O_RDWR, 0600)
+	f, err := filelock.Open(path)
 	if err != nil {
 		return nil, errors.New("auth: cannot open refresh lock")
 	}
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		if syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB) == nil {
-			return func() {
-				_ = syscall.Flock(fd, syscall.LOCK_UN)
-				_ = syscall.Close(fd)
-			}, nil
-		}
-		if ctx.Err() != nil || time.Now().After(deadline) {
-			_ = syscall.Close(fd)
-			return nil, errors.New("auth: refresh lock busy")
-		}
-		time.Sleep(20 * time.Millisecond)
+	// Attempt once even for an already-cancelled context, as before.
+	err = filelock.TryLock(f)
+	if errors.Is(err, filelock.ErrLocked) {
+		wait, cancel := context.WithTimeout(ctx, 10*time.Second)
+		err = filelock.Lock(wait, f)
+		cancel()
 	}
+	if err != nil {
+		_ = f.Close()
+		return nil, errors.New("auth: refresh lock busy")
+	}
+	return func() {
+		_ = filelock.Unlock(f)
+		_ = f.Close()
+	}, nil
 }

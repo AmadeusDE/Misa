@@ -51,7 +51,7 @@
 //     be admitted against the next preset's limit (OverflowLimit) before the harness
 //     steps it down a tier: the limit exists to prevent downtime, not to cause it.
 //   - Root requests receive priority for the NEXT available slot.
-//   - Root waiter registration is backed by an OS flock on an individual waiter file.
+//   - Root waiter registration is backed by an OS lock on an individual waiter file.
 //     If the root process terminates or crashes, the OS kernel unconditionally releases
 //     the lock. Subsequent processes detect the unheld lock, purge the stale record, and
 //     do not block children on stale PID records.
@@ -59,13 +59,12 @@
 //     preserving the next slot for the root waiter.
 //
 // 6. Lock Lifetimes & Operating System Guarantees:
-//   - Advisory locks use Linux OS flock(2) on slot descriptor files.
-//   - All file descriptors are created with O_CLOEXEC (and syscall.CloseOnExec), ensuring
-//     lock descriptors are never inherited by spawned subprocesses.
+//   - Slot and waiter files use platform-specific OS locks.
+//   - Lock files are opened non-inheritable, so spawned subprocesses do not retain locks.
 //   - A slot lock is held for the entire request lifetime until handle.Close() is called.
 //   - handle.Close() must only be called after all caller cleanup (reading HTTP bodies,
 //     streaming completion, stream error handling) is complete.
-//   - If a process dies or crashes, the Linux kernel automatically cleans up all held locks.
+//   - If a process dies or crashes, the OS automatically cleans up all held locks.
 //   - No heartbeat leases, TTL renewals, renewal-loss quarantines, or distributed fencing.
 //
 // 7. Request Boundary Acquisition Order:
@@ -111,7 +110,7 @@
 //   - TestSubprocessDeath: process holding a slot killed with SIGKILL; OS releases lock immediately;
 //     second process acquires slot without delay or stale lock penalty.
 //   - TestSubprocessFDNonInheritance: process holding slot spawns subprocess; parent closes FD/exits;
-//     lock is free because O_CLOEXEC prevented child inheritance.
+//     lock is free because the lock file was not inherited.
 //   - TestSubprocessRootPriority: root waiter in separate process preempts ordinary child in another
 //     process from acquiring the next freed slot.
 //   - TestSubprocessSharedLimitReload: one process changes account limit from 1 to 5; second process

@@ -73,6 +73,7 @@ main.go                          Entry point — starts Bubble Tea program; `--g
                                  `--ssh`/`misa-ssh` opens it running sshc; `--web`/`--web-admin` serve it in a browser (main_web.go, `-tags noweb` stub); guiCommand resolves builtins not on PATH
 main_gui.go main_nogui.go        runGUI, or its `-tags nogui` stub
 internal/
+  filelock/                      Reusable file-based exclusive process locks; lower-level library with no imports from ugh or webui
   ugh/                           ugh agent harness merged in (agent, tools, llm, perm, policy, session, ughtui, …); cmd/ugh is its CLI
   ughbot/                        ughbot daemon (docs/ughbot/DEPLOY.md); cmd/ughbot is its CLI:
                                  config (ughbot.toml, capabilities decide a bot's tools), store (SQLite: bot defs, mail with

@@ -385,3 +385,22 @@ func TestMigrationInlineRoutingCurrentSilent(t *testing.T) {
 		t.Fatalf("file changed: %q, want %q", got, original)
 	}
 }
+
+func TestMigrationLockRejectsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	if err := os.WriteFile(path, []byte("[routing]\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(dir, "target")
+	if err := os.WriteFile(target, []byte("safe"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path+".migration.lock"); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	cfg := config.Default()
+	if _, err := MigrateConfig(&cfg, path); err == nil {
+		t.Fatal("accepted symlink lock")
+	}
+}
