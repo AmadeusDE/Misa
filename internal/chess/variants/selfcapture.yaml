@@ -1,0 +1,5 @@
+id: selfcapture
+name: Self-capture Chess
+description: Orthodox chess where a player may capture their own non-royal pieces.
+extends: chess
+self_capture: true

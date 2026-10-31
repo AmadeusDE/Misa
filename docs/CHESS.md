@@ -61,6 +61,8 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
 
 ## Bundled variants
 
+`chess --list` shows every variant available. The embedded ones are:
+
 - **Chess** (`chess`): orthodox chess.
 - **Amazon Chess** (`chess amazon`): 8×8 orthodox chess with queens replaced by Amazons, moving as queen or knight. Castling, en passant, and checkmate/stalemate follow orthodox rules; promotion is to Amazon, rook, bishop, or knight. The Amazon's value (1200 cp) is approximate. This queen-replacement variant follows the published Amazon piece definition at [Chess Variants](https://www.chessvariants.com/diffmove.dir/amazone.html) and [Wikipedia](https://en.wikipedia.org/wiki/Amazon_(chess)).
 
@@ -85,13 +87,37 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
 - **Stalemate-wins Chess** (`chess stalematewins`): orthodox chess except that
   the side delivering stalemate wins; see
   [Stalemate rules](#stalemate-rules).
-- Double Chess (`double`): 16×12.
-- Betza's Big Board (`bigboard`): 16×16.
-- Double Big Board (`doublebig`): 32×16.
+
+- **Self-capture Chess** (`selfcapture`): orthodox chess where a player may
+  capture their own pieces with normal capture movement, except the king.
+  Self-capture Chess follows the self-capture rule set of Tomašev, Paquet,
+  Hassabis and Kramnik, *Assessing Game Balance with AlphaZero: Exploring
+  Alternative Rule Sets in Chess* (2020),
+  [arXiv:2009.04374](https://arxiv.org/abs/2009.04374). Only friendly non-royal
+  pieces can be taken; a piece's ordinary capture moves apply (so a pawn
+  self-captures diagonally, never forward), and all other rules, including
+  castling, promotion, en passant and checkmate, are orthodox. The engine
+  exposes the rule as the variant YAML field `self_capture: true`, which
+  `extends:` inherits like any other field (a child may switch it off with
+  `self_capture: false`).
+
+- **Double Chess** (`double`): Julian Hayward, 1916: two armies side by side on
+  16×12, pawns may first move up to four squares, kings castle within their own
+  half, checkmating either enemy king wins.
+
+- **Betza's Big Board** (`bigboard`, listed as "Chess on a Really Big Board"):
+  Ralph Betza, 1996: sixteen pieces a side on 16×16, pawns may first move as
+  far as the middle, castling rooks move as far as in chess.
+
+- **Double Big Board** (`doublebig`): two Big Board armies per side on 32×16;
+  each king castles within its own half.
 
 ## During play
 
-- Arrows or `h/j/k/l`: move the cursor; space/enter or click: select/move.
+- Arrows or `h/j/k/l`: move the cursor; space/enter or click: select/move. In a
+  self-capture variant, activating a friendly piece that the selected piece can
+  legally capture plays that self-capture; click the selected piece to deselect
+  first if you meant to switch pieces.
 - `d`: cycle beginner → easy → normal → hard → expert → beginner.
 - `c`: cycle computer sides; `u`/backspace: undo to a human turn.
 - `n`: new game; `v`/`V`: open the variant picker. Type to filter by name or id;

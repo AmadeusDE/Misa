@@ -35,6 +35,7 @@ func TestBuiltinVariants(t *testing.T) {
 		{"capablanca", 10, 8, 8, 2},
 		{"berolina", 8, 8, 6, 2},
 		{"stalematewins", 8, 8, 6, 2},
+		{"selfcapture", 8, 8, 6, 2},
 	}
 	for _, tt := range tests {
 		v := builtin(t, tt.id)

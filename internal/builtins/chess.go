@@ -107,8 +107,12 @@ func runChess(ctx *Context) int {
 
 func listChessVariants(ctx *Context) int {
 	vs, errs := chess.Load()
+	width := 10
 	for _, v := range vs {
-		fmt.Fprintf(ctx.Stdout, "%-10s %-28s %2d×%-2d  %s\n", v.ID, v.Name, v.Files, v.Ranks, v.Source)
+		width = max(width, len(v.ID))
+	}
+	for _, v := range vs {
+		fmt.Fprintf(ctx.Stdout, "%-*s %-28s %2d×%-2d  %s\n", width, v.ID, v.Name, v.Files, v.Ranks, v.Source)
 	}
 	for _, err := range errs {
 		fmt.Fprintln(ctx.Stderr, "chess:", err)

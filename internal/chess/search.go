@@ -466,7 +466,11 @@ func (e *Engine) victimValue(p *Position, mv Move) int {
 	if mv.Take < 0 {
 		return 0
 	}
-	return e.v.Pieces[p.Board[mv.Take].Type-1].Value
+	value := e.v.Pieces[p.Board[mv.Take].Type-1].Value
+	if p.Board[mv.Take].Color == p.Turn { // a self-capture loses material
+		return -value
+	}
+	return value
 }
 
 func (e *Engine) historyIndex(p *Position, mv Move) int {
