@@ -39,8 +39,8 @@ ANDROID_NDK_HOME=... ANDROID_HOME=... just apk-release
 # CGO_ENABLED=0 go vet ./... is arm64 only. android/amd64 cannot load test
 # binaries without the external linker, so that arch typechecks libraries
 # with go build. The arm64 vet covers the pure-Go android files.
-# Windows (in progress, #108). The reduced build (no ugh, no --web) compiles for both arches; the terminal
-# returns term.ErrUnsupported until ConPTY (plan P02). platformset_test.go pins the package set.
+# Windows (in progress, #108). The reduced build (no ugh, no --web) compiles for both arches; terminals
+# run on ConPTY (internal/term). StartFunc, job control and `sh` are unavailable there. platformset_test.go pins the set.
 GOOS=windows GOARCH=amd64 go build -tags 'nough noweb' -o /dev/null .
 GOOS=windows GOARCH=arm64 go build -tags 'nough noweb' -o /dev/null .
 # CI (windows-cross, windows-native): .github/windows/packages.txt is the package scope. cross.sh builds, vets and

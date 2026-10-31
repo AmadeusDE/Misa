@@ -752,3 +752,21 @@ Windows runtime results.
 `lscore` (`syscall.Stat_t`, `statTimes`), `sysinfo` (`Statfs_t`, `Statfs`, `getMountSpace`),
 `procmon` (Unix signal table), and `sshclient` (`SIGWINCH`). F02–F04 remain the reduced-root build gate.
 No commits, workflow edits, module changes or new implementation PR are part of this worktree task.
+
+## ConPTY in the reduced build; term and ui native (#108, PR #136)
+
+`internal/term` and `internal/ui` are `native` in `.github/windows/packages.txt` and pass on windows-latest for both
+tag sets. Terminal sessions in the reduced build are real ConPTY sessions (F04 stack plus P01-P03).
+
+- Term tests that assumed `sh` or `echo` re-exec the test binary (`helperproc_test.go`, mode echo/status/sleep):
+  exit-after-final-output, argv-not-shell, reader notification, SendBytes never blocking, plus a new `^C` test.
+  Restricted per test with `skipOnWindows` and a reason: StartFunc (2 tests, a pipe pair is not a tty file) and the
+  128+signal shell status.
+- ui terminal tests use the same pattern (`status`, `readline`, `flood` modes). `testmain_windows_test.go` makes the ui
+  test binary a multicall binary and sets `BuiltinExecutable`, as `main` does, because in-process builtins need StartFunc.
+  Stopped-job tests (fg, bg, suspend) are restricted: SIGSTOP and `/bin/sh`, `jobleader.Supported` is false.
+- Fixed: `main` derived the multicall name from `os.Args[0]` without stripping `.exe`, so `busybox.exe`, `misa-gui.exe`
+  and `misa-ssh.exe` never matched. `programName` strips it on Windows.
+- Findings, not fixed: `builtin_mode: inprocess` fails on Windows (StartFunc unsupported); input with shell syntax and
+  commands not found on PATH are planned as `sh -c`, which needs a shell resolution policy (I01); `.bat`/`.cmd` direct
+  launches are refused; `procmon` still reads /proc.

@@ -54,7 +54,7 @@ func captureTerm(t *testing.T, rows, cols int) (*term.Terminal, func() string) {
 		}
 	}); err != nil {
 		if errors.Is(err, term.ErrUnsupported) {
-			t.Skip("no terminal transport on this platform until ConPTY (plan P02)")
+			t.Skip("StartFunc (an in-process tty session) is unsupported on this platform")
 		}
 		t.Fatal(err)
 	}
