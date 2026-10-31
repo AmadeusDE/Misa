@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -54,6 +54,8 @@ type Variant struct {
 	Stalemate             StalemateRule
 	CheckLimit            int   // checks a side must give to win, or 0 for no such rule
 	Goal                  []int // absolute squares whose arrival by a royal wins
+	NoChecks              bool  // a move that leaves the other side's royals attacked is illegal
+	GoalReplyDraw         bool  // the first side's goal arrival is drawn when the other can arrive in reply
 	Setup                 string
 	Source                string
 
@@ -104,7 +106,8 @@ type variantDef struct {
 	Promotion     []string    `yaml:"promotion"`
 	PromotionZone int         `yaml:"promotion_zone"`
 	// The two promotion rules are pointers so an inheriting variant can tell
-	// "unset" (keep the parent's) from "false".
+	// "unset" (keep the parent's) from "false". no_checks and goal_reply_draw
+	// are pointers for the same reason.
 	PromotionOptional     *bool         `yaml:"promotion_optional"`
 	PromotionCapturedOnly *bool         `yaml:"promotion_captured_only"`
 	MoveLimit             int           `yaml:"move_limit"`
@@ -112,6 +115,8 @@ type variantDef struct {
 	Stalemate             StalemateRule `yaml:"stalemate"`
 	SelfCapture           *bool         `yaml:"self_capture"`
 	Goal                  []string      `yaml:"goal"`
+	NoChecks              *bool         `yaml:"no_checks"`
+	GoalReplyDraw         *bool         `yaml:"goal_reply_draw"`
 
 	source string
 }
@@ -315,6 +320,12 @@ func merge(parent, child variantDef) variantDef {
 	if child.Goal != nil {
 		d.Goal = child.Goal
 	}
+	if child.NoChecks != nil {
+		d.NoChecks = child.NoChecks
+	}
+	if child.GoalReplyDraw != nil {
+		d.GoalReplyDraw = child.GoalReplyDraw
+	}
 	d.Pieces = slices.Clone(parent.Pieces)
 	for _, p := range child.Pieces {
 		i := slices.IndexFunc(d.Pieces, func(q pieceDef) bool { return strings.EqualFold(q.Letter, p.Letter) })
@@ -362,6 +373,15 @@ func build(d variantDef) (*Variant, error) {
 	}
 	if err := v.parseGoal(d.Goal); err != nil {
 		return nil, err
+	}
+	if d.NoChecks != nil {
+		v.NoChecks = *d.NoChecks
+	}
+	if d.GoalReplyDraw != nil {
+		v.GoalReplyDraw = *d.GoalReplyDraw
+	}
+	if v.GoalReplyDraw && len(v.Goal) == 0 {
+		return nil, fmt.Errorf("goal_reply_draw needs goal squares")
 	}
 	if len(d.Pieces) == 0 || len(d.Pieces) > 255 {
 		return nil, fmt.Errorf("needs 1-255 piece types")

@@ -1,0 +1,19 @@
+id: racingkings
+name: Racing Kings
+description: V. R. Parton, 1961. No pawns and no castling, and neither side may give check; both kings race for the eighth rank, so the first king there wins unless White's arrival can be answered on the eighth rank, which draws.
+files: 8
+ranks: 8
+pieces:
+  - {letter: K, name: King, betza: K, royal: true, glyph: ♚}
+  - {letter: Q, name: Queen, betza: Q, glyph: ♛, value: 900}
+  - {letter: R, name: Rook, betza: R, glyph: ♜, value: 500}
+  - {letter: B, name: Bishop, betza: B, glyph: ♝, value: 330}
+  - {letter: N, name: Knight, betza: N, glyph: ♞, value: 310}
+# Both armies stand on ranks 1 and 2, Black on the a-d files and White on e-h.
+setup: 8/8/8/8/8/8/krbnNBRK/qrbnNBRQ
+castling: []
+promotion: []
+# Absolute squares: the eighth rank is the same rank for both colours.
+goal: [a8, b8, c8, d8, e8, f8, g8, h8]
+no_checks: true
+goal_reply_draw: true
