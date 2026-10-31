@@ -1584,7 +1584,18 @@ func runWithTimeout(cmd builtins.Command, ctx *builtins.Context, d time.Duration
 }
 
 var sandboxUnsafeCmds = map[string]bool{
-	"chown": true, "chgrp": true, "chroot": true,
+	"chown": true, "chroot": true,
+	// chgrp stays here because its uutils cases are not confined to the temp
+	// dir and lean on flags Misa does not implement: test_error_1 and
+	// test_fail_silently chgrp /dev (the latter also via --quiet/--sil/--qui),
+	// test_reference chgrps /etc with --reference=/etc/passwd, test_big_p and
+	// test_big_h chgrp /proc/self/cwd and /proc/self/fd, the test_preserve_root*
+	// family needs --preserve-root/--no-preserve-root with "/" (Misa rejects
+	// both as unknown options), and test_from_option, test_from_with_reference
+	// and test_numeric_group_formats need --from. Dropping the entry would
+	// require implementing --preserve-root, --no-preserve-root and --from (with
+	// the ":gid" form) and rewriting every case to work only inside the temp dir.
+	"chgrp": true,
 	"chcon": true, "dd": true,
 }
 
