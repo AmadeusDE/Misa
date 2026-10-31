@@ -71,7 +71,11 @@ func (e *Editor) executeCommand(cmd string) {
 	}
 
 	// Parse line range
-	from, to, rest, hasRange := e.parseRange(cmd)
+	from, to, rest, hasRange := e.parseRawRange(cmd)
+	if e.fileCommand(rest, from, to, hasRange) {
+		return
+	}
+	from, to = e.normalizeRange(from, to)
 
 	switch {
 	case rest == "q":
@@ -82,20 +86,6 @@ func (e *Editor) executeCommand(cmd string) {
 		e.Quit = true
 	case rest == "q!":
 		e.Quit = true
-	case rest == "w" || rest == "w!":
-		e.writeCommand(rest == "w!", false)
-	case rest == "wq" || rest == "x" || rest == "wq!" || rest == "x!":
-		e.writeCommand(strings.HasSuffix(rest, "!"), true)
-	case strings.HasPrefix(rest, "w ") || strings.HasPrefix(rest, "w! "):
-		force := strings.HasPrefix(rest, "w! ")
-		name := strings.TrimSpace(strings.TrimPrefix(rest, "w"))
-		if force {
-			name = strings.TrimSpace(strings.TrimPrefix(name, "!"))
-		}
-		if name != "" {
-			e.filename = name
-			e.writeCommand(force, false)
-		}
 	case strings.HasPrefix(rest, "r "):
 		e.readCmd(strings.TrimSpace(rest[2:]))
 
@@ -178,126 +168,6 @@ func (e *Editor) executeCommand(cmd string) {
 
 func isAlphaNum(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
-}
-
-func (e *Editor) parseRange(cmd string) (from, to int, rest string, hasRange bool) {
-	from = e.row
-	to = e.row
-	i := 0
-
-	parseLine := func() (int, bool) {
-		if i >= len(cmd) {
-			return -1, false
-		}
-		switch cmd[i] {
-		case '.':
-			i++
-			return e.row, true
-		case '$':
-			i++
-			return len(e.lines) - 1, true
-		case '%':
-			i++
-			from = 0
-			to = len(e.lines) - 1
-			hasRange = true
-			return -1, false
-		case '\'':
-			if i+1 < len(cmd) {
-				i += 2
-				ch := cmd[i-1]
-				if p, ok := e.marks[ch]; ok {
-					return p.row, true
-				}
-			}
-			return -1, false
-		default:
-			if cmd[i] >= '0' && cmd[i] <= '9' {
-				n := 0
-				for i < len(cmd) && cmd[i] >= '0' && cmd[i] <= '9' {
-					n = n*10 + int(cmd[i]-'0')
-					i++
-				}
-				return n - 1, true
-			}
-		}
-		return -1, false
-	}
-
-	if i < len(cmd) && cmd[i] == '%' {
-		i++
-		from = 0
-		to = len(e.lines) - 1
-		hasRange = true
-		rest = strings.TrimSpace(cmd[i:])
-		return
-	}
-
-	if line, ok := parseLine(); ok {
-		from = line
-		to = line
-		hasRange = true
-
-		for i < len(cmd) && (cmd[i] == '+' || cmd[i] == '-') {
-			sign := 1
-			if cmd[i] == '-' {
-				sign = -1
-			}
-			i++
-			n := 0
-			for i < len(cmd) && cmd[i] >= '0' && cmd[i] <= '9' {
-				n = n*10 + int(cmd[i]-'0')
-				i++
-			}
-			if n == 0 {
-				n = 1
-			}
-			from += sign * n
-			to = from
-		}
-
-		if i < len(cmd) && cmd[i] == ',' {
-			i++
-			if line2, ok := parseLine(); ok {
-				to = line2
-			}
-			for i < len(cmd) && (cmd[i] == '+' || cmd[i] == '-') {
-				sign := 1
-				if cmd[i] == '-' {
-					sign = -1
-				}
-				i++
-				n := 0
-				for i < len(cmd) && cmd[i] >= '0' && cmd[i] <= '9' {
-					n = n*10 + int(cmd[i]-'0')
-					i++
-				}
-				if n == 0 {
-					n = 1
-				}
-				to += sign * n
-			}
-		}
-	}
-
-	if from < 0 {
-		from = 0
-	}
-	if to < 0 {
-		to = 0
-	}
-	if from >= len(e.lines) {
-		from = len(e.lines) - 1
-	}
-	if to >= len(e.lines) {
-		to = len(e.lines) - 1
-	}
-	if from > to {
-		from, to = to, from
-	}
-
-	rest = strings.TrimSpace(cmd[i:])
-	return
 }
 
 func (e *Editor) globalCmd(from, to int, args string, invert bool, hasRange bool) {

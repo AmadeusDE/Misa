@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/T01
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/T01/T02
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -22,7 +22,9 @@ reference profile and documentation for `.`, `repeat.txt`, `r`, `R`, and Replace
 as specifications only; no external code was used. F07 likewise uses Vim 9.1 documentation for
 `fileformat`, `endofline`, `fixendofline`, `:w`, and `backupcopy` as specifications only, with
 `nofixendofline` as noted above. Existing Toybox/vis attribution in
-`internal/vi/NOTICE` remains unchanged.
+`internal/vi/NOTICE` remains unchanged. T02 uses the Vim 9.1 `nocompatible` defaults,
+including default `cpoptions` A/F, as a behavioral specification only; no external source was used.
+The explicit-range saved-state rule below is this task’s contract, not a general Vim parity claim.
 
 ## Replay fixtures (F01)
 
@@ -66,6 +68,7 @@ without quitting Misa and preserves its register.
 | F06: semantic dot repeat and count overrides | `repeat_operator_f06_test.go`, `repeat_interactions_f06_test.go`, `insert_replace_f06_test.go` | Repeats semantic operator/change, put, insert and Replace-mode edits; explicit dot counts override the stored count. Yank does not replace the repeatable change. A no-op does not replace the prior repeat. |
 | F06: insert/Replace behavior and repeat transactions | `insert_replace_f06_test.go`, `repeat_entry_test.go`, `internal/ui/editor_repeat_regression_test.go` | Insert and Replace streams (including Backspace) repeat; `r<CR>` is supported. Each dot execution is one undo transaction; repeated insert/Replace cursor placement and standalone/mux entry paths are covered. |
 | F07: file safety (done) | `file*_f07_test.go`, `internal/ui/editor_file_f07_test.go`, `internal/ui/editor_file_regression_test.go` | Load errors, newline preservation, safe writes and external-change guards; scope and limitations below. |
+| T02: range writes and file identity (done) | Original `*t02*` regression fixtures | Numeric and Visual range writes, append, write identity, save-as and rename semantics; scope and residual deferrals below. |
 | T01: substitute confirmation (done) | `substitute_confirm_test.go`, `substitute_confirm_replay_test.go`, `substitute_confirm_edges_test.go`, `substitute_entry_test.go`, `internal/ui/editor_substitute_regression_test.go` | Public-event fixtures for decisions, ranges, global matches, Unicode, cursor/highlight/prompt, counts, undo/redo, no-op history, dot/register preservation, macro playback, and standalone/mux resize and return. |
 
 ### F07 file round trips and safety
@@ -102,6 +105,33 @@ Playback of an existing macro key stream routes confirmation answers like typed 
 command/confirmation recording remains deferred with H09. The `n` flag and numeric Ex counts are
 not added. T01 uses Vim 9.1 `nocompatible` documentation (`:s_c`, `:s_flags`) as specification only.
 
+### T02 range writes and file identity
+
+`:w[!] path` accepts numeric and Visual line ranges, including saved `'<,'>` bounds.
+Invalid numeric write addresses and inverted ranges are rejected with E16 rather than clamped.
+`:w[!] >> [path]` appends; appending to a missing path requires `!` under the selected
+Vim default profile. A partial write to the current file is refused with E140 unless forced.
+An explicit range never marks the buffer clean, even when it spans the entire buffer.
+As in the selected Vim profile, a clean buffer also stays clean after a forced partial
+write or append to its current file, even though the file can then differ from the buffer.
+The external-file snapshot is refreshed after success, so a later full `:w` does not falsely
+report an outside modification. Use a full `:w` to replace that partial/appended file.
+
+For a named buffer, `:w other` writes a copy, records the alternate filename, and preserves
+the current filename and dirty/saved revision. An unnamed buffer adopts the name and becomes
+clean on a successful full, non-range write. `:saveas`/`:sav!` assigns the destination and
+cleans on success; `:file name` changes the name without writing, preserves dirty state, and
+reports `[Not edited]`. `:wq` and `:x` with a range or name use the same write identity rules;
+`:x` writes only when modified. Relative write paths resolve against the editor working directory.
+Failures retain the saved revision and dirty state. F07's safety guards and line-format handling
+remain in force.
+
+`:[range]w !cmd` uses the existing shell runner synchronously. Shell output lifecycle,
+cancellation and non-freezing execution remain T03; general Ex address grammar remains G03,
+and general alternate-buffer navigation remains H12. T02 does not claim the entire roadmap's
+range-aware read work or end-to-end tutor 5.3–5.4 conformance; read/shell lifecycle work remains
+for T03 and later tutor verification for T09. No live-terminal manual check is claimed.
+
 ### Tutor mapping (selected lessons only)
 
 | Tutor lesson | Relevant operation | Ledger coverage |
@@ -111,6 +141,7 @@ not added. T01 uses Vim 9.1 `nocompatible` documentation (`:s_c`, `:s_flags`) as
 | 3.3 | Change (`c`) | Existing `cw`/change ranges and semantic dot repeat are covered by F03/F06. |
 | 3.4 | `c` with motion | Existing change-motion ranges and semantic dot repeat are covered by F03/F06. |
 | 4.4 | Substitution | T01 covers literal substitution confirmation and cancellation, ranges, per-line/global matches, and optional trailing delimiter; full patterns/replacement grammar remain G01–G02. |
+| 5.3 | Write a selection | T02 covers numeric and Visual range writes and file identity; complete lesson verification remains T09. |
 | 6.1 | Open lines | Existing insert/open-line behavior is covered where exercised by insertion fixtures; no complete lesson-parity claim. |
 | 6.2 | Append | `A` and insertion behavior are covered in F01/F06; no complete lesson-parity claim. |
 | 6.3 | Replace mode | Replace stream, Backspace and semantic repeat are covered by F06. |
@@ -132,7 +163,8 @@ Snapshot storage is retained and capped at **200 undo units**. The cap counts un
 saved revision that falls out of the retained history cannot cause another revision to be treated as
 clean: dirty state compares the current revision identity with the saved identity, not undo-stack
 length. Revision IDs allocated for edits are monotonic; undo/redo restore the prior revision identity.
-A successful write updates the saved identity.
+A successful full current-file save, unnamed-buffer adoption, or save-as updates the saved identity;
+range writes, appends, and named-buffer copies do not, as detailed under T02.
 
 Nested `beginEdit`/`commitEdit`/`abortEdit` groups compound changes. Insert mode, through Escape,
 is one unit (including Backspace, newline, and count repetitions); `cw` is one unit. Every dot
@@ -170,8 +202,8 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
   F08. Dot repeats the last real change semantically, with an explicit count overriding the stored
   count; no-op commands and yanks do not replace that repeat. `r<CR>` is supported. Each dot execution
   is one undo transaction.
-- **T02:** Range writes and `:w newname` identity semantics are not implemented by F07;
-  legacy behavior remains pending T02.
+- **T02 residual:** Range-aware read work and full tutor 5.3–5.4 verification are not claimed;
+  shell lifecycle/cancellation remains T03, broader Ex addressing G03, and buffer navigation H12.
 - **T05:** A future `:edit` read failure must preserve the current buffer. `:e`/`:e!` is not implemented. The reload-command fixture remains skipped as `TODO(T05)`;
   F05 tests the internal buffer-history reset boundary only. This reset establishes a fresh clean
   revision and clears undo, redo, and line-restore state; file loading/protection stays in T05.

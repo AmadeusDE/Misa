@@ -52,3 +52,15 @@ func writeInPlace(path string, data []byte, info os.FileInfo) error {
 	}
 	return err
 }
+
+func appendFile(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	return err
+}
