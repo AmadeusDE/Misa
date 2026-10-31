@@ -145,12 +145,16 @@ func (m *Match) Hashes() []uint64 {
 }
 
 func onlyRoyals(p *Position) bool {
+	found := false
 	for _, pc := range p.Board {
-		if pc.Type != 0 && !p.V.Type(pc).Royal {
-			return false
+		if pc.Type != 0 {
+			if !p.V.Type(pc).Royal {
+				return false
+			}
+			found = true
 		}
 	}
-	return true
+	return found
 }
 
 func b2i(b bool) byte {

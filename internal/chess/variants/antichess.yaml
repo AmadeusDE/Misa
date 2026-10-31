@@ -1,0 +1,11 @@
+id: antichess
+name: Antichess
+description: Captures are compulsory; win by losing all your pieces or being stalemated.
+extends: chess
+pieces:
+  - {letter: K, name: King, betza: K, royal: false, value: 300, glyph: ♚}
+castling: []
+promotion: [Q, R, B, N, K]
+forced_capture: true
+material: inverse
+stalemate: loss

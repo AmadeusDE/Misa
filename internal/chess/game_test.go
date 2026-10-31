@@ -188,6 +188,11 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	if got := g.match.Variant().ID; got != "racingkings" {
 		t.Fatalf("picker selected %s, want racingkings", got)
 	}
+	// Antichess is in the same list too.
+	keys(g, "v", "a", "n", "t", "i", "enter")
+	if got := g.match.Variant().ID; got != "antichess" {
+		t.Fatalf("picker selected %s, want antichess", got)
+	}
 	// Restore the big board for the rose move and undo checks below.
 	keys(g, "v", "b", "i", "g", "b", "o", "a", "r", "d", "enter")
 	if got := g.match.Variant().ID; got != "bigboard" {
