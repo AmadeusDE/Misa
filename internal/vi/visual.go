@@ -39,6 +39,24 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	key := typedKey(keyMsg)
 
+	if e.pendingKey == "g" {
+		e.pendingKey = ""
+		count := max(1, e.count)
+		e.count, e.countGiven = 0, false
+		if key == "e" || key == "E" {
+			if m, ok := e.motionDest("g"+key, count, false); ok {
+				e.row, e.col = m.row, m.col
+				e.clampCursor()
+				e.ensureVisible()
+			}
+		}
+		return nil, nil
+	}
+	if key == "g" {
+		e.pendingKey = "g"
+		return nil, nil
+	}
+
 	// Count prefix in visual mode
 	if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
 		e.count = e.count*10 + int(key[0]-'0')
@@ -170,11 +188,7 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 			text := e.extractText(fromR, fromC, toR, toC+1)
 			e.yankToReg([]string{text}, false)
 		}
-		e.row = e.visRow
-		e.col = e.visCol
-		if e.row > e.row {
-			e.row, e.col = e.visRow, e.visCol
-		}
+		e.row, e.col, _, _ = e.visualBounds()
 		e.visual = visualNone
 		e.clampCursor()
 		return nil, nil

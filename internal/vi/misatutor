@@ -38,9 +38,9 @@ ________________________________________________________________________________
 
                                 Movement Commands
 
-w goes forward to next word
-b goes backwards to last word
-e goes to end of next word
+w goes forward to next word; W goes forward to next WORD (whitespace-delimited).
+b goes backwards to last word; B goes backwards to last WORD.
+e goes to end of next word; E goes to end of next WORD.
 $ and [end] goes to end of line
 0 and [home] goes to beginning of line
 ^ or _ to first non-blank character
@@ -505,6 +505,7 @@ ________________________________________________________________________________
 Normal mode:
   hjkl          move cursor
   w b e         word forward, backward, end
+  W B E         WORD forward, backward, end (whitespace-delimited)
   0 $ ^         line start, end, first non-blank
   G gg          go to end/start of file
   x X           delete char forward/backward

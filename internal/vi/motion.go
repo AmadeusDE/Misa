@@ -17,7 +17,7 @@ type motionResult struct {
 
 func (e *Editor) motionDest(key string, count int, countGiven bool) (motionResult, bool) {
 	switch key {
-	case "w", "b", "e", "{", "}", "(", ")":
+	case "w", "b", "e", "W", "B", "E", "ge", "gE", "{", "}", "(", ")":
 		count = e.motionLimit(count)
 	}
 	switch key {
@@ -50,12 +50,21 @@ func (e *Editor) motionDest(key string, count int, countGiven bool) (motionResul
 			r = 0
 		}
 		return motionResult{r, e.col, rangeLinewise}, true
-	case "w":
-		r, c := e.wordForward(count)
-		return motionResult{r, c, rangeExclusive}, true
-	case "b":
-		r, c := e.wordBackward(count)
-		return motionResult{r, c, rangeExclusive}, true
+	case "w", "b", "W", "B", "E", "ge", "gE":
+		big := key == "W" || key == "B" || key == "E" || key == "gE"
+		kind := key[0]
+		if kind >= 'A' && kind <= 'Z' {
+			kind += 'a' - 'A'
+		}
+		r, c := e.wordMotion(count, big, kind)
+		rangeKind := rangeExclusive
+		if kind == 'g' && r == e.row && c == e.col {
+			return motionResult{}, false
+		}
+		if kind == 'e' || kind == 'g' {
+			rangeKind = rangeInclusive
+		}
+		return motionResult{r, c, rangeKind}, true
 	case "e":
 		r, c := e.wordEnd(count)
 		return motionResult{r, c, rangeInclusive}, true
