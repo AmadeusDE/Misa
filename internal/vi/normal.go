@@ -25,18 +25,22 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		e.recordBuf = append(e.recordBuf, key)
 	}
 
+	if key == "esc" || key == "ctrl+[" || key == "ctrl+c" {
+		e.clearCommandState()
+		return nil
+	}
 	if e.pendingKey != "" {
 		return e.handlePendingKey(key)
 	}
 
 	// Count prefix
 	if len(key) == 1 && key[0] >= '1' && key[0] <= '9' {
-		e.count = e.count*10 + int(key[0]-'0')
+		e.count = countDigit(e.count, int(key[0]-'0'))
 		e.countGiven = true
 		return nil
 	}
 	if len(key) == 1 && key[0] == '0' && e.countGiven {
-		e.count = e.count * 10
+		e.count = countDigit(e.count, 0)
 		return nil
 	}
 
@@ -58,11 +62,12 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		if e.pendingOp == op {
 			c := count
 			if e.opCountGiven && cg {
-				c = e.opCount * count
+				c = countProduct(e.opCount, count)
 			} else if e.opCountGiven {
 				c = e.opCount
 			}
 			e.executeLineOp(op, c)
+			e.hasReg, e.pendingReg = false, 0
 			e.pendingOp = 0
 			e.opCount = 0
 			e.opCountGiven = false
@@ -71,7 +76,8 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		}
 		if e.pendingOp != 0 {
-			e.pendingOp = 0
+			e.clearCommandState()
+			return nil
 		}
 		e.pendingOp = op
 		e.opCount = count
@@ -88,15 +94,23 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 	if e.pendingOp != 0 {
 		c := count
 		if e.opCountGiven {
-			c = e.opCount * count
+			c = countProduct(e.opCount, count)
 		}
 		op := e.pendingOp
 		e.pendingOp = 0
 		e.opCount = 0
 		e.opCountGiven = false
 		e.executeOperatorMotion(op, key, c, cg)
+		e.hasReg, e.pendingReg = false, 0
 		return nil
 	}
+
+	// Any completed command consumes an explicit register. Prefixes retain it.
+	defer func() {
+		if e.pendingKey == "" && e.pendingOp == 0 {
+			e.hasReg, e.pendingReg = false, 0
+		}
+	}()
 
 	// --- Standalone motions ---
 	if m, ok := e.motionDest(key, count, cg); ok {
@@ -147,6 +161,7 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 			e.topLine = 0
 		}
 	case "ctrl+e":
+		count = min(count, len(e.lines))
 		for i := 0; i < count; i++ {
 			if e.topLine < len(e.lines)-1 {
 				e.topLine++
@@ -156,6 +171,7 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 			e.row = e.topLine
 		}
 	case "ctrl+y":
+		count = min(count, len(e.lines))
 		for i := 0; i < count; i++ {
 			if e.topLine > 0 {
 				e.topLine--
@@ -169,95 +185,26 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		e.ensureVisible()
 
 	// Actions
-	case "x":
-		e.saveUndo()
-		var deleted []rune
-		for i := 0; i < count; i++ {
-			r := e.lineRunes(e.row)
-			if e.col < len(r) {
-				deleted = append(deleted, e.deleteCharAt(e.row, e.col))
-			}
-		}
-		if len(deleted) > 0 {
-			e.deleteToReg([]string{string(deleted)}, false)
-		}
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			for i := 0; i < n; i++ {
-				r := ed.lineRunes(ed.row)
-				if ed.col < len(r) {
-					ed.deleteCharAt(ed.row, ed.col)
-				}
-			}
-			ed.clampCursor()
-		}
-	case "X":
-		e.saveUndo()
-		var deleted []rune
-		for i := 0; i < count; i++ {
-			if e.col > 0 {
-				e.col--
-				deleted = append(deleted, e.deleteCharAt(e.row, e.col))
-			}
-		}
-		if len(deleted) > 0 {
-			e.deleteToReg([]string{string(deleted)}, false)
-		}
-		n := count
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			for i := 0; i < n; i++ {
-				if ed.col > 0 {
-					ed.col--
-					ed.deleteCharAt(ed.row, ed.col)
-				}
-			}
-			ed.clampCursor()
-		}
+	case "x", "X":
+		backwards := key == "X"
+		e.deleteCountedChars(count, backwards, true)
+		e.lastRepeat = func(ed *Editor) { ed.deleteCountedChars(count, backwards, false); ed.clampCursor() }
 	case "D":
-		e.saveUndo()
-		r := e.lineRunes(e.row)
-		if e.col < len(r) {
-			e.deleteToReg([]string{string(r[e.col:])}, false)
-			e.setLine(e.row, string(r[:e.col]))
-		}
-		e.lastRepeat = func(ed *Editor) {
-			ed.saveUndo()
-			r := ed.lineRunes(ed.row)
-			if ed.col < len(r) {
-				ed.setLine(ed.row, string(r[:ed.col]))
-			}
-			ed.clampCursor()
-		}
+		e.deleteToCountedEnd(count, false)
 	case "C":
-		e.saveUndo()
-		r := e.lineRunes(e.row)
-		if e.col < len(r) {
-			e.deleteToReg([]string{string(r[e.col:])}, false)
-			e.setLine(e.row, string(r[:e.col]))
-		}
-		e.mode = ModeInsert
-		e.insertEntry = "C"
-		e.insertBuf.Reset()
-		e.insertCount = 0
+		e.deleteToCountedEnd(count, true)
 		return nil
 	case "S":
-		e.saveUndo()
-		e.deleteToReg([]string{e.lines[e.row]}, true)
-		e.setLine(e.row, "")
-		e.col = 0
-		e.mode = ModeInsert
-		e.insertEntry = "S"
-		e.insertBuf.Reset()
-		e.insertCount = 0
+		e.executeLineOp('c', count)
+		e.modified = true
 		return nil
 	case "s":
 		e.saveUndo()
 		r := e.lineRunes(e.row)
-		if e.col < len(r) {
-			e.deleteToReg([]string{string(r[e.col : e.col+1])}, false)
-			e.deleteCharAt(e.row, e.col)
+		end := e.col + min(count, len(r)-e.col)
+		if end > e.col {
+			e.deleteToReg([]string{string(r[e.col:end])}, false)
+			e.setLine(e.row, string(r[:e.col])+string(r[end:]))
 		}
 		e.mode = ModeInsert
 		e.insertEntry = "s"
@@ -265,6 +212,7 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		e.insertCount = 0
 		return nil
 	case "r":
+		e.replaceCount = count
 		e.mode = ModeReplaceChar
 		return nil
 	case "R":
@@ -284,7 +232,7 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		if len(e.register) > 0 {
 			e.saveUndo()
-			e.doPut(false)
+			e.putCounted(false, count)
 			e.lastRepeat = func(ed *Editor) {
 				if len(ed.register) > 0 {
 					ed.saveUndo()
@@ -304,7 +252,7 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		if len(e.register) > 0 {
 			e.saveUndo()
-			e.doPut(true)
+			e.putCounted(true, count)
 			e.lastRepeat = func(ed *Editor) {
 				if len(ed.register) > 0 {
 					ed.saveUndo()
@@ -313,32 +261,32 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 			}
 		}
 	case "u":
+		count = min(count, len(e.undoStack))
 		for i := 0; i < count; i++ {
 			e.undo()
 		}
 	case "U":
 		e.undoLine()
 	case "ctrl+r":
+		count = min(count, len(e.redoStack))
 		for i := 0; i < count; i++ {
 			e.redo()
 		}
 	case "J":
-		if e.row < len(e.lines)-1 {
+		joins := min(max(2, count)-1, len(e.lines)-1-e.row)
+		if joins > 0 {
 			e.saveUndo()
-			for i := 0; i < count; i++ {
-				e.doJoinLine(e.row)
-			}
-			n := count
+			e.joinCounted(joins)
 			e.lastRepeat = func(ed *Editor) {
-				if ed.row < len(ed.lines)-1 {
+				n := min(joins, len(ed.lines)-1-ed.row)
+				if n > 0 {
 					ed.saveUndo()
-					for i := 0; i < n; i++ {
-						ed.doJoinLine(ed.row)
-					}
+					ed.joinCounted(n)
 				}
 			}
 		}
 	case "~":
+		count = min(count, len(e.lineRunes(e.row))-e.col)
 		r := e.lineRunes(e.row)
 		if e.col < len(r) {
 			e.saveUndo()
@@ -393,30 +341,8 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 	case "%":
 		e.matchBracket()
 		return nil
-	case "n":
-		if e.searchPat != "" {
-			e.addJump()
-			for i := 0; i < count; i++ {
-				if !e.searchNext() {
-					e.statusMsg = "Pattern not found: " + e.searchPat
-					break
-				}
-			}
-		} else {
-			e.statusMsg = "No previous search pattern"
-		}
-	case "N":
-		if e.searchPat != "" {
-			e.addJump()
-			for i := 0; i < count; i++ {
-				if !e.searchPrev() {
-					e.statusMsg = "Pattern not found: " + e.searchPat
-					break
-				}
-			}
-		} else {
-			e.statusMsg = "No previous search pattern"
-		}
+	case "n", "N":
+		e.searchCounted(count, key == "N")
 
 	case "ctrl+g":
 		fname := e.filename
@@ -441,6 +367,7 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 
 	// Find char
 	case "f", "F", "t", "T":
+		e.opCount = count
 		e.pendingKey = key
 		return nil
 	case ";":
@@ -541,12 +468,15 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 		e.pendingKey = "z"
 		return nil
 	case "[":
+		e.count, e.countGiven = count, cg
 		e.pendingKey = "["
 		return nil
 	case "]":
+		e.count, e.countGiven = count, cg
 		e.pendingKey = "]"
 		return nil
 	case "g":
+		e.count, e.countGiven = count, cg
 		e.pendingKey = "g"
 		return nil
 
@@ -586,16 +516,24 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 func (e *Editor) handlePendingKey(key string) tea.Cmd {
 	pending := e.pendingKey
 	e.pendingKey = ""
+	if pending != "\"" {
+		defer e.clearCommandState()
+	}
 
 	switch pending {
 	case "\"":
+		valid := false
 		if len(key) == 1 {
 			ch := key[0]
 			if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
 				(ch >= '0' && ch <= '9') || ch == '-' || ch == '.' || ch == '%' || ch == ':' || ch == '"' {
 				e.pendingReg = ch
 				e.hasReg = true
+				valid = true
 			}
+		}
+		if !valid {
+			e.clearCommandState()
 		}
 		return nil
 
@@ -673,7 +611,7 @@ func (e *Editor) handlePendingKey(key string) tea.Cmd {
 			e.count = 0
 			e.countGiven = false
 			e.addJump()
-			e.row = e.sectionBack(count)
+			e.row = e.sectionBack(e.motionLimit(count))
 			e.col = e.firstNonBlank(e.row)
 			e.clampCursor()
 			e.ensureVisible()
@@ -688,7 +626,7 @@ func (e *Editor) handlePendingKey(key string) tea.Cmd {
 			e.count = 0
 			e.countGiven = false
 			e.addJump()
-			e.row = e.sectionForward(count)
+			e.row = e.sectionForward(e.motionLimit(count))
 			e.col = e.firstNonBlank(e.row)
 			e.clampCursor()
 			e.ensureVisible()

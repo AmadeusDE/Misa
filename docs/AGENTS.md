@@ -166,6 +166,8 @@ internal/
                                  letters toggle, move list panel; the computer thinks in a tea.Cmd (thoughtMsg,
                                  gen drops abandoned searches); standalone runner
   vi/                            Built-in vi editor implementation
+    replay_test.go               Public-event behavioral fixture helper; original tutor/count regression fixtures
+                                 and compatibility baseline: docs/plans/vi-compat.md
   ascii/                         ASCII art loading (embedded + external dirs). Android and Termux art
                                  live under distro/pfetch; ids come from sysinfo (termux / android)
   clipboard/                     Host clipboard: atotto on Linux/BSD/macOS, termux-clipboard-* when on
