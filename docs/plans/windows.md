@@ -1,10 +1,11 @@
 # Plan: Windows port, GUI first
 
-Status: draft. The gui core/backend split (W2, shared with Android A2) has landed on Linux;
-the Win32 backend and the rest of this plan are not started. Part 1 is Misa (phases W0–W6); part 2 is ugh (phases UW0–UW4), which
+Status: draft, now tracked by #108, whose task IDs (F01–R02) supersede the W/UW numbering below where they differ.
+The gui core/backend split (W2, shared with Android A2) has landed; the Win32 backend is not started. #108 F01
+(package selection and the jobleader boundary) is delivered, see "F01 delivered". Part 1 is Misa (phases W0–W6); part 2 is ugh (phases UW0–UW4), which
 Misa needs before its Windows build can include the agent. The measurements below are from 2026-10-13; code
 added since then (`internal/webui`'s file lock, `internal/ughbot`, `internal/ugh/confine`) needs the same
-treatment. ughbot is out of scope: it stays Linux-only.
+treatment. ughbot is out of scope for the Windows port (it is not redefined as Linux-only: it also builds for the BSDs and macOS).
 
 # Part 1: Misa
 
@@ -30,7 +31,7 @@ Hard constraints:
 
 | package | failure |
 |---|---|
-| `main`, `ui`, `gui` | `internal/jobleader` is `//go:build unix`, so the package is empty |
+| `main`, `ui`, `gui` | (fixed by F01) `internal/jobleader` was `//go:build unix`, so the package was empty |
 | `term` | `pollable`, `setWinsize` (ptyfd.go) and `waitProcess` (jobs.go) are unix-only. creack/pty compiles but can't start anything on Windows |
 | `wayland` | `unix.UnixRights`, `ParseUnixRights`, `Mmap`: SCM_RIGHTS and shm are Unix by nature |
 | `gui` (beyond ui) | `input.go` imports `x/sys/unix` (keymap mmap). Everything else is Wayland-bound or OS-neutral, see W2 |
@@ -87,7 +88,8 @@ embedded Windows ASCII art (`internal/ascii/distro/*/Windows_11.txt` etc.).
     `powershell.exe` → `%ComSpec%`. A `shell:` key in config.yaml overrides both.
 - **D7. No job control on Windows.** There's no SIGTSTP/SIGCONT: ^Z goes to the program as 0x1a, `jobs`/`fg`/`bg`
   print that they aren't supported, `job_control` is forced off, and `jobleader` gets a `!unix` stub (`Run`
-  execs and waits; `SuspendOnCtrlZ` does nothing).
+  execs and waits; `SuspendOnCtrlZ` does nothing). F01 added `jobleader.Supported` (false there), and the
+  UI forces `jobControl` off with it; the I06 UI work (`jobs`/`fg`/`bg` messages) builds on that constant.
 - **D8. Fonts without fontconfig:** read the font registry (HKLM and HKCU
   `SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts`, via `x/sys/windows/registry`), then index family and
   style from each file's sfnt `name` table, lazily and cached. The default chain is the configured font →
@@ -119,12 +121,12 @@ The milestones in order:
 ### W0. Compile for Windows (stubs, build tags, CI gate)
 
 Goal: `GOOS=windows go build -tags nough .` and `go vet` pass, and the Linux/OpenBSD builds are unchanged.
-- `jobleader/jobleader_other.go` (`!unix`): `Flag`, `Run` (exec + wait + exit code), `SuspendOnCtrlZ` no-op.
+- `jobleader/jobleader_other.go` (`!unix`): `Flag`, `Run` (exec + wait + exit code), `SuspendOnCtrlZ` no-op. Done in F01.
 - `term`: rename `ptyfd.go`/`jobs.go` to `pty_unix.go`/`jobs_unix.go`, tag `session_other.go`
-  `!linux && !windows`, and add temporary `pty_windows.go` stubs that return an error (replaced in W1).
-- `wayland` and the Wayland files of `gui`: `//go:build unix`. `main_gui.go` keeps `!nogui`, and the gui package
+  `unix && !linux` (done in F01), and add temporary `pty_windows.go` stubs that return an error (replaced in W1).
+- `wayland` (every file, tests included, now `unix`; done in F01) and the Wayland files of `gui` (already `unix && !android`). `main_gui.go` keeps `!nogui`, and the gui package
   compiles on Windows with a stub `Run` that reports "not yet" until W3.
-- `statfs_unix.go` ×3: retag `unix && !(openbsd || freebsd || netbsd || darwin || dragonfly)`. Add
+- `statfs_unix.go` ×3: retagged `unix && !(openbsd || freebsd || netbsd || darwin || dragonfly)` in F01. Add
   `statfs_windows.go` (`GetDiskFreeSpaceExW`).
 - `lscore`: move the `Stat_t` reads behind `fileinfo_unix.go`/`fileinfo_windows.go` helpers
   (owner/group/nlink/inode/blocks). Windows returns attributes from `Win32FileAttributeData` and leaves owner
@@ -512,3 +514,35 @@ Already fine:
 - **Path checks:** case-insensitivity, 8.3 short names (`PROGRA~1`), UNC and `\\?\` prefixes can defeat naive
   containment checks. `paths.Within` should resolve with `filepath.EvalSymlinks` and `GetFinalPathNameByHandle`
   when the path exists, and fail closed when it can't.
+
+## F01 delivered (#108)
+
+Package selection and the jobleader boundary. The Windows reduced build (`-tags 'nough noweb'`, both
+architectures) now resolves every package: `go list -deps .` passes. It does not compile yet.
+
+- `internal/jobleader`: `doc.go` holds the package comment and `Flag`; `jobleader.go` is `unix`;
+  `jobleader_other.go` (`!unix`) runs the command and waits, with `Supported = false` and a no-op
+  `SuspendOnCtrlZ`. `ui.Model.jobControl` is `jobleader.Supported && config`, so Windows never wraps a command
+  in `--job-leader`.
+- Build-tag audit: constraints that selected Windows by negation were retagged `unix && …`
+  (`builtins`/`procmon`/`sysinfo` `statfs_unix.go`, `term/session_other.go`, `ughbot/vm/procattr_other.go`,
+  `wayland/shm_other.go`). Every `internal/wayland` file is now `unix`, so the package is absent on Windows
+  (its tests too). Confirmed portable and left alone: `builtins/utimenow.go` (`!darwin && !windows`),
+  `builtins/rename_other.go` (`!linux`, returns `ENOSYS`), `gui/backend_other.go` (`!unix || android`, the
+  clean "no backend" error), `cmd/misagui/main.go` (`!android || !cgo`, empty stub), `sysinfo/prop_stub.go`,
+  `privdir`/`tools`/`webui` `!unix` siblings (compile-only stubs; real Windows behaviour is A01/A02/W01).
+- Package set: `platformset_test.go` (root, no subprocess, `go/build` contexts) pins the Windows product
+  set, i.e. the in-module import closure of the root package under `nough noweb`, and fails on drift. It
+  also checks that wayland, the `wl_*` gui files, the JNI file, ughbot and `gui/android` stay out of that
+  closure, that test imports resolve, and that Linux, Android, OpenBSD, FreeBSD and macOS keep their packages
+  and the Unix jobleader.
+- Remaining compile errors, `GOOS=windows go build -tags 'nough noweb' .` (identical on arm64), by task:
+  - F02: `lscore/fileinfo.go` (`syscall.Stat_t`, `statTimes`), `sysinfo/extended.go` (`syscall.Statfs`,
+    `getMountSpace`), `sshclient/resize.go` (`SIGWINCH`), `procmon/htop.go` (the signal table, `Kill`,
+    `Setpriority`).
+  - P01 (with F04 stubs until P02): `term/terminal.go` (`pollable`, `setWinsize`, `waitProcess`,
+    `killSession`, `session`).
+  - F03/F04: `internal/builtins` is not reached yet because its dependencies fail first; by grep it still
+    needs the items listed for `builtins` above.
+  - Not in the reduced build, so not F01: the agent packages (`ugh/admission`, `auth`, `policy`, `tools`,
+    `worktree`) fail on Unix-only calls (A01–A06).
