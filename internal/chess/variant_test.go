@@ -36,6 +36,7 @@ func TestBuiltinVariants(t *testing.T) {
 		{"berolina", 8, 8, 6, 2},
 		{"stalematewins", 8, 8, 6, 2},
 		{"selfcapture", 8, 8, 6, 2},
+		{"kingofthehill", 8, 8, 6, 2},
 	}
 	for _, tt := range tests {
 		v := builtin(t, tt.id)
@@ -127,6 +128,8 @@ setup: k2/3/K1R
 		"wide glyph":     strings.Replace(base, "betza: R}", "betza: R, glyph: 漢}", 1),
 		"castle square":  base + "castling: [{king: a1, rook: z1, king_to: b1, rook_to: c1}]\n",
 		"promotion":      base + "promotion: [X]\n",
+		"goal square":    base + "goal: [d4]\n",
+		"goal duplicate": base + "goal: [a1, a1]\n",
 	}
 	for name, src := range tests {
 		if _, err := parseVariants(map[string][]byte{"tiny.yaml": []byte(src)}); err == nil {
@@ -251,4 +254,50 @@ func TestAmazonMovesAsQueenAndKnight(t *testing.T) {
 	if !result.Found || !slices.Contains(start.Moves(), result.Move) {
 		t.Fatalf("search move %v is not legal", result.Move)
 	}
+}
+func TestGoalSquares(t *testing.T) {
+	v := builtin(t, "kingofthehill")
+	want := []int{}
+	for _, name := range []string{"d4", "d5", "e4", "e5"} {
+		sq, err := v.ParseSquare(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want = append(want, sq)
+	}
+	if !slices.Equal(v.Goal, want) {
+		t.Errorf("%s goal = %v, want %v", v.ID, v.Goal, want)
+	}
+	if goal := builtin(t, "chess").Goal; len(goal) != 0 {
+		t.Errorf("chess goal = %v, want none", goal)
+	}
+}
+
+func TestGoalInheritanceAndClearing(t *testing.T) {
+	src := map[string][]byte{
+		"inherits.yaml":  []byte("id: inherits\nextends: kingofthehill\n"),
+		"overrides.yaml": []byte("id: overrides\nextends: kingofthehill\ngoal: [a1]\n"),
+		"cleared.yaml":   []byte("id: cleared\nextends: kingofthehill\ngoal: []\n"),
+	}
+	vs, err := parseVariants(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(id string, n int) *Variant {
+		t.Helper()
+		v, err := Find(vs, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(v.Goal) != n {
+			t.Errorf("%s goal = %v, want %d squares", id, v.Goal, n)
+		}
+		return v
+	}
+	check("inherits", 4)
+	over := check("overrides", 1)
+	if a1, _ := over.ParseSquare("a1"); len(over.Goal) == 1 && over.Goal[0] != a1 {
+		t.Errorf("overrides goal = %v, want a1", over.Goal)
+	}
+	check("cleared", 0)
 }

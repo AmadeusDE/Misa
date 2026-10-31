@@ -52,6 +52,38 @@ func TestEngineFindsMoveFromStart(t *testing.T) {
 	}
 }
 
+func TestEngineWinsOnGoal(t *testing.T) {
+	v := builtin(t, "kingofthehill")
+	p := fen(t, v, "7k/8/8/8/8/2K5/8/8 w -")
+	r := think(t, p, 3)
+	if got := moveName(p, r.Move); got != "Kc3-d4" {
+		t.Errorf("played %s, want Kc3-d4", got)
+	}
+	if !IsMateScore(r.Score) || MateIn(r.Score) != 1 {
+		t.Errorf("score %d is not a win in one", r.Score)
+	}
+	after := p.Apply(r.Move)
+	if o, over := adjudicate(after, true); !over || o.winner != White {
+		t.Errorf("after the move: %+v over %v", o, over)
+	}
+}
+
+func TestEngineScoresGoalAsLossForSideToMove(t *testing.T) {
+	v := builtin(t, "kingofthehill")
+	p := fen(t, v, "7k/8/8/8/3K4/8/8/8 b -")
+	e := NewEngine(v)
+	e.begin(nil, Limits{Depth: 1})
+	if score := e.negamax(p, 1, 3, -infinity, infinity, true); score != -mateScore+3 {
+		t.Errorf("negamax = %d, want %d", score, -mateScore+3)
+	}
+	if score := e.quiesce(p, 5, -infinity, infinity); score != -mateScore+5 {
+		t.Errorf("quiesce = %d, want %d", score, -mateScore+5)
+	}
+	if r := NewEngine(v).Think(p, nil, Limits{Depth: 2}); r.Found {
+		t.Errorf("searched on after a goal win: %+v", r)
+	}
+}
+
 func TestEngineMatesInOne(t *testing.T) {
 	v := builtin(t, "chess")
 	p := fen(t, v, "6k1/5ppp/8/8/8/8/8/R5K1 w -")
@@ -111,7 +143,7 @@ func TestEngineEscapesMateThreat(t *testing.T) {
 }
 
 func TestEnginePlaysEveryVariant(t *testing.T) {
-	for _, id := range []string{"chess", "double", "bigboard"} {
+	for _, id := range []string{"chess", "double", "bigboard", "kingofthehill"} {
 		v := builtin(t, id)
 		p := NewPosition(v)
 		start := time.Now()

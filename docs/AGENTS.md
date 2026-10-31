@@ -321,8 +321,10 @@ internal/
   doublebig (Double Big Board 32×16), amazon (queen-replacement Amazon Chess), nocastling (orthodox chess without
   castling), capablanca (10×8 with Archbishop and Chancellor), berolina (Berolina Chess: diagonal noncapturing
   pawn moves, diagonal initial double-step, straight captures and en passant), stalematewins (Stalemate-wins
-  Chess: delivering stalemate wins), and selfcapture (Self-capture Chess: `self_capture: true` in the variant
-  YAML lets a side capture its own non-royal pieces with normal capture moves; Tomašev et al., arXiv:2009.04374).
+  Chess: delivering stalemate wins), selfcapture (Self-capture Chess: `self_capture: true` in the variant
+  YAML lets a side capture its own non-royal pieces with normal capture moves; Tomašev et al., arXiv:2009.04374),
+  and kingofthehill (chess plus `goal: [d4, d5, e4, e5]`: a royal arriving on one of those absolute, unmirrored
+  squares wins).
   `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
   and the search both honour it.
   Movement is checked by perft (`position_test.go`), so run the chess tests after touching move generation.

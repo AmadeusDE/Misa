@@ -14,9 +14,9 @@ a set of built-in tools, and it ships as one self-contained binary.
   (`chess amazon`), No-castling Chess (`chess nocastling`), Capablanca (`chess capablanca`, 10×8 with
   Archbishop and Chancellor), Berolina Chess (`chess berolina`, pawns move diagonally without capturing
   and capture straight ahead), Stalemate-wins Chess (`chess stalematewins`, delivering stalemate wins),
-  and Self-capture Chess (`chess selfcapture`, orthodox chess plus captures of your own non-royal
-  pieces, after the self-capture rule set in
-  [arXiv:2009.04374](https://arxiv.org/abs/2009.04374)).
+  Self-capture Chess (`chess selfcapture`, orthodox chess plus captures of your own non-royal pieces,
+  after the self-capture rule set in [arXiv:2009.04374](https://arxiv.org/abs/2009.04374)), and
+  King of the Hill (`chess kingofthehill`, a king reaching one of the four centre squares wins at once).
 - Minesweeper controls: `space` open, `f` flag, `n` new game, `1`–`3` select a level, `c` custom game, `q` quit
 - Data-driven package manager menus, a file browser, and tldr/man help
 - `misa --gui`: an optional Wayland window, pure Go and software rendered
