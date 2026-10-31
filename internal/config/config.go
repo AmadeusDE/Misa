@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 type Entry struct {
@@ -120,11 +122,11 @@ func ActivePath() string {
 }
 
 func DefaultPath() string {
-	dir, err := os.UserConfigDir()
-	if err != nil {
+	dir := hostpath.ConfigDir()
+	if dir == "" {
 		return "config.yaml"
 	}
-	return filepath.Join(dir, "misa", "config.yaml")
+	return filepath.Join(dir, "config.yaml")
 }
 
 func EnsureExists(path string) error {

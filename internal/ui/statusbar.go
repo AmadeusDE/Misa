@@ -14,6 +14,7 @@ import (
 	"github.com/AmadeusDE/Misa/internal/ascii"
 	"github.com/AmadeusDE/Misa/internal/config"
 	"github.com/AmadeusDE/Misa/internal/gitinfo"
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 	"github.com/AmadeusDE/Misa/internal/sysinfo"
 )
 
@@ -161,10 +162,7 @@ func (m *Model) resolveInfoItem(key string, info sysinfo.Info) string {
 		}
 		return colorize(info.Terminal, sc.terminal)
 	case "user":
-		u := os.Getenv("USER")
-		if u == "" {
-			u = os.Getenv("LOGNAME")
-		}
+		u := hostpath.Username()
 		if u == "" {
 			return ""
 		}

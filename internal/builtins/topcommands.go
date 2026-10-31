@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 const topCommandsSpec = "^n#(count)a(all)b(bash)z(zsh)m(misa)"
@@ -60,7 +62,7 @@ func runTopCommands(ctx *Context) int {
 	}
 
 	if all || onlyMisa {
-		cmds := readMisaHistory(filepath.Join(home, ".local", "share", "misa", "history"))
+		cmds := readMisaHistory(hostpath.HistoryFile())
 		commands = append(commands, cmds...)
 		total += len(cmds)
 	}

@@ -12,6 +12,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 type ExtendedInfo struct {
@@ -63,10 +65,7 @@ func FetchExtended() ExtendedInfo {
 }
 
 func getTitle() string {
-	user := os.Getenv("USER")
-	if user == "" {
-		user = os.Getenv("LOGNAME")
-	}
+	user := hostpath.Username()
 	if user == "" {
 		user = "user"
 	}

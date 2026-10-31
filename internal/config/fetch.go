@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 type FetchConfig struct {
@@ -23,11 +25,11 @@ type FetchConfig struct {
 func findFetchConfig() string { return findConfigFile("fetch.yaml") }
 
 func DefaultFetchPath() string {
-	dir, err := os.UserConfigDir()
-	if err != nil {
+	dir := hostpath.ConfigDir()
+	if dir == "" {
 		return "fetch.yaml"
 	}
-	return filepath.Join(dir, "misa", "fetch.yaml")
+	return filepath.Join(dir, "fetch.yaml")
 }
 
 func LoadFetch() FetchConfig {

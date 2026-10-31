@@ -13,6 +13,8 @@ import (
 
 	"github.com/charmbracelet/x/term"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 const exitSSHError = 255
@@ -44,9 +46,9 @@ func Run(o Options, termName string, stdin io.Reader, stdout, stderr io.Writer) 
 	}
 	e.Home, _ = os.UserHomeDir()
 	if u, err := user.Current(); err == nil {
-		e.LocalUser = u.Username
+		e.LocalUser = hostpath.AccountName(u.Username)
 	} else {
-		e.LocalUser = os.Getenv("USER")
+		e.LocalUser = hostpath.Username()
 	}
 	return run(o, e)
 }

@@ -15,6 +15,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/AmadeusDE/Misa/internal/color"
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 //go:embed distro/pfetch/*.txt distro/neofetch/*.txt distro/fastfetch/*.txt
@@ -62,14 +63,7 @@ func parseFile(content, name, source string) *AsciiArt {
 var sources = []string{"pfetch", "neofetch", "fastfetch"}
 
 func externalDirs(subpath string) []string {
-	var dirs []string
-	if execPath, err := os.Executable(); err == nil {
-		dirs = append(dirs, filepath.Join(filepath.Dir(execPath), subpath))
-	}
-	if cfgDir, err := os.UserConfigDir(); err == nil {
-		dirs = append(dirs, filepath.Join(cfgDir, "misa", subpath))
-	}
-	return dirs
+	return hostpath.SearchDirs(subpath)
 }
 
 func loadAllArts() []*AsciiArt {

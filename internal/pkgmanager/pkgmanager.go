@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 type ListAction struct {
@@ -109,14 +111,7 @@ func loadExternal() []Manager {
 }
 
 func searchDirs(subdir string) []string {
-	var dirs []string
-	if execPath, err := os.Executable(); err == nil {
-		dirs = append(dirs, filepath.Join(filepath.Dir(execPath), subdir))
-	}
-	if cfgDir, err := os.UserConfigDir(); err == nil {
-		dirs = append(dirs, filepath.Join(cfgDir, "misa", subdir))
-	}
-	return dirs
+	return hostpath.SearchDirs(subdir)
 }
 
 func onTermux() bool {

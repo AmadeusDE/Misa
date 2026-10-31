@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 type MuxConfig struct {
@@ -19,31 +21,17 @@ type MuxConfig struct {
 
 func findMuxConfig() string { return findConfigFile("mux.yaml") }
 
-// findConfigFile looks for name next to the executable, then in
-// ~/.config/misa. The working directory is never searched, so a cloned
-// repository cannot supply config (autorun, aliases) by being entered.
-func findConfigFile(name string) string {
-	if execPath, err := os.Executable(); err == nil {
-		p := filepath.Join(filepath.Dir(execPath), name)
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	if dir, err := os.UserConfigDir(); err == nil {
-		p := filepath.Join(dir, "misa", name)
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return ""
-}
+// findConfigFile looks for name next to the executable, then in the user
+// configuration directory (hostpath). The working directory is never searched,
+// so a cloned repository cannot supply config (autorun, aliases) by being entered.
+func findConfigFile(name string) string { return hostpath.FindFile(name) }
 
 func DefaultMuxPath() string {
-	dir, err := os.UserConfigDir()
-	if err != nil {
+	dir := hostpath.ConfigDir()
+	if dir == "" {
 		return "mux.yaml"
 	}
-	return filepath.Join(dir, "misa", "mux.yaml")
+	return filepath.Join(dir, "mux.yaml")
 }
 
 func LoadMux() MuxConfig {
