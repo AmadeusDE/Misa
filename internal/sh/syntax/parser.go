@@ -2175,7 +2175,11 @@ func (p *Parser) gotStmtPipe(s *Stmt, binCmd bool) *Stmt {
 			if p.lang.in(langBashLike | LangZsh) { // Note that mksh lacks this one.
 				p.declClause(s)
 			}
-		case "local", "export", "readonly", "typeset", "nameref":
+		case "export", "readonly":
+			if p.lang.in(LangPOSIX | langBashLike | LangMirBSDKorn | LangZsh) {
+				p.declClause(s)
+			}
+		case "local", "typeset", "nameref":
 			if p.lang.in(langBashLike | LangMirBSDKorn | LangZsh) {
 				p.declClause(s)
 			}

@@ -30,6 +30,14 @@
         "interp/os_unix.go"
       ],
       "reason": "Import-path rewrite changes canonical import order."
+    },
+    {
+      "kind": "session-support",
+      "files": [
+        "syntax/parser.go",
+        "interp/session_status.go"
+      ],
+      "reason": "Parse POSIX export and readonly as declarations, and permit a session host to set the last status for cancellation."
     }
   ],
   "files": [
@@ -200,7 +208,7 @@
       "original": "syntax/parser.go",
       "local": "syntax/parser.go",
       "upstream_sha256": "f9325c1fe7c0645136f25b87e678befaeac24ef3c7cd10dd6a18f3c1642dc370",
-      "local_sha256": "f9325c1fe7c0645136f25b87e678befaeac24ef3c7cd10dd6a18f3c1642dc370"
+      "local_sha256": "c3cdbe4e7785c7f00ae14b6f8b9f948ab339309be30cbc03c61b511c6d6687aa"
     },
     {
       "original": "syntax/parser_arithm.go",
