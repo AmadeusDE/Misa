@@ -16,6 +16,9 @@ type Invocation struct {
 	Env            []string
 	Stdin          io.Reader
 	Stdout, Stderr io.Writer
+	// Argv0, when non-empty, is the command name presented to the executed
+	// program; it defaults to Name. It never affects lookup.
+	Argv0 string
 }
 
 // ExecHandler executes a command without invoking a shell implicitly.
@@ -36,6 +39,17 @@ type Options struct {
 	Stdin          io.Reader
 	Stdout, Stderr io.Writer
 	Exec           ExecHandler
+	// MisaBuiltin reports whether a bare name is a Misa registry utility. Nil
+	// means no registry is known, so only the interpreter's keywords,
+	// functions, and builtins resolve before PATH.
+	MisaBuiltin func(name string) bool
+	// LookPath resolves an executable name through env's PATH, relative to dir.
+	// Nil uses the interpreter's PATH search. It should match the Exec handler,
+	// so that `type`, `command -v`, and `hash` agree with execution.
+	LookPath func(name, dir string, env []string) (string, bool)
+	// DefaultPath is the PATH that `command -p` searches. Empty means
+	// DefaultCommandPath.
+	DefaultPath string
 }
 
 // Result describes one submission. Ordinary nonzero shell statuses are not errors.

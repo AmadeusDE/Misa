@@ -238,3 +238,36 @@ func TestStdinReadDeadline(t *testing.T) {
 		t.Fatalf("status %d", code)
 	}
 }
+
+// TestResolutionIntrospection drives the CLI end to end: Misa utilities shadow
+// PATH, `command` bypasses functions, and introspection reports what runs.
+func TestResolutionIntrospection(t *testing.T) {
+	dir := t.TempDir()
+	cases := []struct {
+		name, source, want, wantErr string
+		status                      int
+	}{
+		{"misa utility", "type rev", "rev is a misa builtin\n", "", 0},
+		{"misa utility runs", "printf abc | rev", "cba", "", 0},
+		{"shell builtin", "type echo", "echo is a shell builtin\n", "", 0},
+		{"command -v keeps builtins", "command -v echo", "echo\n", "", 0},
+		{"command bypasses functions", "rev() { echo function; }; command rev", "", "", 0},
+		{"function shadows the utility", "rev() { echo function; }; rev", "function\n", "", 0},
+		{"unknown name", "type absent-command", "", "type: absent-command: not found\n", 1},
+		{"missing external", "absent-command", "", "not found", 127},
+		{"unsupported option", "type -a echo", "", "type: -a: unsupported option\n", 2},
+		{"hash is empty", "hash", "", "", 0},
+		{"hash records nothing for builtins", "hash rev; hash", "", "", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			code, out, errOut := run(t, "shell", []string{"-c", tc.source}, Options{Dir: dir, Env: []string{"PATH=" + dir}})
+			if code != tc.status || out != tc.want {
+				t.Fatalf("%q: status %d out %q, want %d %q (stderr %q)", tc.source, code, out, tc.status, tc.want, errOut)
+			}
+			if tc.wantErr != "" && !strings.Contains(errOut, tc.wantErr) {
+				t.Fatalf("%q: stderr %q, want it to mention %q", tc.source, errOut, tc.wantErr)
+			}
+		})
+	}
+}

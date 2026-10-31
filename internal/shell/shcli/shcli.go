@@ -149,7 +149,7 @@ func Run(ctx context.Context, name string, args []string, opts Options) int {
 		}
 		source = data
 	}
-	s, err := session.New(session.Options{Dir: opts.Dir, Env: opts.Env, Stdin: opts.Stdin, Stdout: opts.Stdout, Stderr: opts.Stderr, Exec: sessionbuiltins.Run, Arg0: &arg0, Args: positional, ShellOptions: flags})
+	s, err := session.New(*sessionbuiltins.Configure(&session.Options{Dir: opts.Dir, Env: opts.Env, Stdin: opts.Stdin, Stdout: opts.Stdout, Stderr: opts.Stderr, Arg0: &arg0, Args: positional, ShellOptions: flags}))
 	if err != nil {
 		return usage(err.Error())
 	}

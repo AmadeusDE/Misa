@@ -141,3 +141,121 @@ S03 does not solve S04 command resolution or introspection. S05 interactive
 execution and S06 TUI integration remain unwired. The remaining S07–S22 roadmap
 and boundaries above are unchanged. This is not a claim of full POSIX or Bash
 parity.
+
+## S04 — registry-aware resolution and introspection
+
+S04 makes one resolver serve both execution and `type`, `command -v`, `command -V`
+and `hash`. It adds no builtin, no registry entry and no dependency; the session
+still imports neither the builtin registry nor Bubble Tea. Instead the caller
+injects two hooks, and `sessionbuiltins.Configure` fills them with the same
+dispatch `Run` uses:
+
+- `Options.MisaBuiltin(name) bool` reports Misa registry utilities.
+- `Options.LookPath(name, dir, env) (path, ok)` resolves an executable through the
+  invocation's `PATH`. The adapter uses F06 `commandexec.Resolve`, so the search
+  rules, `dir` rooting and permission checks match execution exactly.
+- `Options.DefaultPath` is the path `command -p` searches; empty means
+  `session.DefaultCommandPath` (`/bin:/usr/bin`, the POSIX `_CS_PATH` value).
+
+A nil `MisaBuiltin` knows no registry, and a nil `LookPath` falls back to the
+interpreter's own `PATH` search, so an unwired session behaves as before.
+
+### Precedence
+
+One order is used for execution and for reporting:
+
+1. shell keywords (reported by `type`; they are not runnable commands);
+2. shell functions;
+3. interpreter shell builtins (`echo`, `cd`, `read`, …);
+4. Misa registry utilities, matched on the exact bare name only;
+5. `PATH` executables, resolved through F06.
+
+Misa utilities therefore shadow `PATH` names by default, exactly like F06's
+builtin-first dispatch (a `rev` on `PATH` does not displace the Misa `rev`), and
+shell builtins shadow Misa utilities. Two documented escapes preserve user
+control:
+
+- An **explicit path** is always external: `/usr/bin/ls` or `./rev` never falls
+  back to a builtin with that basename. A missing path returns 127, a
+  non-executable or directory returns 126, and no host `/bin/sh` is involved.
+- **`command -p name`** forces the external utility found on `DefaultCommandPath`,
+  skipping functions, shell builtins, Misa utilities and the session's own
+  `PATH`. This is the one-word escape from a shadowing Misa utility; it is a
+  deliberate Misa extension of the POSIX `-p` search, which normally still
+  prefers builtins. A miss returns 127 with `command: name: not found`.
+
+`command name` bypasses functions (POSIX) but not builtins, so `command rev` still
+runs the Misa utility, and `command -v`/`-V` report what would run. The working
+directory never silently precedes `PATH`; only an empty or `.` `PATH` entry
+selects it (F06 rules).
+
+### Introspection output
+
+`type name…` writes one line per operand: `name is a shell keyword`,
+`name is a function`, `name is a shell builtin`, `name is a misa builtin`, or
+`name is /absolute/path`. A name that is not found writes
+`type: name: not found` to standard error and makes the status 1; operands that
+are found are still reported. `type -t` prints one token instead: `keyword`,
+`function`, `builtin`, `misa` (a Misa registry utility, deliberately distinct
+from a shell builtin) or `file`. `type -p`/`-P` force a `PATH`-only search and
+print the path, ignoring keywords, functions, builtins and the registry. `type -a`
+and `-f` are **unsupported**: they print `type: -a: unsupported option` and exit
+2 rather than faking a list, and `--help` is reported as an invalid option. This replaces the interpreter's own `type`, whose
+`-a` returned 3 with an unrelated `command:` diagnostic.
+
+`command -v name…` prints the name itself for keywords, functions, shell builtins
+and Misa utilities, and the resolved path for a `PATH` executable, matching the
+`type` classification; a name that is not found prints nothing and makes the
+status 1, while found names are still printed. `command -V` prints the same
+lines as `type`. `-v`/`-V` never execute anything. An unknown option prints
+`command: invalid option "-q"` and exits 2. `command` with no operands succeeds
+silently.
+
+### `hash`
+
+`hash` records `PATH` resolutions in a per-session table. `hash name…` resolves
+each name (a `PATH`-only lookup), reports `hash: name: not found` with status 1
+for a miss while keeping the names it did record, and prints nothing on success.
+`hash -r` clears the table, and a `PATH` assignment clears it implicitly: entries
+carry the `PATH` they were resolved with and a differing `PATH` drops them.
+Bare `hash` prints the table as sorted `name=path` lines. Names that are shell
+builtins, functions or Misa utilities have no path and are neither recorded nor
+reported as missing; an operand containing a slash is not a bare command name and
+is reported as such instead of being stored. Executing an external command records its resolution
+automatically; explicit paths and builtins never are.
+
+A hash entry is a record, not a cache used to launch: execution always
+re-resolves through the injected handler, so a stale entry can never run a
+different file. This is a deliberate difference from shells that execute the
+hashed path.
+
+### Mechanism and limits
+
+The interpreter owns `type`, `hash` and `command` and its builtins cannot see the
+registry. The session installs a `CallHandler` that rewrites those three names to
+the reserved `__misa_type`, `__misa_hash` and `__misa_command` before
+function/builtin dispatch, and its exec handler implements them. A function with
+one of the three names is never rewritten, so functions keep precedence; the
+private names are reserved and should not be defined. `exec type`, `exec hash`
+and `exec command` are recognised by the exec handler as well, because `exec`
+reaches it without the call handler. The interpreter's own `builtin` builtin
+still calls its internal `type`/`hash`/`command`, so `builtin type x` reports
+without registry awareness — an explicit, documented gap that belongs with the
+S11 special-builtin work.
+
+Nothing else changes: aliases (S14), `read`/`getopts` semantics (S11),
+redirection and pipeline lifecycle (S09/S10), traps, job control and terminal
+ownership (S15–S18), the interactive worker (S05) and TUI wiring (S06) remain
+unwired, and this is not a claim of POSIX or Bash parity.
+
+### Verification
+
+Native tests cover the resolution order and its collisions (function vs shell
+builtin vs Misa utility vs `PATH`), `command` bypass, `command -v`/`-V`/`type`
+output and status, `type -t`/`-p`/`-P`, unsupported options, `hash`/`hash -r`/`PATH`
+reset/auto-recording, `command -p` forcing the external, explicit paths, 126 for a
+non-executable file and 127 for a missing one. They are hermetic: the session
+tests inject fake registry and path lookups, and the adapter tests create their
+fake executables by linking the test binary into a temporary directory, skipping
+where exec permission is unavailable. `shcli` re-runs the same paths through
+`misa sh -c`.
