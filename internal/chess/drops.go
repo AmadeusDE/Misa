@@ -14,11 +14,26 @@ func (p *Position) dropMoves() []Move {
 			continue
 		}
 		t := p.V.Pieces[typ-1]
+		// Only an unpromoted piece of this exact type and color occupies a
+		// restricted file; a promoted pawn no longer counts as a pawn.
+		var occupiedFiles []bool
+		if t.DropOnePerFile {
+			occupiedFiles = make([]bool, p.V.Files)
+			for sq, pc := range p.Board {
+				if pc.Type == uint8(typ) && pc.Color == p.Turn && pc.Promoted == 0 {
+					x, _ := p.V.XY(sq)
+					occupiedFiles[x] = true
+				}
+			}
+		}
 		for sq, pc := range p.Board {
 			if pc.Type != 0 || (p.V.Blocker && sq == p.Blocker) {
 				continue // a duck's square is not empty for a drop
 			}
-			_, y := p.V.XY(sq)
+			x, y := p.V.XY(sq)
+			if t.DropOnePerFile && occupiedFiles[x] {
+				continue
+			}
 			rank := y + 1
 			if p.Turn == Black {
 				rank = p.V.Ranks - y
@@ -30,6 +45,17 @@ func (p *Position) dropMoves() []Move {
 		}
 	}
 	return moves
+}
+
+// legalDrop excludes immediate checkmate by types with the no-mate rule.
+// Evaluating all legal replies (including drops) also handles variants where
+// a drop can interpose against a checking rider. Recursion is finite: each
+// nested no-mate check applies a drop and consumes a piece from a hand.
+func (p *Position) legalDrop(m Move, q *Position) bool {
+	if m.Drop == 0 || !p.V.Pieces[m.Drop-1].DropNoMate || !q.InCheck() {
+		return true
+	}
+	return len(q.Moves()) != 0
 }
 
 func (p *Position) applyDrop(m Move) {

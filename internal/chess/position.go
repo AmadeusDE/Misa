@@ -43,7 +43,7 @@ type Move struct {
 	From, To int
 	Take     int   // square of the captured piece (differs from To en passant), or -1
 	Drop     uint8 // type dropped from hand, or 0
-	Promote  uint8 // piece type the pawn becomes, or 0
+	Promote  uint8 // piece type the mover becomes, or 0
 	Castle   int   // index into Variant.Castling, or -1
 	Blocker  int   // destination + 1, or 0 when absent
 }
@@ -139,7 +139,8 @@ func (p *Position) clone() *Position {
 func (p *Position) Moves() []Move {
 	var legal []Move
 	for _, m := range p.moveCandidates() {
-		if p.Apply(m).legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
+		q := p.Apply(m)
+		if q.legalAfter(p.Turn, len(p.royalSq[p.Turn])) && p.legalDrop(m, q) {
 			legal = append(legal, m)
 		}
 	}
@@ -187,7 +188,7 @@ func (p *Position) searchMoves(tactical bool, preferred Move) []Move {
 				continue
 			}
 			q.Blocker = sq
-			if q.legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
+			if q.legalAfter(p.Turn, len(p.royalSq[p.Turn])) && p.legalDrop(m, q) {
 				squares = append(squares, sq)
 			}
 		}
@@ -212,7 +213,7 @@ func (p *Position) searchMoves(tactical bool, preferred Move) []Move {
 func (p *Position) hasLegalMove() bool {
 	for _, m := range p.generate(false) {
 		if !p.V.Blocker {
-			if p.Apply(m).legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
+			if q := p.Apply(m); q.legalAfter(p.Turn, len(p.royalSq[p.Turn])) && p.legalDrop(m, q) {
 				return true
 			}
 			continue
@@ -224,7 +225,7 @@ func (p *Position) hasLegalMove() bool {
 		for sq, pc := range q.Board {
 			if pc.Type == 0 && sq != p.Blocker {
 				q.Blocker = sq
-				if q.legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
+				if q.legalAfter(p.Turn, len(p.royalSq[p.Turn])) && p.legalDrop(m, q) {
 					return true
 				}
 			}
@@ -348,7 +349,13 @@ func (p *Position) generate(tactical bool) []Move {
 		t := v.Type(pc)
 		clear(seen)
 		add := func(to, take int) {
-			promotes := t.Pawn && to != from && p.promotes(to) && len(v.Promotion) > 0
+			// A piece's own promotion rule wins over the variant's, which
+			// applies to pawns that declare none of their own.
+			choices, zone, optional, onExit, mandatory := t.Promotion, t.PromotionZone, t.PromotionOptional, t.PromotionOnExit, t.PromotionMandatory
+			if !t.promotionDefined && t.Pawn {
+				choices, zone, optional, onExit, mandatory = v.Promotion, v.PromotionZone, v.PromotionOptional, false, 0
+			}
+			promotes := to != from && len(choices) > 0 && (p.inPromotionZone(to, zone) || (onExit && p.inPromotionZone(from, zone)))
 			// A piece confined to a region (a general in its palace, an
 			// elephant that may not cross the river) cannot enter to at all.
 			if !t.allows(v, to, pc.Color) {
@@ -366,15 +373,16 @@ func (p *Position) generate(tactical bool) []Move {
 			}
 			seen[to] = len(moves) + 1
 			if promotes {
-				for _, promo := range v.Promotion {
+				for _, promo := range choices {
 					if available(promo) {
 						moves = append(moves, Move{From: from, To: to, Take: take, Promote: promo, Castle: -1})
 					}
 				}
-				// Promotion is mandatory on the final rank and wherever the
-				// variant does not let a pawn decline it; with nothing left to
-				// promote to the pawn simply cannot enter the square.
-				if !v.PromotionOptional || p.lastRank(to) {
+				// Promotion is mandatory on the final rank, wherever a piece's
+				// own rule asks for it and wherever the variant does not let a
+				// pawn decline it; with nothing left to promote to the piece
+				// simply cannot enter the square.
+				if !optional || p.lastRank(to) || p.inPromotionZone(to, mandatory) {
 					return
 				}
 				// Optional inside the zone: arriving as a pawn is a move too.
@@ -459,12 +467,14 @@ func (p *Position) lastRank(sq int) bool {
 	return y == 0
 }
 
-func (p *Position) promotes(sq int) bool {
+// inPromotionZone reports whether sq is inside the side-relative zone of the
+// last zone ranks; a zone of 0 is empty, so the test is false everywhere.
+func (p *Position) inPromotionZone(sq, zone int) bool {
 	_, y := p.V.XY(sq)
 	if p.Turn == White {
-		return y >= p.V.Ranks-p.V.PromotionZone
+		return y >= p.V.Ranks-zone
 	}
-	return y < p.V.PromotionZone
+	return y < zone
 }
 
 // castles returns the castling moves available to the side to move: the

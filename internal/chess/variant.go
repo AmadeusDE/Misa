@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml", "crazyhouse.yaml", "xiangqi.yaml", "horde.yaml", "fog.yaml", "duck.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml", "crazyhouse.yaml", "xiangqi.yaml", "horde.yaml", "fog.yaml", "duck.yaml", "shogi.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -30,8 +30,18 @@ type PieceType struct {
 	Royal           bool   // may not be left attacked; goals and check limits count royals
 	Pawn            bool   // promotes, takes and is taken en passant, resets the move clock
 	DropForbidRanks []int  // side-relative ranks on which this piece cannot be dropped
-	Demote          uint8  // original type of a promoted piece, or 0
-	Value           int    // centipawns for the computer player; estimated when the file leaves it out
+	DropOnePerFile  bool   // only one unpromoted piece of this type per file
+	DropNoMate      bool   // dropping this type may not deliver immediate checkmate
+	// A piece may carry its own promotion rule; without one a pawn uses the
+	// variant's Promotion and PromotionZone.
+	Promotion          []uint8 // types this piece becomes, or nil
+	PromotionZone      int     // side-relative ranks at the far end that promote
+	PromotionOptional  bool    // the mover may decline while inside the zone
+	PromotionOnExit    bool    // leaving the zone also promotes (a shogi piece)
+	PromotionMandatory int     // ranks inside which the mover must promote, or 0
+	promotionDefined   bool    // the file gave this piece its own promotion rule
+	Demote             uint8   // original type of a promoted piece, or 0
+	Value              int     // centipawns for the computer player; estimated when the file leaves it out
 
 	zone        []bool
 	moveZones   []moveZone
@@ -69,6 +79,7 @@ type Variant struct {
 	PromotionOptional     bool    // a pawn may decline to promote inside the zone
 	PromotionCapturedOnly bool    // a type is available only once its setup piece is gone
 	MoveLimit             int     // moves by each side without a capture or pawn move before a draw
+	Repetition            int     // occurrences of a position that draw, three by default
 	Blocker               bool    // a neutral, uncapturable duck must relocate after each move
 	Stalemate             StalemateRule
 	CheckLimit            int        // checks a side must give to win, or 0 for no such rule
@@ -104,6 +115,16 @@ type pieceDef struct {
 	Zone            []string      `yaml:"zone"`
 	MoveZones       []moveZoneDef `yaml:"move_zones"`
 	RoyalAttack     *string       `yaml:"royal_attack"`
+	DropOnePerFile  bool          `yaml:"drop_one_per_file"`
+	DropNoMate      bool          `yaml:"drop_no_mate"`
+	// A piece's own promotion rule; promotion and promotes_to are the same
+	// field written two ways and may not be combined.
+	Promotion          []string `yaml:"promotion"`
+	PromotesTo         string   `yaml:"promotes_to"`
+	PromotionZone      int      `yaml:"promotion_zone"`
+	PromotionOptional  bool     `yaml:"promotion_optional"`
+	PromotionOnExit    bool     `yaml:"promotion_on_exit"`
+	PromotionMandatory int      `yaml:"promotion_mandatory"`
 }
 
 type castleDef struct {
@@ -182,6 +203,7 @@ type variantDef struct {
 	Explosion             *explosionDef  `yaml:"explosion"`
 	Extinction            *extinctionDef `yaml:"extinction"`
 	Blocker               *bool          `yaml:"blocker"`
+	Repetition            int            `yaml:"repetition"`
 
 	Shuffle *shuffleDef `yaml:"shuffle"`
 	source  string
@@ -389,6 +411,9 @@ func merge(parent, child variantDef) variantDef {
 	if child.Stalemate != "" {
 		d.Stalemate = child.Stalemate
 	}
+	if child.Repetition != 0 {
+		d.Repetition = child.Repetition
+	}
 	if child.SelfCapture != nil {
 		d.SelfCapture = child.SelfCapture
 	}
@@ -439,6 +464,7 @@ func build(d variantDef) (*Variant, error) {
 		ID: d.ID, Name: d.Name, Description: d.Description,
 		Files: d.Files, Ranks: d.Ranks, Setup: d.Setup, Source: d.source,
 		PromotionZone: d.PromotionZone, MoveLimit: d.MoveLimit, CheckLimit: d.CheckLimit,
+		Repetition:            d.Repetition,
 		Stalemate:             d.Stalemate,
 		SelfCapture:           d.SelfCapture != nil && *d.SelfCapture,
 		PromotionOptional:     d.PromotionOptional != nil && *d.PromotionOptional,
@@ -464,6 +490,12 @@ func build(d variantDef) (*Variant, error) {
 		v.Blocker = *d.Blocker
 	}
 	v.startBlocker = -1
+	if v.Repetition == 0 {
+		v.Repetition = 3
+	}
+	if v.Repetition < 2 {
+		return nil, fmt.Errorf("repetition must be at least 2, not %d", v.Repetition)
+	}
 	if v.Name == "" {
 		v.Name = v.ID
 	}
@@ -530,6 +562,29 @@ func build(d variantDef) (*Variant, error) {
 		return nil, err
 	}
 	for i, p := range d.Pieces {
+		t := v.Pieces[i]
+		if p.PromotionZone < 0 || p.PromotionZone > v.Ranks || p.PromotionMandatory < 0 || p.PromotionMandatory > v.Ranks {
+			return nil, fmt.Errorf("piece %c: invalid promotion ranks", t.Letter)
+		}
+		t.PromotionZone, t.PromotionMandatory = p.PromotionZone, p.PromotionMandatory
+		if t.PromotionZone == 0 {
+			t.PromotionZone = v.PromotionZone
+		}
+		t.PromotionOptional, t.PromotionOnExit = p.PromotionOptional, p.PromotionOnExit
+		t.DropOnePerFile, t.DropNoMate = p.DropOnePerFile, p.DropNoMate
+		if p.PromotesTo != "" {
+			if p.Promotion != nil {
+				return nil, fmt.Errorf("piece %c: specify only one of promotion and promotes_to", t.Letter)
+			}
+			p.Promotion = []string{p.PromotesTo}
+		}
+		t.promotionDefined = p.Promotion != nil
+		for _, letter := range p.Promotion {
+			if len(letter) != 1 || v.TypeOf(letter[0]) == 0 {
+				return nil, fmt.Errorf("piece %c: unknown promotion piece %q", t.Letter, letter)
+			}
+			t.Promotion = append(t.Promotion, v.TypeOf(letter[0]))
+		}
 		for _, rank := range p.DropForbidRanks {
 			if rank < 1 || rank > v.Ranks {
 				return nil, fmt.Errorf("piece %c: invalid forbidden rank %d", v.Pieces[i].Letter, rank)

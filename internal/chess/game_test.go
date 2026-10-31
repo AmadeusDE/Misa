@@ -146,7 +146,7 @@ func TestPromotionByClick(t *testing.T) {
 }
 
 func TestViewFitsEachVariant(t *testing.T) {
-	for _, id := range []string{"chess", "double", "bigboard", "duck"} {
+	for _, id := range []string{"chess", "double", "bigboard", "duck", "shogi"} {
 		g := newGame(t, id, 80, 24)
 		out := g.View()
 		lines := strings.Split(out, "\n")
@@ -257,6 +257,10 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	keys(g, "v", "t", "h", "r", "e", "e", "c", "h", "e", "c", "k", "enter")
 	if got := g.match.Variant().ID; got != "threecheck" {
 		t.Fatalf("picker selected %s, want threecheck", got)
+	}
+	keys(g, "v", "s", "h", "o", "g", "i", "enter")
+	if got := g.match.Variant().ID; got != "shogi" {
+		t.Fatalf("picker selected %s, want shogi", got)
 	}
 }
 

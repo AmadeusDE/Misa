@@ -1,0 +1,25 @@
+id: shogi
+name: Shogi
+description: Japanese chess on a 9×9 board, with drops and promotions.
+files: 9
+ranks: 9
+drops: true
+promotion_zone: 3
+stalemate: win
+repetition: 4
+pieces:
+  - {letter: K, name: King, betza: K, royal: true}
+  - {letter: R, name: Rook, betza: R, value: 1000, promotes_to: D, promotion_optional: true, promotion_on_exit: true}
+  - {letter: B, name: Bishop, betza: B, value: 850, promotes_to: H, promotion_optional: true, promotion_on_exit: true}
+  - {letter: G, name: Gold general, betza: WfF, value: 600}
+  - {letter: S, name: Silver general, betza: FfW, value: 500, promotes_to: V, promotion_optional: true, promotion_on_exit: true}
+  - {letter: N, name: Knight, betza: ffN, value: 350, promotes_to: U, promotion_optional: true, promotion_on_exit: true, promotion_mandatory: 2, drop_forbid_ranks: [8, 9]}
+  - {letter: L, name: Lance, betza: fR, value: 300, promotes_to: X, promotion_optional: true, promotion_on_exit: true, promotion_mandatory: 1, drop_forbid_ranks: [9]}
+  - {letter: P, name: Pawn, betza: fW, pawn: true, value: 100, promotes_to: T, promotion_optional: true, promotion_on_exit: true, promotion_mandatory: 1, drop_forbid_ranks: [9], drop_one_per_file: true, drop_no_mate: true}
+  - {letter: D, name: Dragon, betza: RF, value: 1200, demote: R}
+  - {letter: H, name: Horse, betza: BW, value: 1050, demote: B}
+  - {letter: V, name: Promoted silver, betza: WfF, value: 600, demote: S}
+  - {letter: U, name: Promoted knight, betza: WfF, value: 600, demote: N}
+  - {letter: X, name: Promoted lance, betza: WfF, value: 600, demote: L}
+  - {letter: T, name: Tokin, betza: WfF, value: 600, demote: P}
+setup: lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL
