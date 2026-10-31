@@ -53,6 +53,10 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 
 - **toybox** by Rob Landley et al. — 0BSD
   https://github.com/landley/toybox
+  `patch` references Toybox `toys/posix/patch.c` and `tests/patch.test` at
+  `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb` (0BSD). The implementation is
+  native Go and the tests are native Go; no upstream code or fixture bytes
+  were imported.
 
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils

@@ -9,3 +9,9 @@ The environment reference-conflict audit also checked test_env.rs at that pin.
 F08 implementations and regression tests are native Go; no upstream algorithm
 or fixture bytes were imported. Local adapter fixture provenance is recorded
 separately in tests/provenance/fixtures.json.
+
+patch (internal/builtins/patch.go, patch_parse.go, patch_apply.go) references:
+- Toybox toys/posix/patch.c and tests/patch.test,
+  6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb, 0BSD.
+The reference is behaviour only: the implementation and its tests are native Go;
+no upstream source or fixture bytes were imported.
