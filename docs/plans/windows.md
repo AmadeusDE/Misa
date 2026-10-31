@@ -2,7 +2,7 @@
 
 Status: draft, now tracked by #108, whose task IDs (F01–R02) supersede the W/UW numbering below where they differ.
 The gui core/backend split (W2, shared with Android A2) has landed; the Win32 backend is not started. #108 F01
-(package selection and the jobleader boundary) is delivered, see "F01 delivered". Part 1 is Misa (phases W0–W6); part 2 is ugh (phases UW0–UW4), which
+(package selection and the jobleader boundary) and F02 (metadata boundary) are delivered, see "F01 delivered" and "F02 delivered". Part 1 is Misa (phases W0–W6); part 2 is ugh (phases UW0–UW4), which
 Misa needs before its Windows build can include the agent. The measurements below are from 2026-10-13; code
 added since then (`internal/webui`'s file lock, `internal/ughbot`, `internal/ugh/confine`) needs the same
 treatment. ughbot is out of scope for the Windows port (it is not redefined as Linux-only: it also builds for the BSDs and macOS).
@@ -546,3 +546,31 @@ architectures) now resolves every package: `go list -deps .` passes. It does not
     needs the items listed for `builtins` above.
   - Not in the reduced build, so not F01: the agent packages (`ugh/admission`, `auth`, `policy`, `tools`,
     `worktree`) fail on Unix-only calls (A01–A06).
+
+## F02 delivered (#108)
+
+Filesystem and system metadata compile boundary. `lscore`, `sysinfo`, `procmon` and `sshclient` now build and
+vet for `windows/amd64` and `windows/arm64`. Unix (Android included) output is unchanged.
+
+- `lscore`: `meta.go` holds the portable `Fields` flags and `FileInfo.Missing` (zero means every field is
+  present, so literals in tests and Unix behaviour are unchanged). `meta_unix.go` reads `Stat_t`;
+  `meta_windows.go` reads link count, volume serial and file index with `GetFileInformationByHandle` (opened
+  with `FILE_FLAG_OPEN_REPARSE_POINT` for `lstat` semantics) plus access and creation time from the directory
+  entry; `meta_other.go` reports everything missing. Windows leaves owner, group, blocks and change time
+  unavailable. A missing field prints `?` in `-i`, `-s`, link count, owner and group (the convention
+  already used for a dangling link under `-L`); it is never fabricated. `Identify` (symlink-loop identity) has
+  the same three providers.
+- `sysinfo.mountSpace` and `procmon.diskSpace`: `diskspace_unix.go` wraps `Statfs` and the existing
+  per-OS `statfs_*` formulas; `diskspace_windows.go` uses `GetDiskFreeSpaceEx` (sysinfo: bytes available to
+  the caller, procmon: total free bytes, matching the `Bavail`/`Bfree` split on Unix); `diskspace_other.go`
+  returns an error.
+- `procmon.Actions` is the capability table behind the kill dialog (htop `F9`/`k`), btop `k` and htop
+  `F7`/`F8`. Unix keeps the full signal menu with `kill` and `setpriority`. Windows offers `Cancel` and
+  `Terminate` (`OpenProcess(PROCESS_TERMINATE)` plus `TerminateProcess`) and reports `ErrUnsupported` for
+  priority changes. The process list itself still reads `/proc`, so on Windows it is empty until I04.
+- `sshclient`: `resizeEvents` is `SIGWINCH` on Unix and no event source elsewhere; `watchSize` (event or
+  500 ms poll, apply only on a change) is portable and tested with a fake size source.
+- Remaining compile errors for `GOOS=windows go build -tags 'nough noweb' .`: P01 (`term/terminal.go`) and
+  F03/F04 (`internal/builtins`: `Stat_t`, signals in `util.go`, `Umask`, `Mkfifo`, `Getpriority`, and so on
+  across `arch`, `chown`, `cp`, `du`, `mkdir`, `mv`, `nice`, `proc`, `rm`, `split`, `stat`, `sysutil`,
+  `touch`, `truncate`, `umask`, `util`).

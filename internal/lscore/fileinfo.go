@@ -3,10 +3,8 @@ package lscore
 import (
 	"errors"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
 )
 
@@ -23,6 +21,8 @@ type FileInfo struct {
 	ModTime    time.Time
 	AccessTime time.Time
 	ChangeTime time.Time
+	BirthTime  time.Time
+	Missing    Fields
 	IsDir      bool
 	IsSymlink  bool
 	LinkTarget string
@@ -55,23 +55,11 @@ type CollectOpts struct {
 	GitStatus   bool
 }
 
-// DirIdent identifies a directory by device+inode, for symlink-loop
-// detection while recursing.
+// DirIdent identifies a directory by device+inode (Windows: volume serial and
+// file index), for symlink-loop detection while recursing. Identify, per
+// platform, returns it.
 type DirIdent struct {
 	Dev, Ino uint64
-}
-
-// Identify returns the (dev, inode) pair of path, dereferencing symlinks.
-func Identify(path string) (DirIdent, bool) {
-	st, err := os.Stat(path)
-	if err != nil {
-		return DirIdent{}, false
-	}
-	sys, ok := st.Sys().(*syscall.Stat_t)
-	if !ok {
-		return DirIdent{}, false
-	}
-	return DirIdent{Dev: uint64(sys.Dev), Ino: sys.Ino}, true
 }
 
 func Collect(root string, opts CollectOpts) ([]*FileInfo, error) {
@@ -218,26 +206,7 @@ func statFile(path, name string, followLinks bool) *FileInfo {
 	fi.ModTime = info.ModTime()
 	fi.IsDir = info.IsDir()
 
-	if sys, ok := info.Sys().(*syscall.Stat_t); ok {
-		fi.UID = sys.Uid
-		fi.GID = sys.Gid
-		fi.Inode = sys.Ino
-		fi.Dev = uint64(sys.Dev)
-		fi.Nlink = uint64(sys.Nlink)
-		fi.Blocks = sys.Blocks
-		fi.AccessTime, fi.ChangeTime = statTimes(sys)
-
-		if u, err := user.LookupId(strconv.Itoa(int(sys.Uid))); err == nil {
-			fi.Owner = u.Username
-		} else {
-			fi.Owner = strconv.Itoa(int(sys.Uid))
-		}
-		if g, err := user.LookupGroupId(strconv.Itoa(int(sys.Gid))); err == nil {
-			fi.Group = g.Name
-		} else {
-			fi.Group = strconv.Itoa(int(sys.Gid))
-		}
-	}
+	fi.applyMeta(readMeta(path, info, info == linfo))
 
 	return fi
 }

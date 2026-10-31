@@ -3,7 +3,6 @@ package procmon
 import (
 	"fmt"
 	"strings"
-	"syscall"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -129,7 +128,7 @@ func (b *BtopViewer) killSelected() {
 	if b.selectedIdx < 0 || b.selectedIdx >= len(procs) {
 		return
 	}
-	_ = syscall.Kill(procs[b.selectedIdx].PID, syscall.SIGTERM)
+	_ = platformActions.Terminate(procs[b.selectedIdx].PID)
 }
 
 func (b *BtopViewer) refresh() {

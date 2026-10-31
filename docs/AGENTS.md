@@ -139,9 +139,12 @@ internal/
     hostkeys.go                  known_hosts check, ask/accept-new/yes trust, changed-key refusal, known key algorithms
     auth.go                      Agent, identity files (passphrase asked only when the server accepts the key),
                                  keyboard-interactive, password
-    escape.go resize.go          `~.` disconnect / `~~`; SIGWINCH plus polling (in-process panes get no SIGWINCH)
+    escape.go resize.go          `~.` disconnect / `~~`; resize events (resize_unix.go: SIGWINCH; none on Windows) plus
+                                 polling (in-process panes get no SIGWINCH)
     prompt.go                    Terminal prompts read byte-wise so typed-ahead input still reaches the remote
-  lscore/                        ls formatting engine — colors, icons, git status, sorting
+  lscore/                        ls formatting engine — colors, icons, git status, sorting.
+                                 meta*.go: per-platform stat provider (`Identify`, `readMeta`); a field the platform
+                                 cannot report is in `FileInfo.Missing` and prints `?`
   mines/                         Minesweeper clone: board.go (rules, first reveal always safe, flood fill, chording),
                                  game.go (keys/mouse, clock), view.go (centred layout + hit test), run.go (standalone).
                                  Game satisfies procmon.Viewer, so typing `mines` in Misa opens it as an in-process screen
