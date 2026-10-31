@@ -269,7 +269,7 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 	legal := 0
 	for _, mv := range e.order(p, p.pseudoMoves(), ttMove, ply) {
 		child := p.Apply(mv)
-		if child.royalAttacked(p.Turn) {
+		if !child.legalAfter(p.Turn) {
 			continue
 		}
 		legal++
@@ -361,7 +361,7 @@ func (e *Engine) quiesce(p *Position, ply, alpha, beta int) int {
 			continue
 		}
 		child := p.Apply(mv)
-		if child.royalAttacked(p.Turn) {
+		if !child.legalAfter(p.Turn) {
 			continue
 		}
 		legal++

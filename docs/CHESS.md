@@ -131,6 +131,19 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
   limit-th check is also mate the game is won either way. See
   [Variant files](#variant-files) for the `check_limit` key.
 
+- **Racing Kings** (`racingkings`): V. R. Parton, 1961: 8×8 with no pawns, no
+  castling and no promotion, both armies on ranks 1 and 2 (Black on the a–d
+  files, White on the e–h files), and neither side may give check. The whole
+  eighth rank is a goal for both colours: the first king there wins, except
+  that White's arrival is only pending while Black can answer on the eighth
+  rank, which draws. See [Variant files](#variant-files) for the `goal`,
+  `no_checks` and `goal_reply_draw` keys.
+
+Because checking is illegal, no move in Racing Kings can ever be mate:
+stalemate, repetition and the move limit are what end a race that no king wins.
+The bare-kings material rule does not apply while a variant has goal squares
+either, since a lone king can still reach the eighth rank.
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
@@ -231,6 +244,36 @@ side-to-move field: `+2+1` counts the checks White and Black have already
 given, while Lichess's `1+2` style gives the checks each side has left. A
 variant without a check limit ignores the field, so existing FENs are
 unchanged.
+
+Two flags refine goal variants. `no_checks: true` makes a move that leaves the
+opponent's royal piece attacked illegal, for both colours, so a checking move is
+never a legal move at all: the move list, the notation, the search and the UI
+all agree that it does not exist, and checkmate can therefore never occur.
+`goal_reply_draw: true` makes the arrival provisional for the side that moves
+first. White reaching a goal square is not yet a win while Black has a legal
+move that also puts a royal on a goal square; if Black plays it the game ends as
+`draw by the goal reply`, and if Black cannot, the arrival wins. A goal arrival
+by Black always wins at once. Both flags default to `false`, are inherited
+through `extends` like every other field, and a child file may set them back to
+`false`. `goal_reply_draw` without goal squares would do nothing, so it is a
+load error. A variant with goal squares is also never drawn by the bare-kings
+material rule, because a lone king can still reach a goal.
+
+`racingkings` uses both flags; its piece list is the ordinary one, so only the
+shape of the variant is shown here:
+
+```yaml
+id: racingkings
+name: Racing Kings
+files: 8
+ranks: 8
+setup: 8/8/8/8/8/8/krbnNBRK/qrbnNBRQ   # Black a-d, White e-h, ranks 1-2
+castling: []
+promotion: []
+goal: [a8, b8, c8, d8, e8, f8, g8, h8]  # the eighth rank, both colours
+no_checks: true
+goal_reply_draw: true
+```
 
 ## Custom board dimensions
 
