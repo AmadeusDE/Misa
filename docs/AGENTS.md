@@ -142,6 +142,15 @@ internal/
                                  (opt-in), grep -x/-w/-F modes, C-locale classes. Go's regexp runs patterns it can
                                  express exactly; the rest use a backtracker (visited set, or a step budget with
                                  back-references). TestEnginesAgree checks both engines against each other
+  awk/                           AWK language core behind the `awk` builtin (U41): lexer.go (regex-vs-divide by previous token),
+                                 parser.go (POSIX precedence; arrays, functions, getline, redirection, pipes, split, close,
+                                 system, fflush are rejected with an error naming the feature, for U42), interp.go (rules,
+                                 ranges, BEGIN/END, exit, loops), fields.go (lazy split and rebuild of $0), input.go (RS single
+                                 char, paragraph, regex), value.go (strnum coercion, CONVFMT/OFMT), format.go (printf),
+                                 builtins.go (string/math functions, sub/gsub). Regexes are posixre EREs with a small cache.
+                                 length/substr/index/match count UTF-8 characters (bytes with `-b`). Config.Done cancels
+                                 a running program; the builtin Context has no cancellation yet. Tests: awk_test.go,
+                                 toybox_test.go (cases adapted from Toybox tests/awk.test, 0BSD)
   mines/                         Minesweeper clone: board.go (rules, first reveal always safe, flood fill, chording),
                                  game.go (keys/mouse, clock), view.go (centred layout + hit test), run.go (standalone).
                                  Game satisfies procmon.Viewer, so typing `mines` in Misa opens it as an in-process screen
