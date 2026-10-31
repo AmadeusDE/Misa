@@ -128,14 +128,20 @@ func (e *Editor) renderTextLine(lineIdx int) string {
 			}
 			dc += spaces
 		} else {
-			if showCursor && i == e.col {
-				b.WriteString(cursorStyle.Render(string(r)))
-			} else if isSelected(lineIdx, i) {
-				b.WriteString(visualStyle.Render(string(r)))
-			} else {
-				b.WriteRune(r)
+			text := string(r)
+			width := 1
+			if r == '\r' {
+				text = "^M"
+				width = 2
 			}
-			dc++
+			if showCursor && i == e.col {
+				b.WriteString(cursorStyle.Render(text))
+			} else if isSelected(lineIdx, i) {
+				b.WriteString(visualStyle.Render(text))
+			} else {
+				b.WriteString(text)
+			}
+			dc += width
 		}
 	}
 	if showCursor && e.col >= len(runes) {
