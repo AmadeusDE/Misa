@@ -12,6 +12,35 @@ func playAll(t *testing.T, m *Match, moves ...string) {
 	}
 }
 
+func TestStalemateRule(t *testing.T) {
+	chessVariant := builtin(t, "chess")
+	if chessVariant.Stalemate != StalemateDraw {
+		t.Fatalf("orthodox stalemate rule = %q", chessVariant.Stalemate)
+	}
+	v := builtin(t, "stalematewins")
+	m := NewMatch(v)
+	p := fen(t, v, "7k/5Q2/6K1/8/8/8/8/8 b -")
+	m.Load(p)
+	if st, winner := m.Status(); st != Stalemate || winner != White || !m.Over() {
+		t.Fatalf("status = %v, winner %v, over %v", st, winner, m.Over())
+	}
+	orthodox := NewMatch(chessVariant)
+	orthodox.Load(fen(t, chessVariant, "7k/5Q2/6K1/8/8/8/8/8 b -"))
+	if st, _ := orthodox.Status(); st != Stalemate || orthodox.Decisive() {
+		t.Fatalf("orthodox stalemate = %v, decisive %v", st, orthodox.Decisive())
+	}
+	if !m.Decisive() {
+		t.Fatal("stalemate win is not decisive")
+	}
+	loss := *v
+	loss.Stalemate = StalemateLoss
+	lm := NewMatch(&loss)
+	lm.Load(fen(t, &loss, "7k/5Q2/6K1/8/8/8/8/8 b -"))
+	if _, winner := lm.Status(); winner != Black || !lm.Decisive() {
+		t.Fatalf("stalemate loss winner = %v", winner)
+	}
+}
+
 func TestNotation(t *testing.T) {
 	m := NewMatch(builtin(t, "chess"))
 	playAll(t, m, "e2", "e4", "f7", "f6", "d2", "d4", "g7", "g5", "d1", "h5")

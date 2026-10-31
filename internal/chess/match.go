@@ -52,10 +52,19 @@ func (m *Match) CanUndo() bool       { return len(m.history) > 1 }
 func (m *Match) Turn() Color         { return m.Position().Turn }
 func (m *Match) Over() bool          { return m.status != Playing }
 
-// Status reports how the game stands; the winner only means something after
-// checkmate.
+// Status reports how the game stands; the winner only means something when
+// Decisive reports true (checkmate, or stalemate under a winning stalemate rule).
 func (m *Match) Status() (Status, Color) {
-	return m.status, m.Position().Turn.Other()
+	winner := m.Position().Turn.Other()
+	if m.status == Stalemate && m.variant.Stalemate == StalemateLoss {
+		winner = m.Position().Turn
+	}
+	return m.status, winner
+}
+
+// Decisive reports whether the game ended with a winner rather than a draw.
+func (m *Match) Decisive() bool {
+	return m.status == Checkmate || m.status == Stalemate && m.variant.Stalemate != StalemateDraw
 }
 
 // Play makes a move, which must be one of Legal.

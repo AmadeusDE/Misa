@@ -163,6 +163,10 @@ func (g *Game) header() string {
 		return name + " · " + turn
 	case Checkmate:
 		return name + " · checkmate, " + winner.String() + " wins"
+	case Stalemate:
+		if m.Decisive() {
+			return name + " · stalemate, " + winner.String() + " wins"
+		}
 	}
 	return name + " · " + st.String()
 }

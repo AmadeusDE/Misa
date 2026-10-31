@@ -1,0 +1,5 @@
+id: stalematewins
+name: Stalemate-wins Chess
+description: Orthodox chess where stalemating the opponent wins.
+extends: chess
+stalemate: win
