@@ -1,0 +1,8 @@
+id: atomic
+name: Atomic Chess
+description: Captures explode, destroying nearby non-pawns.
+extends: chess
+pieces:
+  - {letter: K, name: King, betza: mK, royal: true, glyph: ♚}
+explosion: {radius: 1, immune: [P]}
+extinction: [K]

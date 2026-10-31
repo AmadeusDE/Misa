@@ -20,8 +20,9 @@ a set of built-in tools, and it ships as one self-contained binary.
   Chess (`chess grand`), Christian Freeling's 10×10 game with marshals, cardinals and captured-only
   promotion, Three-Check (`chess threecheck`, giving check three times wins), Racing Kings
   (`chess racingkings`), V. R. Parton's 1961 race: no pawns or castling, no checks allowed, and the
-  first king onto the eighth rank wins; Black answering there draws, and Antichess
-  (`chess antichess`): captures are compulsory and a side that loses all its pieces, or cannot move,
+  first king onto the eighth rank wins; Black answering there draws, Antichess (`chess antichess`):
+  captures are compulsory and a side that loses all its pieces, or cannot move, wins, and Atomic
+  (`chess atomic`): captures explode, destroying adjacent non-pawns, and blowing up the enemy king
   wins.
 - Minesweeper controls: `space` open, `f` flag, `n` new game, `1`–`3` select a level, `c` custom game, `q` quit
 - Data-driven package manager menus, a file browser, and tldr/man help

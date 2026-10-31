@@ -16,10 +16,11 @@ const (
 	GoalWin
 	CheckWin
 	DrawGoalReply
+	ExtinctionWin
 )
 
 func (s Status) String() string {
-	return [...]string{"playing", "checkmate", "stalemate", "draw by the move limit", "draw by repetition", "draw: only royal pieces left", "goal reached", "check limit reached", "draw by the goal reply"}[s]
+	return [...]string{"playing", "checkmate", "stalemate", "draw by the move limit", "draw by repetition", "draw: only royal pieces left", "goal reached", "check limit reached", "draw by the goal reply", "extinction"}[s]
 }
 
 // Match is a game in progress: the positions so far, so moves can be taken
@@ -57,20 +58,20 @@ func (m *Match) Turn() Color         { return m.Position().Turn }
 func (m *Match) Over() bool          { return m.status != Playing }
 
 // Status reports how the game stands; the winner only means something when
-// the game is decisive, which a goal arrival, a check limit and checkmate are,
-// and so is a stalemate under a stalemate rule that names a winner. The drawn
-// endings, the goal reply draw among them, name no winner.
+// the game is decisive, which a goal arrival, a check limit, an extinction and
+// checkmate are, and so is a stalemate under a stalemate rule that names a
+// winner. The drawn endings, the goal reply draw among them, name no winner.
 func (m *Match) Status() (Status, Color) {
 	return m.status, m.winner
 }
 
 // Decisive reports whether the game ended with a winner rather than a draw:
-// a checkmate, a goal arrival, a check limit, or a stalemate under whichever
-// rule says one side wins or loses it. The goal reply draw and the other draw
-// rules are not decisive.
+// a checkmate, a goal arrival, a check limit, an extinction, or a stalemate
+// under whichever rule says one side wins or loses it. The goal reply draw and
+// the other draw rules are not decisive.
 func (m *Match) Decisive() bool {
 	switch m.status {
-	case Checkmate, GoalWin, CheckWin:
+	case Checkmate, GoalWin, CheckWin, ExtinctionWin:
 		return true
 	case Stalemate:
 		return m.variant.Stalemate != StalemateDraw
@@ -86,7 +87,7 @@ func (m *Match) Play(mv Move) {
 	m.refresh()
 	text := describe(before, mv)
 	switch {
-	case m.status == Checkmate:
+	case m.status == Checkmate || m.status == ExtinctionWin:
 		text += "#"
 	case m.Position().InCheck():
 		text += "+"

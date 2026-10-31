@@ -158,6 +158,16 @@ either, since a lone king can still reach the eighth rank.
   [Variant files](#variant-files) for the `forced_capture`, `material` and
   `stalemate` keys.
 
+- **Atomic Chess** (`atomic`): 8×8, orthodox chess except that a capture
+  explodes: it removes the capturing piece, the captured piece and every
+  adjacent non-pawn piece of either colour. Kings move as `mK` and so never
+  capture, a move that would explode its own king is illegal, and exploding the
+  enemy king wins at once, even when the moving side would otherwise be in
+  check. See [Explosions and extinction](#explosions-and-extinction) for the
+  `explosion` and `extinction` keys, the
+  [Lichess rules](https://lichess.org/variant/atomic) and
+  [Wikipedia](https://en.wikipedia.org/wiki/Atomic_chess).
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
@@ -212,9 +222,9 @@ goal: [d4, d5, e4, e5]
 ```
 
 Each entry accepts a square label as for `castling` (e.g. `d4`). A variant
-without `goal` has no goal squares: it is won only by checkmate and otherwise
-ends in stalemate, repetition or the move limit. Grand Chess, for one, sets no
-goal.
+without `goal` has no goal squares: it can still be won by checkmate or, when
+the variant configures it, extinction; otherwise it ends in stalemate,
+repetition or the move limit. Grand Chess, for one, sets no goal.
 
 Promotion is governed by four keys:
 
@@ -316,6 +326,46 @@ Nothing can then be in check or mate, the bare-kings material draw does not
 apply, and every ending comes from `stalemate:`, which antichess sets to `loss`:
 the side that cannot move wins, whether it lost its last piece or is
 simply stuck.
+
+## Explosions and extinction
+
+Variants can configure these mechanisms independently, for example:
+
+```yaml
+explosion: {radius: 1, immune: [P]}
+extinction: [K]
+```
+
+A capture explodes around its destination, removing pieces within the configured
+Chebyshev radius (a square neighbourhood). Listed immune piece types survive the
+blast, but the capturer and captured piece are always removed, even if immune.
+Radius 0 disables explosions, including an inherited configuration. With
+explosions enabled, a royal within that radius of an enemy royal is connected
+and is not considered in check. A legal move must preserve all of the mover's
+royals and either extinguish the opponent or leave the mover out of check.
+
+A side loses when none of its listed extinction types remain. Extinguishing the
+opponent wins immediately, before goal, check limit, checkmate, stalemate or
+draw adjudication, and it is the `extinction` status the header, Match.Decisive
+and the search treat as decisive. If both sides become extinct at once, the side
+that just moved wins (losing a royal still makes that move illegal). The scalar
+`all` or `"*"` expands to all piece types, useful for horde-style armies. An
+empty list (`extinction: []`) clears inherited extinction. An omitted
+`explosion` inherits the parent's configuration; an explicit `explosion`
+mapping replaces it as a whole. Other unspecified variant fields are inherited
+from the parent. The computer disables null-move pruning when explosions are
+enabled, since passing is not a safe tactical shortcut for these positions.
+
+### Atomic
+
+A capture removes the capturer, captured piece and all adjacent nonpawns of
+either side. En passant explodes around the capturing pawn’s destination, not
+the captured pawn’s square. Kings use `mK` and cannot capture. A move that
+explodes its own royal is illegal; exploding the enemy king wins immediately,
+even if the moving king would otherwise be in check. Connected royals suppress
+check. Normal castling, en passant, promotion, checkmate, stalemate, repetition
+and move-limit rules remain in effect. See [Lichess Atomic rules](https://lichess.org/variant/atomic)
+and [Wikipedia: Atomic chess](https://en.wikipedia.org/wiki/Atomic_chess).
 
 ## Custom board dimensions
 

@@ -164,7 +164,7 @@ func (p *Position) clone() *Position {
 func (p *Position) Moves() []Move {
 	var legal []Move
 	for _, m := range p.moveCandidates() {
-		if p.Apply(m).legalAfter(p.Turn) {
+		if p.Apply(m).legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
 			legal = append(legal, m)
 		}
 	}
@@ -173,8 +173,19 @@ func (p *Position) Moves() []Move {
 
 // legalAfter reports whether a move by mover is legal once made: no royal of
 // the mover may be left attacked and, where the variant forbids checking, no
-// royal of the other side may be attacked either.
-func (p *Position) legalAfter(mover Color) bool {
+// royal of the other side may be attacked either. previousRoyals is the mover's
+// royal count before the move: with explosions or extinction in play, a move
+// that costs the mover a royal is illegal, while one that extinguishes the
+// other side wins even when the mover is left in check.
+func (p *Position) legalAfter(mover Color, previousRoyals int) bool {
+	if p.V.Explosion != nil || len(p.V.Extinction) > 0 {
+		if len(p.royalSq[mover]) < previousRoyals {
+			return false
+		}
+		if p.extinct(mover.Other()) {
+			return true
+		}
+	}
 	if p.royalAttacked(mover) {
 		return false
 	}
@@ -185,7 +196,15 @@ func (p *Position) legalAfter(mover Color) bool {
 func (p *Position) InCheck() bool { return p.royalAttacked(p.Turn) }
 
 func (p *Position) royalAttacked(c Color) bool {
-	return p.anyAttacked(p.royalSq[c], c.Other())
+	if p.V.Explosion == nil {
+		return p.anyAttacked(p.royalSq[c], c.Other())
+	}
+	for _, sq := range p.royalSq[c] {
+		if !p.connectedRoyal(sq, c.Other()) && p.anyAttacked([]int{sq}, c.Other()) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Position) findRoyals() {
@@ -211,7 +230,7 @@ func (p *Position) moveCandidates() []Move {
 	tactical := p.captures()
 	var captures []Move
 	for _, m := range tactical {
-		if m.Take >= 0 && p.Apply(m).legalAfter(p.Turn) {
+		if m.Take >= 0 && p.Apply(m).legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
 			captures = append(captures, m)
 		}
 	}
@@ -362,7 +381,7 @@ func (p *Position) castles() []Move {
 		for sq := min(king, kingTo); sq <= max(king, kingTo); sq++ {
 			path = append(path, sq)
 		}
-		if p.anyAttacked(path, p.Turn.Other()) {
+		if p.castlePathAttacked(king, path) {
 			continue
 		}
 		moves = append(moves, Move{From: king, To: kingTo, Take: -1, Castle: i})
@@ -398,6 +417,9 @@ func (p *Position) Apply(m Move) *Position {
 	}
 	q.Board[m.From] = Piece{}
 	q.Board[m.To] = mover
+	if m.Take >= 0 && v.Explosion != nil {
+		q.explode(m.To)
+	}
 	q.Clock++
 	if pawn := v.Type(p.Board[m.From]).Pawn; pawn || m.Take >= 0 {
 		q.Clock = 0
@@ -409,7 +431,7 @@ func (p *Position) Apply(m Move) *Position {
 		}
 	}
 	q.Turn = p.Turn.Other()
-	if v.Pieces[mover.Type-1].Royal || v.Type(p.Board[m.From]).Royal || (m.Take >= 0 && v.Type(p.Board[m.Take]).Royal) {
+	if (m.Take >= 0 && v.Explosion != nil) || v.Pieces[mover.Type-1].Royal || v.Type(p.Board[m.From]).Royal || (m.Take >= 0 && v.Type(p.Board[m.Take]).Royal) {
 		q.findRoyals()
 	}
 	q.countCheck()

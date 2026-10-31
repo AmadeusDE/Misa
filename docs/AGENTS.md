@@ -320,8 +320,8 @@ internal/
   cmd; a Misa builtin missing from PATH (sshc) runs through the multicall binary. `misa --ssh [sshc opts] dest` is the
   ssh-client launcher. A program exiting non-zero leaves its screen up with a note until a key is pressed.
 - **Chess variants**: Every rule lives in variant YAML; the engine has no orthodox-chess special cases. Pieces are
-  Betza strings (`fmWfcFifmW2` pawn, `qN` rose, `mRcpR` cannon); `royal` pieces may never be left attacked (so with
-  two kings, mating either wins), `pawn` pieces promote and take/are taken en passant. A pawn's long first step marks
+  Betza strings (`fmWfcFifmW2` pawn, `qN` rose, `mRcpR` cannon); `royal` pieces normally may never be left attacked
+  (so with two kings, mating either wins), `pawn` pieces promote and take/are taken en passant. A pawn's long first step marks
   every crossed square for en passant. Castling entries are White's four squares, mirrored for Black. A file with
   `extends: <id>` inherits unset fields and merges pieces by letter; `castling: []` drops inherited castling. A later
   file with an existing id replaces it. Built-ins: chess, double (Double Chess 16×12), bigboard (Betza's 16×16),
@@ -336,9 +336,11 @@ internal/
   racingkings (Racing Kings: 8×8 with no pawns or castling, both armies on ranks 1-2; `no_checks` makes a
   move that leaves the enemy royal attacked illegal so mate never happens, `goal` is the whole eighth rank,
   and `goal_reply_draw` makes White's arrival pending until Black cannot answer on a goal square, which
-  draws), and antichess (Antichess: `forced_capture: true` makes a legal capture compulsory, `material:
+  draws), antichess (Antichess: `forced_capture: true` makes a legal capture compulsory, `material:
   inverse` reverses material preference, the king is non-royal so it can be captured, and `stalemate: loss`
-  makes the side that cannot move — including one that lost every piece — the winner).
+  makes the side that cannot move — including one that lost every piece — the winner), and atomic (Atomic
+  Chess: an `explosion: {radius: 1, immune: [P]}` blast takes the capturer, the captured piece and every
+  adjacent non-immune piece of either colour, and `extinction: [K]` makes a side without its king lose).
   `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
   and the search both honour it. `promotion_optional: true` lets a pawn stay a pawn inside `promotion_zone` (but
   not on the last rank, where promotion is forced); `promotion_captured_only: true` restricts the choices to
@@ -349,6 +351,12 @@ internal/
   `goal_reply_draw:` are pointers like the promotion flags, so `extends` inherits them and a child may set them
   back to `false`; a `goal_reply_draw` without goal squares is a load error. An answered goal arrival is the
   `DrawGoalReply` status, which Match.Decisive and outcome.score treat as a draw.
+  Explosion YAML specifies `radius` and `immune`; radius 0 disables it, and capturer/captured are never
+  immune. Connected royals suppress check. `extinction:` loses when no listed-type pieces remain; scalar `all`
+  or `"*"` expands to all types, while `extinction: []` clears inheritance. Extinguishing the opponent wins
+  even while in check (the `ExtinctionWin` status, decisive for Match.Decisive and a mate score for the
+  search), but losing any own royal is illegal; adjudicate checks extinction before goals, check limits, mate
+  and stalemate. Unspecified fields are inherited. See `docs/CHESS.md` for rules.
   Movement is checked by perft (`position_test.go`), so run the chess tests after touching move generation.
   The engine only uses what variants define (values, royal/pawn flags, ranks to promotion), so new pieces need at
   most a `value:`. Search runs off the UI goroutine on immutable Positions; cancel() sets the Stop flag and bumps

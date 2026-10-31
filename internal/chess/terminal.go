@@ -13,17 +13,25 @@ type outcome struct {
 }
 
 // adjudicate reports the result the rules fix for p without looking at its
-// history. A royal that just moved onto a goal square wins, and so does a side
-// that has just given the checks its variant's limit asks for, even when the
-// side to move is also checkmated or a draw rule applies. Without those, a
-// side with no legal move is checkmated when in check and otherwise
+// history. A side that has just lost every piece of a type its variant lists
+// under extinction loses first (and if both are extinct, the side that just
+// moved wins), then a royal that just moved onto a goal square wins, and so
+// does a side that has just given the checks its variant's limit asks for, even
+// when the side to move is also checkmated or a draw rule applies. Without
+// those, a side with no legal move is checkmated when in check and otherwise
 // stalemated, and the variant's stalemate rule names the stalemate's winner:
 // the side that delivered it under StalemateWin, the stalemated side under
 // StalemateLoss, and nobody under StalemateDraw. hasMoves says whether the
 // side to move has a legal move; callers that have not generated them pass
-// true and adjudicate only the immediate wins, a goal arrival or a check
-// limit.
+// true and adjudicate only the immediate wins, an extinction, a goal arrival
+// or a check limit.
 func adjudicate(p *Position, hasMoves bool) (outcome, bool) {
+	if p.extinct(p.Turn) {
+		return outcome{status: ExtinctionWin, winner: p.Turn.Other()}, true
+	}
+	if p.extinct(p.Turn.Other()) {
+		return outcome{status: ExtinctionWin, winner: p.Turn}, true
+	}
 	if o, over := p.goalOutcome(); over {
 		return o, true
 	}
@@ -46,14 +54,15 @@ func adjudicate(p *Position, hasMoves bool) (outcome, bool) {
 }
 
 // score turns an outcome into a search score from the side to move's point of
-// view, counted from the root. Goal arrivals, check limits and checkmates are
-// mates, and so is a stalemate under a winning or a losing stalemate rule; a
-// drawn ending, a drawn stalemate or a goal arrival the other side answers on
-// a goal square, scores 0. A decisive ending scores as if mate came on this
-// ply, so the root prefers to win sooner and lose later.
+// view, counted from the root. Extinctions, goal arrivals, check limits and
+// checkmates are mates, and so is a stalemate under a winning or a losing
+// stalemate rule; a drawn ending, a drawn stalemate, a goal arrival the other
+// side answers on a goal square or a drawn stalemate scores 0. A decisive
+// ending scores as if mate came on this ply, so the root prefers to win sooner
+// and lose later.
 func (o outcome) score(turn Color, ply int) int {
 	switch o.status {
-	case GoalWin, CheckWin, Checkmate, Stalemate, DrawGoalReply:
+	case ExtinctionWin, GoalWin, CheckWin, Checkmate, Stalemate, DrawGoalReply:
 		if o.drawn {
 			return 0
 		}

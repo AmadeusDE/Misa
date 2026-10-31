@@ -216,6 +216,8 @@ func (g *Game) header() string {
 		return name + " · " + turn
 	case Checkmate:
 		return name + " · checkmate, " + winner.String() + " wins"
+	case ExtinctionWin:
+		return name + " · extinction, " + winner.String() + " wins"
 	case GoalWin:
 		return name + " · goal reached, " + winner.String() + " wins"
 	case CheckWin:
