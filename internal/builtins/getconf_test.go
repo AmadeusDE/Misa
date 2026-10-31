@@ -283,7 +283,7 @@ func TestGetconfAll(t *testing.T) {
 }
 
 func TestGetconfCacheNames(t *testing.T) {
-	// Cache geometry comes from sysfs on Linux; elsewhere (or on a machine
+	// Cache geometry comes from sysfs on Linux and Android; elsewhere (or on a machine
 	// without sysfs) it is undefined, never a made-up number.
 	r := runBuiltin(t, "getconf", "LEVEL1_DCACHE_SIZE")
 	assertExitCode(t, r, 0)
@@ -297,7 +297,7 @@ func TestGetconfCacheNames(t *testing.T) {
 	if n, err := strconv.ParseInt(value, 10, 64); err != nil || n <= 0 {
 		t.Errorf("LEVEL1_DCACHE_SIZE = %q, want a positive number or undefined", value)
 	}
-	if runtime.GOOS != "linux" {
+	if runtime.GOOS != "linux" && runtime.GOOS != "android" {
 		t.Errorf("LEVEL1_DCACHE_SIZE = %q on %s, want undefined", value, runtime.GOOS)
 	}
 }
