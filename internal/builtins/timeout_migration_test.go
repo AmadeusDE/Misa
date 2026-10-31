@@ -77,6 +77,9 @@ func TestTimeoutStandaloneInterrupt(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds standalone binary")
 	}
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not available")
+	}
 	binary := filepath.Join(t.TempDir(), "misa")
 	build := exec.Command("go", "build", "-o", binary, "../..")
 	if out, err := build.CombinedOutput(); err != nil {
