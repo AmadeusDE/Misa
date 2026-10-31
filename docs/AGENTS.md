@@ -120,6 +120,7 @@ internal/
     ls.go cat.go cp.go mv.go     File utilities
     rm.go mkdir.go touch.go      File operations
     chmod.go chown.go link.go    Permissions and links
+    chgrp.go                     Group ownership — shares chown.go's traversal
     tail.go proc.go sysutil.go   System utilities
     man.go install.go util.go    Misc helpers
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)

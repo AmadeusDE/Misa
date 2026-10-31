@@ -126,7 +126,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `chcpu` | – | – | util-linux:10 | 10 | kernel/fs | uutils: Rust, 10/10 simple new_ucmd! cases parseable by tests/uutils adapter | – | 704 | medium |
 | `chfn` | – | – | shadow:4 | 0 | root | uutils: Rust, 0/4 simple new_ucmd! cases parseable by tests/uutils adapter | – | 695 | heavy |
 | `chgpasswd` | – | – | shadow:18 | 0 | – | uutils: Rust, 0/18 simple new_ucmd! cases parseable by tests/uutils adapter | – | 733 | medium |
-| `chgrp` | posix | 24 | coreutils:32 | 18 | kernel/fs, root | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 18/32 simple new_ucmd! cases parseable by tests/uutils adapter | 100 | 186 | medium |
 | `chpasswd` | – | – | shadow:15 | 0 | – | uutils: Rust, 0/15 simple new_ucmd! cases parseable by tests/uutils adapter | – | 822 | medium |
 | `chroot` | other | – | coreutils:21 | 3 | root | uutils: Rust, 3/21 simple new_ucmd! cases parseable by tests/uutils adapter | 33 | 528 | medium |
 | `chrt` | other | – | – | – | – | no tests | 96 | – | light |
