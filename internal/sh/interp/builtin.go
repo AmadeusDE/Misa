@@ -209,7 +209,13 @@ func (r *Runner) builtin(ctx context.Context, pos syntax.Pos, name string, args 
 		}
 
 		for _, arg := range args {
-			if vars && r.lookupVar(arg).IsSet() {
+			vr := r.lookupVar(arg)
+			if vars && vr.ReadOnly {
+				// POSIX: a readonly variable cannot be unset; report it
+				// once and fail the command.
+				r.errf("%s: readonly variable\n", arg)
+				exit.code = 1
+			} else if vars && vr.IsSet() {
 				r.delVar(arg)
 			} else if _, ok := r.Funcs[arg]; ok && funcs {
 				delete(r.Funcs, arg)
@@ -302,23 +308,49 @@ func (r *Runner) builtin(ctx context.Context, pos syntax.Pos, name string, args 
 		}
 		r.outf("%s\n", pwd)
 	case "cd":
+		// POSIX cd [-L|-P] [directory]; -L is the default.
+		physical, printPath := false, false
+		var operands []string
+	opts:
+		for i := range args {
+			switch args[i] {
+			case "-L":
+				physical = false
+			case "-P":
+				physical = true
+			case "--":
+				operands = args[i+1:]
+				break opts
+			default:
+				operands = args[i:]
+				break opts
+			}
+		}
 		var path string
-		switch len(args) {
+		switch len(operands) {
 		case 0:
 			path = r.envGet("HOME")
+			if path == "" {
+				r.errf("cd: HOME not set\n")
+				exit.code = 1
+				return exit
+			}
 		case 1:
-			path = args[0]
-
-			// replicate the commonly implemented behavior of `cd -`
-			// ref: https://www.man7.org/linux/man-pages/man1/cd.1p.html#OPERANDS
+			path = operands[0]
+			// `cd -` goes to $OLDPWD and writes the new directory.
 			if path == "-" {
 				path = r.envGet("OLDPWD")
-				r.outf("%s\n", path)
+				if path == "" {
+					r.errf("cd: OLDPWD not set\n")
+					exit.code = 1
+					return exit
+				}
+				printPath = true
 			}
 		default:
-			return failf(2, "usage: cd [dir]\n")
+			return failf(2, "cd: too many arguments\n")
 		}
-		exit.code = r.changeDir(ctx, "cd", path)
+		exit.code = r.changeDir(ctx, "cd", path, physical, printPath)
 	case "wait":
 		fp := flagParser{remaining: args}
 		for fp.more() {
@@ -598,14 +630,14 @@ func (r *Runner) builtin(ctx context.Context, pos syntax.Pos, name string, args 
 				return failf(1, "pushd: no other directory\n")
 			}
 			newtop := swap()
-			if code := r.changeDir(ctx, "pushd", newtop); code != 0 {
+			if code := r.changeDir(ctx, "pushd", newtop, false, false); code != 0 {
 				exit.code = code
 				return exit
 			}
 			r.builtin(ctx, syntax.Pos{}, "dirs", nil)
 		case 1:
 			if change {
-				if code := r.changeDir(ctx, "pushd", args[0]); code != 0 {
+				if code := r.changeDir(ctx, "pushd", args[0], false, false); code != 0 {
 					exit.code = code
 					return exit
 				}
@@ -633,7 +665,7 @@ func (r *Runner) builtin(ctx context.Context, pos syntax.Pos, name string, args 
 			r.dirStack = r.dirStack[:len(r.dirStack)-1]
 			if change {
 				newtop := r.dirStack[len(r.dirStack)-1]
-				if code := r.changeDir(ctx, "popd", newtop); code != 0 {
+				if code := r.changeDir(ctx, "popd", newtop, false, false); code != 0 {
 					exit.code = code
 					return exit
 				}
@@ -1073,25 +1105,160 @@ func (r *Runner) readLine(ctx context.Context, raw bool) ([]byte, error) {
 	}
 }
 
-func (r *Runner) changeDir(ctx context.Context, cmd, path string) uint8 {
+// joinPath appends path to base without removing dot-dot components.
+func joinPath(base, path string) string {
+	if base == "" || path == "" || strings.HasSuffix(base, "/") {
+		return base + path
+	}
+	return base + "/" + path
+}
+
+// wordLit returns the literal text of a word made of a single literal.
+func wordLit(w *syntax.Word) (string, bool) {
+	if w == nil || len(w.Parts) != 1 {
+		return "", false
+	}
+	lit, ok := w.Parts[0].(*syntax.Lit)
+	if !ok {
+		return "", false
+	}
+	return lit.Value, true
+}
+
+// declList writes every readonly or exported variable when an "export" or
+// "readonly" declaration command is given no names, which POSIX requires. It
+// reports whether it handled the command.
+func (r *Runner) declList(variant string, args []*syntax.Assign) bool {
+	if variant != "export" && variant != "readonly" {
+		return false
+	}
+	if len(args) > 1 {
+		return false
+	}
+	if len(args) == 1 {
+		lit, ok := wordLit(args[0].Value)
+		if args[0].Name != nil || !ok || (lit != "-p" && lit != "--") {
+			return false
+		}
+	}
+	var names []string
+	vars := make(map[string]expand.Variable)
+	r.writeEnv.Each(func(n string, vr expand.Variable) bool {
+		if (variant == "readonly" && vr.ReadOnly) || (variant == "export" && vr.Exported) {
+			if _, seen := vars[n]; !seen {
+				names = append(names, n)
+			}
+			vars[n] = vr
+		}
+		return true
+	})
+	slices.Sort(names)
+	for _, n := range names {
+		vr := vars[n]
+		if !vr.IsSet() {
+			r.outf("%s %s\n", variant, n)
+			continue
+		}
+		if vr.Kind != expand.String {
+			continue // POSIX declarations are strings only
+		}
+		r.outf("%s %s=%s\n", variant, n, declQuote(vr.Str))
+	}
+	return true
+}
+
+// declQuote quotes a value so that declaration output can be re-evaluated.
+func declQuote(s string) string {
+	safe := s != ""
+	for _, c := range s {
+		if !strings.ContainsRune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./-+:,@%^", c) {
+			safe = false
+			break
+		}
+	}
+	if safe {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+func (r *Runner) changeDir(ctx context.Context, cmd, path string, physical, printPath bool) uint8 {
 	if path == "" {
 		r.errf("%s: empty directory path\n", cmd)
 		return 1
 	}
-	apath := r.absPath(path)
+	apath, printPath := r.cdTarget(ctx, cmd, path, physical, printPath)
 	info, err := r.stat(ctx, apath)
-	if err != nil || !info.IsDir() {
+	if err != nil {
 		r.errf("%s: no such file or directory: %q\n", cmd, path)
+		return 1
+	}
+	if !info.IsDir() {
+		r.errf("%s: not a directory: %q\n", cmd, path)
 		return 1
 	}
 	if r.access(ctx, apath, access_X_OK) != nil {
 		r.errf("%s: permission denied: %q\n", cmd, path)
 		return 1
 	}
+	oldDir := r.Dir
 	r.Dir = apath
-	r.setVarString("OLDPWD", r.envGet("PWD"))
-	r.setVarString("PWD", apath)
+	// POSIX keeps PWD and OLDPWD exported and current for child commands.
+	r.setVar("OLDPWD", expand.Variable{Set: true, Kind: expand.String, Str: oldDir, Exported: true})
+	r.setVar("PWD", expand.Variable{Set: true, Kind: expand.String, Str: apath, Exported: true})
+	if printPath {
+		r.outf("%s\n", apath)
+	}
+	r.reportDirChange(oldDir, apath)
 	return 0
+}
+
+// cdTarget resolves a cd operand to the absolute directory to change to. It
+// follows POSIX logical (-L) or physical (-P) rules, including the CDPATH
+// search. The second result reports whether the new directory must be written
+// to standard output, as for `cd -` and a CDPATH match other than ".".
+func (r *Runner) cdTarget(ctx context.Context, cmd, path string, physical, printPath bool) (string, bool) {
+	base := r.Dir
+	if physical {
+		if resolved, err := filepath.EvalSymlinks(base); err == nil {
+			base = resolved
+		}
+	}
+	first, _, _ := strings.Cut(path, "/")
+	if cmd == "cd" && !filepath.IsAbs(path) && first != "." && first != ".." {
+		if cdpath := r.envGet("CDPATH"); cdpath != "" {
+			for _, elem := range strings.Split(cdpath, ":") {
+				if elem == "" {
+					elem = "."
+				}
+				candidate := joinPath(elem, path)
+				if !filepath.IsAbs(candidate) {
+					candidate = joinPath(base, candidate)
+				}
+				if info, err := r.stat(ctx, candidate); err == nil && info.IsDir() {
+					path = candidate
+					if elem != "." {
+						printPath = true
+					}
+					break
+				}
+			}
+		}
+	}
+	if !filepath.IsAbs(path) {
+		// Concatenate rather than filepath.Join, which would remove dot-dot
+		// components textually before -P could resolve them physically.
+		path = joinPath(base, path)
+	}
+	// -P resolves every symlink, including the ones a dot-dot component
+	// steps through. -L instead removes dot components textually and names
+	// directories through symlinks.
+	if physical {
+		if resolved, err := filepath.EvalSymlinks(path); err == nil {
+			return resolved, printPath
+		}
+	}
+	return filepath.Clean(path), printPath
 }
 
 func absPath(dir, path string) string {

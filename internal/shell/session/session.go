@@ -24,7 +24,14 @@ type Session struct {
 	runner *interp.Runner
 	parser *syntax.Parser
 	input  *os.File // owned pipe read end, if any
+
+	onCwdChange func(oldDir, newDir string)
+	notifyMu    sync.Mutex
+	cwdEvents   []cwdEvent // pending changes of the running submission
 }
+
+// cwdEvent is one successful directory change reported by the interpreter.
+type cwdEvent struct{ oldDir, newDir string }
 
 // New constructs a session without changing the process environment or cwd.
 func New(o Options) (*Session, error) {
@@ -34,7 +41,7 @@ func New(o Options) (*Session, error) {
 	} else {
 		env = slices.Clone(env)
 	}
-	s := &Session{parser: syntax.NewParser(syntax.Variant(syntax.LangPOSIX))}
+	s := &Session{parser: syntax.NewParser(syntax.Variant(syntax.LangPOSIX)), onCwdChange: o.OnCwdChange}
 	// Dir is validated before attaching input, so constructor errors do not
 	// consume a caller-owned reader.
 	stdio := func(r *interp.Runner) error {
@@ -74,6 +81,10 @@ func New(o Options) (*Session, error) {
 		return nil, err
 	}
 	s.runner = r
+	r.SetOnChangeDir(func(oldDir, newDir string) {
+		// Runs while Run holds runMu, so the slice needs no extra lock.
+		s.cwdEvents = append(s.cwdEvents, cwdEvent{oldDir, newDir})
+	})
 	r.Reset()
 	// Populate the interpreter’s public Vars snapshot, including bootstrap
 	// variables, without executing a command.
@@ -95,9 +106,31 @@ func exported(env expand.Environ) []string {
 }
 
 // Run parses all source before executing it. Runs on the same session serialize.
+//
+// Options' OnCwdChange is called for every successful directory change a
+// submission made, in order, with the old and new logical directories. The
+// events are delivered after the submission finishes and outside the run lock,
+// so the callback may call Dir; it must not call Run. Changes made inside a
+// subshell or process substitution are not reported, and neither is a change
+// that lands on the directory the shell is already in.
 func (s *Session) Run(ctx context.Context, src string) Result {
 	s.runMu.Lock()
-	defer s.runMu.Unlock()
+	s.cwdEvents = nil
+	result := s.runLocked(ctx, src)
+	events := s.cwdEvents
+	s.cwdEvents = nil
+	s.runMu.Unlock()
+	if s.onCwdChange != nil && len(events) > 0 {
+		s.notifyMu.Lock()
+		for _, e := range events {
+			s.onCwdChange(e.oldDir, e.newDir)
+		}
+		s.notifyMu.Unlock()
+	}
+	return result
+}
+
+func (s *Session) runLocked(ctx context.Context, src string) Result {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()

@@ -31,6 +31,9 @@ type shFile struct {
 	UpstreamSHA256 string `json:"upstream_sha256"`
 	LocalSHA256    string `json:"local_sha256"`
 	Generated      bool   `json:"generated,omitempty"`
+	// Patched marks a file with local edits that no mechanical reverse patch
+	// can undo; it must be named by a declared local_patches entry.
+	Patched bool `json:"patched,omitempty"`
 }
 type shSource struct {
 	Source       string    `json:"source"`
@@ -56,7 +59,7 @@ func validShPath(p string) bool {
 
 // checkShFiles verifies the imported bytes and the declared reversible patches.
 func checkShFiles(dir string, s shSource) error {
-	if len(s.LocalPatches) < 1 || len(s.LocalPatches) > 3 {
+	if len(s.LocalPatches) < 1 || len(s.LocalPatches) > 4 {
 		return fmt.Errorf("invalid patches")
 	}
 	p := s.LocalPatches[0]
@@ -70,11 +73,32 @@ func checkShFiles(dir string, s shSource) error {
 			return fmt.Errorf("invalid gofmt patch")
 		}
 	}
-	sessionPatch := len(s.LocalPatches) == 3
+	sessionPatch := len(s.LocalPatches) >= 3
 	if sessionPatch {
 		p := s.LocalPatches[2]
 		if p.Kind != "session-support" || p.From != "" || p.To != "" || len(p.Files) != 2 || p.Files[0] != "syntax/parser.go" || p.Files[1] != "interp/session_status.go" || p.Reason == "" {
 			return fmt.Errorf("invalid session patch")
+		}
+	}
+	// Patches beyond the three reversible ones record local edits that cannot
+	// be derived from the upstream bytes, such as behaviour changes to a
+	// builtin. Every file they name must also carry the patched marker.
+	labelled := map[string]bool{}
+	extra := s.LocalPatches
+	if len(extra) > 3 {
+		extra = extra[3:]
+	} else {
+		extra = nil
+	}
+	for _, p := range extra {
+		if p.Kind != "posix-dirs-vars" || p.From != "" || p.To != "" || len(p.Files) == 0 || p.Reason == "" {
+			return fmt.Errorf("invalid local semantics patch")
+		}
+		for _, f := range p.Files {
+			if !validShPath(f) || labelled[f] {
+				return fmt.Errorf("invalid patched file %q", f)
+			}
+			labelled[f] = true
 		}
 	}
 	if len(s.Packages) == 0 || len(s.Omissions) == 0 {
@@ -105,6 +129,17 @@ func checkShFiles(dir string, s shSource) error {
 		}
 		if shDigest(b) != f.LocalSHA256 {
 			return fmt.Errorf("local hash mismatch: %s", f.Local)
+		}
+		if f.Patched {
+			if !labelled[f.Local] {
+				return fmt.Errorf("patched file not declared: %s", f.Local)
+			}
+			if f.UpstreamSHA256 == "" {
+				return fmt.Errorf("patched file without upstream hash: %s", f.Local)
+			}
+			// Local edits are recorded, not reversed: the checker proves the
+			// tree matches the recorded bytes and that the edit is declared.
+			continue
 		}
 		upstream := bytes.ReplaceAll(b, []byte(shNew), []byte(shOld))
 		if gofmtPatch && f.Local == "interp/os_unix.go" {
@@ -137,6 +172,11 @@ func checkShFiles(dir string, s shSource) error {
 		b, err := os.ReadFile(filepath.Join(dir, "interp", "session_status.go"))
 		if err != nil || shDigest(b) != "ebef9f14b6f9c008267d81aac77e8dc2c16e0585376b773f65a031235404deb9" {
 			return fmt.Errorf("session status file missing or modified")
+		}
+	}
+	for f := range labelled {
+		if !locals[f] {
+			return fmt.Errorf("declared patch file is not imported: %s", f)
 		}
 	}
 	if !locals["LICENSE"] {
