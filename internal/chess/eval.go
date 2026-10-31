@@ -37,7 +37,7 @@ func (v *Variant) estimateValues() {
 }
 
 func (v *Variant) mobility(t *PieceType) float64 {
-	p := &Position{V: v, Board: make([]Piece, v.Size()), EPPawn: -1}
+	p := &Position{V: v, Board: make([]Piece, v.Size()), EPPawn: -1, Blocker: -1}
 	weight := make([]float64, v.Size())
 	total := 0.0
 	for from := range p.Board {

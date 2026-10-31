@@ -45,12 +45,14 @@ type Move struct {
 	Drop     uint8 // type dropped from hand, or 0
 	Promote  uint8 // piece type the pawn becomes, or 0
 	Castle   int   // index into Variant.Castling, or -1
+	Blocker  int   // destination + 1, or 0 when absent
 }
 
 type Position struct {
 	V        *Variant
 	Board    []Piece
 	Hands    [2][]int // drop-variant pockets, counts indexed by piece type
+	Blocker  int      // neutral blocker square, or -1 when the variant has none
 	Turn     Color
 	EP       []int  // squares the last move's pawn crossed
 	EPPawn   int    // that pawn, or -1
@@ -72,7 +74,7 @@ func NewPositionWithRand(v *Variant, rng *rand.Rand) *Position {
 	} else {
 		board = v.shuffledStart(rng)
 	}
-	p := &Position{V: v, Board: board, EPPawn: -1, Fullmove: 1}
+	p := &Position{V: v, Board: board, EPPawn: -1, Fullmove: 1, Blocker: v.startBlocker}
 	for c := range p.Hands {
 		p.Hands[c] = slices.Clone(v.startHands[c])
 		if len(p.Hands[c]) != len(v.Pieces)+1 {
@@ -165,6 +167,72 @@ func (p *Position) legalAfter(mover Color, previousRoyals int) bool {
 	return !p.V.NoChecks || !p.royalAttacked(mover.Other())
 }
 
+// searchMoves samples blocker destinations for each distinct piece move. Unlike
+// Moves, this is an engine heuristic; callers presenting legal moves must not use it.
+func (p *Position) searchMoves(tactical bool, preferred Move) []Move {
+	base := p.generate(tactical)
+	if !p.V.Blocker {
+		return base
+	}
+	const choices = 8
+	var result []Move
+	for _, m := range base {
+		if m.From == m.To {
+			continue
+		}
+		q := p.Apply(m)
+		var squares []int
+		for sq, pc := range q.Board {
+			if pc.Type != 0 || sq == p.Blocker {
+				continue
+			}
+			q.Blocker = sq
+			if q.legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
+				squares = append(squares, sq)
+			}
+		}
+		n := min(choices, len(squares))
+		for i := 0; i < n; i++ {
+			// Sample across the whole board, including both extremes.
+			index := 0
+			if n > 1 {
+				index = i * (len(squares) - 1) / (n - 1)
+			}
+			m.Blocker = squares[index] + 1
+			result = append(result, m)
+		}
+		if preferred.Blocker > 0 && preferred.From == m.From && preferred.To == m.To && preferred.Take == m.Take && preferred.Promote == m.Promote && preferred.Castle == m.Castle && slices.Contains(squares, preferred.Blocker-1) && !slices.Contains(result, preferred) {
+			result = append(result, preferred)
+		}
+	}
+	return result
+}
+
+// hasLegalMove avoids materializing the full compound-turn list at search leaves.
+func (p *Position) hasLegalMove() bool {
+	for _, m := range p.generate(false) {
+		if !p.V.Blocker {
+			if p.Apply(m).legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
+				return true
+			}
+			continue
+		}
+		if m.From == m.To {
+			continue
+		}
+		q := p.Apply(m)
+		for sq, pc := range q.Board {
+			if pc.Type == 0 && sq != p.Blocker {
+				q.Blocker = sq
+				if q.legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // InCheck reports whether any of the side to move's royal pieces is attacked.
 func (p *Position) InCheck() bool { return p.royalAttacked(p.Turn) }
 
@@ -192,7 +260,7 @@ func (p *Position) findRoyals() {
 // Royals returns the squares of a side's royal pieces.
 func (p *Position) Royals(c Color) []int { return slices.Clone(p.royalSq[c]) }
 
-func (p *Position) pseudoMoves() []Move { return p.generate(false) }
+func (p *Position) pseudoMoves() []Move { return p.compound(p.generate(false)) }
 
 // moveCandidates applies the compulsory capture rule before the common royal
 // safety filter. Only legal captures suppress quiet moves, including promotions.
@@ -213,9 +281,43 @@ func (p *Position) moveCandidates() []Move {
 	return p.pseudoMoves()
 }
 
+// nodeMoves is the move list the search expands at a node: the position's
+// candidates, except that a duck variant samples the duck's destinations
+// instead of enumerating every turn.
+func (p *Position) nodeMoves(tactical bool, preferred Move) []Move {
+	if p.V.Blocker {
+		return p.searchMoves(tactical, preferred)
+	}
+	if tactical {
+		return p.captures()
+	}
+	return p.moveCandidates()
+}
+
 // captures lists the moves that take something or promote, for the
 // quiescence search.
-func (p *Position) captures() []Move { return p.generate(true) }
+func (p *Position) captures() []Move { return p.compound(p.generate(true)) }
+
+// compound expands each piece move into all legal blocker relocations.
+func (p *Position) compound(base []Move) []Move {
+	if !p.V.Blocker {
+		return base
+	}
+	var out []Move
+	for _, m := range base {
+		if m.From == m.To {
+			continue
+		}
+		q := p.Apply(m)
+		for sq, pc := range q.Board {
+			if pc.Type == 0 && sq != p.Blocker {
+				m.Blocker = sq + 1
+				out = append(out, m)
+			}
+		}
+	}
+	return out
+}
 
 func (p *Position) generate(tactical bool) []Move {
 	v := p.V
@@ -293,6 +395,9 @@ func (p *Position) generate(tactical bool) []Move {
 				if t.Pawn && v.PawnDoubleRanks != nil && comp.Initial && p.forwardDouble(from, to, pc.Color) {
 					return true // configured double steps are generated separately
 				}
+				if v.Blocker && to == p.Blocker {
+					return true // the duck blocks the square
+				}
 				switch {
 				case to == from && comp.Move:
 					add(to, -1)
@@ -313,7 +418,7 @@ func (p *Position) generate(tactical bool) []Move {
 			step := pc.Color.forward()
 			if v.OnBoard(x, y+2*step) {
 				middle, to := v.Square(x, y+step), v.Square(x, y+2*step)
-				if p.Board[middle].Type == 0 && p.Board[to].Type == 0 {
+				if p.Board[middle].Type == 0 && p.Board[to].Type == 0 && !(v.Blocker && (middle == p.Blocker || to == p.Blocker)) {
 					add(to, -1)
 				}
 			}
@@ -384,7 +489,7 @@ func (p *Position) castles() []Move {
 		hi := max(c.King, c.Rook, c.KingTo, c.RookTo)
 		clearPath := true
 		for sq := lo; sq <= hi; sq++ {
-			if sq != c.King && sq != c.Rook && p.Board[sq].Type != 0 {
+			if sq != c.King && sq != c.Rook && (p.Board[sq].Type != 0 || (v.Blocker && sq == p.Blocker)) {
 				clearPath = false
 				break
 			}
@@ -396,8 +501,8 @@ func (p *Position) castles() []Move {
 		for sq := min(c.King, c.KingTo); sq <= max(c.King, c.KingTo); sq++ {
 			path = append(path, sq)
 		}
-		// A royal king may not castle out of, through or into attack; a fog
-		// variant's king is no royal, so it castles regardless of attacks.
+		// A royal king may not castle out of, through or into attack; a fog or
+		// duck variant's king is no royal, so it castles regardless of attacks.
 		if v.Type(k).Royal && p.castlePathAttacked(c.King, path) {
 			continue
 		}
@@ -412,6 +517,9 @@ func (p *Position) Apply(m Move) *Position {
 	q := p.clone()
 	if p.Turn == Black {
 		q.Fullmove++
+	}
+	if v.Blocker && m.Blocker > 0 {
+		q.Blocker = m.Blocker - 1
 	}
 	if m.Drop != 0 {
 		q.applyDrop(m)
@@ -514,7 +622,7 @@ func (p *Position) walk(from int, comp *Component, c Color, visit func(int) bool
 		}
 		return v.Square(x, y), true
 	}
-	occupied := func(sq int) bool { return p.Board[sq].Type != 0 }
+	occupied := func(sq int) bool { return p.Board[sq].Type != 0 || (v.Blocker && sq == p.Blocker) }
 
 	if comp.Circular {
 		p.walkCircle(fx, fy, comp, dir, visit)
@@ -590,7 +698,7 @@ func (p *Position) walkCircle(fx, fy int, comp *Component, dir int, visit func(i
 				if !visit(sq) {
 					return
 				}
-				if p.Board[sq].Type != 0 {
+				if p.Board[sq].Type != 0 || (v.Blocker && sq == p.Blocker) {
 					break
 				}
 			}

@@ -135,7 +135,7 @@ func TestVariantPickerBackspace(t *testing.T) {
 func TestVariantPickerSmallView(t *testing.T) {
 	g := newGame(t, "chess", 30, 8)
 	keys(g, "v")
-	for range 20 {
+	for range len(g.variants) + 4 { // scrolling clamps at the last variant
 		keys(g, "down")
 	}
 	out := g.View()

@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml", "crazyhouse.yaml", "xiangqi.yaml", "horde.yaml", "fog.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml", "kingofthehill.yaml", "grand.yaml", "threecheck.yaml", "racingkings.yaml", "antichess.yaml", "atomic.yaml", "chess960.yaml", "crazyhouse.yaml", "xiangqi.yaml", "horde.yaml", "fog.yaml", "duck.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -69,6 +69,7 @@ type Variant struct {
 	PromotionOptional     bool    // a pawn may decline to promote inside the zone
 	PromotionCapturedOnly bool    // a type is available only once its setup piece is gone
 	MoveLimit             int     // moves by each side without a capture or pawn move before a draw
+	Blocker               bool    // a neutral, uncapturable duck must relocate after each move
 	Stalemate             StalemateRule
 	CheckLimit            int        // checks a side must give to win, or 0 for no such rule
 	Goal                  []int      // absolute squares whose arrival by a royal wins
@@ -82,11 +83,12 @@ type Variant struct {
 	Setup                 string
 	Source                string
 
-	shuffle     *shuffleSetup
-	start       []Piece
-	startHands  [2][]int // pockets the setup starts with
-	startPieces [2][]int // per side, how many of each type the setup holds
-	zobrist     zobrist
+	shuffle      *shuffleSetup
+	start        []Piece
+	startHands   [2][]int // pockets the setup starts with
+	startPieces  [2][]int // per side, how many of each type the setup holds
+	startBlocker int      // the duck's setup square, or -1
+	zobrist      zobrist
 }
 
 type pieceDef struct {
@@ -179,6 +181,7 @@ type variantDef struct {
 	Material              string         `yaml:"material"`
 	Explosion             *explosionDef  `yaml:"explosion"`
 	Extinction            *extinctionDef `yaml:"extinction"`
+	Blocker               *bool          `yaml:"blocker"`
 
 	Shuffle *shuffleDef `yaml:"shuffle"`
 	source  string
@@ -416,6 +419,9 @@ func merge(parent, child variantDef) variantDef {
 	if child.Extinction != nil {
 		d.Extinction = child.Extinction
 	}
+	if child.Blocker != nil {
+		d.Blocker = child.Blocker
+	}
 	d.Pieces = slices.Clone(parent.Pieces)
 	for _, p := range child.Pieces {
 		i := slices.IndexFunc(d.Pieces, func(q pieceDef) bool { return strings.EqualFold(q.Letter, p.Letter) })
@@ -454,6 +460,10 @@ func build(d variantDef) (*Variant, error) {
 	if d.Fog != nil {
 		v.Fog = *d.Fog
 	}
+	if d.Blocker != nil {
+		v.Blocker = *d.Blocker
+	}
+	v.startBlocker = -1
 	if v.Name == "" {
 		v.Name = v.ID
 	}
@@ -538,11 +548,12 @@ func build(d variantDef) (*Variant, error) {
 		return nil, fmt.Errorf("setup: %v", err)
 	}
 	v.startHands = hands
-	start, err := v.parsePlacement(placement)
+	start, blocker, err := v.parsePlacementBlocker(placement)
 	if err != nil {
 		return nil, fmt.Errorf("setup: %v", err)
 	}
 	v.start = start
+	v.startBlocker = blocker
 	if d.Shuffle != nil {
 		if err := v.buildShuffle(d.Shuffle); err != nil {
 			return nil, fmt.Errorf("shuffle: %v", err)
@@ -745,8 +756,10 @@ func (v *Variant) markTrackedPieces() {
 			continue
 		}
 		for _, color := range []Color{White, Black} {
-			if p := v.start[v.orient(c.Rook, color)]; p.Type != 0 {
-				v.Type(p).tracksMoved = true
+			for _, sq := range []int{c.King, c.Rook} {
+				if p := v.start[v.orient(sq, color)]; p.Type != 0 {
+					v.Type(p).tracksMoved = true
+				}
 			}
 		}
 	}
@@ -787,11 +800,21 @@ func (v *Variant) orient(sq int, c Color) int {
 }
 
 // parsePlacement reads FEN-style ranks, top rank first: letters are pieces
-// (upper case White), numbers of any length are runs of empty squares.
+// (upper case White), numbers of any length are runs of empty squares, and a
+// blocker variant's * marks its duck.
 func (v *Variant) parsePlacement(s string) ([]Piece, error) {
+	board, _, err := v.parsePlacementBlocker(s)
+	return board, err
+}
+
+// parsePlacementBlocker is parsePlacement told about the one thing a setup
+// needs that a board cannot hold: the square of a variant's neutral blocker,
+// written * and returned as an index, or -1 when the setup has none.
+func (v *Variant) parsePlacementBlocker(s string) ([]Piece, int, error) {
+	blocker := -1
 	rows := strings.Split(s, "/")
 	if len(rows) != v.Ranks {
-		return nil, fmt.Errorf("%d ranks, want %d", len(rows), v.Ranks)
+		return nil, -1, fmt.Errorf("%d ranks, want %d", len(rows), v.Ranks)
 	}
 	board := make([]Piece, v.Size())
 	for i, row := range rows {
@@ -807,10 +830,16 @@ func (v *Variant) parsePlacement(s string) ([]Piece, error) {
 				n, _ := strconv.Atoi(row[j:k])
 				x, j = x+n, k
 				continue
+			case c == '*':
+				if !v.Blocker || blocker >= 0 || x >= v.Files {
+					return nil, -1, fmt.Errorf("invalid blocker placement")
+				}
+				blocker = v.Square(x, y)
+				x++
 			case isLetter(c):
 				t := v.TypeOf(c)
 				if t == 0 {
-					return nil, fmt.Errorf("unknown piece %c", c)
+					return nil, -1, fmt.Errorf("unknown piece %c", c)
 				}
 				if x < v.Files {
 					color := White
@@ -820,7 +849,7 @@ func (v *Variant) parsePlacement(s string) ([]Piece, error) {
 					pc := Piece{Type: t, Color: color}
 					if j+1 < len(row) && row[j+1] == '~' {
 						if !v.Drops || v.Pieces[t-1].Demote == 0 {
-							return nil, fmt.Errorf("piece %c cannot be marked promoted", c)
+							return nil, -1, fmt.Errorf("piece %c cannot be marked promoted", c)
 						}
 						pc.Promoted = v.Pieces[t-1].Demote
 						j++
@@ -829,15 +858,15 @@ func (v *Variant) parsePlacement(s string) ([]Piece, error) {
 				}
 				x++
 			default:
-				return nil, fmt.Errorf("unexpected %q", c)
+				return nil, -1, fmt.Errorf("unexpected %q", c)
 			}
 			j++
 		}
 		if x != v.Files {
-			return nil, fmt.Errorf("rank %d has %d squares, want %d", y+1, x, v.Files)
+			return nil, -1, fmt.Errorf("rank %d has %d squares, want %d", y+1, x, v.Files)
 		}
 	}
-	return board, nil
+	return board, blocker, nil
 }
 
 func isLetter(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }

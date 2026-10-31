@@ -329,7 +329,7 @@ func (g *Game) header() string {
 	case Checkmate:
 		return name + " · checkmate, " + winner.String() + " wins"
 	case ExtinctionWin:
-		if m.Variant().Fog {
+		if m.Variant().Fog || m.Variant().Blocker {
 			return name + " · king captured, " + winner.String() + " wins"
 		}
 		return name + " · extinction, " + winner.String() + " wins"
@@ -352,9 +352,19 @@ func (g *Game) board(l layout) string {
 	hints := g.hints()
 	checked := g.checkedRoyals()
 	last := g.lastMove()
+	// A duck waiting for its square shows the piece move already made, with the
+	// duck still standing where it does now.
+	p := g.match.Position()
+	blocker := -1
+	if v.Blocker {
+		blocker = p.Blocker
+	}
+	if len(g.duck) > 0 {
+		p = p.Apply(g.duck[0])
+	}
 	var visible []bool
 	if v.Fog {
-		visible = g.match.Position().Visible(g.perspective())
+		visible = p.Visible(g.perspective())
 	}
 	rows := make([]string, l.rows)
 	var sb strings.Builder
@@ -363,7 +373,7 @@ func (g *Game) board(l layout) string {
 		for col := range l.cols {
 			x, y := g.boardXY(col, row)
 			sq := v.Square(x, y)
-			sb.WriteString(g.square(sq, x, y, l.cw, hints, checked[sq], last, visible))
+			sb.WriteString(g.squareAt(p, blocker, sq, x, y, l.cw, hints, checked[sq], last, visible))
 		}
 		rows[row] = sb.String() + strings.Repeat(" ", l.pad)
 	}
@@ -411,6 +421,12 @@ const (
 // hints marks where the selected piece may go.
 func (g *Game) hints() map[int]hint {
 	h := map[int]hint{}
+	if g.duck != nil {
+		for _, mv := range g.duck {
+			h[mv.Blocker-1] = hintMove
+		}
+		return h
+	}
 	if g.sel < 0 && g.drop == 0 {
 		return h
 	}
@@ -464,6 +480,15 @@ func (g *Game) lastMove() map[int]bool {
 
 func (g *Game) square(sq, x, y, cw int, hints map[int]hint, checked bool, last map[int]bool, visible []bool) string {
 	p := g.match.Position()
+	blocker := -1
+	if p.V.Blocker {
+		blocker = p.Blocker
+	}
+	return g.squareAt(p, blocker, sq, x, y, cw, hints, checked, last, visible)
+}
+
+// squareAt draws one cell of p; blocker is the duck's square, or -1.
+func (g *Game) squareAt(p *Position, blocker, sq, x, y, cw int, hints map[int]hint, checked bool, last map[int]bool, visible []bool) string {
 	bg := darkSq
 	if (x+y)%2 == 1 {
 		bg = lightSq
@@ -487,7 +512,9 @@ func (g *Game) square(sq, x, y, cw int, hints map[int]hint, checked bool, last m
 		bg = lastBg
 	}
 	text, st := " ", dotSt
-	if pc := p.Board[sq]; pc.Type != 0 && !hidden {
+	if sq == blocker {
+		text, st = "D", headerSt
+	} else if pc := p.Board[sq]; pc.Type != 0 && !hidden {
 		text, st = g.glyph(p.V.Type(pc), pc.Color), pieceFg[pc.Color]
 	} else if !hidden && hints[sq] == hintMove {
 		text = "•"
@@ -572,6 +599,8 @@ func (g *Game) status() string {
 	case text != "":
 	case g.thinking:
 		text = "The computer is thinking…"
+	case g.duck != nil:
+		text = "Place the duck on a highlighted square (esc cancels)"
 	case g.drop != 0:
 		text = "Choose a highlighted square to drop " + g.match.Variant().Pieces[g.drop-1].Name
 	case g.sel >= 0 && len(g.movesBetween(g.sel, g.sel)) > 0:

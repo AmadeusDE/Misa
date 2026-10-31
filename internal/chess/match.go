@@ -178,8 +178,17 @@ func b2i(b bool) byte {
 	return 0
 }
 
-// describe writes a move in long algebraic notation: Ng1-f3, e7xd8=Q, O-O.
+// describe writes a move in long algebraic notation: Ng1-f3, e7xd8=Q, O-O, and
+// a duck variant's duck placement after an @.
 func describe(p *Position, mv Move) string {
+	text := describePiece(p, mv)
+	if p.V.Blocker && mv.Blocker > 0 {
+		text += "@" + p.V.SquareName(mv.Blocker-1)
+	}
+	return text
+}
+
+func describePiece(p *Position, mv Move) string {
 	v := p.V
 	if mv.Drop != 0 {
 		return string(v.Pieces[mv.Drop-1].Letter) + "@" + v.SquareName(mv.To)

@@ -21,6 +21,7 @@ type Game struct {
 	sel           int    // selected square, or -1
 	drop          uint8  // selected pocket type, or 0
 	promo         []Move // promotion choices waiting for an answer
+	duck          []Move // complete moves awaiting a blocker destination
 	flipped       bool
 	letters       bool
 	note          string
@@ -101,7 +102,7 @@ func (g *Game) reset() {
 	if g.match.Turn() == Black {
 		g.cy = max(0, v.Ranks-2)
 	}
-	g.sel, g.drop, g.promo, g.note = -1, 0, nil, ""
+	g.sel, g.drop, g.promo, g.duck, g.note = -1, 0, nil, nil, ""
 }
 
 func (g *Game) Init() tea.Cmd   { return g.think() }
@@ -158,9 +159,12 @@ func (g *Game) key(k string) {
 	case "q", "ctrl+c":
 		g.quit = true
 	case "esc":
-		if g.sel >= 0 || g.drop != 0 {
+		switch {
+		case g.duck != nil:
+			g.duck, g.sel = nil, -1
+		case g.sel >= 0 || g.drop != 0:
 			g.sel, g.drop = -1, 0
-		} else {
+		default:
 			g.quit = true
 		}
 	case "up", "k":
@@ -203,14 +207,14 @@ func (g *Game) promotionKey(k string) {
 	v := g.match.Variant()
 	for _, mv := range g.promo {
 		if mv.Promote != 0 && v.Pieces[mv.Promote-1].Letter == c {
-			g.play(mv)
+			g.choosePromotion(mv.Promote)
 			return
 		}
 	}
 	// Staying a pawn has no piece type of its own, so the pawn's letter picks
 	// it, just as the glyph it wears in the prompt suggests.
 	if keep, ok := g.keepMove(); ok && g.moverLetter(keep.From) == c {
-		g.play(keep)
+		g.choosePromotion(0)
 	}
 }
 
@@ -242,7 +246,7 @@ func (g *Game) click(m tea.Mouse) {
 	l := g.layout()
 	if g.promo != nil {
 		if i := l.promoChoice(g, m.X, m.Y); i >= 0 && m.Button == tea.MouseLeft {
-			g.play(g.promo[i])
+			g.choosePromotion(g.promo[i].Promote)
 		} else if m.Button == tea.MouseRight {
 			g.promo = nil
 		}
@@ -285,10 +289,19 @@ func (g *Game) activate(sq int) {
 	if g.match.Over() || g.computerToMove() {
 		return
 	}
+	if g.duck != nil {
+		for _, mv := range g.duck {
+			if mv.Blocker == sq+1 {
+				g.play(mv)
+				return
+			}
+		}
+		return // other squares leave the duck's destinations untouched
+	}
 	if g.drop != 0 {
 		for _, mv := range g.match.Legal() {
 			if mv.Drop == g.drop && mv.To == sq {
-				g.play(mv)
+				g.chooseMoves([]Move{mv})
 				return
 			}
 		}
@@ -300,7 +313,7 @@ func (g *Game) activate(sq int) {
 				g.promo = choices
 				return
 			}
-			g.play(moves[0])
+			g.chooseMoves(moves)
 			return
 		}
 	}
@@ -342,6 +355,36 @@ func (g *Game) selectDropLetter(letter byte) bool {
 	return false
 }
 
+// choosePromotion keeps every duck destination for the chosen promotion; piece
+// 0 is the choice that leaves the pawn as it is.
+func (g *Game) choosePromotion(piece uint8) {
+	if len(g.promo) == 0 {
+		return
+	}
+	from, to := g.promo[0].From, g.promo[0].To
+	g.promo = nil
+	var moves []Move
+	for _, mv := range g.entryMoves(from, to) {
+		if mv.Promote == piece {
+			moves = append(moves, mv)
+		}
+	}
+	g.chooseMoves(moves)
+}
+
+// chooseMoves plays the move, or asks for the duck's destination first: the
+// duck variant makes the relocation part of every turn.
+func (g *Game) chooseMoves(moves []Move) {
+	if len(moves) == 0 {
+		return
+	}
+	if moves[0].Blocker != 0 {
+		g.duck, g.sel, g.drop = moves, -1, 0
+		return
+	}
+	g.play(moves[0])
+}
+
 // movesBetween lists the legal moves from one square to another, or to
 // anywhere when to is -1.
 func (g *Game) movesBetween(from, to int) []Move {
@@ -378,13 +421,13 @@ func promotionChoices(moves []Move) []Move {
 
 func (g *Game) play(mv Move) {
 	g.match.Play(mv)
-	g.sel, g.drop, g.promo, g.note = -1, 0, nil, ""
+	g.sel, g.drop, g.promo, g.duck, g.note = -1, 0, nil, nil, ""
 }
 
 // undo takes back moves until a human is to move, so against the computer it
 // takes back its reply along with your move.
 func (g *Game) undo() {
-	g.sel, g.drop, g.promo = -1, 0, nil
+	g.sel, g.drop, g.promo, g.duck = -1, 0, nil, nil
 	played := len(g.match.Played())
 	plies := 0
 	for plies < played {
@@ -409,7 +452,7 @@ func (g *Game) cycleComputer() {
 	i := slices.Index(modes, g.computer)
 	next := modes[(i+1)%len(modes)]
 	g.SetComputer(next[0], next[1])
-	g.sel, g.drop, g.promo = -1, 0, nil
+	g.sel, g.drop, g.promo, g.duck = -1, 0, nil, nil
 	g.note = "Computer plays " + g.opponent()
 }
 
