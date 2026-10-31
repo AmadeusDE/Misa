@@ -65,6 +65,16 @@ func (o outcome) score(turn Color, ply int) int {
 	return 0
 }
 
+// terminalScore scores the ending p has reached from the side to move's point
+// of view, for the search's terminal nodes: adjudicate names the winner, and a
+// drawn ending scores 0. Callers use it once they know the side to move has no
+// legal move, so the search scores every ending the rules fix, not just the
+// checkmate its move loop runs into.
+func terminalScore(p *Position, ply int) int {
+	o, _ := adjudicate(p, false)
+	return o.score(p.Turn, ply)
+}
+
 // checkWinner reports whether the side that just moved has given as many
 // checks as its variant asks for. Every move that leaves the opponent in check
 // counts, including the one that delivers the limit-th check.

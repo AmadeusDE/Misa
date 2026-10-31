@@ -107,7 +107,9 @@ type pickerLayout struct {
 }
 
 func (g *Game) pickerLayout() pickerLayout {
-	w, h := min(g.width, 60), min(g.height, 20)
+	// The box is twenty rows tall unless the list needs more: header, filter
+	// and help row plus a row per variant, as far as the terminal allows.
+	w, h := min(g.width, 60), min(g.height, max(20, len(g.variants)+5))
 	l := pickerLayout{width: w, height: h, left: max(0, (g.width-w)/2), top: max(0, (g.height-h)/2)}
 	if w < 2 || h < 2 {
 		return l
