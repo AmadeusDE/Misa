@@ -685,3 +685,10 @@ reduced application compiles; it cannot run a terminal yet, because `term` retur
   priority hooks once those land.
 - Known gaps: `which` and the local-executable lookup in `nice` do not expand PATHEXT; terminal sessions fail until
   P02; `procmon` lists processes only from I04.
+
+### CI gates (F05)
+
+`.github/windows/packages.txt` names the packages. `windows-cross` (ubuntu) builds the root binary for amd64 and arm64
+under `nough noweb` and `nough noweb nogui`, vets the set, and compiles each package's test binary to its own path.
+`windows-native` runs `go test` on the `native` packages on `windows-latest` under the same tag sets. cmd/ugh is not
+built yet (agent port, part 2). `internal/term` native tests gain coverage when P02 (ConPTY) lands.

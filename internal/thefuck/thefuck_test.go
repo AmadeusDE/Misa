@@ -1,6 +1,7 @@
 package thefuck
 
 import (
+	"path/filepath"
 	"testing"
 )
 
@@ -50,8 +51,9 @@ func TestRuleMkdirP(t *testing.T) {
 
 func TestRuleCdFile(t *testing.T) {
 	fix := Match("cd /etc/hosts", "cd: Not a directory: /etc/hosts", 1)
-	if fix != "cd /etc" {
-		t.Errorf("got %q, want %q", fix, "cd /etc")
+	want := "cd " + filepath.Dir("/etc/hosts")
+	if fix != want {
+		t.Errorf("got %q, want %q", fix, want)
 	}
 }
 

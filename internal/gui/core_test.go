@@ -2,8 +2,10 @@ package gui
 
 import (
 	"bytes"
+	"errors"
 	"image"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -51,6 +53,9 @@ func captureTerm(t *testing.T, rows, cols int) (*term.Terminal, func() string) {
 			}
 		}
 	}); err != nil {
+		if errors.Is(err, term.ErrUnsupported) {
+			t.Skip("no terminal transport on this platform until ConPTY (plan P02)")
+		}
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { tm.Close() })
@@ -330,10 +335,10 @@ func TestBlitSwizzlesBGRAAndRGBA(t *testing.T) {
 func TestSystemFontDirsUsesPrefix(t *testing.T) {
 	t.Setenv("PREFIX", "/data/data/com.termux/files/usr")
 	dirs := systemFontDirs()
-	if !strings.Contains(strings.Join(dirs, "\n"), "/system/fonts") {
+	if !strings.Contains(filepath.ToSlash(strings.Join(dirs, "\n")), "/system/fonts") {
 		t.Fatalf("dirs %v", dirs)
 	}
-	if !strings.Contains(strings.Join(dirs, "\n"), "/data/data/com.termux/files/usr/share/fonts") {
+	if !strings.Contains(filepath.ToSlash(strings.Join(dirs, "\n")), "/data/data/com.termux/files/usr/share/fonts") {
 		t.Fatalf("dirs %v", dirs)
 	}
 }

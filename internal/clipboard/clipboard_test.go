@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -15,6 +16,9 @@ func writeExe(t *testing.T, path, body string) {
 }
 
 func TestTermuxClipboardWhenOnPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Termux is Android: the stub tools are #!/bin/sh scripts")
+	}
 	dir := t.TempDir()
 	store := filepath.Join(dir, "clip")
 	writeExe(t, filepath.Join(dir, "termux-clipboard-set"), "#!/bin/sh\n/bin/cat > '"+store+"'\n")

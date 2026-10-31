@@ -118,6 +118,9 @@ func TestProcPermissionIsDash(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores file mode")
 	}
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix file modes: chmod 0 does not make a file unreadable on Windows")
+	}
 	dir := t.TempDir()
 	for _, name := range []string{"meminfo", "uptime"} {
 		path := dir + "/" + name
