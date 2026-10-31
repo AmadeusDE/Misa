@@ -75,7 +75,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | 46 | `pidwait` | 4 | – | 4 (4) | – | – |
 | 47 | `setpgid` | 4 | – | 5 (4) | – | – |
 | 48 | `users` | 4 | – | 5 (4) | – | – |
-| 49 | `fallocate` | 3 | 3 | – | 33 | – |
 | 50 | `getopt` | 3 | 3 | – | 112 | – |
 | 51 | `hostid` | 3 | – | 3 (3) | – | – |
 | 52 | `mesg` | 3 | – | 3 (3) | – | tty |
@@ -156,18 +155,15 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `egrep` | posix | – | – | – | – | no tests | 548 | – | medium |
 | `eject` | other | – | – | – | – | no tests | 66 | – | light |
 | `expiry` | – | – | shadow:7 | 0 | root | uutils: Rust, 0/7 simple new_ucmd! cases parseable by tests/uutils adapter | – | 322 | medium |
-| `fallocate` | other | 3 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 33 | – | light |
 | `fdisk` | pending | – | – | – | – | no tests | 1557 | – | heavy |
 | `fgrep` | posix | – | – | – | – | no tests | 548 | – | medium |
 | `file` | posix | 25 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 549 | – | medium |
 | `find` | posix | 58 | findutils:87 | 0 | kernel/fs, network, root, tty | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 0/87 simple new_ucmd! cases parseable by tests/uutils adapter | 730 | – | heavy |
-| `flock` | other | – | – | – | – | no tests | 39 | – | light |
 | `free` | other | – | procps:12 | 12 | – | uutils: Rust, 12/12 simple new_ucmd! cases parseable by tests/uutils adapter | 58 | 641 | light |
 | `freeramdisk` | other | – | – | – | – | no tests | 23 | – | light |
 | `fsck` | pending | – | – | – | – | no tests | 434 | – | medium |
 | `fsfreeze` | other | – | util-linux:5 | 5 | – | uutils: Rust, 5/5 simple new_ucmd! cases parseable by tests/uutils adapter | 30 | 86 | light |
 | `fstype` | other | 4 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 259 | – | medium |
-| `fsync` | other | – | – | – | – | no tests | 32 | – | light |
 | `ftpget` | net | – | – | – | – | no tests | 202 | – | heavy |
 | `ftpput` | net | – | – | – | – | no tests | 202 | – | heavy |
 | `getconf` | posix | – | – | – | – | no tests | 250 | – | medium |

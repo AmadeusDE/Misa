@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -978,6 +979,12 @@ func runTestCaseShell(t *testing.T, cmdName string, tc testCase, setupLog []setu
 		os.MkdirAll(filepath.Join(dir, "walrus"), 0755)
 	}
 
+	if cmdName == "fallocate" && (tc.name == "shorter" || tc.name == "longer") {
+		// toybox's cases share foo with the earlier "simple" case; this adapter
+		// gives every case a fresh directory, so seed the 123-byte file.
+		os.WriteFile(filepath.Join(dir, "foo"), bytes.Repeat([]byte("x"), 123), 0644)
+	}
+
 	if cmdName == "chmod" {
 		dirPath := filepath.Join(dir, "dir")
 		filePath := filepath.Join(dir, "file")
@@ -1130,6 +1137,12 @@ func TestToyboxSuite(t *testing.T) {
 		}
 
 		if _, ok := builtins.Lookup(suite.cmdName); !ok {
+			continue
+		}
+
+		if suite.cmdName == "fallocate" && runtime.GOOS != "linux" {
+			// fallocate(2) is Linux-only for Go; other platforms fail honestly.
+			t.Logf("skipping %s: fallocate is unsupported on %s", e.Name(), runtime.GOOS)
 			continue
 		}
 
