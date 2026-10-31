@@ -1,3 +1,5 @@
+// F08 self-source protection follows MIT uutils/coreutils tests/by-util/test_ln.rs
+// at fee61ff5d4f87e0f912a52e639942b5f7ad58663. Native Go implementation.
 package builtins
 
 import (
@@ -126,7 +128,7 @@ func runLn(ctx *Context) int {
 		cleanDst := filepath.Clean(dst)
 		isSame := false
 		if sym {
-			if !force && cleanSrc == cleanDst {
+			if cleanSrc == cleanDst {
 				if _, lerr := os.Lstat(dst); lerr == nil {
 					isSame = true
 				}

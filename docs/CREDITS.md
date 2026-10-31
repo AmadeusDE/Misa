@@ -56,6 +56,12 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils
+  F08 native copy/link/move regressions reference Toybox `tests/cp.test` at
+  `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb` (0BSD) and uutils
+  `tests/by-util/test_ln.rs` / `test_mv.rs` at
+  `fee61ff5d4f87e0f912a52e639942b5f7ad58663` (MIT). The env reference-conflict
+  audit also checked `test_env.rs` at that pin. Implementations and regression
+  tests are native Go; no upstream algorithms or fixture bytes were imported.
 
 - **uutils/diffutils** by the uutils contributors — MIT / Apache-2.0
   https://github.com/uutils/diffutils

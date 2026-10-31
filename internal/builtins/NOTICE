@@ -1,2 +1,11 @@
 Several builtins here follow uutils (coreutils, diffutils, util-linux; MIT) or toybox (0BSD) closely;
 each file names its source in its header. License texts: ../../THIRD_PARTY_NOTICES.md
+
+F08 copy/link/move regression scenarios reference:
+- Toybox tests/cp.test, 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb, 0BSD.
+- uutils/coreutils tests/by-util/test_ln.rs and test_mv.rs,
+  fee61ff5d4f87e0f912a52e639942b5f7ad58663, MIT.
+The environment reference-conflict audit also checked test_env.rs at that pin.
+F08 implementations and regression tests are native Go; no upstream algorithm
+or fixture bytes were imported. Local adapter fixture provenance is recorded
+separately in tests/provenance/fixtures.json.

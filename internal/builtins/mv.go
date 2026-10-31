@@ -1,3 +1,5 @@
+// F08 move regressions follow MIT uutils/coreutils tests/by-util/test_mv.rs
+// at fee61ff5d4f87e0f912a52e639942b5f7ad58663. Native Go implementation.
 package builtins
 
 import (
@@ -183,9 +185,8 @@ func runMv(ctx *Context) int {
 		return 1
 	}
 
-	// Track inodes and paths to detect duplicate sources and hard links
+	// Track paths to detect duplicate source operands.
 	seenSources := map[string]bool{}
-	seenInodes := map[uint64]string{} // inode -> canonical source path
 
 	// Track destinations that have been successfully written in this invocation
 	// to prevent "will not overwrite just-created" errors
@@ -213,20 +214,6 @@ func runMv(ctx *Context) int {
 		}
 		seenSources[canon] = true
 
-		// Check for hard links (same inode from different paths)
-		stat := srcInfo.Sys().(*syscall.Stat_t)
-		inode := stat.Ino
-		if _, isDuplicate := seenInodes[inode]; isDuplicate {
-			// Same inode seen before - this is a hard link, skip it
-			kind := "file"
-			if srcInfo.IsDir() {
-				kind = "directory"
-			}
-			fmt.Fprintf(ctx.Stderr, "mv: warning: source %s '%s' specified more than once\n", kind, src)
-			continue
-		}
-		seenInodes[inode] = canon
-
 		target := dst
 		if dstIsDir {
 			target = filepath.Join(dst, filepath.Base(src))
@@ -235,7 +222,7 @@ func runMv(ctx *Context) int {
 		displayTarget := displayDst
 		if dstIsDir {
 			base := filepath.Base(src)
-			if displayDst == "." {
+			if displayDst == "." && base != "." {
 				displayTarget = "./" + base
 			} else {
 				displayTarget = filepath.Join(displayDst, base)

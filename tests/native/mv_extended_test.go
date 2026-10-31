@@ -43,31 +43,38 @@ func TestMvJustCreated(t *testing.T) {
 	}
 }
 
-// TestMvHardLink tests that mv detects hard links and warns about duplicates
+// TestMvHardLink guards F08: distinct hardlinked operands are not duplicate paths.
+// See also internal/builtins TestF08MoveHardlinkedOperands.
 func TestMvHardLink(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create test structure: touch a; ln a b
 	mkFile(t, dir, "a", "")
-	os.Link(dir+"/a", dir+"/b")
-	os.Mkdir(dir+"/d", 0755)
+	if err := os.Link(dir+"/a", dir+"/b"); err != nil {
+		t.Skipf("hardlinks unavailable: %v", err)
+	}
+	if err := os.Mkdir(dir+"/d", 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	r := runIn(t, dir, "mv", "a", "b", "d")
-
-	// Should succeed
 	wantSuccess(t, r)
+	wantErr(t, r, "")
 
-	// Should have warning about duplicate source
-	wantErrContains(t, r, "warning")
-	wantErrContains(t, r, "specified more than once")
-
-	// Only one file should be in d (the other source was skipped as duplicate)
-	entries, err := os.ReadDir(dir + "/d")
+	a, err := os.Stat(dir + "/d/a")
 	if err != nil {
-		t.Fatalf("Failed to read d: %v", err)
+		t.Fatal(err)
 	}
-	if len(entries) != 1 {
-		t.Fatalf("Expected 1 file in d, got %d", len(entries))
+	b, err := os.Stat(dir + "/d/b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !os.SameFile(a, b) {
+		t.Fatal("moved files are no longer hardlinked")
+	}
+	for _, name := range []string{"a", "b"} {
+		if _, err := os.Lstat(dir + "/" + name); !os.IsNotExist(err) {
+			t.Errorf("source %s remains: %v", name, err)
+		}
 	}
 }
 

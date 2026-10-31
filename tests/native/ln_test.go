@@ -66,9 +66,13 @@ func TestLn_SameFile(t *testing.T) {
 	r := runIn(t, dir, "ln", "-s", "file.txt", "file.txt")
 	wantFail(t, r)
 	wantErrContains(t, r, "are the same file")
-	// With -f, GNU allows replacing a file with a self-referential symlink
+	// Force must not replace an existing source with a self-referential link.
 	r = runIn(t, dir, "ln", "-sf", "file.txt", "file.txt")
-	wantSuccess(t, r)
+	wantFail(t, r)
+	wantErrContains(t, r, "are the same file")
+	if got := readFile(t, dir+"/file.txt"); got != "data" {
+		t.Errorf("source content = %q, want data", got)
+	}
 }
 
 func TestLn_HardSameFile(t *testing.T) {

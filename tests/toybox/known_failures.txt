@@ -1,11 +1,10 @@
 # Toybox cases Misa does not pass yet. Each line: <command>/<case>  # reason
 # They are skipped; MISA_KNOWN_FAILURES=1 runs them. Remove a line once it passes.
-chmod/u-x_dir_file  # adapter: multi-line setup loop isn't parsed
-chmod/g-x_dir_file  # adapter: multi-line setup loop isn't parsed
-chmod/o-x_dir_file  # adapter: multi-line setup loop isn't parsed
-mv/interactive:_no_stdin  # adapter: setup reuses link1 from an earlier case; also GNU 9.x exits 1 when -i declines
-mv/interactive:_answered_NO  # adapter: setup reuses link1 from an earlier case; also GNU 9.x exits 1 when -i declines
-cp/symlink_dest_permissions  # cp: mode of a symlinked destination differs from toybox
+chmod/u-x_dir_file  # F08 later batch: chmod verifies remaining execute bits incorrectly; adapter also splits multiline setup
+chmod/g-x_dir_file  # F08 later batch: chmod verifies remaining execute bits incorrectly; adapter also splits multiline setup
+chmod/o-x_dir_file  # F08 later batch: chmod verifies remaining execute bits incorrectly; adapter also splits multiline setup
+mv/interactive:_no_stdin  # adapter: wildcard cleanup leaves link1; decline status also differs from Toybox (F08 follow-up)
+mv/interactive:_answered_NO  # adapter: wildcard cleanup leaves link1; decline status also differs from Toybox (F08 follow-up)
 du/(no_options)  # du: block counts depend on the filesystem (btrfs/zfs allocate differently)
 du/-s  # du: block counts depend on the filesystem
 du/counts_symlinks_without_following  # du: block counts depend on the filesystem
@@ -15,4 +14,4 @@ du/-HL_follows_symlinks  # du: block counts depend on the filesystem
 du/-H_does_not_follow_unspecified_symlinks  # du: block counts depend on the filesystem
 du/-LH_does_not_follow_unspecified_symlinks  # du: block counts depend on the filesystem
 du/-H_follows_specified_symlinks  # du: block counts depend on the filesystem
-env/why_is_this_allowed  # env: =BLAH (empty variable name) is rejected
+env/why_is_this_allowed  # reference conflict: Toybox accepts =value, uutils warns and drops; Misa follows uutils

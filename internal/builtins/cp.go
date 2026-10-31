@@ -1,3 +1,5 @@
+// F08 creation-mode behavior is checked against Toybox tests/cp.test
+// at 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb (0BSD). Native Go implementation.
 package builtins
 
 import (
@@ -874,9 +876,8 @@ func applyCopiedAttrs(dst string, srcInfo os.FileInfo, preserve preserveAttrs) {
 	if preserve.mode {
 		os.Chmod(dst, srcInfo.Mode().Perm())
 	}
-	// Else: leave dst's mode as the OS already set it at creation time
-	// (the standard 0666/0777 default masked by the process umask) —
-	// GNU cp does *not* fall back to "source mode minus umask".
+	// Else: leave the destination mode as set by open (source mode masked
+	// by umask for a new file, unchanged for an existing file).
 	if preserve.timestamps {
 		os.Chtimes(dst, srcInfo.ModTime(), srcInfo.ModTime())
 	}
@@ -952,10 +953,10 @@ func copyOneFile(src, dst string, srcInfo os.FileInfo, preserve preserveAttrs, f
 	} else if force {
 		_ = os.Remove(dst)
 	}
-	df, err := os.Create(dst)
+	df, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, srcInfo.Mode().Perm())
 	if err != nil && force && !backupActive {
 		_ = os.Remove(dst)
-		df, err = os.Create(dst)
+		df, err = os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, srcInfo.Mode().Perm())
 	}
 	if err != nil {
 		return bpath, fmt.Errorf("cannot create regular file '%s': %s", displayDst, fmtOsErr(err))

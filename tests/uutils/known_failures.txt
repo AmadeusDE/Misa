@@ -1,13 +1,10 @@
 # uutils cases Misa does not pass yet. Each line: <command>/<case>  # reason
 # They are skipped; MISA_KNOWN_FAILURES=1 runs them. Remove a line once it passes.
 id/test_id_digital_username_0_L580  # adapter: upstream test only runs when a user named 200 exists
-ln/test_symlink_remove_existing_same_src_and_dest_0_L971  # ln -sf a a: should fail like GNU
 ls/test_invalid_value_returns_1_7_L10  # ls: --time doesn't take a value yet
 ls/test_invalid_value_time_style_1_L153  # ls: --time doesn't take a value yet
 ls/test_time_style_empty_after_posix_prefix_L171  # ls: --time-style validation
 ls/test_long_options_detached_2_L7699  # ls: --time doesn't take a value yet
-mv/test_mv_same_file_dot_dir_0_L824  # mv: message for moving a directory onto itself differs
-mv/test_mv_hardlink_preservation_0_L2725  # mv: hard links across a directory move aren't preserved
 nl/test_negative_line_increment_L1  # nl: negative -i is rejected
 nl/test_negative_line_increment_1_L1  # nl: negative -i is rejected
 numfmt/test_locale_fr_output_L1689  # numfmt: no locale support (the test needs fr_FR)
