@@ -16,3 +16,5 @@ func idOf(info fs.FileInfo) (fileID, bool) {
 	}
 	return fileID{uint64(st.Dev), uint64(st.Ino)}, true
 }
+
+func sameDevice(a, b fileID) bool { return a.dev == b.dev }

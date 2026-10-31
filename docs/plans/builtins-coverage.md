@@ -160,7 +160,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `fdisk` | pending | – | – | – | – | no tests | 1557 | – | heavy |
 | `fgrep` | posix | – | – | – | – | no tests | 548 | – | medium |
 | `file` | posix | 25 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 549 | – | medium |
-| `find` | posix | 58 | findutils:87 | 0 | kernel/fs, network, root, tty | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 0/87 simple new_ucmd! cases parseable by tests/uutils adapter | 730 | – | heavy |
 | `flock` | other | – | – | – | – | no tests | 39 | – | light |
 | `free` | other | – | procps:12 | 12 | – | uutils: Rust, 12/12 simple new_ucmd! cases parseable by tests/uutils adapter | 58 | 641 | light |
 | `freeramdisk` | other | – | – | – | – | no tests | 23 | – | light |

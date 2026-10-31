@@ -15,9 +15,13 @@ import (
 
 // Options says where relative roots resolve and which symlinks to follow.
 type Options struct {
-	Base        string // directory relative roots resolve against; "" is the process's
-	FollowLinks bool   // follow every symlink, the root included (-R, -L)
-	FollowRoot  bool   // follow only a symlink given as the root (-r, -H)
+	Base          string // directory relative roots resolve against; "" is the process's
+	FollowLinks   bool   // follow every symlink, the root included (-R, -L)
+	FollowRoot    bool   // follow only a symlink given as the root (-r, -H)
+	PostOrder     bool   // report directories after their children
+	MaxDepth      *int   // nil means unlimited
+	SameDevice    bool   // do not descend onto another device
+	DanglingLinks bool   // report missing symlink targets as links
 }
 
 // Entry is one visited file. Path is the root joined with the names below
@@ -42,9 +46,10 @@ var ErrLoop = errors.New("recursive directory loop")
 const maxDepth = 2048
 
 // Walk calls fn for root and then, depth first and sorted by name, for
-// everything below it. A directory is passed to fn before its contents. An
-// error from fn other than SkipDir stops the walk and is returned, as is
-// the context's error once it is done.
+// everything below it. Directories are passed to fn before their contents,
+// unless PostOrder is set. SkipDir cannot prune a postorder directory because
+// its children have already been visited. An error from fn other than SkipDir
+// stops the walk and is returned, as is the context's error once it is done.
 func Walk(ctx context.Context, root string, opt Options, fn func(Entry) error) error {
 	w := &walker{ctx: ctx, opt: opt, fn: fn}
 	info, err := os.Lstat(w.fsPath(root))
@@ -52,11 +57,14 @@ func Walk(ctx context.Context, root string, opt Options, fn func(Entry) error) e
 		var target fs.FileInfo
 		if target, err = os.Stat(w.fsPath(root)); err == nil {
 			info = target
+		} else if opt.DanglingLinks && errors.Is(err, fs.ErrNotExist) {
+			err = nil
 		}
 	}
 	if err != nil {
 		return w.report(root, info, 0, err)
 	}
+	w.rootID, w.hasRootID = idOf(info)
 	return w.visit(root, info, 0)
 }
 
@@ -65,6 +73,8 @@ type walker struct {
 	opt       Options
 	fn        func(Entry) error
 	ancestors []fileID
+	rootID    fileID
+	hasRootID bool
 }
 
 func (w *walker) visit(path string, info fs.FileInfo, depth int) error {
@@ -72,8 +82,17 @@ func (w *walker) visit(path string, info fs.FileInfo, depth int) error {
 	if info.IsDir() && (hasID && slices.Contains(w.ancestors, id) || !hasID && depth > maxDepth) {
 		return w.report(path, info, depth, ErrLoop)
 	}
-	if err := w.call(Entry{Path: path, Info: info, Depth: depth}); err != nil || !info.IsDir() {
-		return skipped(err)
+	if !w.opt.PostOrder || !info.IsDir() {
+		if err := w.call(Entry{Path: path, Info: info, Depth: depth}); err != nil || !info.IsDir() {
+			return skipped(err)
+		}
+	}
+	if (w.opt.MaxDepth != nil && depth >= *w.opt.MaxDepth) ||
+		(w.opt.SameDevice && depth > 0 && hasID && w.hasRootID && !sameDevice(id, w.rootID)) {
+		if w.opt.PostOrder {
+			return skipped(w.call(Entry{Path: path, Info: info, Depth: depth}))
+		}
+		return nil
 	}
 	if hasID {
 		w.ancestors = append(w.ancestors, id)
@@ -97,6 +116,9 @@ func (w *walker) visit(path string, info fs.FileInfo, depth int) error {
 			return err
 		}
 	}
+	if w.opt.PostOrder {
+		return skipped(w.call(Entry{Path: path, Info: info, Depth: depth}))
+	}
 	return nil
 }
 
@@ -107,6 +129,9 @@ func (w *walker) childInfo(path string, d fs.DirEntry) (fs.FileInfo, error) {
 	}
 	target, err := os.Stat(w.fsPath(path))
 	if err != nil {
+		if w.opt.DanglingLinks && errors.Is(err, fs.ErrNotExist) {
+			return info, nil
+		}
 		return info, err
 	}
 	return target, nil

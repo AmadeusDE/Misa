@@ -204,7 +204,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `fgconsole` |  |  | ✓ |  |
 | `fgrep` |  | ✓ posix | ✓ |  |
 | `file` |  | ✓ posix |  |  |
-| `find` |  | ✓ posix | ✓ | ✓ findutils |
+| `find` | ✓ | ✓ posix | ✓ | ✓ findutils |
 | `findfs` |  |  | ✓ |  |
 | `fix` | ✓ |  |  |  |
 | `flash_eraseall` |  |  | ✓ |  |

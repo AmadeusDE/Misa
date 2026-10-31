@@ -112,6 +112,7 @@ internal/
     delegate.go                  Compact list delegate using titled interface
     items.go                     menuItem and fileItem types
   builtins/                      Shell built-in commands (coreutils subset + top-commands)
+    find*.go                    `find` argv expression parser/evaluator; uses shared `walk` and `posixre`
     registry.go                  Command registry — Register/Lookup/Names
     args.go                      POSIX/GNU option parser with compact spec strings
     topcommands.go               History analytics — ranked command frequency across shells
