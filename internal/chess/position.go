@@ -191,6 +191,8 @@ func (p *Position) generate(tactical bool) []Move {
 					add(to, p.EPPawn)
 				case target.Type != 0 && target.Color != pc.Color && comp.Capture:
 					add(to, to)
+				case target.Type != 0 && target.Color == pc.Color && v.SelfCapture && !v.Type(target).Royal && comp.Capture:
+					add(to, to)
 				}
 				return true
 			})

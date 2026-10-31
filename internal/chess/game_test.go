@@ -186,6 +186,10 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	if len(g.match.Notation()) != 0 {
 		t.Error("undo kept the move")
 	}
+	keys(g, "v", "s", "e", "l", "f", "c", "a", "p", "t", "u", "r", "e", "enter")
+	if got := g.match.Variant().ID; got != "selfcapture" {
+		t.Fatalf("picker selected %s, want selfcapture", got)
+	}
 }
 
 func TestLettersToggle(t *testing.T) {

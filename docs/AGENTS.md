@@ -320,9 +320,11 @@ internal/
   file with an existing id replaces it. Built-ins: chess, double (Double Chess 16×12), bigboard (Betza's 16×16),
   doublebig (Double Big Board 32×16), amazon (queen-replacement Amazon Chess), nocastling (orthodox chess without
   castling), capablanca (10×8 with Archbishop and Chancellor), berolina (Berolina Chess: diagonal noncapturing
-  pawn moves, diagonal initial double-step, straight captures and en passant), and stalematewins (Stalemate-wins
-  Chess: delivering stalemate wins). `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins)
-  or `loss`; Match.Status/Decisive and the search both honour it.
+  pawn moves, diagonal initial double-step, straight captures and en passant), stalematewins (Stalemate-wins
+  Chess: delivering stalemate wins), and selfcapture (Self-capture Chess: `self_capture: true` in the variant
+  YAML lets a side capture its own non-royal pieces with normal capture moves; Tomašev et al., arXiv:2009.04374).
+  `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
+  and the search both honour it.
   Movement is checked by perft (`position_test.go`), so run the chess tests after touching move generation.
   The engine only uses what variants define (values, royal/pawn flags, ranks to promotion), so new pieces need at
   most a `value:`. Search runs off the UI goroutine on immutable Positions; cancel() sets the Stop flag and bumps

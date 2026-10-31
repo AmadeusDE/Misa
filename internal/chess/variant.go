@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml", "selfcapture.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -43,6 +43,7 @@ type Castle struct{ King, Rook, KingTo, RookTo int }
 type Variant struct {
 	ID, Name, Description string
 	Files, Ranks          int
+	SelfCapture           bool
 	Pieces                []*PieceType
 	Castling              []Castle
 	Promotion             []uint8 // piece types a pawn may become
@@ -99,6 +100,7 @@ type variantDef struct {
 	PromotionZone int           `yaml:"promotion_zone"`
 	MoveLimit     int           `yaml:"move_limit"`
 	Stalemate     StalemateRule `yaml:"stalemate"`
+	SelfCapture   *bool         `yaml:"self_capture"`
 
 	source string
 }
@@ -287,6 +289,9 @@ func merge(parent, child variantDef) variantDef {
 	if child.Stalemate != "" {
 		d.Stalemate = child.Stalemate
 	}
+	if child.SelfCapture != nil {
+		d.SelfCapture = child.SelfCapture
+	}
 	d.Pieces = slices.Clone(parent.Pieces)
 	for _, p := range child.Pieces {
 		i := slices.IndexFunc(d.Pieces, func(q pieceDef) bool { return strings.EqualFold(q.Letter, p.Letter) })
@@ -303,6 +308,7 @@ func build(d variantDef) (*Variant, error) {
 	v := &Variant{
 		ID: d.ID, Name: d.Name, Description: d.Description,
 		Files: d.Files, Ranks: d.Ranks, Setup: d.Setup, Source: d.source,
+		SelfCapture:   d.SelfCapture != nil && *d.SelfCapture,
 		PromotionZone: d.PromotionZone, MoveLimit: d.MoveLimit, Stalemate: d.Stalemate,
 	}
 	if v.Name == "" {
