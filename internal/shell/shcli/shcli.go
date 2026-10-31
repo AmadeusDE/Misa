@@ -1,4 +1,4 @@
-// Package shcli provides the noninteractive shell command-line entry point.
+// Package shcli provides noninteractive shell and persistent-worker entry points.
 package shcli
 
 import (
@@ -72,6 +72,12 @@ func Run(ctx context.Context, name string, args []string, opts Options) int {
 		stderr = io.Discard
 	}
 	usage := func(message string) int { fmt.Fprintf(stderr, "%s: %s\n", name, message); return 1 }
+	if len(args) > 0 && args[0] == "--worker" {
+		if len(args) != 1 {
+			return usage("--worker accepts no arguments")
+		}
+		return runWorker(ctx, name, opts)
+	}
 	var flags []string
 	command, fromStdin := false, false
 	i := 0

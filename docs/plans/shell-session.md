@@ -259,3 +259,155 @@ tests inject fake registry and path lookups, and the adapter tests create their
 fake executables by linking the test binary into a temporary directory, skipping
 where exec permission is unavailable. `shcli` re-runs the same paths through
 `misa sh -c`.
+
+## S05 — persistent worker and control protocol
+
+### Prototype decision and scope
+
+S05 selects a **persistent child Misa process per pane** as the production
+transport. `worker.StartProcess` re-executes the Misa multicall binary as
+`misa sh --worker`; it never starts a host shell. A child gives process-local
+mutations a separate home and can be killed when cooperative cancellation is
+insufficient. This is a library/CLI foundation, not TUI wiring: S06 will create
+and own workers from panes. Plain `misa` and all existing builtin dispatch remain
+unchanged.
+
+`worker.Start` is the smaller, in-process prototype and portable test transport.
+It uses the same framing and session owner over `net.Pipe`, not a second parser
+or a state-reconstruction mechanism. It remains useful for audited handlers and
+captured scripts, but cannot isolate process-global changes or forcibly stop Go
+code. No external implementation was consulted or copied for this orchestration;
+the existing attributed in-tree interpreter remains unchanged.
+
+### Channels and lifecycle
+
+The child transport supports Unix, including Android. The parent creates a
+socketpair and passes one endpoint as descriptor 3. The exact `sh --worker`
+entry point converts that descriptor to an owned control connection; it is not
+script input. Command stdin/stdout/stderr remain three separate streams supplied
+by the caller (and can later be attached to a PTY). Command output, including
+binary data or JSON-looking text, is never parsed as control traffic. Child
+launch is explicitly unsupported on other platforms; the in-process transport
+is portable. There are no startup files or implicit project configuration.
+
+Control protocol version 1 uses a four-byte big-endian length followed by a JSON
+object, with a maximum payload of 1 MiB. The maximum includes JSON escaping and
+metadata, not just script bytes. Both endpoints exchange `hello` with `version`
+and `capabilities` before accepting commands. Supported messages are:
+
+- `run {id, script}` and `result {id, status, exited, error, syntax}`;
+- `cancel {id}` for the active submission;
+- `shutdown`, followed by an `exit` report;
+- `crash {status}` for a recovered worker failure.
+
+The client serializes submissions, assigns IDs, and keeps its submission slot
+until the prior response is consumed, even after the caller cancels. The server
+allows only one active submission; that submission alone owns the persistent
+session. Functions, unexported variables, exports, options, cwd and status are
+retained, not copied back out of one-shot shells. Ordinary command failures stay
+shell statuses; syntax, cancellation, exited-session and runtime failures are
+separate from control/worker failures. A canceled request does not roll back
+already changed shell state.
+
+The child is also supervised with `exec.Cmd.Wait`, independently of control EOF:
+a worker exit cannot strand a request merely because another process retained a
+control descriptor. Abnormal process exit has a typed `worker.ExitError` and
+subsequent requests fail. Recovered panics are reported without including the
+panic payload (which might contain command data). Fatal process failures outside
+the recoverable owner are detected by the parent wait monitor. Workers are not
+restarted automatically: silent restart would lose pane state.
+
+A `result` reports interpreter completion, **not** an output-drained barrier.
+The raw I/O and control channels are independent: parent-side output copying may
+lag the result. Supplied writers must be safe for asynchronous access; a plain
+`bytes.Buffer` must not be read concurrently with a copy pump. Caller-owned I/O
+that never returns can leave its copy goroutine blocked, but cannot hold up child
+reaping or bounded shutdown. Use file/PTY streams or cooperative I/O in production.
+**S06 TODO:** handle output-vs-result ordering explicitly, for example by draining
+to quiescence before redrawing a prompt; do not assume receiving a result means
+all screen bytes have already arrived.
+
+Shutdown is idempotent. It requests cancellation and graceful termination, then
+the child transport bounds waiting and escalates to process kill/reaping. The
+caller can set a shorter context deadline. The in-process transport cannot force
+an uncooperative handler or caller-owned blocking I/O to return; shutdown can
+seal its control connection but must not be described as having stopped that Go
+code. Streams remain caller-owned and are never closed by the worker.
+
+### Migration boundaries
+
+No existing interactive execution surface is migrated in S05. S06 owns pane
+creation, prompt submission, state reflection and user-visible worker failure
+handling. This control channel is not a job-control protocol: PTY foreground
+ownership, traps, process groups shared by pipelines, stop/continue and full job
+supervision remain S09/S10 and S15–S18. Existing F03/F04/F05 process-state and
+cooperative utility limitations still apply; killing a worker is not a claim
+that arbitrary descendant jobs are supervised. Editor, agent and platform
+execution surfaces remain S19–S21, and the default rollout gate remains S22.
+
+### Verification and cost
+
+Native tests and benchmarks accompany the implementation. Results and exact
+commands are recorded below after verification; cross-vet is type checking,
+not a claim of runtime behavior on those systems.
+
+Constructors (`Start`, `StartProcess`, `Connect`) use their context for startup
+and handshake only. Per-command contexts cancel individual submissions; explicit
+`Shutdown` owns the worker lifetime. `Serve`'s context, in contrast, owns that
+server's lifetime. The child shutdown timeout defaults to one second and may be
+configured; the in-process caller must provide a deadline if its handler might
+not cooperate. Canceling during a blocked control write seals the client, since
+a partially written frame cannot safely be reused. On control EOF the child
+transport allows up to 100 ms for independent process reaping to supply an exact
+`ExitError`; if a still-live worker closes its socket, the original transport
+error is returned instead of waiting indefinitely. A signal-terminated process
+has `ExitCode() == -1`, with the underlying `*exec.ExitError` available through
+`errors.As`; a recovered owner panic uses status 125.
+
+Measured on Linux/amd64, Intel Xeon VM, Go 1.27.3, `CGO_ENABLED=0`, with no race
+instrumentation (short samples, not performance guarantees):
+
+```sh
+env -u OPENROUTER_API_KEY CGO_ENABLED=0 go test ./internal/shell/worker \
+  -run '^$' -bench . -benchmem -benchtime=100x -count=3
+CGO_ENABLED=0 go build -o /tmp/misa-worker-cost .
+```
+
+| Measurement | Observed cost |
+|---|---:|
+| In-process startup + graceful shutdown | 55–68 µs; about 32 KiB allocated |
+| In-process `true` round trip | 14–16 µs; about 5.6 KiB allocated |
+| Test-binary child startup + graceful shutdown | 2.67–2.74 ms |
+| Test-binary child `true` round trip | 41–49 µs |
+| Idle test-binary child RSS | about 12,288 KiB per child |
+| Full Misa binary spawn through handshake (30-run median) | 15.29 ms |
+| Full Misa binary `true` round trip (30 × 100 commands, median) | 37.17 µs |
+| Full Misa idle RSS delta versus no worker | +26,964 KiB per child |
+| RSS growth after state setup and 100 `true` requests (median) | +1,066 KiB |
+
+The test-binary startup benchmark includes shutdown and process reaping; it
+**underestimates full-binary initialization**. The full-binary probe launched
+`/tmp/misa-worker-cost sh --worker` directly with an empty `PATH`, descriptor 3
+connected to a Unix socketpair, and stdio attached to `/dev/null`. It timed the
+version-1 hello round trip, sampled `/proc/<pid>/status` `VmRSS`, submitted three
+state/setup/check requests and 100 `true` requests, sampled RSS again, then sent
+shutdown and waited for exit. The state checks exercised functions, cwd and
+`printenv` across requests. No host shell was used. RSS is resident memory, not
+private/PSS memory: shared executable/runtime pages may be counted in more than
+one process, so these deltas must not be summed as an exact physical-memory
+budget. There is no per-pane RSS for the goroutine prototype because it shares
+the process; its allocation numbers above are not a resident-memory estimate.
+The child cost is material enough that S06 should avoid speculative idle worker
+creation and measure actual pane workloads before optimizing this protocol.
+
+Final checks passed: `gofmt -l .` (empty), `go vet ./...`, `nough` and combined
+`nogui noweb` builds, focused builtins/shell tests, full tests with
+`OPENROUTER_API_KEY` unset, and shell race tests. The vet/build/full-test checks
+also passed with `CGO_ENABLED=0`. OpenBSD, FreeBSD and Darwin builtins plus shell
+cross-vet passed; Windows builtins were already failing baseline type checking
+in unrelated platform code, but the standalone worker package cross-vet passed.
+Android/arm64 `CGO_ENABLED=0` shell builds passed. No Android emulator, Android
+NDK/cgo build, or real-PTY/job-control runtime test is claimed by S05. Full tests
+passed without needing the known flaky-test reruns. Binary smoke checks covered
+`echo`, `printf`, `rev`, `sh -c`, invalid worker descriptor handling and the
+persistent full-binary protocol probe.
