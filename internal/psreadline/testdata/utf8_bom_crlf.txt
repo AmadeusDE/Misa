@@ -1,0 +1,7 @@
+﻿Get-ChildItem
+write-host "héllo"
+
+ls `
+  -Force `
+  | sort
+Get-Date

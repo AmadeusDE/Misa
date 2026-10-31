@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 type CompanionConfig struct {
@@ -99,34 +101,20 @@ func (mc CompanionConfig) Selection() Selection {
 
 func companionConfigPath() string { return findFile("companion.yaml") }
 
-// findFile looks for name next to the executable, then in ~/.config/misa,
-// never in the working directory.
-func findFile(name string) string {
-	if execPath, err := os.Executable(); err == nil {
-		p := filepath.Join(filepath.Dir(execPath), name)
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	if dir, err := os.UserConfigDir(); err == nil {
-		p := filepath.Join(dir, "misa", name)
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return ""
-}
+// findFile looks for name next to the executable, then in the user
+// configuration directory, never in the working directory.
+func findFile(name string) string { return hostpath.FindFile(name) }
 
 func companionConfigSavePath() string {
 	p := companionConfigPath()
 	if p != "" {
 		return p
 	}
-	dir, err := os.UserConfigDir()
-	if err != nil {
+	dir := hostpath.ConfigDir()
+	if dir == "" {
 		return ""
 	}
-	return filepath.Join(dir, "misa", "companion.yaml")
+	return filepath.Join(dir, "companion.yaml")
 }
 
 func LoadCompanionConfig() CompanionConfig {

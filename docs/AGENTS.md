@@ -186,6 +186,10 @@ internal/
   clipboard/                     Host clipboard: atotto on Linux/BSD/macOS, termux-clipboard-* when on
                                  PATH, ErrUnavailable so the UI emits OSC 52. APK JNI replaces it later
   color/                         Color palette loading, hex-to-ANSI, color translation
+  hostpath/                      The one place that picks host directories (config, data, history, tldr), the login
+                                 name, and splits typed paths for completion (`\` and drive/UNC roots behind a
+                                 `windows` parameter). Every config/art/theme/chess/pkgmanager search goes through it
+  psreadline/                    Read-only parser for PowerShell's PSReadLine history (BOM/UTF-16, CRLF, backtick lines)
   config/                        YAML config — config.yaml (menu, ascii, colors, ui, statusbar), mux.yaml, fetch.yaml, gui.yaml
   companion/                     Encouraging messages after command (cargo-mommy derived)
     companion.go                 Respond(), template vars ({role}, {part}, {item}, {prefix}…)
@@ -299,11 +303,11 @@ internal/
 - **Android build tags**: `GOOS=android` satisfies `linux`. Android-only files are tagged `android`. `import "C"` only with `android && cgo` (the same constraint covers `.c` files that include `jni.h` or `native_window.h`). `CGO_ENABLED=0` everywhere else. NDK version is `android/ndk.version`; API level for the CLI is 24. `libmisagui.so` is built with the API 26 clang (`just android-lib`).
 - **External asset loading**: Distro art from `~/.config/misa/ascii/distro/`, anime only from `~/.config/misa/ascii/anime/` or `ascii/anime/` next to the binary (none is bundled; no art means an empty right column), themes from `presets.json`, all also searched next to binary.
 - **Picker screen**: Reusable searchable toggle-list with preview. Used by settings, onboarding. `finishPicker()` checks `m.picker == nil` before overwriting screen to handle chained pickers.
-- **Config search order**: next to executable → `~/.config/misa/`. Same for companion, mux, fetch and gui configs. Never the working directory: a cloned repo must not be able to supply `autorun:` or aliases.
+- **Config search order**: next to executable → the user config dir (`hostpath.ConfigDir()`: `os.UserConfigDir()/misa`, so `$XDG_CONFIG_HOME` or `~/.config/misa` on Linux, `%APPDATA%\misa` on Windows). Same for companion, mux, fetch, gui, chess, ascii, pkgmanager and `presets.json`. Never the working directory: a cloned repo must not be able to supply `autorun:` or aliases. Data, history and tldr live in `hostpath.DataDir()`: `~/.local/share/misa` on Unix (`XDG_DATA_HOME` is not honoured), `%LOCALAPPDATA%\misa` on Windows. Call `hostpath`, never `os.UserConfigDir`/`UserHomeDir` plus a literal path; the login name comes from `hostpath.Username()` (`USER`, `LOGNAME`; `USERNAME` on Windows).
 - **Config `*bool` pattern**: `BoolDefault()`/`BoolPtr()` helpers for settings that default to true.
 - **Configurable colors**: All colors configurable via `colors:` (info items) and `ui:` (prompt, divider, ghost, etc.) in config.yaml. Defaults are gruvbox.
 - **Builtins**: Registered via `init()` with `Register(Command{...})`. Each uses the `Spec`/`ParseArgs` option parser. Context provides Dir, Args, Width, Height, Stdout/Stderr/Stdin.
-- **History format**: Zsh-style (`: timestamp:0;command`). Import from bash/zsh is read-only — never writes to external history files. Entries without timestamps (bash imports) sort to the front.
+- **History format**: Zsh-style (`: timestamp:0;command`). Import from bash/zsh (and, on Windows, PSReadLine's `%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt`) is read-only — never writes to external history files. Entries without timestamps (bash and PSReadLine imports) sort to the front; PSReadLine's backtick-continued lines are flattened to one line.
 - **Companion setup**: Moods, pronouns, call terms, prefixes, items/parts, emotes, kemonos, modifiers. Thirsty unlocks NSFW `{part}` (original mommy: milk, cock, cum, mouth); otherwise `{part}` uses SFW items. Modifiers can add combo lines when other modifiers are also selected. Texts load from embedded yaml under `internal/companion/data/`.
 - **Root view**: `Model.View()` returns a `tea.View` (alt screen, `MouseModeAllMotion`) only for the root; panes compose through `render() string`.
 - **Mouse support**: Enabled via the root view's `MouseMode` (hover events included). The root converts Bubble Tea's mouse messages once (`fromTea`) into `mouseMsg` (Mouse + `Action`: press/release/motion), which handlers and pane coordinate translation use; `toTea` turns it back for embedded agents. Helpers in `mouse.go`. Click to select/activate list items, scroll wheel on lists/viewports, click mux bar tags to switch, click panes to focus. Hovering focuses the pane under the pointer unless `focus_follows_mouse: false` in mux.yaml. Bare hovers that don't move focus reuse the last root frame (`muxFrame`), so mouse handlers must not change the view on button-less motion. Each screen handler has a `mouseMsg` case. Mux root translates absolute coords to pane-relative coords for nested Misa panes.
@@ -370,8 +374,8 @@ Project rules:
 - All assets embedded via `//go:embed`. No `//go:generate`.
 - Tests in `_test.go` files in the same package.
 - Companion has its own config file (`companion.yaml`), separate from main config.
-- History stored at `~/.local/share/misa/history` in zsh format (`: timestamp:0;command`).
-- Config search order: next to executable → `~/.config/misa/` (never the working directory).
+- History stored at `~/.local/share/misa/history` (Windows: `%LOCALAPPDATA%\misa\history`) in zsh format (`: timestamp:0;command`).
+- Config search order: next to executable → `~/.config/misa/` (Windows: `%APPDATA%\misa`), never the working directory.
 - Never write to external shell history files (bash, zsh). Read-only imports.
 - Builtins register via `init()` with `Register(Command{...})` and use the `Spec`/`ParseArgs` option parser.
 - Plans stay plans: never open a GitHub issue or a pull request for a plan alone. Keep plans in

@@ -1192,7 +1192,7 @@ func (m *Model) handleBuiltinCmd(input string) (bool, tea.Cmd) {
 					return true, nil
 				}
 				target = home
-			} else if strings.HasPrefix(target, "~/") {
+			} else if strings.HasPrefix(target, "~/") || (onWindows && strings.HasPrefix(target, `~\`)) {
 				home, err := os.UserHomeDir()
 				if err != nil {
 					m.shellBuffer = append(m.shellBuffer, "cd: "+err.Error())

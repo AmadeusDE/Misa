@@ -2,6 +2,7 @@ package help
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,14 +10,16 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 func tldrDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
+	dir := hostpath.TldrDir()
+	if dir == "" {
+		return "", errors.New("cannot determine the data directory")
 	}
-	return filepath.Join(home, ".local", "share", "misa", "tldr"), nil
+	return dir, nil
 }
 
 func EnsureTldr() error {

@@ -21,6 +21,7 @@ internal/gitinfo native
 internal/gradle native
 internal/gui native
 internal/help native
+internal/hostpath native
 internal/jobleader native
 internal/justfile native
 internal/launcher native
@@ -29,6 +30,7 @@ internal/makefile native
 internal/mines native
 internal/pkgmanager native
 internal/procmon compile # reads /proc; no Windows reader yet
+internal/psreadline native
 internal/sshclient native
 internal/sysinfo native
 internal/term compile # no ConPTY until P02 (#121)

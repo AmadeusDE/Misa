@@ -279,8 +279,24 @@ PATH; the non-fontconfig path searches `$PREFIX/share/fonts` and `/system/fonts`
 - Job control off (D7). `handleBuiltinCmd` jobs/fg/bg print a message. Ctrl+C reaches the child as
   `CTRL_C_EVENT` through ConPTY.
 - Environment: `USER` → `USERNAME` fallback (statusbar.go:164, sysinfo). `HOME` → `os.UserHomeDir`.
-- History: the zsh-format file stays under `%AppData%\misa`. Import PSReadLine history
+- History: the zsh-format file lives under `%LocalAppData%\misa\history`. Import PSReadLine history
   (`%AppData%\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt`) read-only, like bash/zsh.
+- **Host locations (I02, implemented in `internal/hostpath`).** Executable-adjacent files are always searched first;
+  the working directory never.
+
+  | What | Unix (unchanged) | Windows |
+  |---|---|---|
+  | config.yaml, mux/fetch/gui/companion.yaml, presets.json, ascii/, chess/, managers/ | `$XDG_CONFIG_HOME/misa`, else `~/.config/misa` | `%APPDATA%\misa` |
+  | history (zsh format), tldr pages | `~/.local/share/misa/` (no `XDG_DATA_HOME`) | `%LOCALAPPDATA%\misa\` |
+  | login name | `$USER`, `$LOGNAME` | `%USERNAME%`, else the `os/user` name without `DOMAIN\` |
+  | external history imported | `~/.bash_history`, `~/.zsh_history` | those, plus PSReadLine `ConsoleHost_history.txt` |
+
+  PSReadLine import (`internal/psreadline`): UTF-8 with or without BOM, UTF-16 LE/BE with BOM, BOM-less UTF-16LE,
+  CRLF/LF. A line ending in an odd number of backticks continues on the next line. Misa's history is one command per
+  line, so a multiline entry is flattened with single spaces. Entries have no timestamps and sort to the front.
+  Completion splits paths with `hostpath.SplitPath(p, windows)`: `\` and `/`, `C:\` roots, bare `C:` and UNC
+  prefixes; `PATH` is split with `filepath.SplitList` (`;` on Windows).
+  Not yet done: case-insensitive completion and PATHEXT-aware command completion on Windows; ugh's own paths (UD7).
 - File browser: drive roots (`GetLogicalDrives`), hidden/system attributes, open with `ShellExecuteW`.
 - Package manager menus: built-in `winget` definition, plus `scoop`/`choco` as external YAML examples
   (data-driven, `internal/pkgmanager`).

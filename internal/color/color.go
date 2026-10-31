@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 //go:embed assets/presets.json
@@ -41,10 +43,8 @@ func LoadPalettes(customPath string) Palettes {
 	}
 
 	if data == nil {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			d, err := os.ReadFile(filepath.Join(home, ".config", "misa", "presets.json"))
-			if err == nil {
+		if dir := hostpath.ConfigDir(); dir != "" {
+			if d, err := os.ReadFile(filepath.Join(dir, "presets.json")); err == nil {
 				data = d
 			}
 		}

@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/AmadeusDE/Misa/internal/builtins"
+	"github.com/AmadeusDE/Misa/internal/hostpath"
+	"github.com/AmadeusDE/Misa/internal/psreadline"
 )
 
 const maxHistoryLines = 5000
@@ -25,13 +28,9 @@ func builtinNames() []string {
 	return names
 }
 
-func historyPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".local", "share", "misa", "history")
-}
+func historyPath() string { return hostpath.HistoryFile() }
+
+const onWindows = runtime.GOOS == "windows"
 
 func loadHistory() []string {
 	entries := loadHistoryEntries()
@@ -151,6 +150,11 @@ func ImportExternalHistory() (int, error) {
 		zshEntries = parseZshHistory(string(data))
 	}
 
+	var psEntries []histEntry
+	if onWindows {
+		psEntries = psReadLineEntries(os.Getenv("APPDATA"))
+	}
+
 	var imported []histEntry
 	for _, e := range bashEntries {
 		if !seen[e.cmd] {
@@ -159,6 +163,12 @@ func ImportExternalHistory() (int, error) {
 		}
 	}
 	for _, e := range zshEntries {
+		if !seen[e.cmd] {
+			seen[e.cmd] = true
+			imported = append(imported, e)
+		}
+	}
+	for _, e := range psEntries {
 		if !seen[e.cmd] {
 			seen[e.cmd] = true
 			imported = append(imported, e)
@@ -193,6 +203,27 @@ func ImportExternalHistory() (int, error) {
 	merged := append(noTS, withTS...)
 	saveHistoryEntries(merged)
 	return len(imported), nil
+}
+
+// psReadLineEntries reads PSReadLine history under appData. Misa history holds one command per line, so a
+// multiline entry is flattened to one line (a backtick continuation is whitespace to PowerShell).
+func psReadLineEntries(appData string) []histEntry {
+	path := psreadline.Path(appData)
+	if path == "" {
+		return nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var entries []histEntry
+	for _, cmd := range psreadline.Parse(data) {
+		cmd = strings.Join(strings.Fields(cmd), " ")
+		if cmd != "" {
+			entries = append(entries, histEntry{cmd: cmd})
+		}
+	}
+	return entries
 }
 
 type shellState struct {
@@ -426,7 +457,7 @@ func firstFromPath(prefix string) string {
 		return ""
 	}
 	var best string
-	for _, dir := range strings.Split(pathEnv, ":") {
+	for _, dir := range filepath.SplitList(pathEnv) {
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			continue
@@ -453,7 +484,7 @@ func allFromPath(prefix string) []string {
 	}
 	seen := map[string]bool{}
 	var matches []string
-	for _, dir := range strings.Split(pathEnv, ":") {
+	for _, dir := range filepath.SplitList(pathEnv) {
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			continue
@@ -481,20 +512,24 @@ func firstFromFS(partial, dir string) string {
 	return ""
 }
 
-func allFromFS(partial, dir string) []string {
-	searchDir := dir
-	base := partial
-	pathPrefix := ""
+func allFromFS(partial, dir string) []string { return completeFS(partial, dir, onWindows) }
 
-	if strings.Contains(partial, "/") {
-		idx := strings.LastIndex(partial, "/")
-		pathPrefix = partial[:idx+1]
-		base = partial[idx+1:]
-		parent := filepath.Dir(partial)
-		if filepath.IsAbs(parent) {
-			searchDir = parent
+// completeFS lists the entries of the directory named by partial's leading part that start with its last
+// element. windows adds the backslash separator, drive roots and UNC paths; it is a parameter so both
+// behaviours can be tested on any host.
+func completeFS(partial, dir string, windows bool) []string {
+	searchDir := dir
+	pathPrefix, base := hostpath.SplitPath(partial, windows)
+
+	if pathPrefix != "" {
+		lookup := pathPrefix
+		if windows {
+			lookup = strings.ReplaceAll(lookup, `\`, "/")
+		}
+		if hostpath.IsAbs(pathPrefix, windows) {
+			searchDir = filepath.Clean(lookup)
 		} else {
-			searchDir = filepath.Join(dir, parent)
+			searchDir = filepath.Join(dir, lookup)
 		}
 	}
 
@@ -517,7 +552,7 @@ func allFromFS(partial, dir string) []string {
 		}
 		result := pathPrefix + name
 		if e.IsDir() {
-			result += "/"
+			result += hostpath.Separator(partial, windows)
 		}
 		matches = append(matches, result)
 	}

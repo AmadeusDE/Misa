@@ -13,6 +13,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"gopkg.in/yaml.v3"
+
+	"github.com/AmadeusDE/Misa/internal/hostpath"
 )
 
 //go:embed variants
@@ -176,14 +178,7 @@ func externalSources() []source {
 }
 
 func searchDirs(subdir string) []string {
-	var dirs []string
-	if execPath, err := os.Executable(); err == nil {
-		dirs = append(dirs, filepath.Join(filepath.Dir(execPath), subdir))
-	}
-	if cfgDir, err := os.UserConfigDir(); err == nil {
-		dirs = append(dirs, filepath.Join(cfgDir, "misa", subdir))
-	}
-	return dirs
+	return hostpath.SearchDirs(subdir)
 }
 
 // parseVariants loads the built-in variants plus extra files, for tests.
