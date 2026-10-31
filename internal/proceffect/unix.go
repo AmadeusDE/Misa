@@ -44,12 +44,24 @@ func handle(args []string, dispatch func(context.Context, []string) int) int {
 		fmt.Printf("%d", mask)
 		return 0
 	}
-	if len(args) != 2 || (args[0] != "adjust" && args[0] != "dispatch") {
+	if len(args) != 2 || (args[0] != "adjust" && args[0] != "dispatch" && args[0] != "renice") {
 		fmt.Fprintln(os.Stderr, "process effect: invalid protocol")
 		return 125
 	}
 	req, e := decode(args[1])
-	if e != nil || len(req.Argv) == 0 {
+	if e != nil {
+		fmt.Fprintln(os.Stderr, "process effect: invalid request")
+		return 125
+	}
+	// SIG_IGN survives exec, so the child's descendants outlive a closed
+	// terminal. Only the isolated child is affected.
+	if req.IgnoreHup {
+		signal.Ignore(syscall.SIGHUP)
+	}
+	if args[0] == "renice" {
+		return reniced(req.Renice)
+	}
+	if len(req.Argv) == 0 {
 		fmt.Fprintln(os.Stderr, "process effect: invalid request")
 		return 125
 	}
@@ -110,8 +122,56 @@ func handle(args []string, dispatch func(context.Context, []string) int) int {
 
 func sharesGroup() bool { return inEffectGroup.Load() }
 
+// reniced applies explicit targets from the isolated child. Each failure is
+// reported on its own line; any failure makes the child exit 1.
+func reniced(r *ReniceRequest) int {
+	if r == nil || len(r.IDs) == 0 {
+		fmt.Fprintln(os.Stderr, "process effect: invalid request")
+		return 125
+	}
+	status := 0
+	for _, id := range r.IDs {
+		// toybox's renice treats -n as an increment over the current value.
+		current, e := priority(r.Which, id)
+		if e != nil {
+			fmt.Fprintf(os.Stderr, "renice: setpriority %d: %s\n", id, errnoText(e))
+			status = 1
+			continue
+		}
+		next := current + r.Priority
+		if next > 19 {
+			next = 19
+		} else if next < -20 {
+			next = -20
+		}
+		if e := syscall.Setpriority(r.Which, id, next); e != nil {
+			fmt.Fprintf(os.Stderr, "renice: setpriority %d: %s\n", id, errnoText(e))
+			status = 1
+		}
+	}
+	return status
+}
+
+// errnoText renders an errno as a capitalised reason, matching the diagnostics
+// the stream utilities print.
+func errnoText(e error) string {
+	switch {
+	case errors.Is(e, syscall.EPERM), errors.Is(e, syscall.EACCES):
+		return "Permission denied"
+	case errors.Is(e, syscall.ESRCH):
+		return "No such process"
+	case errors.Is(e, syscall.EINVAL):
+		return "Invalid argument"
+	}
+	s := e.Error()
+	if s != "" && s[0] >= 'a' && s[0] <= 'z' {
+		s = string(s[0]-32) + s[1:]
+	}
+	return s
+}
+
 func start(ctx context.Context, req Request, inv Invocation, opts commandexec.Options) (*commandexec.Process, error) {
-	if len(req.Argv) == 0 {
+	if len(req.Argv) == 0 && req.Renice == nil {
 		return nil, errors.New("process effect: missing command")
 	}
 	exe, err := registeredHelper()
@@ -121,6 +181,9 @@ func start(ctx context.Context, req Request, inv Invocation, opts commandexec.Op
 	stage := "adjust"
 	if req.DispatchOnly {
 		stage = "dispatch"
+	}
+	if req.Renice != nil {
+		stage = "renice"
 	}
 	// A helper may own nested groups. Give cooperative dispatch time to tear
 	// those down before the outer owner forcibly kills its own group.

@@ -86,3 +86,47 @@ The unused legacy `internal/launcher.Command`, `Run`, and host-shell `UserShell`
 - **F07/U44:** The explicitly requested `sort` external compressor path remains unchanged: migrating that two-way streaming subprocess API is outside this env/nice/timeout slice. Future wrappers (`xargs` U08, `find -exec` U07, U29) can consume the neutral launcher; shell ENOEXEC fallback remains S12. No TODO(F06) markers remain in migrated wrapper code.
 
 - **Vi follow-up:** The registered `vi` builtin passes the invocation environment to its shell commands, but the terminal still uses process streams. Shell working directories depend on the edited filename (or process cwd), not consistently on the invocation directory. Cancellation is not propagated. These need a separate design without changing the UI frontend inadvertently.
+
+## U29 — process-target wrappers (`nohup`, `setsid`, `setpgid`, `renice`)
+
+Four wrappers consume the F06 launcher without adding supervision of their own; S17 still owns job control.
+`nohup`, `setsid`, `setpgid` and `renice` are registered on Unix; on other hosts the same names are registered
+but refuse with `unsupported on this platform` and status 125 rather than pretending to work.
+
+**Child-side requests.** `proceffect.Request` gained `IgnoreHup`, `Setsid`/`Setctty` (via `commandexec.Options`)
+and `Renice`; the private protocol stages are `adjust`, `dispatch` (both pre-existing) and `renice`, and `IgnoreHup`
+is applied in the child before dispatch in every stage, because `SIG_IGN` survives `exec`. `Setsid` and `Setctty` are kernel
+`SysProcAttr` fields on the **child** (the kernel clears `Setpgid` for a new session), so the parent's session,
+process group and terminal are untouched. `Setctty` is requested only when the invocation's stdin is a terminal:
+toybox issues `TIOCSCTTY` unchecked, while a failed kernel call here would fail the launch.
+
+**`nohup`.** Streams are replaced only when they are terminals: stdin becomes `/dev/null` (opened read-only, as
+toybox does — uutils opens it write-only), stdout appends to `nohup.out` (`O_CREATE|O_APPEND|O_WRONLY`, mode 0600,
+cwd first then `$HOME`), and stderr follows the redirected stdout. The hint
+`nohup: ignoring input and appending output to '<path>'` goes to the original stderr before that redirection.
+A `nohup.out` that cannot be opened anywhere exits 125. The command always runs through the dispatch-only helper so
+both Misa builtins and external programs inherit the ignored `SIGHUP`; an unresolvable command is reported by the
+parent as `nohup: failed to run command '…'` with 126/127. Usage errors exit 125 (`TOYFLAG_ARGFAIL(125)`), which
+deliberately beats uutils' `POSIXLY_CORRECT=127` (recorded in `tests/uutils/known_failures.txt`).
+
+**`setsid`.** `-c` (stdin becomes the new session's controlling terminal) and `-d` (detach from the terminal; a new
+session already has none, so it is accepted and has no further effect) are mutually exclusive; `-w` is accepted.
+Misa always waits for the command and forwards its status because nothing yet reaps a detached child — a deliberate
+difference from toybox, where the parent exits 0 immediately without `-w`, to revisit with S17. `-c` is a plain flag
+(toybox makes it repeatable to *steal* the terminal with `TIOCSCTTY` 1 and also moves the foreground group with
+`tcsetpgrp`; neither is implemented), and the kernel request is made only when stdin is a terminal.
+
+**`setpgid`.** A Misa-specific utility (toybox has none): it runs the command in its own process group through the
+launcher and waits. The calling process keeps its group.
+
+**`renice`.** `-n INCREMENT` is required and adds to each target's current nice value (toybox semantics, unlike
+GNU's absolute priority); the result is clamped to `-20..19`. `-p` (default), `-g` and `-u` select the target kind
+with toybox's precedence (`-g` over `-u` over `-p`); `-u` accepts user names and, unlike toybox, numeric uids.
+`getpriority`/`setpriority` run only inside the isolated `renice` stage, so the Misa host never inherits a priority
+change; the tests assert the caller's own nice value is unchanged afterwards. Every rejected operand keeps the
+other targets working, and any failure exits 1 — an intentional deviation from toybox, which reports the same
+errors but always exits 0. Identifiers are resolved in the parent (`os/user` for `-u`), and the child reports each
+`setpriority` failure on its own line.
+
+Options that these wrappers do not implement are rejected rather than ignored: `nohup` takes no options at all,
+`setsid` rejects unknown flags, and `setpgid` needs `--` before a command whose name begins with `-`.

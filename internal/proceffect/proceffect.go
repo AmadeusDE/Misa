@@ -15,7 +15,28 @@ type Request struct {
 	Adjustment int
 	// DispatchOnly skips priority adjustment and launches the default dispatcher.
 	DispatchOnly bool
-	Argv         []string
+	// IgnoreHup makes the child ignore SIGHUP. The disposition survives exec,
+	// which is how nohup's command outlives a closed terminal.
+	IgnoreHup bool
+	// Renice changes the priority of other processes from the child, so the
+	// calling process is never reniced by accident.
+	Renice *ReniceRequest
+	Argv   []string
+}
+
+// ReniceRequest is one nice-value change for explicit targets.
+type ReniceRequest struct {
+	Priority int
+	// Which is syscall.PRIO_PROCESS, PRIO_PGRP or PRIO_USER.
+	Which int
+	IDs   []int
+}
+
+// Renice applies req in an isolated child and returns its exit status: zero
+// when every target was changed, one when any setpriority failed (the child
+// reports each failure on stderr).
+func Renice(ctx context.Context, req ReniceRequest, inv Invocation) int {
+	return run(ctx, Request{Renice: &req}, inv)
 }
 
 // Invocation describes the child's exact environment and working directory. A nil

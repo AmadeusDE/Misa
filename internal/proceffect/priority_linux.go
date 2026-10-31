@@ -9,7 +9,11 @@ import (
 	"syscall"
 )
 
-func niceness() (int, error) { n, e := syscall.Getpriority(syscall.PRIO_PROCESS, 0); return 20 - n, e }
+func niceness() (int, error) { return priority(syscall.PRIO_PROCESS, 0) }
+
+// priority converts the raw Linux getpriority result (20 - nice) back to the
+// process's nice value.
+func priority(which, id int) (int, error) { n, e := syscall.Getpriority(which, id); return 20 - n, e }
 func umask() (int, error) {
 	b, e := os.ReadFile("/proc/self/status")
 	if e == nil {

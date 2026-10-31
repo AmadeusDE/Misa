@@ -399,7 +399,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `nice` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `nl` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `nmeter` |  |  | ✓ |  |
-| `nohup` |  | ✓ posix | ✓ | ✓ coreutils |
+| `nohup` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `nologin` |  | ✓ other | ✓ | ✓ util-linux |
 | `nproc` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `nsenter` |  | ✓ other | ✓ |  |
@@ -455,7 +455,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `reformime` |  |  | ✓ |  |
 | `remove-shell` |  |  | ✓ |  |
 | `rename` |  |  |  | ✓ util-linux |
-| `renice` |  | ✓ posix | ✓ | ✓ bsdutils, ✓ util-linux |
+| `renice` | ✓ | ✓ posix | ✓ | ✓ bsdutils, ✓ util-linux |
 | `reset` |  | ✓ other | ✓ |  |
 | `resize` |  |  | ✓ |  |
 | `restorecon` |  | ✓ android | ✓ |  |
@@ -496,11 +496,11 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `setfont` |  |  | ✓ |  |
 | `setkeycodes` |  |  | ✓ |  |
 | `setlogcons` |  |  | ✓ |  |
-| `setpgid` |  |  |  | ✓ util-linux |
+| `setpgid` | ✓ |  |  | ✓ util-linux |
 | `setpriv` |  |  | ✓ |  |
 | `setsebool` |  |  | ✓ |  |
 | `setserial` |  |  | ✓ |  |
-| `setsid` |  | ✓ other | ✓ | ✓ util-linux |
+| `setsid` | ✓ | ✓ other | ✓ | ✓ util-linux |
 | `setuidgid` |  |  | ✓ |  |
 | `sg` |  |  |  | ✓ shadow |
 | `sh` |  | ✓ pending | ✓ |  |

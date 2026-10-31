@@ -37,6 +37,13 @@ type Options struct {
 	// restarts whenever output arrives, so a slow writer never truncates
 	// output. Zero waits for EOF.
 	WaitDelay time.Duration
+	// Setsid puts the child in a new session, which also makes it the leader
+	// of a new process group. The kernel clears Setpgid in that case; the
+	// caller's own session is never touched.
+	Setsid bool
+	// Setctty makes the child's stdin the controlling terminal of its new
+	// session. It is only meaningful with Setsid.
+	Setctty bool
 }
 
 // Resolve resolves name against the invocation's working directory and PATH.

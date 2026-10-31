@@ -54,7 +54,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | 25 | `sysctl` | 9 | – | 9 (9) | 149 | – |
 | 26 | `uuidgen` | 8 | 1 | 7 (7) | 25 | kernel/fs |
 | 27 | `pwdx` | 8 | – | 8 (8) | 33 | – |
-| 28 | `setsid` | 8 | – | 11 (8) | 58 | kernel/fs, tty |
 | 29 | `sha3sum` | 8 | 8 | – | 105 | – |
 | 30 | `sum` | 8 | – | 13 (8) | – | kernel/fs, network |
 | 31 | `unicode` | 7 | 7 | – | 86 | – |
@@ -68,12 +67,10 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | 39 | `iconv` | 5 | 5 | – | 75 | – |
 | 40 | `mkpasswd` | 5 | 5 | – | 81 | – |
 | 41 | `modinfo` | 5 | 5 | – | 129 | – |
-| 42 | `renice` | 4 | 2 | 2 (2) | 51 | – |
 | 43 | `shred` | 4 | – | 31 (4) | 99 | kernel/fs, tty |
 | 44 | `more` | 4 | 2 | 11 (2) | 172 | – |
 | 45 | `zcat` | 4 | 4 | – | 179 | – |
 | 46 | `pidwait` | 4 | – | 4 (4) | – | – |
-| 47 | `setpgid` | 4 | – | 5 (4) | – | – |
 | 48 | `users` | 4 | – | 5 (4) | – | – |
 | 49 | `fallocate` | 3 | 3 | – | 33 | – |
 | 50 | `getopt` | 3 | 3 | – | 112 | – |
@@ -279,7 +276,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `newuidmap` | – | – | shadow:9 | 0 | kernel/fs, root | uutils: Rust, 0/9 simple new_ucmd! cases parseable by tests/uutils adapter | – | 762 | heavy |
 | `newusers` | – | – | shadow:16 | 0 | root | uutils: Rust, 0/16 simple new_ucmd! cases parseable by tests/uutils adapter | – | 715 | heavy |
 | `nfsmount` | lsb | – | – | – | – | no tests | 415 | – | medium |
-| `nohup` | posix | – | coreutils:16 | 6 | root, tty | uutils: Rust, 6/16 simple new_ucmd! cases parseable by tests/uutils adapter | 41 | 327 | medium |
 | `nologin` | other | – | util-linux:2 | 2 | – | uutils: Rust, 2/2 simple new_ucmd! cases parseable by tests/uutils adapter | 24 | 92 | light |
 | `nsenter` | other | – | – | – | – | no tests | 166 | – | light |
 | `numfmt` | – | – | coreutils:196 | 174 | network, tty | uutils: Rust, 174/196 simple new_ucmd! cases parseable by tests/uutils adapter | – | 3233 | heavy |
@@ -310,7 +306,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `readelf` | other | 9 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 775 | – | heavy |
 | `reboot` | other | – | – | – | – | no tests | 46 | – | light |
 | `rename` | – | – | util-linux:60 | 5 | root | uutils: Rust, 5/60 simple new_ucmd! cases parseable by tests/uutils adapter | – | 1071 | heavy |
-| `renice` | posix | 2 | bsdutils:1, util-linux:1 | 2 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 2/2 simple new_ucmd! cases parseable by tests/uutils adapter | 51 | 66 | light |
 | `reset` | other | – | – | – | – | no tests | 31 | – | light |
 | `restorecon` | android | – | – | – | – | no tests | 46 | – | medium |
 | `rfkill` | net | – | – | – | – | no tests | 105 | – | medium |
@@ -323,8 +318,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `setenforce` | android | – | – | – | – | no tests | 32 | – | medium |
 | `setfacl` | – | – | acl:1 | 1 | – | uutils: Rust, 1/1 simple new_ucmd! cases parseable by tests/uutils adapter | – | 116 | light |
 | `setfattr` | other | 3 | – | – | kernel/fs | toybox: shell .test (runs in tests/toybox adapter) | 40 | – | light |
-| `setpgid` | – | – | util-linux:5 | 4 | – | uutils: Rust, 4/5 simple new_ucmd! cases parseable by tests/uutils adapter | – | 103 | light |
-| `setsid` | other | – | util-linux:11 | 8 | kernel/fs, tty | uutils: Rust, 8/11 simple new_ucmd! cases parseable by tests/uutils adapter | 58 | 200 | light |
 | `sg` | – | – | shadow:8 | 0 | root | uutils: Rust, 0/8 simple new_ucmd! cases parseable by tests/uutils adapter | – | 247 | medium |
 | `sh` | pending | 233 | – | – | kernel/fs, network, root, tty | toybox: shell .test (runs in tests/toybox adapter) | 5466 | – | heavy |
 | `sha224sum` | lsb | 8 | coreutils:8 | 2 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 2/8 simple new_ucmd! cases parseable by tests/uutils adapter | 142 | 12 | light |
