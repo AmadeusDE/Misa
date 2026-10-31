@@ -73,7 +73,7 @@ func nativeStartBare(t testing.TB, mode string) (conn, proc) {
 		t.Fatal(err)
 	}
 	c, p, err := startProcess(startSpec{
-		Argv: []string{exe, "-test.run=^TestNativeTransportHelper$"},
+		Argv: []string{exe, "-test.run=^TestNativeTransportHelper$", "--"},
 		Env:  append(os.Environ(), nativeHelperEnv+"="+mode, "MISA_UNICODE=x"),
 		Rows: 24, Cols: 80,
 	})
@@ -201,7 +201,7 @@ func TestNativeStartFailureCleansUp(t *testing.T) {
 	}
 	t.Cleanup(func() { assignProcess = windows.AssignProcessToJobObject })
 	_, _, err = startProcess(startSpec{
-		Argv: []string{exe, "-test.run=^TestNativeTransportHelper$"},
+		Argv: []string{exe, "-test.run=^TestNativeTransportHelper$", "--"},
 		Env:  append(os.Environ(), nativeHelperEnv+"=sleep"),
 		Rows: 24, Cols: 80,
 	})
