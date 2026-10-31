@@ -25,6 +25,7 @@ type Game struct {
 	note          string
 	width, height int
 	quit          bool
+	picker        *variantPicker
 
 	computer  [2]bool // which sides the computer plays
 	level     Level
@@ -43,7 +44,7 @@ type thoughtMsg struct {
 }
 
 // New starts a game of v, the computer playing Black; variants are the ones
-// v cycles through.
+// the variant picker offers, including user variants.
 func New(variants []*Variant, v *Variant) *Game {
 	g := &Game{variants: variants, seed: uint64(time.Now().UnixNano()), engines: map[*Variant]*Engine{}}
 	g.SetComputer(false, true)
@@ -111,7 +112,11 @@ func (g *Game) Update(msg tea.Msg) tea.Cmd {
 	case tea.WindowSizeMsg:
 		g.Resize(msg.Width, msg.Height)
 	case tea.KeyPressMsg:
-		g.key(msg.String())
+		if g.picker != nil && len([]rune(msg.Text)) > 1 && msg.Mod&(tea.ModCtrl|tea.ModAlt) == 0 {
+			g.pickerText(msg.Text)
+		} else {
+			g.key(msg.String())
+		}
 	case tea.MouseClickMsg:
 		g.click(msg.Mouse())
 	case thoughtMsg:
@@ -125,6 +130,10 @@ func (g *Game) Update(msg tea.Msg) tea.Cmd {
 }
 
 func (g *Game) key(k string) {
+	if g.picker != nil {
+		g.pickerKey(k)
+		return
+	}
 	if g.promo != nil {
 		g.promotionKey(k)
 		return
@@ -163,7 +172,7 @@ func (g *Game) key(k string) {
 	case "n":
 		g.newGame(g.match.Variant())
 	case "v", "V":
-		g.cycleVariant(map[string]int{"v": 1, "V": -1}[k])
+		g.openVariantPicker()
 	}
 }
 
@@ -184,6 +193,10 @@ func (g *Game) promotionKey(k string) {
 }
 
 func (g *Game) click(m tea.Mouse) {
+	if g.picker != nil {
+		g.pickerClick(m)
+		return
+	}
 	l := g.layout()
 	if g.promo != nil {
 		if i := l.promoChoice(g, m.X, m.Y); i >= 0 && m.Button == tea.MouseLeft {
@@ -372,13 +385,10 @@ func scoreText(score int, mover Color) string {
 	return fmt.Sprintf("%+.2f", float64(score)/100)
 }
 
-func (g *Game) cycleVariant(step int) {
-	i := slices.Index(g.variants, g.match.Variant())
-	if len(g.variants) == 0 {
-		return
+func (g *Game) setVariant(i int) {
+	if i >= 0 && i < len(g.variants) && g.variants[i] != g.match.Variant() {
+		g.newGame(g.variants[i])
 	}
-	i = ((i+step)%len(g.variants) + len(g.variants)) % len(g.variants)
-	g.newGame(g.variants[i])
 }
 
 func upper(c byte) byte {

@@ -11,7 +11,7 @@ import (
 const (
 	chromeLines = 6 // header, two border rows, file letters, status, help
 	panelWidth  = 26
-	help        = "space select/move  u undo  c computer  d level  f flip  t letters  v variant  n new  q quit"
+	help        = "space select/move  u undo  c computer  d level  f flip  t letters  v/V picker  n new  q quit"
 )
 
 var (
@@ -120,6 +120,9 @@ func (g *Game) choiceLabel(mv Move) string {
 func (g *Game) View() string {
 	if g.width <= 0 || g.height <= 0 {
 		return ""
+	}
+	if g.picker != nil {
+		return g.pickerView()
 	}
 	l := g.layout()
 	if !l.fits {
@@ -375,7 +378,7 @@ func (g *Game) tooSmall(l layout) string {
 	need := fmt.Sprintf("%d×%d", l.boardW, l.rows+chromeLines)
 	msg := []string{
 		statusSt.Render(truncate("Terminal too small for "+g.match.Variant().Name+" ("+need+")", g.width)),
-		helpSt.Render(truncate("v change variant  q quit", g.width)),
+		helpSt.Render(truncate("v/V picker  q quit", g.width)),
 	}
 	return strings.Join(msg, "\n")
 }
