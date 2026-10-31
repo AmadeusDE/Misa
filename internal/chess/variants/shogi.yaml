@@ -1,3 +1,6 @@
+# Shogi as implemented here is not tournament-complete: perpetual check is a
+# plain repetition draw and impasse (jishogi) is not implemented. See
+# "Shogi known gaps (follow-up)" under Bundled variants in docs/CHESS.md.
 id: shogi
 name: Shogi
 description: Japanese chess on a 9×9 board, with drops and promotions.

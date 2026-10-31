@@ -227,6 +227,16 @@ either, since a lone king can still reach the eighth rank.
   immediate checkmate. Fourfold repetition draws, and stalemate is a win for the
   side that delivered it.
 
+  **Shogi known gaps (follow-up).** These tournament rules are not implemented yet:
+  - *Perpetual check (renzoku ōte no sennichite):* under JSA rules the side giving
+    the repeated checks loses. Here it is scored like any other fourfold
+    repetition, as a draw, so the engine may treat a perpetual-check line as
+    safe for the checking side.
+  - *Impasse (jishōgi / entering king):* when both kings have entered the
+    promotion zone, JSA rules settle the game by declaration and a point count
+    (24-point rule; 27-point declaration). Neither is implemented, so such
+    positions only end by checkmate, repetition, or the move limit.
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
