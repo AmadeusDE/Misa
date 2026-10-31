@@ -34,6 +34,7 @@ func (e *Editor) usePattern(pat string, ignoreCase bool) (string, *vipat.Regexp,
 		return "", nil, false
 	}
 	e.searchPat = pat
+	e.searchHighlightSuppressed = false
 	return pat, re, true
 }
 

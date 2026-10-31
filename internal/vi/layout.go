@@ -126,6 +126,8 @@ type cellStyle uint8
 
 const (
 	stylePlain cellStyle = iota
+	styleSearch
+	styleSearchCurrent
 	styleSelected
 	styleCursor
 )
@@ -135,6 +137,8 @@ const (
 type lineMarks struct {
 	cursorStart, cursorN int
 	selected             func(lead int) bool
+	search               func(lead int) bool
+	searchCurrent        func(lead int) bool
 	eolSelected          bool
 }
 
@@ -150,6 +154,12 @@ func (l lineLayout) window(left, w int, m lineMarks) []styledRun {
 	var out []styledRun
 	emit := func(col int, lead int, text string) {
 		st := stylePlain
+		if m.search != nil && lead >= 0 && m.search(lead) {
+			st = styleSearch
+		}
+		if m.searchCurrent != nil && lead >= 0 && m.searchCurrent(lead) {
+			st = styleSearchCurrent
+		}
 		if m.selected != nil && lead >= 0 && m.selected(lead) {
 			st = styleSelected
 		} else if lead < 0 && m.eolSelected {
@@ -164,7 +174,15 @@ func (l lineLayout) window(left, w int, m lineMarks) []styledRun {
 		}
 		out = append(out, styledRun{st, text})
 	}
-	start := sort.Search(len(l.spans), func(i int) bool { return l.spans[i].col+l.spans[i].width > left })
+	// Search by start column, which remains monotonic across continuation
+	// runes; col+width is not monotonic within a grapheme cluster.
+	start := sort.Search(len(l.spans), func(i int) bool { return l.spans[i].col >= left })
+	if start > 0 {
+		lead := l.spans[start-1].lead
+		if s := l.spans[lead]; s.col+s.width > left {
+			start = lead
+		}
+	}
 	for i := start; i < len(l.spans); i++ {
 		s := l.spans[i]
 		if s.col >= left+w {

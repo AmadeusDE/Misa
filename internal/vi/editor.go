@@ -102,7 +102,12 @@ type Editor struct {
 	searchDir      int
 	searchInputDir int
 
-	ignoreCase bool
+	ignoreCase                bool
+	hlSearch                  bool
+	incSearch                 bool
+	searchHighlightSuppressed bool
+
+	searchPreview searchPreviewState
 
 	jumpList []pos
 	jumpIdx  int

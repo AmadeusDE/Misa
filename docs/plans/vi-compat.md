@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F09/G01/T01/T02/T03/T05
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F09/G01/T01/T02/T03/T04/T05
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -70,6 +70,7 @@ without quitting Misa and preserves its register.
 | F07: file safety (done) | `file*_f07_test.go`, `internal/ui/editor_file_f07_test.go`, `internal/ui/editor_file_regression_test.go` | Load errors, newline preservation, safe writes and external-change guards; scope and limitations below. |
 | T02: range writes and file identity (done) | Original `*t02*` regression fixtures | Numeric and Visual range writes, append, write identity, save-as and rename semantics; scope and residual deferrals below. |
 | T03: shell lifecycle and reads (done) | Original `shell*_test.go` and `internal/ui/editor_shell_regression_test.go` fixtures | Async output/cancellation, shared cwd/environment, addressed file/shell reads and failure-safe filters; limits below. |
+| T04: search options and highlighting (done) | `case_t04_replay_test.go`, `options_t04_test.go`, `highlight_view_test.go`, `search_options_entry_t04_test.go`, `internal/ui/editor_search_options_t04_test.go` | `ignorecase`/`noignorecase` (`ic`/`noic`) affect search and substitution; `smartcase` defaults uppercase patterns to case-sensitive; `hlsearch` and `incsearch` highlighting/preview behavior is covered through editor rendering and entry paths. `:set` parsing and option reporting are narrower than full Vim (details below). |
 | T05: edit another file | Original `edit*_t05_test.go`, `edit_edges_t05_test.go`, `edit_policy_t05_test.go`, reload replay fixture, and `internal/ui/editor_edit_regression_test.go` | File switching and reload contract below; automated fixtures are being added, not a claim of manual verification. |
 | T01: substitute confirmation (done) | `substitute_confirm_test.go`, `substitute_confirm_replay_test.go`, `substitute_confirm_edges_test.go`, `substitute_entry_test.go`, `internal/ui/editor_substitute_regression_test.go` | Public-event fixtures for decisions, ranges, global matches, Unicode, cursor/highlight/prompt, counts, undo/redo, no-op history, dot/register preservation, macro playback, and standalone/mux resize and return. |
 | F09: bounded viewport and display cells (done) | `internal/vi/layout_test.go`, `display_f09_test.go`, `internal/ui/editor_display_regression_test.go` | One line-to-cells layout (`layout.go`) behind rendering, cursor, Visual/confirm highlights and `j`/`k`; scope below. |
@@ -130,16 +131,29 @@ errors; `:s//x/` and `:s//x/c` reuse the last pattern instead of replacing at ev
 rejected; `:s` and `:g` set the last search pattern. `:g/pat/cmd` previously cut the command at its next
 delimiter, so `:g/x/s/a/b/` never ran the substitute; the command is now everything after the pattern.
 
-Left to other tasks: `ignorecase`/`smartcase`/`hlsearch`/`incsearch` options (T04; the matcher takes a
-default-case flag and `\c`/`\C` already work), the replacement grammar `&`, `\1`, `~`, case conversion,
-`:&`, `g&` (G02), Ex addresses and `:g` execution order/register order (G03: `:g/pat/d` still runs
-bottom-up), `*`/`#` (H02), search offsets (`/pat/e`) and history (T07). Vim 9.1 `nocompatible`
-`:help pattern` is used as specification only; no Vim, Neovim or regex-library code is used.
+Left to other tasks: the replacement grammar `&`, `\1`, `~`, case conversion, `:&`, `g&` (G02), Ex addresses and `:g` execution order/register order (G03: `:g/pat/d` still runs bottom-up), `*`/`#` (H02), search offsets (`/pat/e`) and history (T07). Vim 9.1 `nocompatible` `:help pattern` is used as specification only; no Vim, Neovim or regex-library code is used.
+
+### T04 search options
+
+`:set` recognizes `ignorecase`/`noignorecase` (`ic`/`noic`), `smartcase`/`nosmartcase`,
+`hlsearch`/`nohlsearch`, and `incsearch`/`noincsearch`. The case options govern search and
+substitution: ignorecase folds by default, while smartcase makes a pattern containing uppercase
+characters case-sensitive; `\c` and `\C` explicitly override the option-derived default. Incremental
+search previews the current match as pattern input changes, and Escape restores the prior cursor.
+Highlight search marks current-pattern matches in the text view. Rendering uses the shared display-cell
+layout, so match spans cover tabs and wide/combining clusters.
+
+Option implementation remains partial: only `ignorecase` is retained as editor state and listed by
+bare `:set`; `smartcase`, `hlsearch`, and `incsearch` are accepted but their option values are not
+reported there. Their full Vim option/query semantics are not claimed. Existing tutor instructions
+already describe `\c`/`\C` and `:set ic`/`:set noic`; they remain correct. Tutor text does not cover
+`smartcase`, highlighting, or incremental preview, and was left unchanged.
+
 
 ### F09 Display cells and the bounded viewport
 
 `layout.go` turns a line into per-rune spans (display column, width) so a rune index and a display
-column convert both ways. Later work (hlsearch T04, help window T06, line numbers H11, Visual block G04,
+column convert both ways. Later work (help window T06, line numbers H11, Visual block G04,
 `wrap`/`listchars` D07) should build on `newLayout` and `lineLayout.window` rather than counting runes.
 Policies:
 

@@ -7,14 +7,17 @@ import (
 	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
+	"github.com/AmadeusDE/Misa/internal/vi/vipat"
 	"github.com/charmbracelet/x/ansi"
 )
 
 var (
-	cursorStyle = lipgloss.NewStyle().Reverse(true)
-	statusStyle = lipgloss.NewStyle().Reverse(true)
-	tildeStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
-	visualStyle = lipgloss.NewStyle().Reverse(true)
+	cursorStyle        = lipgloss.NewStyle().Reverse(true)
+	statusStyle        = lipgloss.NewStyle().Reverse(true)
+	tildeStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
+	visualStyle        = lipgloss.NewStyle().Reverse(true)
+	searchStyle        = lipgloss.NewStyle().Background(lipgloss.Color("3")).Foreground(lipgloss.Color("0"))
+	searchCurrentStyle = lipgloss.NewStyle().Background(lipgloss.Color("6")).Foreground(lipgloss.Color("0"))
 )
 
 func (e *Editor) viewRows() int {
@@ -130,6 +133,76 @@ func (e *Editor) ensureColumnVisible() {
 	e.leftCol = max(0, min(e.leftCol, start))
 }
 
+// searchLineMarks maps byte match ranges onto entire grapheme clusters. Empty
+// matches have no cells; advance one rune so they cannot stall rendering.
+func searchLineMarks(layout lineLayout, line string, re *vipat.Regexp) func(int) bool {
+	marked := make([]bool, len(layout.spans))
+	from, runePos, bytePos := 0, 0, 0
+	for from <= len(line) {
+		start, end, ok, err := re.Find(line, from)
+		if err != nil || !ok {
+			break
+		}
+		for bytePos < start {
+			_, n := utf8.DecodeRuneInString(line[bytePos:])
+			bytePos += n
+			runePos++
+		}
+		for bytePos < end {
+			if runePos < len(layout.spans) {
+				marked[layout.spans[runePos].lead] = true
+			}
+			_, n := utf8.DecodeRuneInString(line[bytePos:])
+			bytePos += n
+			runePos++
+		}
+		from = end
+		if start == end {
+			if end == len(line) {
+				break
+			}
+			_, n := utf8.DecodeRuneInString(line[end:])
+			from += n
+		}
+	}
+	return func(lead int) bool { return lead >= 0 && lead < len(marked) && marked[lead] }
+}
+
+// highlightLineMarks selects the committed pattern, or the speculative search
+// while incsearch is active. The current preview is visible even without hls.
+func (e *Editor) highlightLineMarks(row int, layout lineLayout) (all, current func(int) bool) {
+	pattern, matchRow, start, end, active, matched := e.previewHighlight()
+	if active {
+		if !matched {
+			return nil, nil
+		}
+		if row == matchRow && start < end {
+			line := e.lines[row]
+			first := utf8.RuneCountInString(line[:start])
+			last := utf8.RuneCountInString(line[:end])
+			marked := make([]bool, len(layout.spans))
+			for i := first; i < last && i < len(layout.spans); i++ {
+				marked[layout.spans[i].lead] = true
+			}
+			current = func(lead int) bool { return lead >= 0 && lead < len(marked) && marked[lead] }
+		}
+		if !e.hlSearch {
+			return nil, current
+		}
+	} else {
+		if !e.hlSearch || e.searchHighlightSuppressed {
+			return nil, nil
+		}
+		pattern = e.searchPat
+	}
+	if pattern != "" {
+		if re, err := vipat.Compile(pattern, e.ignoreCase); err == nil {
+			all = searchLineMarks(layout, e.lines[row], re)
+		}
+	}
+	return all, current
+}
+
 func (e *Editor) renderTextLine(lineIdx int) string {
 	layout := e.rowLayout(lineIdx)
 
@@ -172,6 +245,7 @@ func (e *Editor) renderTextLine(lineIdx int) string {
 	}
 
 	marks := lineMarks{selected: isSelected}
+	marks.search, marks.searchCurrent = e.highlightLineMarks(lineIdx, layout)
 	if lineIdx == e.row {
 		marks.cursorStart, marks.cursorN = layout.cursorCells(e.col, e.insertLike())
 	}
@@ -184,6 +258,10 @@ func (e *Editor) renderTextLine(lineIdx int) string {
 			b.WriteString(cursorStyle.Render(run.text))
 		case styleSelected:
 			b.WriteString(visualStyle.Render(run.text))
+		case styleSearch:
+			b.WriteString(searchStyle.Render(run.text))
+		case styleSearchCurrent:
+			b.WriteString(searchCurrentStyle.Render(run.text))
 		default:
 			b.WriteString(run.text)
 		}
