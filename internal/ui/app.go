@@ -449,7 +449,7 @@ func buildRootItems(dir string, entries []config.Entry) []list.Item {
 		},
 		menuItem{
 			title: "Games",
-			desc:  "Battleship, Minesweeper and Chess",
+			desc:  "Board games and classic card tables",
 			action: func(m *Model) tea.Cmd {
 				gamesItems := []list.Item{
 					menuItem{
@@ -482,6 +482,7 @@ func buildRootItems(dir string, entries []config.Entry) []list.Item {
 						},
 					},
 				}
+				gamesItems = append(gamesItems, cardGameMenuItems()...)
 				m.pushMenu("Games", gamesItems)
 				return nil
 			},
@@ -1290,6 +1291,14 @@ func (m *Model) handleBuiltinCmd(input string) (bool, tea.Cmd) {
 		return true, m.procViewer.Init()
 	case "chess":
 		game, err := builtins.ChessGame(fields[1:])
+		if err != nil {
+			return false, nil
+		}
+		m.enterProcMon(game)
+		m.cmdInput.SetValue("")
+		return true, m.procViewer.Init()
+	case "solitaire", "freecell", "spider", "hearts":
+		game, err := builtins.CardGame(fields[0], fields[1:])
 		if err != nil {
 			return false, nil
 		}

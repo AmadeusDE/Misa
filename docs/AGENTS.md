@@ -137,6 +137,13 @@ internal/
                                  keyboard-interactive, password
     escape.go resize.go          `~.` disconnect / `~~`; SIGWINCH plus polling (in-process panes get no SIGWINCH)
     prompt.go                    Terminal prompts read byte-wise so typed-ahead input still reaches the remote
+  cards/                         Physical card IDs, deck construction, frozen v1 shuffle/replay and action histories
+  cardui/                        Original classic card-table renderer, shared hit targets, focus/scrolling, help,
+                                 confirmation, standalone runner and generation-tagged cancellable computer commands
+  klondike/ freecell/ spider/     Independent solitaire rule engines and presentation adapters; builtins solitaire,
+                                 freecell and spider share factories with the Games menu and in-pane dispatch
+  hearts/                        Passing/trick/round/match rules; bots receive detached restricted observations,
+                                 never seeds or opponents' hands. See docs/CARD_GAMES.md for rules and release gates
   lscore/                        ls formatting engine — colors, icons, git status, sorting
   mines/                         Minesweeper clone: board.go (rules, first reveal always safe, flood fill, chording),
                                  game.go (keys/mouse, clock), view.go (centred layout + hit test), run.go (standalone).
@@ -381,6 +388,8 @@ Commit trailers for agent-made commits:
 - `internal/vi/NOTICE` — Vi editor attribution (toybox, vis).
 - `THIRD_PARTY_NOTICES.md` — Licenses of third-party code, test suites and data.
 - `docs/MISA_WEB.md` — `misa --web`: Misa in a browser (enroll, binding, security).
+- `docs/CARD_GAMES.md` — Solitaire, FreeCell, Spider and Hearts: controls, original artwork,
+  variants/scoring, v1 replay protocol, rule references and outstanding platform acceptance gates.
 - `docs/UGH.md` — ugh: providers, running, TUI, tools, permissions, subagents, configuration.
 - `docs/ughbot/DEPLOY.md`, `docs/ughbot/WEB.md` — ughbot (experimental): setup, bots, approvals, web UI.
 - `docs/plans/` — Plans for upcoming work: `terminal.md`, `web.md`, `ugh-confinement.md`, `ughbot.md`,
