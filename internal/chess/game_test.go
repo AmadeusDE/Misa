@@ -1,6 +1,7 @@
 package chess
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -172,31 +173,44 @@ func TestTooSmall(t *testing.T) {
 }
 
 func TestCycleVariantAndUndo(t *testing.T) {
+	variants, errs := Builtins()
+	if len(errs) != 0 {
+		t.Fatalf("loading builtins: %v", errs)
+	}
+	start := slices.IndexFunc(variants, func(v *Variant) bool { return v.ID == "chess" })
+	if start < 0 {
+		t.Fatal("builtins must include chess")
+	}
 	g := newGame(t, "chess", 80, 24)
-	keys(g, "v")
-	if g.match.Variant().ID != "double" {
-		t.Fatalf("v went to %s", g.match.Variant().ID)
+	for step := 1; step <= len(variants); step++ {
+		keys(g, "v")
+		want := variants[(start+step)%len(variants)].ID
+		if got := g.match.Variant().ID; got != want {
+			t.Fatalf("forward step %d: got %s, want %s", step, got, want)
+		}
 	}
+	// V wraps to the last built-in variant and walks back through the same order,
+	// so the newest additions (capablanca, nocastling, amazon) come first.
 	keys(g, "V")
-	if g.match.Variant().ID != "chess" {
-		t.Fatalf("V went to %s", g.match.Variant().ID)
-	}
-	keys(g, "V")
-	if g.match.Variant().ID != "nocastling" {
+	if g.match.Variant().ID != "capablanca" {
 		t.Fatalf("V wrapped to %s", g.match.Variant().ID)
 	}
 	keys(g, "V")
-	if g.match.Variant().ID != "amazon" {
+	if g.match.Variant().ID != "nocastling" {
 		t.Fatalf("V went to %s", g.match.Variant().ID)
+	}
+	for step := 3; step <= len(variants)-1; step++ {
+		keys(g, "V")
+		want := variants[(start-step+len(variants))%len(variants)].ID
+		if got := g.match.Variant().ID; got != want {
+			t.Fatalf("reverse step %d: got %s, want %s", step, got, want)
+		}
 	}
 	keys(g, "V")
-	if g.match.Variant().ID != "doublebig" {
-		t.Fatalf("V went to %s", g.match.Variant().ID)
+	if g.match.Variant().ID != "chess" {
+		t.Fatalf("V did not come back to chess: %s", g.match.Variant().ID)
 	}
-	keys(g, "V")
-	if g.match.Variant().ID != "bigboard" {
-		t.Fatalf("V went to %s", g.match.Variant().ID)
-	}
+	g = newGame(t, "bigboard", 80, 24)
 	clickSquare(t, g, "f1", tea.MouseLeft)
 	clickSquare(t, g, "d6", tea.MouseLeft)
 	if len(g.match.Notation()) != 1 {
