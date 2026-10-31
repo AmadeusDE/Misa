@@ -135,6 +135,9 @@ func TestDuCountsHardLinkOnce(t *testing.T) {
 	dir := t.TempDir()
 	p := writeFile(t, dir, "a", "hello")
 	if err := os.Link(p, filepath.Join(dir, "b")); err != nil {
+		if os.IsPermission(err) {
+			t.Skipf("hard links unavailable on this filesystem: %v", err)
+		}
 		t.Fatal(err)
 	}
 	r := runBuiltinIn(t, dir, "du", "-a", "-b", ".")

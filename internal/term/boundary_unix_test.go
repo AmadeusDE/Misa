@@ -3,14 +3,48 @@
 package term
 
 import (
+	"bufio"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
+// sizeHelperEnv makes the test binary act as a tiny program that prints its
+// tty's size, waits for a line, and prints it again. stty is not on every
+// target (Android 8's toybox has none; it arrived in Android 9), so the test
+// re-executes itself instead of relying on the device's shell utilities.
+const sizeHelperEnv = "MISA_TERM_SIZE_HELPER"
+
+func TestSizeHelperProcess(t *testing.T) {
+	if os.Getenv(sizeHelperEnv) != "1" {
+		t.Skip("helper process for TestResizeReachesTheProgramsTTY")
+	}
+	printSize := func() {
+		ws, err := unix.IoctlGetWinsize(0, unix.TIOCGWINSZ)
+		if err != nil {
+			fmt.Printf("winsize: %v\r\n", err)
+			os.Exit(2)
+		}
+		fmt.Printf("%d %d\r\n", ws.Row, ws.Col)
+	}
+	printSize()
+	bufio.NewReader(os.Stdin).ReadString('\n')
+	printSize()
+	os.Exit(0)
+}
+
 func TestResizeReachesTheProgramsTTY(t *testing.T) {
+	self, err := os.Executable()
+	if err != nil {
+		t.Skip("test binary path unavailable: ", err)
+	}
+	t.Setenv(sizeHelperEnv, "1")
 	tm := New(5, 40)
-	if err := tm.StartArgv("", testBin(t, "sh"), "-c", "stty size; read x; stty size"); err != nil {
+	if err := tm.StartArgv("", self, "-test.run=^TestSizeHelperProcess$", "-test.count=1"); err != nil {
 		t.Fatal(err)
 	}
 	tm.StartReader()
