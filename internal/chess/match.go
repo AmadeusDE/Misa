@@ -121,13 +121,21 @@ func (m *Match) refresh() {
 		return
 	}
 	switch {
-	case m.repetitions() >= 3:
+	case m.repetitions() >= repetitionCount(m.variant):
 		m.status = DrawRepetition
 	case p.Clock >= 2*m.variant.MoveLimit:
 		m.status = DrawMoveLimit
 	case len(m.variant.Goal) == 0 && onlyRoyals(p):
 		m.status = DrawMaterial
 	}
+}
+
+// repetitionCount also handles programmatically constructed variants.
+func repetitionCount(v *Variant) int {
+	if v.Repetition < 2 {
+		return 3
+	}
+	return v.Repetition
 }
 
 func (m *Match) repetitions() int {

@@ -216,6 +216,27 @@ either, since a lone king can still reach the eighth rank.
   blocks movement and starts off the board. Capturing the enemy king wins, and a
   side with no legal turn wins (see [Duck Chess](#duck-chess)).
 
+- **Shogi** (`shogi`): Japanese chess on a 9×9 board with drops and per-piece
+  promotion. Captured pieces change sides and join the captor's hand, and on a
+  turn a player may drop a hand piece on an empty square instead of moving.
+  Pawns, lances, knights, silvers and bishops and rooks promote inside the last
+  three ranks or on leaving them, may decline while a plain move stays legal,
+  and must promote where the unpromoted piece could never move again. Drops
+  follow Shogi's restrictions: only one unpromoted pawn per file, no lance on
+  the last rank and no knight on the last two, and no pawn drop that gives
+  immediate checkmate. Fourfold repetition draws, and stalemate is a win for the
+  side that delivered it.
+
+  **Shogi known gaps (follow-up).** These tournament rules are not implemented yet:
+  - *Perpetual check (renzoku ōte no sennichite):* under JSA rules the side giving
+    the repeated checks loses. Here it is scored like any other fourfold
+    repetition, as a draw, so the engine may treat a perpetual-check line as
+    safe for the checking side.
+  - *Impasse (jishōgi / entering king):* when both kings have entered the
+    promotion zone, JSA rules settle the game by declaration and a point count
+    (24-point rule; 27-point declaration). Neither is implemented, so such
+    positions only end by checkmate, repetition, or the move limit.
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
@@ -378,7 +399,10 @@ embedded set, then `chess/*.yaml` next to the binary, then
 `blocker: true` gives the variant one neutral duck that both sides must relocate
 after every piece move (see [Duck Chess](#duck-chess)); a setup may place it with
 `*`. `stalemate:` selects the stalemate ending, as described under
-[Stalemate rules](#stalemate-rules).
+[Stalemate rules](#stalemate-rules); `repetition: N` (default 3) is how many
+occurrences of an identical position draw, and Shogi sets it to 4. Match
+adjudication compares position hashes, pieces and pockets included, and does not
+tell perpetual check from any other repetition.
 
 `goal` names **absolute** squares, not White's squares: a royal piece arriving
 on any of them wins immediately, for either side, and that arrival outranks a
@@ -417,6 +441,25 @@ two queens or two marshals.
 Where a variant lets a pawn decline, the prompt lists the pawn first: press its
 letter (`p`) or click it to leave the pawn as it is. Long prompt lists fall back
 to glyphs on a narrow terminal.
+
+Any piece can carry its own promotion rule instead of relying on the variant's
+pawn promotion, which is what Shogi needs. The piece-level keys are the same
+names with the same meanings:
+
+- `promotes_to: T` — the single type this piece becomes; `promotion: [T]` is the
+  multi-target form, and giving both is a load error.
+- `promotion_zone: N` — the piece's own zone, defaulting to the variant's.
+- `promotion_optional: true` and `promotion_on_exit: true` — decline while a
+  plain move stays legal, and promote when leaving the zone rather than only
+  when entering it.
+- `promotion_mandatory: N` — promote whenever the piece stands inside the last N
+  ranks, which is how a lance or a knight that could never move again must
+  promote.
+
+A piece without its own rule keeps the variant's pawn promotion, so Grand
+Chess's captured-only choices are unaffected. Shogi's rooks and bishops promote
+on leaving the three-rank zone as well, which is why its dragons and horses keep
+their rank instead of stranding a piece at the far edge.
 
 `check_limit: N` wins the game for a side that gives check N times. It is not
 tied to any id: 0 or no field turns the rule off, `extends` inherits it, and a
@@ -663,6 +706,12 @@ Piece definitions support:
 - `drop_forbid_ranks: [1, 8]`: ranks on which this type may not be dropped,
   counted from the dropping side, starting at 1. An omitted list allows all
   ranks. This is a per-piece restriction, not an engine pawn special case.
+- `drop_one_per_file: true`: only one unpromoted piece of this type may stand
+  on a file, so the type cannot be dropped there. A promoted piece of the same
+  type no longer counts, which is Shogi's nifu rule for pawns.
+- `drop_no_mate: true`: a drop of this type may not deliver immediate
+  checkmate. Every legal reply is tried, drops and interpositions included, so a
+  drop that only looks like mate because the defender can block is allowed.
 - `demote: P`: original type to use when reading a promoted piece marked `~`
   in FEN. Actual promotions remember the original piece type, so capturing a
   promoted piece returns that original type to the hand. Promotion does not

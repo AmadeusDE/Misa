@@ -376,12 +376,23 @@ internal/
   and `Position.compound`, sampled for the search by `searchMoves`, previewed by the UI before it commits
   (`Game.duck`), and legal only where the duck does not block the mover's own path or castling transit; the
   king is non-royal, so there is no check, and `extinction: [K]` gives the game to whoever captures it, while
-  `stalemate: loss` makes a side with no legal turn the winner).
+  `stalemate: loss` makes a side with no legal turn the winner), and shogi (Shogi: 9×9 Japanese chess that
+  reuses the crazyhouse pocket machinery for its hand drops, adds a per-piece promotion rule — `promotes_to`/
+  `promotion`, `promotion_zone`, `promotion_optional`, `promotion_on_exit` (leaving the zone promotes too) and
+  `promotion_mandatory`: inside those ranks a piece that could no longer move must promote — and the drop
+  restrictions `drop_one_per_file` (one unpromoted piece of that type per file, so `Position.dropMoves` counts
+  them first) and `drop_no_mate` (`Position.legalDrop`, which asks the child position for its legal replies, so
+  every legal-move filter — Moves, negamax and quiesce — must apply it); `repetition: 4` makes the fourth
+  occurrence the repetition draw and `stalemate: win` gives the stalemated side's opponent the game).
   `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
   and the search both honour it. `promotion_optional: true` lets a pawn stay a pawn inside `promotion_zone` (but
   not on the last rank, where promotion is forced); `promotion_captured_only: true` restricts the choices to
   piece types its side has fewer of than in the setup, i.e. to captured pieces, and blocks the last rank when
-  none is available. Grand uses both with `promotion_zone: 3`. `check_limit:` counts the checks a side must give
+  none is available. Grand uses both with `promotion_zone: 3`. A piece may carry its own promotion rule
+  instead (`promotionDefined`), which then also covers non-pawns: Shogi promotes its pawns, lances, knights,
+  silvers, bishops and rooks that way, and `promotion_mandatory: N` replaces the last-rank force where an
+  unpromoted piece would have no move left. `repetition: N` (default 3, `repetitionCount`) sets how many
+  occurrences of a position draw; Shogi configures 4. `check_limit:` counts the checks a side must give
   to win; Position.Checks travels with history and undo and is hashed, adjudicate/score treat the limit like a
   goal arrival (before mate and stalemate), and the header shows the checks left. `no_checks:` and
   `goal_reply_draw:` are pointers like the promotion flags, so `extends` inherits them and a child may set them

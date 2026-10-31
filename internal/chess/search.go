@@ -280,7 +280,7 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 	legal := 0
 	for _, mv := range e.order(p, p.nodeMoves(false, ttMove), ttMove, ply) {
 		child := p.Apply(mv)
-		if !child.legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
+		if !child.legalAfter(p.Turn, len(p.royalSq[p.Turn])) || !p.legalDrop(mv, child) {
 			continue
 		}
 		legal++
@@ -398,7 +398,7 @@ func (e *Engine) quiesce(p *Position, ply, alpha, beta int) int {
 			continue
 		}
 		child := p.Apply(mv)
-		if !child.legalAfter(p.Turn, len(p.royalSq[p.Turn])) {
+		if !child.legalAfter(p.Turn, len(p.royalSq[p.Turn])) || !p.legalDrop(mv, child) {
 			continue
 		}
 		legal++
