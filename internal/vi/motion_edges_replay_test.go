@@ -13,7 +13,7 @@ func TestF04ReviewedEdges(t *testing.T) {
 		{name: "cancel search preserves direction", input: "x a x b x\n", keys: "/x<CR>?z<Esc>n", want: replayState{lines: []string{"x a x b x"}, col: 8}},
 		{name: "cancel search preserves pattern", input: "x a x b x\n", keys: "/x<CR>/z<Esc>n", want: replayState{lines: []string{"x a x b x"}, col: 8}},
 		{name: "repeat bracket delete stays bracket motion", input: "(a)(b)z\ntail\n", keys: "d%.", want: replayState{lines: []string{"z", "tail"}, reg: []string{"(b)"}, modified: true}},
-		{name: "change find dot", input: "abcx defx z\n", keys: "ctxQ<Esc>w.", skip: "TODO(F06): semantic dot-repeat of c-motion entries", want: replayState{lines: []string{"Qx Qx z"}, col: 3, reg: []string{"def"}, modified: true}},
+		{name: "change find dot", input: "abcx defx z\n", keys: "ctxQ<Esc>w.", want: replayState{lines: []string{"Qx Qx z"}, col: 3, reg: []string{"def"}, modified: true}},
 	} {
 		t.Run(f.name, func(t *testing.T) { runReplayFixture(t, f) })
 	}
