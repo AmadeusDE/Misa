@@ -16,7 +16,7 @@ func (e *Editor) handlePendingKey(key string) tea.Cmd {
 
 	switch pending {
 	case "i", "a":
-		if key == "w" || key == "W" {
+		if isTextObjectKey(pending + key) {
 			count, given := e.commandMotionCount(max(1, e.count), e.countGiven)
 			e.executeOperatorMotion(e.pendingOp, pending+key, count, given)
 		}

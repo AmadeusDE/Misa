@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05/H01/H02/H04
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F08/F09/G01/T01/T02/T03/T04/T05/H01/H02/H04/H05
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -78,6 +78,7 @@ without quitting Misa and preserves its register.
 | H01: WORD motions | `word_h01_replay_test.go` | `W`/`B`/`E` move by whitespace-delimited WORDs; operator forms use the same motion path, including `dW`/`cW`/`dE`. Counts and line-boundary behavior are covered. |
 | H02: word searches | `word_search_h02_replay_test.go` | `*`/`#` search forward/backward for a whole keyword; `g*`/`g#` also match within words. Punctuation is searched literally. Normal, Visual and operator searches use shared search state, including counts, wrapping, `n`/`N`, options and highlighting. |
 | H04: word text objects | `word_object_h04_replay_test.go` | Public-event fixtures cover `d`/`c`/`y` with `iw`/`aw`/`iW`/`aW`, operator × object counts, whitespace, tabs, punctuation, trailing whitespace, missing final newline, single- and multiline objects, empty lines, failed counts, named registers, Visual selection and repeated Visual extension, `ciw` followed by dot, undo/redo, a multiline register round trip, and the `!` filter-prompt handoff. These examples are not a claim of complete text-object or Visual parity. |
+| H05: paired and quoted text objects | `pair_object_h05_replay_test.go` | `i(`/`a(`/`ib`/`ab`, `i[`/`a[`, `i{`/`a{`/`iB`/`aB`, `i<`/`a<` (either delimiter works as the key) and `i"`/`a"`, `i'`/`a'`, ``i` ``/``a` `` with `d`/`c`/`y`/`>`/`<`/`!` and Visual mode. Fixtures cover nesting, counts, multiline pairs, empty objects, cursor on a delimiter, unmatched delimiters, escapes, Visual growth, registers, dot repeat and undo. |
 
 ### H04 word-object limits
 
@@ -85,7 +86,7 @@ without quitting Misa and preserves its register.
 `d`, `c`, and `y` route to characterwise and linewise operations; `>` and `<` route to the
 existing indent operators, and `!` opens the existing range-filter prompt without creating an
 edit. The fixtures assert the `d`/`c`/`y` and `!` paths; no dedicated H04 fixture pins `>iw`
-or `<aw` results. Paired, quoted, prose, and tag objects remain H05–H06; broader Visual
+or `<aw` results. Paired and quoted objects are H05 (below); prose and tag objects remain H06; broader Visual
 parity is H07, and numbered-register or Visual dot-repeat behavior is not claimed beyond the
 single `ciw`-then-dot case above.
 
@@ -99,6 +100,42 @@ H04 expectations were checked against Vim 9.0.1378 (`vim.tiny`, `-Nu NONE`, `noc
 defaults) for the same keystrokes. That is the reference for these objects; it does not revise
 the project-wide baseline elsewhere in this ledger. No Vim is required to run the fixtures, and
 no external editor code or prose was copied.
+
+### H05 paired and quoted object limits
+
+Pairs and quotes share the H04 dispatch (`isTextObjectKey`, `executeObjectOperator`, the Visual
+`i`/`a` prefix). Scanners are `pair_object.go` and `quote_object.go`; the dispatch is
+`delim_object.go`. Neither needs a language parser.
+
+Behaviour that matches Vim: a count picks the n-th enclosing pair; a cursor on either delimiter
+uses that pair; `i(` on a pair whose delimiters sit on their own lines is linewise, and is
+charwise when text shares a line with a delimiter; an empty pair makes `di(`/`yi(` a no-op (the
+cursor moves between the delimiters) and `ci(` inserts there; quotes are line-local, a quote
+preceded by an odd number of backslashes is ordinary text, a cursor before the first quote uses
+the next string, a cursor between two strings selects the gap between the closest quotes on each
+side, and a cursor on a quote pairs the quotes of the line from its start; `2i"` includes the
+quotes; `a"` takes trailing white space, else leading; repeated Visual `i(`/`a(`/`i"` grow
+outwards (the new object must be strictly larger than the selection, and a one-character
+selection counts as no selection, so `vi(i(` on `((a))` reselects `a`); Visual `i(` on a
+multiline pair includes the final line break.
+
+Known divergences:
+
+- A cursor that is not inside any pair makes the command fail and change nothing. Misa has no
+  audible bell, so the failure is silent and the pending operator is dropped. Recent Vim 9.1/9.2
+  builds instead search forward for the next pair on or after the cursor; Misa follows the H05
+  specification and the older behaviour, so `di(` on the `a` of `a (b)` does nothing.
+- Delimiters are counted by kind only. Brackets inside quotes or comments count, so `f("a)", b)`
+  with the cursor on `b` fails where Vim's quote heuristics may skip the `)`.
+- A failed command does not discard the keys typed after it: a script or `.` replay continues,
+  and the keys that follow run as ordinary commands (Vim aborts the remainder of a typeahead
+  sequence). This is how every Misa operator failure already behaves.
+- A Visual `i(`/`i"` that finds nothing larger (or an empty pair) leaves the selection unchanged.
+- `>i(` on an empty pair indents nothing, and `<`/`>` over a charwise multi-line object shift
+  every line the object touches.
+- Fixtures were checked against Vim 9.2 run as a black-box oracle (`vim -u NONE -N -es`) except
+  where the divergence above applies; the cases that differ are written by hand. No Vim source,
+  documentation text or tests were read or copied.
 
 ### F08 input and paste contract
 

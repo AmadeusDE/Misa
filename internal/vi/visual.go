@@ -53,6 +53,8 @@ func (e *Editor) updateVisual(msg tea.Msg) (tea.Model, tea.Cmd) {
 		e.count, e.countGiven = 0, false
 		if key == "w" || key == "W" {
 			e.visualObject(prefix+key, count)
+		} else if _, ok := delimObjectFor(prefix + key); ok {
+			e.visualDelimObject(prefix+key, count)
 		}
 		return nil, nil
 	}
