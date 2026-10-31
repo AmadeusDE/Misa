@@ -1,0 +1,7 @@
+nr_free_pages 262144
+pgpgin 1111111
+pgpgout 2222222
+pswpin 33
+pswpout 44
+pgalloc_normal 5000
+pgfree 4000
