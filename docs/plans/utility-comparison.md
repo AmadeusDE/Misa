@@ -31,7 +31,7 @@ uutils org repos checked that ship no utilities (libraries/docs/trackers): rust-
 
 | Column | Utilities |
 |---|---|
-| Misa | 114 |
+| Misa | 117 |
 | toybox (all) | 349 |
 | toybox: non-pending, default y | 250 |
 | toybox: non-pending, default n | 3 |
@@ -252,8 +252,8 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `grpck` |  |  |  | ✓ shadow |
 | `grpconv` |  |  |  | ✓ shadow |
 | `grpunconv` |  |  |  | ✓ shadow |
-| `gunzip` |  | ✓ lsb | ✓ |  |
-| `gzip` |  | ✓ lsb (default n) | ✓ |  |
+| `gunzip` | ✓ | ✓ lsb | ✓ |  |
+| `gzip` | ✓ | ✓ lsb (default n) | ✓ |  |
 | `halt` |  | ✓ other | ✓ |  |
 | `hd` |  | ✓ other | ✓ |  |
 | `hdparm` |  |  | ✓ |  |
@@ -649,6 +649,6 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `xz` |  |  | ✓ |  |
 | `xzcat` |  | ✓ pending | ✓ |  |
 | `yes` | ✓ | ✓ other | ✓ | ✓ coreutils |
-| `zcat` |  | ✓ lsb | ✓ |  |
+| `zcat` | ✓ | ✓ lsb | ✓ |  |
 | `zcip` |  |  | ✓ |  |
-| **Total** | **114** | **349** (250 default, 96 pending) | **445** | **190** |
+| **Total** | **117** | **349** (250 default, 96 pending) | **445** | **190** |
