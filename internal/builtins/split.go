@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 const splitSpec = "l(lines):b(bytes):a(suffix-length):d(numeric-suffixes):?x(hex-suffixes):?n(number):e(elide-empty-files)u(unbuffered)C(line-bytes):(additional-suffix):t(separator):(verbose)(IO-blksize):"
@@ -417,7 +416,6 @@ func runSplit(ctx *Context) int {
 				fmt.Fprintf(ctx.Stderr, "split: cannot open '%s' for reading: No such file or directory\n", name)
 				return 1
 			}
-			inputInode := inputInfo.Sys().(*syscall.Stat_t).Ino
 
 			fh, err := os.Open(path)
 			if err != nil {
@@ -434,8 +432,7 @@ func runSplit(ctx *Context) int {
 				firstOutPath := filepath.Join(ctx.Dir, firstOutName)
 				firstOutInfo, err := os.Stat(firstOutPath)
 				if err == nil {
-					firstOutInode := firstOutInfo.Sys().(*syscall.Stat_t).Ino
-					if firstOutInode == inputInode {
+					if sameFileInfo(firstOutInfo, inputInfo) {
 						fmt.Fprintf(ctx.Stderr, "split: '%s' would overwrite input; aborting\n", firstOutName)
 						return 1
 					}
@@ -465,9 +462,7 @@ func runSplit(ctx *Context) int {
 			if err == nil {
 				// Check if output file exists with same inode
 				if outInfo, err := os.Stat(firstOutPath); err == nil {
-					stdinInode := stdinInfo.Sys().(*syscall.Stat_t).Ino
-					outInode := outInfo.Sys().(*syscall.Stat_t).Ino
-					if stdinInode != 0 && stdinInode == outInode && outInfo.Mode().IsRegular() {
+					if sameFileInfo(stdinInfo, outInfo) && outInfo.Mode().IsRegular() {
 						fmt.Fprintf(ctx.Stderr, "split: '%s' would overwrite input; aborting\n", firstOutName)
 						return 1
 					}
@@ -476,7 +471,6 @@ func runSplit(ctx *Context) int {
 		}
 	}
 
-	// Need to import syscall for Stat_t
 	_ = inputPath
 
 	if useNumber {

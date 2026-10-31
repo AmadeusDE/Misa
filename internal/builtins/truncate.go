@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 const truncateSpec = "s(size):c(no-create)r(reference):o(io-blocks)"
@@ -127,7 +126,7 @@ func runTruncate(ctx *Context) int {
 			}
 			if ioBlocks {
 				blkSize := int64(512)
-				if st, ok := info.Sys().(*syscall.Stat_t); ok && st.Blksize > 0 {
+				if st, ok := readFSMeta(path, info); ok && st.Blksize > 0 {
 					blkSize = int64(st.Blksize)
 				}
 				// Check for overflow in multiplication

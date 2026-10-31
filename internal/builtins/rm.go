@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/x/term"
-	"golang.org/x/sys/unix"
 )
 
 const rmSpec = "(interactive):?(one-file-system)(-presume-input-tty)r(recursive)f(force)v(verbose)d(dir)RiI(preserve-root):?(no-preserve-root)g(progress)"
@@ -279,7 +278,7 @@ func (s *rmState) confirmRemoval(path string, info os.FileInfo, display string) 
 // confirmDir prompts for removal; uses "attempt removal of inaccessible directory" phrasing for
 // dirs that lack execute permission (matching uutils/GNU rm behavior).
 func (s *rmState) confirmDir(path string, info os.FileInfo, display string) bool {
-	if info.IsDir() && unix.Access(path, unix.X_OK) != nil {
+	if info.IsDir() && !canSearch(path) {
 		return s.confirmf("rm: attempt removal of inaccessible directory '%s'? ", display)
 	}
 	return s.confirmf("rm: remove %s '%s'? ", rmClassifyFile(path, info), display)
@@ -310,7 +309,7 @@ func rmClassifyFile(path string, info os.FileInfo) string {
 			return "directory"
 		}
 		// If we can't execute (traverse) the directory at all, it's inaccessible.
-		if unix.Access(path, unix.X_OK) != nil {
+		if !canSearch(path) {
 			return "inaccessible directory"
 		}
 		return "write-protected directory"
@@ -326,7 +325,7 @@ func rmClassifyFile(path string, info os.FileInfo) string {
 }
 
 func isWritableAccess(path string) bool {
-	return unix.Access(path, unix.W_OK) == nil
+	return canWrite(path)
 }
 
 func isTerminalReader(r io.Reader) bool {

@@ -211,6 +211,12 @@ func statFile(path, name string, followLinks bool) *FileInfo {
 	return fi
 }
 
+// StatPath reads the portable metadata of one path, following symlinks when
+// follow is set. Err is set when the path cannot be read.
+func StatPath(path string, follow bool) *FileInfo {
+	return statFile(path, filepath.Base(path), follow)
+}
+
 func HumanSize(b int64) string {
 	const unit = 1024
 	if b < unit {

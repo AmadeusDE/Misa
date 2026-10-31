@@ -1,10 +1,6 @@
 package builtins
 
-import (
-	"fmt"
-
-	"golang.org/x/sys/unix"
-)
+import "fmt"
 
 func init() {
 	Register(Command{Name: "arch", Run: runArch})
@@ -28,18 +24,26 @@ func runArch(ctx *Context) int {
 			return 1
 		}
 	}
-	var u unix.Utsname
-	if err := unix.Uname(&u); err != nil {
+	machine, err := machineName()
+	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "arch:", err)
 		return 1
 	}
-	machine := make([]byte, 0, len(u.Machine))
-	for _, b := range u.Machine {
-		if b == 0 {
-			break
-		}
-		machine = append(machine, byte(b))
-	}
-	fmt.Fprintln(ctx.Stdout, string(machine))
+	fmt.Fprintln(ctx.Stdout, machine)
 	return 0
+}
+
+// machineFromGOARCH names a Go architecture the way uname -m does.
+func machineFromGOARCH(goarch string) string {
+	switch goarch {
+	case "amd64":
+		return "x86_64"
+	case "386":
+		return "i686"
+	case "arm64":
+		return "aarch64"
+	case "arm":
+		return "armv7l"
+	}
+	return goarch
 }

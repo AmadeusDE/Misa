@@ -6,10 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 const touchSpec = "c(no-create)h(no-dereference)t:d(date):r(reference):amf"
@@ -212,47 +209,6 @@ func parseObsolescentDate(s string) (time.Time, error) {
 		cc = 1900
 	}
 	return time.ParseInLocation("200601021504", fmt.Sprintf("%d%s", cc+yy, mmddhhmm), time.Local)
-}
-
-func touchChtimes(ctx *Context, name, path string, atime, mtime time.Time, noFollow bool, specifyTimes bool) error {
-	var ts []unix.Timespec
-	if specifyTimes {
-		ts = []unix.Timespec{
-			unix.NsecToTimespec(atime.UnixNano()),
-			unix.NsecToTimespec(mtime.UnixNano()),
-		}
-	} else {
-		ts = []unix.Timespec{
-			{Sec: 0, Nsec: utimeNow},
-			{Sec: 0, Nsec: utimeNow},
-		}
-	}
-
-	if name == "-" {
-		return unix.UtimesNanoAt(1, "", ts, 0)
-	}
-
-	flags := 0
-	if noFollow {
-		flags = unix.AT_SYMLINK_NOFOLLOW
-	}
-
-	err := unix.UtimesNanoAt(unix.AT_FDCWD, path, ts, flags)
-	if err == nil {
-		return nil
-	}
-
-	if (err == syscall.EACCES || err == syscall.EPERM) && !specifyTimes {
-		fd, errOpen := unix.Open(path, unix.O_RDONLY|unix.O_NONBLOCK, 0)
-		if errOpen == nil {
-			defer unix.Close(fd)
-			errFutimens := unix.UtimesNanoAt(fd, "", ts, 0)
-			if errFutimens == nil {
-				return nil
-			}
-		}
-	}
-	return err
 }
 
 func parseTouchT(s string) (time.Time, error) {

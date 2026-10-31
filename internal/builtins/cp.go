@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/charmbracelet/x/term"
 )
@@ -568,8 +567,7 @@ func runCp(ctx *Context) int {
 			continue
 		}
 
-		if st, ok := srcInfo.Sys().(*syscall.Stat_t); ok && !srcInfo.IsDir() && preserve.links {
-			k := inodeKey{uint64(st.Dev), st.Ino}
+		if k, ok := inodeKeyOf(srcPath, srcInfo); ok && !srcInfo.IsDir() && preserve.links {
 			if prevDst, exists := copiedInodes[k]; exists {
 				_ = os.Remove(target)
 				if err := os.Link(prevDst, target); err == nil {
@@ -859,8 +857,8 @@ func applyAttributesOnly(target, displayTarget string, srcInfo os.FileInfo, pres
 		_ = os.Chtimes(target, srcInfo.ModTime(), srcInfo.ModTime())
 	}
 	if preserve.ownership {
-		if st, ok := srcInfo.Sys().(*syscall.Stat_t); ok {
-			_ = os.Chown(target, int(st.Uid), int(st.Gid))
+		if uid, gid, ok := ownerOf(srcInfo); ok {
+			_ = os.Chown(target, uid, gid)
 		}
 	}
 	return nil
@@ -881,8 +879,8 @@ func applyCopiedAttrs(dst string, srcInfo os.FileInfo, preserve preserveAttrs) {
 		os.Chtimes(dst, srcInfo.ModTime(), srcInfo.ModTime())
 	}
 	if preserve.ownership {
-		if st, ok := srcInfo.Sys().(*syscall.Stat_t); ok {
-			os.Chown(dst, int(st.Uid), int(st.Gid))
+		if uid, gid, ok := ownerOf(srcInfo); ok {
+			os.Chown(dst, uid, gid)
 		}
 	}
 }
@@ -929,7 +927,7 @@ func copyOneFile(src, dst string, srcInfo os.FileInfo, preserve preserveAttrs, f
 		}
 		// 0666: the umask still applies at mknod() time; applyCopiedAttrs
 		// below corrects the mode explicitly when preserve.mode is set.
-		if err := syscall.Mkfifo(dst, 0666); err != nil {
+		if err := makeFifo(dst, 0666); err != nil {
 			return bpath, fmt.Errorf("cannot create fifo '%s': %s", displayDst, fmtOsErr(err))
 		}
 		applyCopiedAttrs(dst, srcInfo, preserve)
@@ -1063,8 +1061,7 @@ func copyDirRecursiveLinked(src, dst, displaySrc, displayDst string, preserve pr
 		}
 
 		if linkMap != nil {
-			if st, ok := leafInfo.Sys().(*syscall.Stat_t); ok && preserve.links {
-				k := inodeKey{uint64(st.Dev), st.Ino}
+			if k, ok := inodeKeyOf(srcChild, leafInfo); ok && preserve.links {
 				if prevDst, exists := linkMap[k]; exists {
 					_ = os.Remove(dstChild)
 					if err := os.Link(prevDst, dstChild); err == nil {
@@ -1088,8 +1085,8 @@ func copyDirRecursiveLinked(src, dst, displaySrc, displayDst string, preserve pr
 		os.Chtimes(dst, srcInfo.ModTime(), srcInfo.ModTime())
 	}
 	if preserve.ownership {
-		if st, ok := srcInfo.Sys().(*syscall.Stat_t); ok {
-			os.Chown(dst, int(st.Uid), int(st.Gid))
+		if uid, gid, ok := ownerOf(srcInfo); ok {
+			os.Chown(dst, uid, gid)
 		}
 	}
 	if hasError {
