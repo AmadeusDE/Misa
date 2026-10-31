@@ -24,13 +24,7 @@ func init() {
 }
 
 func getEnv(ctx *Context, key string) string {
-	prefix := key + "="
-	for _, e := range ctx.Env {
-		if strings.HasPrefix(e, prefix) {
-			return e[len(prefix):]
-		}
-	}
-	return os.Getenv(key)
+	return ctx.Getenv(key)
 }
 
 type cutRange struct{ lo, hi int }
@@ -114,7 +108,12 @@ func selectFieldsOrdered(fields []string, ranges []cutRange, complement bool) []
 	return selected
 }
 
-func runCut(ctx *Context) int {
+func runCut(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	out := &trackedOutput{writer: ctx.Stdout}
+	ctx.Stdout = out
 	flags, err := cutSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "cut:", err)
@@ -259,6 +258,9 @@ func runCut(ctx *Context) int {
 
 	exitCode := 0
 	for _, f := range files {
+		if out.err != nil {
+			return 1
+		}
 		var r io.Reader
 		if f == "-" {
 			r = ctx.Stdin
@@ -271,7 +273,7 @@ func runCut(ctx *Context) int {
 				continue
 			}
 			defer fh.Close()
-			r = fh
+			r = ContextReader(ctx.CancellationContext(), fh)
 		}
 
 		if hasFields && delim == "\n" {
@@ -281,6 +283,9 @@ func runCut(ctx *Context) int {
 
 		br := bufio.NewReader(r)
 		for {
+			if out.err != nil {
+				return 1
+			}
 			var line string
 			if zeroTerm {
 				line, err = br.ReadString(0)
@@ -422,6 +427,9 @@ func runCut(ctx *Context) int {
 				break
 			}
 		}
+	}
+	if out.err != nil {
+		return 1
 	}
 	return exitCode
 }

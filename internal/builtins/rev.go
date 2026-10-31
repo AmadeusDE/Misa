@@ -20,7 +20,13 @@ func revLine(line []byte) []byte {
 	return []byte(string(runes))
 }
 
-func runRev(ctx *Context) int {
+func runRev(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	args := ctx.Args
 	if len(args) > 0 && args[0] == "--" {
 		args = args[1:]
@@ -59,7 +65,7 @@ func runRev(ctx *Context) int {
 			r = f
 		}
 
-		data, err := io.ReadAll(r)
+		data, err := io.ReadAll(ContextReader(ctx.CancellationContext(), r))
 		if err != nil {
 			fmt.Fprintf(ctx.Stderr, "rev: %v\n", err)
 			exitCode = 1
@@ -71,9 +77,13 @@ func runRev(ctx *Context) int {
 			lines = lines[:len(lines)-1]
 		}
 		for i, line := range lines {
-			ctx.Stdout.Write(revLine(line))
+			if _, err := ctx.Stdout.Write(revLine(line)); err != nil {
+				return 1
+			}
 			if i < len(lines)-1 || endsWithNewline {
-				ctx.Stdout.Write([]byte{'\n'})
+				if _, err := ctx.Stdout.Write([]byte{'\n'}); err != nil {
+					return 1
+				}
 			}
 		}
 	}

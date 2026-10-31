@@ -2,8 +2,6 @@ package builtins
 
 import (
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/AmadeusDE/Misa/internal/sshclient"
 )
@@ -48,20 +46,19 @@ func sshcOptions(args []string) (sshclient.Options, error) {
 	return o, nil
 }
 
-func runSSHC(ctx *Context) int {
+func sshcInvocationOptions(ctx *Context) (sshclient.Options, error) {
 	o, err := sshcOptions(ctx.Args)
+	if err == nil && ctx.Env != nil {
+		o.Env = append([]string{}, ctx.Env...)
+	}
+	return o, err
+}
+
+func runSSHC(ctx *Context) int {
+	o, err := sshcInvocationOptions(ctx)
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr, "sshc: %v\n%s", err, sshcUsage)
 		return 255
 	}
-	return sshclient.Run(o, envValue(ctx.Env, "TERM"), ctx.Stdin, ctx.Stdout, ctx.Stderr)
-}
-
-func envValue(environ []string, key string) string {
-	for _, kv := range environ {
-		if v, ok := strings.CutPrefix(kv, key+"="); ok {
-			return v
-		}
-	}
-	return os.Getenv(key)
+	return sshclient.Run(o, ctx.Getenv("TERM"), ctx.Stdin, ctx.Stdout, ctx.Stderr)
 }
