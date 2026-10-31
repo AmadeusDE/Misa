@@ -118,7 +118,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `chess` | ✓ |  |  |  |
 | `chfn` |  |  |  | ✓ shadow |
 | `chgpasswd` |  |  |  | ✓ shadow |
-| `chgrp` |  | ✓ posix | ✓ | ✓ coreutils |
+| `chgrp` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `chmod` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `chown` | ✓ | ✓ posix | ✓ | ✓ coreutils |
 | `chpasswd` |  |  | ✓ | ✓ shadow |
