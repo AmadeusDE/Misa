@@ -198,6 +198,12 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	if got := g.match.Variant().ID; got != "atomic" {
 		t.Fatalf("picker selected %s, want atomic", got)
 	}
+	// Chess960 needs no cycling either: the same filter reaches it, and the
+	// seeded setup is picked when the variant loads.
+	keys(g, "v", "c", "h", "e", "s", "s", "9", "6", "enter")
+	if got := g.match.Variant().ID; got != "chess960" {
+		t.Fatalf("picker selected %s, want chess960", got)
+	}
 	// Restore the big board for the rose move and undo checks below.
 	keys(g, "v", "b", "i", "g", "b", "o", "a", "r", "d", "enter")
 	if got := g.match.Variant().ID; got != "bigboard" {
@@ -434,5 +440,52 @@ func TestHeaderShowsGoalWin(t *testing.T) {
 	g.match.Play(findMove(t, g.match.Position(), "c3", "d4"))
 	if got := g.header(); !strings.Contains(got, "goal reached, White wins") {
 		t.Errorf("header = %q", got)
+	}
+}
+
+func TestChess960CastleEntry(t *testing.T) {
+	for _, tc := range []struct {
+		name, fen, king, target string
+		keyboard                bool
+	}{
+		{"rook click", "k7/8/8/8/8/8/8/4K2R w H", "e1", "h1", false},
+		{"ambiguous destination", "k7/8/8/8/8/8/8/5K1R w H", "f1", "g1", false},
+		{"stationary rook entry", "k7/8/8/8/8/8/8/6KR w H", "g1", "h1", false},
+		{"queenside rook entry", "k7/8/8/8/8/8/8/RK6 w A", "b1", "a1", false},
+		{"stationary king", "k7/8/8/8/8/8/8/6KR w H", "g1", "g1", false},
+		{"swap", "k7/8/8/8/8/8/8/5KR1 w G", "f1", "g1", false},
+		{"keyboard rook", "k7/8/8/8/8/8/8/5K1R w H", "f1", "h1", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g := newGame(t, "chess960", 80, 24)
+			p, err := ParseFEN(g.match.Variant(), tc.fen)
+			if err != nil {
+				t.Fatal(err)
+			}
+			g.Load(p)
+			if tc.keyboard {
+				sq, _ := g.match.Variant().ParseSquare(tc.king)
+				g.cx, g.cy = g.match.Variant().XY(sq)
+				keys(g, "space", "l", "l", "enter")
+			} else {
+				clickSquare(t, g, tc.king, tea.MouseLeft)
+				clickSquare(t, g, tc.target, tea.MouseLeft)
+			}
+			played := g.match.Played()
+			if len(played) != 1 || played[0].Castle < 0 {
+				t.Fatalf("expected castle, got %+v", played)
+			}
+		})
+	}
+}
+
+func TestChess960HeaderKeepsStartingRank(t *testing.T) {
+	g := newGame(t, "chess960", 80, 24)
+	before := g.header()
+	clickSquare(t, g, "a2", tea.MouseLeft)
+	clickSquare(t, g, "a3", tea.MouseLeft)
+	after := g.header()
+	if strings.Replace(before, "White to move", "Black to move", 1) != after {
+		t.Fatalf("starting rank changed: %q -> %q", before, after)
 	}
 }

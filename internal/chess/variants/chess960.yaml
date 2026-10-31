@@ -1,0 +1,11 @@
+id: chess960
+name: Chess960
+description: Chess with a randomized back rank.
+extends: chess
+shuffle:
+  rank: 1
+  opposite_color: B
+  between: {royal: K, pieces: R}
+castling:
+  - {rook_side: right, rook_piece: R, king_to: g1, rook_to: f1}
+  - {rook_side: left, rook_piece: R, king_to: c1, rook_to: d1}

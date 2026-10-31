@@ -199,6 +199,19 @@ func (g *Game) View() string {
 func (g *Game) header() string {
 	m := g.match
 	name := m.Variant().Name + " · " + g.level.String()
+	if m.Variant().shuffle != nil {
+		var rank strings.Builder
+		start := m.history[0]
+		for x := range m.Variant().Files {
+			pc := start.Board[m.Variant().Square(x, m.Variant().shuffle.rank)]
+			if pc.Type != 0 {
+				rank.WriteByte(m.Variant().Pieces[pc.Type-1].Letter)
+			} else {
+				rank.WriteByte('-')
+			}
+		}
+		name += " · " + rank.String()
+	}
 	st, winner := m.Status()
 	switch st {
 	case Playing:
@@ -296,6 +309,10 @@ func (g *Game) hints() map[int]hint {
 		return h
 	}
 	for _, mv := range g.movesBetween(g.sel, -1) {
+		if mv.Castle >= 0 {
+			p := g.match.Position()
+			h[p.Castle(mv.Castle, p.Turn).Rook] = hintMove
+		}
 		if mv.Take >= 0 {
 			h[mv.To] = hintCapture
 		} else {
@@ -340,6 +357,8 @@ func (g *Game) square(sq, x, y, cw int, hints map[int]hint, checked bool, last m
 		bg = checkBg
 	case hints[sq] == hintCapture:
 		bg = captureBg
+	case hints[sq] == hintMove && p.Board[sq].Type != 0 && sq != g.sel:
+		bg = selectBg
 	case last[sq]:
 		bg = lastBg
 	}
@@ -427,7 +446,11 @@ func (g *Game) status() string {
 	case g.thinking:
 		text = "The computer is thinking…"
 	case g.sel >= 0 && len(g.movesBetween(g.sel, g.sel)) > 0:
-		text = "Choose its own square again to pass"
+		if g.entryMoves(g.sel, g.sel)[0].Castle >= 0 {
+			text = "Choose the king square again or its rook to castle"
+		} else {
+			text = "Choose its own square again to pass"
+		}
 	default:
 		if n := g.match.Notation(); len(n) > 0 {
 			text = "Last move: " + n[len(n)-1]
