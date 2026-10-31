@@ -88,12 +88,52 @@ func TestDD_BytesFlags(t *testing.T) {
 	wantOut(t, r, "hi")
 }
 
+// TestDD_Unsupported covers the options this port still refuses; the message
+// has to be honest rather than a silent success.
 func TestDD_Unsupported(t *testing.T) {
-	for _, arg := range []string{"conv=ucase", "conv=ascii", "iflag=direct", "status=progress"} {
+	for _, arg := range []string{"iflag=nocache", "oflag=nocache", "conv=bogus"} {
 		r := runStdin(t, "dd", "x", arg)
 		wantFail(t, r)
-		wantErrContains(t, r, "unsupported in this version")
+		if !strings.Contains(r.stderr, "unsupported in this version") &&
+			!strings.Contains(r.stderr, "invalid conversion") {
+			t.Errorf("%s: stderr = %q, want an honest refusal", arg, r.stderr)
+		}
 	}
+}
+
+// toybox: "conv=sync,sync" stays a plain copy and duplicated flags are fine.
+// ibs= is the record length so that sync has nothing to pad.
+func TestDD_ConvSyncDuplicate(t *testing.T) {
+	r := runStdin(t, "dd", "I WANT\n", "conv=sync,sync", "ibs=7", "status=none")
+	wantSuccess(t, r)
+	wantOut(t, r, "I WANT\n")
+}
+
+// toybox: "oflag=append" appends to a file that is not truncated.
+func TestDD_AppendNotrunc(t *testing.T) {
+	dir := t.TempDir()
+	mkFile(t, dir, "file", "hello ")
+	r := runStdinIn(t, dir, "dd", "world\n", "of=file", "oflag=append", "conv=notrunc", "status=none")
+	wantSuccess(t, r)
+	if got := readFile(t, filepath.Join(dir, "file")); got != "hello world\n" {
+		t.Errorf("file = %q, want %q", got, "hello world\n")
+	}
+}
+
+// uutils: conv=ucase folds ASCII letters, conv=swab swaps byte pairs.
+func TestDD_Conversions(t *testing.T) {
+	r := runStdin(t, "dd", "aBc\n", "conv=ucase", "status=none")
+	wantSuccess(t, r)
+	wantOut(t, r, "ABC\n")
+
+	r = runStdin(t, "dd", "abcde", "conv=swab", "status=none")
+	wantSuccess(t, r)
+	wantOut(t, r, "badce")
+
+	// A conflicting pair is rejected instead of silently picked.
+	r = runStdin(t, "dd", "x", "conv=ucase,lcase")
+	wantFail(t, r)
+	wantErrContains(t, r, "cannot combine ucase and lcase")
 }
 
 func TestDD_MissingInput(t *testing.T) {

@@ -28,9 +28,9 @@ func ddUsagef(format string, args ...any) error {
 // buffer; uutils rejects anything that does not fit.
 const ddMaxBlockSize = 1 << 30
 
-// ddConv holds the conv= flags this version implements. U17 (conv=ucase,
-// lcase, swab, ascii, ebcdic, block, unblock, sparse) adds fields here and a
-// transform call in the copy loop.
+// ddConv holds the conv= flags. table is the character-set and case
+// conversion the flags resolve to, and block/unblock are set only when cbs=
+// gives the record length they need.
 type ddConv struct {
 	notrunc   bool
 	sync      bool
@@ -39,6 +39,14 @@ type ddConv struct {
 	fdatasync bool
 	excl      bool
 	nocreat   bool
+	swab      bool
+	sparse    bool
+
+	ascii, ebcdic, ibm bool
+	ucase, lcase       bool
+	block, unblock     bool
+
+	table *[256]byte
 }
 
 // ddIFlags holds iflag=.
@@ -46,12 +54,18 @@ type ddIFlags struct {
 	countBytes bool
 	skipBytes  bool
 	fullblock  bool
+	direct     bool     // iflag=direct: buffers must be aligned
+	extra      int      // platform open flags such as O_DIRECT
+	names      []string // the platform flag names that were given
 }
 
 // ddOFlags holds oflag=.
 type ddOFlags struct {
 	seekBytes bool
 	append    bool
+	direct    bool     // oflag=direct: buffers must be aligned
+	extra     int      // platform open flags such as O_DIRECT
+	names     []string // the platform flag names that were given
 }
 
 type ddStatus int
@@ -60,10 +74,12 @@ const (
 	ddStatusDefault ddStatus = iota
 	ddStatusNone
 	ddStatusNoxfer
+	ddStatusProgress
 )
 
-func (s ddStatus) records() bool { return s != ddStatusNone }
-func (s ddStatus) xfer() bool    { return s == ddStatusDefault }
+func (s ddStatus) records() bool  { return s != ddStatusNone }
+func (s ddStatus) xfer() bool     { return s != ddStatusNone && s != ddStatusNoxfer }
+func (s ddStatus) progress() bool { return s == ddStatusProgress }
 
 // ddNumber is a parsed count=/skip=/seek= value. A "B" anywhere in the operand
 // makes it a byte count rather than a block count, as in uutils and GNU dd.
@@ -89,6 +105,9 @@ type ddConfig struct {
 	skip uint64 // bytes to discard from the input
 	seek uint64 // bytes to skip on the output
 
+	cbs    int // conv=block/unblock record size
+	cbsSet bool
+
 	conv   ddConv
 	iflag  ddIFlags
 	oflag  ddOFlags
@@ -100,20 +119,20 @@ type ddConfig struct {
 // gathers input blocks into obs= sized output blocks.
 func (c *ddConfig) ddUnbuffered() bool { return c.bsSet && !c.convSet }
 
-// knownUnsupported lists the flags the references define but this version does
-// not implement, so they fail with a clear message instead of being ignored.
-var ddConvUnsupported = map[string]bool{
-	"ascii": true, "ebcdic": true, "ibm": true, "lcase": true, "ucase": true,
-	"block": true, "unblock": true, "swab": true, "sparse": true,
-}
-
-var ddIUnsupported = map[string]bool{
+// ddPlatformFlagNames are the iflag=/oflag= names that ask the kernel for
+// special open behaviour. Each platform file maps the ones it can honour onto
+// os.OpenFile flags; the rest fail with "unsupported on this platform".
+var ddPlatformFlagNames = map[string]bool{
 	"direct": true, "directory": true, "dsync": true, "sync": true,
-	"nocache": true, "nonblock": true, "noatime": true, "noctty": true,
-	"nofollow": true, "cio": true, "nolinks": true, "binary": true, "text": true,
+	"nonblock": true, "noatime": true, "noctty": true, "nofollow": true,
 }
 
-var ddOUnsupported = ddIUnsupported
+// ddReservedFlags are flags the references define for operations this dd does
+// not implement at all, on any platform: the cache advice, the raw tape mode
+// and the Windows text/binary modes.
+var ddReservedFlags = map[string]bool{
+	"nocache": true, "cio": true, "nolinks": true, "binary": true, "text": true,
+}
 
 func ddUnsupported(name, value string) error {
 	return fmt.Errorf("%s=%s: unsupported in this version", name, value)
@@ -160,11 +179,11 @@ func parseDDArgs(args []string) (*ddConfig, error) {
 			}
 			cfg.obs = int(n)
 		case "cbs":
-			// cbs= only means something with conv=block/unblock, which U17 adds.
-			if _, err := ddParseBlockSize(key, value); err != nil {
+			n, err := ddParseBlockSize(key, value)
+			if err != nil {
 				return nil, err
 			}
-			return nil, ddUnsupported(key, value)
+			cfg.cbs, cfg.cbsSet = int(n), true
 		case "count":
 			n, err := ddParseNum(value)
 			if err != nil {
@@ -203,7 +222,7 @@ func parseDDArgs(args []string) (*ddConfig, error) {
 			case "noxfer":
 				cfg.status = ddStatusNoxfer
 			case "progress":
-				return nil, ddUnsupported(key, value)
+				cfg.status = ddStatusProgress
 			default:
 				return nil, ddUsagef("invalid status level: '%s'", value)
 			}
@@ -214,6 +233,9 @@ func parseDDArgs(args []string) (*ddConfig, error) {
 
 	if cfg.bsSet {
 		cfg.ibs, cfg.obs = int(bs), int(bs)
+	}
+	if err := cfg.resolveConv(); err != nil {
+		return nil, err
 	}
 
 	if cfg.countSet {
@@ -282,17 +304,113 @@ func (c *ddConfig) parseConvFlags(value string) error {
 			c.conv.excl = true
 		case "nocreat":
 			c.conv.nocreat = true
+		case "swab":
+			c.conv.swab = true
+		case "sparse":
+			c.conv.sparse = true
+		case "ascii":
+			c.conv.ascii = true
+		case "ebcdic":
+			c.conv.ebcdic = true
+		case "ibm":
+			c.conv.ibm = true
+		case "ucase":
+			c.conv.ucase = true
+		case "lcase":
+			c.conv.lcase = true
+		case "block":
+			c.conv.block = true
+		case "unblock":
+			c.conv.unblock = true
 		default:
-			if ddConvUnsupported[f] {
-				return ddUnsupported("conv", f)
-			}
 			return ddUsagef("invalid conversion: '%s'", f)
 		}
 	}
-	if c.conv.excl && c.conv.nocreat {
+	return nil
+}
+
+// resolveConv rejects the conv= combinations the references refuse and works
+// out which character table and which blocking step the copy uses.
+func (c *ddConfig) resolveConv() error {
+	conv := &c.conv
+	// The order of these refusals follows the references: the character set
+	// first, then the blocking direction, then the case fold, then the output
+	// file rules.
+	charsets := 0
+	for _, set := range []bool{conv.ascii, conv.ebcdic, conv.ibm} {
+		if set {
+			charsets++
+		}
+	}
+	if charsets > 1 {
+		return fmt.Errorf("cannot combine ascii, ebcdic and ibm")
+	}
+
+	// conv=ascii implies conv=unblock and conv=ebcdic/ibm imply conv=block;
+	// with no cbs= there is no record length and the implied step is skipped.
+	blocked := conv.block || conv.ebcdic || conv.ibm
+	unblocked := conv.unblock || conv.ascii
+	if c.cbsSet && blocked && unblocked {
+		return fmt.Errorf("cannot combine block and unblock")
+	}
+	switch {
+	case conv.ucase && conv.lcase:
+		return fmt.Errorf("cannot combine ucase and lcase")
+	case conv.excl && conv.nocreat:
 		return fmt.Errorf("cannot combine excl and nocreat")
 	}
+	conv.block, conv.unblock = false, false
+	if c.cbsSet {
+		conv.block, conv.unblock = blocked, unblocked && !blocked
+	}
+	conv.table = c.convTable()
 	return nil
+}
+
+// convTable picks the character conversion table conv= asked for, combining
+// the character set and the case fold in one lookup the way the references do.
+func (c *ddConfig) convTable() *[256]byte {
+	conv := &c.conv
+	switch {
+	case conv.ascii:
+		switch {
+		case conv.ucase:
+			return &ddEBCDICToASCIILowerToUpper
+		case conv.lcase:
+			return &ddEBCDICToASCIIUpperToLower
+		}
+		return &ddEBCDICToASCII
+	case conv.ebcdic:
+		switch {
+		case conv.ucase:
+			return &ddASCIIToEBCDICLowerToUpper
+		case conv.lcase:
+			return &ddASCIIToEBCDICUpperToLower
+		}
+		return &ddASCIIToEBCDIC
+	case conv.ibm:
+		switch {
+		case conv.ucase:
+			return &ddASCIIToIBMLowerToUpper
+		case conv.lcase:
+			return &ddASCIIToIBMUpperToLower
+		}
+		return &ddASCIIToIBM
+	case conv.ucase:
+		return ddUpperTable
+	case conv.lcase:
+		return ddLowerTable
+	}
+	return nil
+}
+
+// syncPad is the byte conv=sync fills a short input block with: an EBCDIC or
+// ASCII space when conv=block is active, otherwise a zero byte.
+func (c *ddConfig) syncPad() byte {
+	if c.conv.block {
+		return ' '
+	}
+	return 0
 }
 
 func (c *ddConfig) parseInputFlags(value string) error {
@@ -307,10 +425,21 @@ func (c *ddConfig) parseInputFlags(value string) error {
 		case "append", "seek_bytes":
 			// GNU accepts output flags given as iflag and ignores them.
 		default:
-			if ddIUnsupported[f] {
+			if ddReservedFlags[f] {
 				return ddUnsupported("iflag", f)
 			}
-			return ddUsagef("invalid input flag: '%s'", f)
+			bits, err := ddPlatformOpenFlag(f)
+			if err != nil {
+				return fmt.Errorf("iflag=%s: %w", f, err)
+			}
+			if bits == 0 && !ddPlatformFlagNames[f] {
+				return ddUsagef("invalid input flag: '%s'", f)
+			}
+			if f == "direct" {
+				c.iflag.direct = true
+			}
+			c.iflag.extra |= bits
+			c.iflag.names = append(c.iflag.names, f)
 		}
 	}
 	return nil
@@ -326,10 +455,21 @@ func (c *ddConfig) parseOutputFlags(value string) error {
 		case "count_bytes", "skip_bytes", "fullblock":
 			// Input flags given as oflag are ignored, as GNU does.
 		default:
-			if ddOUnsupported[f] {
+			if ddReservedFlags[f] {
 				return ddUnsupported("oflag", f)
 			}
-			return ddUsagef("invalid output flag: '%s'", f)
+			bits, err := ddPlatformOpenFlag(f)
+			if err != nil {
+				return fmt.Errorf("oflag=%s: %w", f, err)
+			}
+			if bits == 0 && !ddPlatformFlagNames[f] {
+				return ddUsagef("invalid output flag: '%s'", f)
+			}
+			if f == "direct" {
+				c.oflag.direct = true
+			}
+			c.oflag.extra |= bits
+			c.oflag.names = append(c.oflag.names, f)
 		}
 	}
 	return nil

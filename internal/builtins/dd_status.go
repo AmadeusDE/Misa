@@ -23,14 +23,31 @@ var ddIECSuffix = [...]string{"B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"}
 func ddPrintSummary(w io.Writer, stats ddStats, elapsed time.Duration, status ddStatus) {
 	if status.records() {
 		fmt.Fprintf(w, "%d+%d records in\n%d+%d records out\n", stats.inFull, stats.inPart, stats.outFull, stats.outPart)
+		if stats.truncated > 0 {
+			fmt.Fprintf(w, "%d truncated %s\n", stats.truncated, ddPlural(stats.truncated, "record", "records"))
+		}
 	}
 	if !status.xfer() {
 		return
 	}
-	fmt.Fprintf(w, "%s, %s s, %s/s\n",
+	fmt.Fprintf(w, "%s\n", ddTransferLine(stats, elapsed))
+}
+
+// ddTransferLine is the "bytes copied, seconds, rate" line: the summary's last
+// line and, without its newline, the status=progress line.
+func ddTransferLine(stats ddStats, elapsed time.Duration) string {
+	return fmt.Sprintf("%s, %s s, %s/s",
 		ddBytesCopied(stats.bytes),
 		strconv.FormatFloat(elapsed.Seconds(), 'g', -1, 64),
 		ddMagnitude(ddRate(stats.bytes, elapsed), true))
+}
+
+// ddPlural picks the singular or plural word for the summary lines.
+func ddPlural(n uint64, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }
 
 // ddBytesCopied is the "N bytes copied" part of the summary line, with the

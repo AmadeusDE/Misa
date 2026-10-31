@@ -166,24 +166,23 @@ func TestDDParseOperandErrors(t *testing.T) {
 		{[]string{"cbs=9223372036854775808"}, "Value too large for defined data type"},
 		{[]string{"count=99999999999999999999"}, "Value too large for defined data type"},
 		{[]string{"skip=18446744073709551616"}, "Value too large for defined data type"},
-		{[]string{"cbs=4"}, "cbs=4: unsupported in this version"},
 		{[]string{"cbs=x"}, "invalid number: 'x'"},
-		{[]string{"conv=ascii"}, "conv=ascii: unsupported in this version"},
-		{[]string{"conv=ucase"}, "conv=ucase: unsupported in this version"},
-		{[]string{"conv=lcase"}, "conv=lcase: unsupported in this version"},
-		{[]string{"conv=swab"}, "conv=swab: unsupported in this version"},
-		{[]string{"conv=ebcdic"}, "conv=ebcdic: unsupported in this version"},
-		{[]string{"conv=block"}, "conv=block: unsupported in this version"},
-		{[]string{"conv=unblock"}, "conv=unblock: unsupported in this version"},
-		{[]string{"conv=sparse"}, "conv=sparse: unsupported in this version"},
+		{[]string{"cbs=0"}, "invalid number: '0'"},
 		{[]string{"conv=bogus"}, "invalid conversion: 'bogus'"},
 		{[]string{"conv=excl,nocreat"}, "cannot combine excl and nocreat"},
-		{[]string{"iflag=direct"}, "iflag=direct: unsupported in this version"},
+		{[]string{"conv=ucase,lcase"}, "cannot combine ucase and lcase"},
+		{[]string{"conv=block,unblock", "cbs=4"}, "cannot combine block and unblock"},
+		// The blocking conflict is reported before the case one.
+		{[]string{"conv=block,unblock,lcase,ucase", "cbs=4"}, "cannot combine block and unblock"},
+		{[]string{"conv=ascii,ebcdic"}, "cannot combine ascii, ebcdic and ibm"},
+		{[]string{"conv=ascii,ibm"}, "cannot combine ascii, ebcdic and ibm"},
+		{[]string{"conv=ascii,block", "cbs=4"}, "cannot combine block and unblock"},
+		{[]string{"conv=nocache"}, "invalid conversion: 'nocache'"},
 		{[]string{"iflag=nocache"}, "iflag=nocache: unsupported in this version"},
+		{[]string{"oflag=nocache"}, "oflag=nocache: unsupported in this version"},
+		{[]string{"iflag=cio"}, "iflag=cio: unsupported in this version"},
 		{[]string{"iflag=nonsense"}, "invalid input flag: 'nonsense'"},
-		{[]string{"oflag=direct"}, "oflag=direct: unsupported in this version"},
 		{[]string{"oflag=nonsense"}, "invalid output flag: 'nonsense'"},
-		{[]string{"status=progress"}, "status=progress: unsupported in this version"},
 		{[]string{"status=loud"}, "invalid status level: 'loud'"},
 	}
 	for _, tc := range tests {
@@ -603,14 +602,14 @@ func TestDDConvFsync(t *testing.T) {
 }
 
 func TestDDUnsupportedConvFails(t *testing.T) {
-	r := ddRunString(t, t.TempDir(), "abc", "conv=ucase")
+	r := ddRunString(t, t.TempDir(), "abc", "iflag=nocache")
 	assertExitCode(t, r, 1)
-	assertStderrContains(t, r, "dd: conv=ucase: unsupported in this version")
+	assertStderrContains(t, r, "dd: iflag=nocache: unsupported in this version")
 	assertStdout(t, r, "")
 }
 
 func TestDDUnknownOperandFails(t *testing.T) {
-	r := ddRunString(t, t.TempDir(), "abc", "iflag=direct")
+	r := ddRunString(t, t.TempDir(), "abc", "iflag=cio")
 	assertExitCode(t, r, 1)
 	assertStderrContains(t, r, "unsupported in this version")
 }

@@ -63,6 +63,13 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 - **uutils/util-linux** by the uutils contributors — MIT (`cal`, `mcookie`, `uuidgen`)
   https://github.com/uutils/util-linux
 
+- **dd** — `internal/builtins/dd*.go` follows toybox `toys/posix/dd.c` (0BSD, commit
+  `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb`) for the copy loop, skip=/seek= and conv=sync, and uutils
+  coreutils `src/uu/dd/src/{dd,parseargs,blocks,progress,numbers}.rs` (MIT, commit
+  `fee61ff5d4f87e0f912a52e639942b5f7ad58663`) for the size suffixes, the summary/status=progress lines,
+  conv=block/unblock, conv=sparse and the conv= conflicts. The character-set tables in `dd_tables.go` are
+  ported from that commit's `src/uu/dd/src/conversion_tables.rs`.
+
 ## Chess
 
 Original Go implementation; rules and notation referenced from:
