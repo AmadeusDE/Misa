@@ -290,6 +290,9 @@ func (p *Position) generate(tactical bool) []Move {
 			}
 			p.walk(from, comp, pc.Color, func(to int) bool {
 				target := p.Board[to]
+				if t.Pawn && v.PawnDoubleRanks != nil && comp.Initial && p.forwardDouble(from, to, pc.Color) {
+					return true // configured double steps are generated separately
+				}
 				switch {
 				case to == from && comp.Move:
 					add(to, -1)
@@ -305,12 +308,36 @@ func (p *Position) generate(tactical bool) []Move {
 				return true
 			})
 		}
+		if t.Pawn && v.PawnDoubleRanks != nil && slices.Contains(v.PawnDoubleRanks, p.relativeRank(from, pc.Color)) {
+			x, y := v.XY(from)
+			step := pc.Color.forward()
+			if v.OnBoard(x, y+2*step) {
+				middle, to := v.Square(x, y+step), v.Square(x, y+2*step)
+				if p.Board[middle].Type == 0 && p.Board[to].Type == 0 {
+					add(to, -1)
+				}
+			}
+		}
 	}
 	if tactical {
 		return moves
 	}
 	moves = append(moves, p.castles()...)
 	return append(moves, p.dropMoves()...)
+}
+
+func (p *Position) relativeRank(sq int, c Color) int {
+	_, y := p.V.XY(sq)
+	if c == Black {
+		return p.V.Ranks - y
+	}
+	return y + 1
+}
+
+func (p *Position) forwardDouble(from, to int, c Color) bool {
+	fx, fy := p.V.XY(from)
+	tx, ty := p.V.XY(to)
+	return fx == tx && ty-fy == 2*c.forward()
 }
 
 func (p *Position) enPassant(sq int) bool {
@@ -432,7 +459,7 @@ func (p *Position) Apply(m Move) *Position {
 	q.Clock++
 	if pawn := v.Type(p.Board[m.From]).Pawn; pawn || m.Take >= 0 {
 		q.Clock = 0
-		if pawn && m.Take < 0 {
+		if pawn && m.Take < 0 && !(p.forwardDouble(m.From, m.To, p.Turn) && slices.Contains(v.EPExemptRanks, p.relativeRank(m.From, p.Turn))) {
 			q.EP = v.crossed(m.From, m.To)
 			if len(q.EP) > 0 {
 				q.EPPawn = m.To

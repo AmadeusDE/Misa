@@ -193,6 +193,12 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	if got := g.match.Variant().ID; got != "xiangqi" {
 		t.Fatalf("picker selected %s, want xiangqi", got)
 	}
+	// Horde is another entry; its name is unique in the list, so a filter
+	// starting with "h" reaches it the same way.
+	keys(g, "v", "h", "o", "r", "enter")
+	if got := g.match.Variant().ID; got != "horde" {
+		t.Fatalf("picker selected %s, want horde", got)
+	}
 	// Racing Kings is another entry in the same picker, found by typing its
 	// name; nothing cycles through the list any more.
 	keys(g, "v", "r", "a", "c", "i", "n", "g", "enter")

@@ -358,7 +358,12 @@ internal/
   (`Placement[PQp]` and `Q~`) and are hashed, the evaluation values pocket material at 80%, and the
   UI shows both pockets for clicking or an uppercase letter). General `drops`, per-piece
   `drop_forbid_ranks` and `demote` settings, pocket FEN and the UI drop controls are documented in
-  `docs/CHESS.md`; a captured promoted piece returns its original type to the hand.
+  `docs/CHESS.md`; a captured promoted piece returns its original type to the hand), and horde
+  (Horde: White is a kingless horde of 36 pawns, so it has no royal to be attacked and wins only by
+  checkmating Black, while `extinction: all` gives Black the game the moment no horde piece is left;
+  `double_step_ranks: [1, 2]` replaces the Betza double step with a two-square advance from those
+  side-relative ranks whether or not the piece has moved, and `ep_exempt_ranks: [1]` withholds the
+  en passant right from the rank-1 step, both `nil` unless configured and both inherited by `extends`).
   `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
   and the search both honour it. `promotion_optional: true` lets a pawn stay a pawn inside `promotion_zone` (but
   not on the last rank, where promotion is forced); `promotion_captured_only: true` restricts the choices to

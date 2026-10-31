@@ -195,6 +195,18 @@ either, since a lone king can still reach the eighth rank.
   stalemate counting as a loss for the stalemated side, and perpetual check
   drawn by repetition (see [Xiangqi](#xiangqi)).
 
+- **Horde** (`horde`): 8×8, White is a kingless horde of 36 pawns against
+  Black's ordinary army. White wins by checkmating Black; Black wins by
+  capturing every horde piece, promoted pieces included, which is the variant's
+  `extinction: all` rule. White is never in check (it has no royal piece), it
+  may still be stalemated, and stalemate stays a draw. Horde pawns may advance
+  two squares from their first or second rank, but only a step from the second
+  rank grants en passant (see
+  [Pawn double steps and en passant](#pawn-double-steps-and-en-passant)).
+  Black castles and promotes as in chess. Rules:
+  [Lichess](https://lichess.org/variant/horde),
+  [Wikipedia: Dunsany's chess](https://en.wikipedia.org/wiki/Dunsany%27s_chess).
+
 `chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
 variant picker during play. A variant file in `chess/*.yaml` next to the binary
 or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
@@ -454,6 +466,26 @@ even if the moving king would otherwise be in check. Connected royals suppress
 check. Normal castling, en passant, promotion, checkmate, stalemate, repetition
 and move-limit rules remain in effect. See [Lichess Atomic rules](https://lichess.org/variant/atomic)
 and [Wikipedia: Atomic chess](https://en.wikipedia.org/wiki/Atomic_chess).
+
+## Pawn double steps and en passant
+
+`double_step_ranks: [1, 2]` replaces the initial Betza double step for
+pawn pieces with a forward two-square move from those ranks, provided both
+squares are empty. Ranks are 1-based and relative to the moving side (Black's
+rank 1 is the board's last rank); eligibility depends on the current rank, not
+whether the piece has moved. Omit the field to retain Betza movement, or use
+`[]` to disable these double steps. `ep_exempt_ranks: [1]` prevents a double
+step from the listed relative ranks from granting en passant rights; other
+long pawn moves retain their usual rights. Both fields inherit unless explicitly
+replaced, and apply to every piece marked `pawn`.
+
+Horde uses these settings so a pawn can advance two squares from its first or
+second rank, but only a double step from its second rank permits en passant.
+Black wins by eliminating every White piece, including promoted pieces; White
+wins by checkmating Black. A royal-less side is never in check and stalemate
+remains a draw. Black retains normal castling and White promotes normally. See
+[Lichess Horde rules](https://lichess.org/variant/horde) and
+[Wikipedia: Dunsany's chess](https://en.wikipedia.org/wiki/Dunsany%27s_chess).
 
 ## Custom board dimensions
 
