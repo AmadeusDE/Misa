@@ -47,3 +47,20 @@ func machineFromGOARCH(goarch string) string {
 	}
 	return goarch
 }
+
+// machineFromProcessorArchitecture names a Windows PROCESSOR_ARCHITECTURE_*
+// value the way uname -m does; an architecture it does not know is "unknown"
+// rather than a guess.
+func machineFromProcessorArchitecture(arch uint16) string {
+	switch arch {
+	case 9:
+		return "x86_64"
+	case 12:
+		return "aarch64"
+	case 0:
+		return "i686"
+	case 5:
+		return "armv7l"
+	}
+	return "unknown"
+}

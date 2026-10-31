@@ -593,22 +593,51 @@ func TestSeparatedWaiterQueues(t *testing.T) {
 
 	// 2. Queue an ordinary root waiter on the full combined pool
 	ctxCancel, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	waiterStarted := make(chan struct{})
+	type waiterResult struct {
+		handle Handle
+		err    error
+	}
+	waiterDone := make(chan waiterResult, 1)
 	go func() {
-		close(waiterStarted)
-		_, _ = mgr.Acquire(ctxCancel, Request{
+		h, err := mgr.Acquire(ctxCancel, Request{
 			AccountID: acct,
 			Provider:  "codex",
 			Model:     "gpt-6-sol",
 			Priority:  PriorityRoot,
 			RequestID: "root-comb-waiting",
 		})
+		waiterDone <- waiterResult{h, err}
+	}()
+	// Cancel and join before releasing the combined slot or removing TempDir.
+	// Acquire can still succeed concurrently with cancellation, so close any handle.
+	defer func() {
+		cancel()
+		result := <-waiterDone
+		if result.handle != nil {
+			if err := result.handle.Close(); err != nil {
+				t.Errorf("close waiter handle: %v", err)
+			}
+		}
+		if !errors.Is(result.err, context.Canceled) {
+			t.Errorf("expected cancelled waiter, got: %v", result.err)
+		}
 	}()
 
-	<-waiterStarted
-	time.Sleep(50 * time.Millisecond) // Let waiter register in waiters_combined
+	// Wait until the root is actually registered, rather than relying on timing.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		diag, err := mgr.Diagnostics(acct)
+		if err != nil {
+			t.Fatalf("diagnostics while waiting for registration: %v", err)
+		}
+		if len(diag.Waiters) == 1 && diag.Waiters[0].RequestID == "root-comb-waiting" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for root waiter registration")
+		}
+		time.Sleep(time.Millisecond)
+	}
 
 	// 3. Council exempt request MUST succeed immediately despite waiting combined root request!
 	hExempt, err := mgr.Acquire(ctx, Request{

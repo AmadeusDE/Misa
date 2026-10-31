@@ -65,7 +65,7 @@ func (t *Terminal) drainInput() {
 		q.pending = nil
 		q.mu.Unlock()
 		for _, b := range batch {
-			if _, err := t.ptm.Write(b); err != nil {
+			if _, err := t.conn.Write(b); err != nil {
 				q.stop()
 				return
 			}

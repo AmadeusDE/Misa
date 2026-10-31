@@ -169,9 +169,11 @@ Goal: `GOOS=windows go build -tags nough .` and `go vet` pass, and the Linux/Ope
   must be running before it's called (it always is after `StartReader`).
 - `Close` → `TerminateJobObject` + `ClosePseudoConsole`. `Resize` → `ResizePseudoConsole`.
 - `jobs_windows.go`: `Stopped()` is always false; `Continue()` returns an "unsupported" error.
-- `StartFunc` (in-process builtins): there's no tty side to hand out. Use a plain pipe pair, so builtins see a
-  non-tty. That's acceptable because multicall (`misa.exe ls …` under ConPTY) is the default `builtin_mode`;
-  document that `inprocess` mode is degraded on Windows.
+- `StartFunc` (in-process builtins): decided in P01, see "P01 delivered". The contract is a single `*os.File`
+  tty, and two unidirectional pipes cannot stand in for it (no tty metadata, no shared close, no way to
+  interrupt a blocked read). P01 returns `term.ErrUnsupported` on Windows and callers use multicall
+  (`misa.exe ls …` under ConPTY), the default `builtin_mode`. A later stream contract would hand fn a separate
+  reader and writer plus tty metadata and a cancellation, behind the same `openFuncTTY` seam.
 - Tests (`//go:build windows`): `cmd /c echo hi` output, exit codes, resize, and that `Close` kills a
   grandchild (`cmd /c start /b ping -t …`).
 - **S0 spike** (see above): log what ConPTY passes through for Misa's sequences and pick a route before W4.
@@ -618,3 +620,68 @@ Support on Windows (everything not listed behaves as on Unix):
 | `mkdir` | `-m`, `-p` | partial | read-only attribute only; parents without a descriptor walk |
 | `rm` | `-i` | partial | write protection is the read-only attribute |
 | `touch` | all | partial | change time cannot be set; 100 ns precision otherwise |
+
+## P01 delivered (#108)
+
+The transport/process boundary in `internal/term`. `go vet`/`go build` of `internal/term` now pass for
+windows/amd64 and windows/arm64, where the transport is honestly unavailable. Unix behaviour is unchanged.
+
+- `transport.go` (portable): `conn` (read/write/close plus `Resize`), `proc` (`ID`, `Status` channel, `Kill` of
+  the whole tree), the optional `continuer` capability (job control, not part of the portable minimum), and
+  `startSpec` (explicit argv, dir, env, size, `OnStop`). `ErrUnsupported` is what a platform without a
+  transport returns. This matches the F02 `builtins.Run` contract in spirit: explicit env and cwd, and
+  cancellation as `Kill`. Coordinate when #55 lands.
+- The core (`terminal.go`, `input.go`, `reports.go`, `jobs.go`, parser/screen/snapshot/render) holds a `conn` and
+  a `proc` and imports no platform syscall. It still owns the single reader goroutine (`StartReader`, DEC 2026
+  buffering), the ordered async input queue, and the exit sequence (`Finish`, `reap`, `exited`), so final output
+  is applied before exit is reported.
+- Unix (`transport_unix.go`): PTY master `conn` (`pollable`, `setWinsize` in `ptyfd.go`), `unixProc` with the
+  `Wait4(WUNTRACED)` loop (stop notification through `OnStop`, `Continue` via SIGCONT to the group), and `Kill`
+  in `proc_linux.go` (walks /proc, pidfd preferred, Android fallbacks) or `proc_other_unix.go`.
+- Windows (`transport_other.go`, `!unix`): `startProcess` and `openFuncTTY` return `ErrUnsupported`; P02 replaces
+  them with ConPTY and P03 adds job-object teardown. `Stopped` is false and `Continue` errors there, consistent
+  with `jobleader.Supported == false`.
+- `StartFunc`: decision above. Unix keeps the PTY tty; Windows returns `ErrUnsupported`.
+- Tests: `fake_transport_test.go` drives the core with no PTY (final output before exit, ordered input, resize,
+  Close idempotent with one tree kill, no job control); `boundary_unix_test.go` pins resize to the program's tty,
+  Close twice, grandchild kill, input order. Existing tests keep covering fast-exit output order, stopped/continue,
+  session kill and StartFunc.
+
+## F04 delivered (#108)
+
+Builtin process and I/O portability, and the reduced root build. `GOOS=windows GOARCH=amd64|arm64 go build -tags
+'nough noweb' .` now succeeds and `go vet` of builtins, term, lscore and jobleader passes for Windows. M0 status: the
+reduced application compiles; it cannot run a terminal yet, because `term` returns `ErrUnsupported` until P02
+(ConPTY). Unix behaviour (Android, BSD, macOS) is unchanged; the Unix code moved into `unix`-tagged files.
+
+- `util.go` is portable only; `util_unix.go` has the signal names and `/proc` list, `util_windows.go` the Windows
+  signal names (what Go's syscall package defines) and a process list that returns `errProcListUnsupported`.
+- `kill`: `proc_unix.go` / `proc_windows.go` hold the signal table, `kill -l`/`-t`, delivery and error text. Windows
+  opens the process with `PROCESS_TERMINATE` and calls `TerminateProcess` (exit code 128+signal) for KILL and TERM;
+  TERM is not graceful. Signal 0 checks the process is alive. Every other signal, and negative pids, fail with the
+  reason. `kill -l` lists `EXIT KILL TERM` there.
+- `pgrep`/`pkill`: registered, unsupported on Windows (exit 1 with the reason) until the process monitor (I04).
+- `nice`: no nice values on Windows. The adjustment is added to the current value (read from the priority class)
+  and mapped to a class for the new process through its creation flags (`nice_class.go`: 15+ Idle, 1-14 Below
+  normal, 0 Normal, -1..-9 Above normal, -10 and below High; never Real-time). Misa's own priority is not changed.
+  A Misa builtin runs in the shell process, so it keeps its priority and `nice` warns. Unix still lowers the priority
+  of the process that runs `nice` (a multicall builtin is its own process); that is unchanged.
+- `timeout` now builds on Windows: PATHEXT lookup, no process group, and at the deadline `Process.Kill`. Only 0, TERM
+  and KILL are accepted (others exit 125 with the reason); children of the command are not ended until job objects
+  (P03).
+- `sync`: Windows flushes named files with `FlushFileBuffers`; no operands and `--file-system` are unsupported.
+- `uname` and `arch`: `RtlGetVersion` for release/version, `GetNativeSystemInfo` for the machine (`unknown` for an
+  architecture it does not know). The sysname is `Windows_NT`.
+- `umask`: there is no `umask` builtin in the repo (only `currentUmask` for `chmod`/`mkdir`, which is 0 off Unix), so
+  nothing was added; a future builtin must fail on Windows with a reason.
+- Support table additions (`windowsLimits`): kill, timeout, timeout -s, nice (partial); pgrep, pkill, sync with no
+  operands, sync --file-system (unsupported); sync --data, which (partial).
+- Tests: `process_portability_test.go` (priority class mapping and round trip, machine names, exit-status
+  normalisation, the table against the registry and `--help`), `process_unix_test.go`, `process_windows_test.go`
+  (kill/timeout/nice child-only/sync/uname; run on Windows CI). The reduced build's closure is checked by
+  `platformset_test.go` plus the cross build and vet commands above; no subprocess type-check test was added.
+- Coordination with #40 (`builtins.Run`, proceffect, launcher): this change is mechanical platform splitting, and
+  `niceRequest`/`timeoutDeliver` are the two places that will want the execution capability's cancellation and
+  priority hooks once those land.
+- Known gaps: `which` and the local-executable lookup in `nice` do not expand PATHEXT; terminal sessions fail until
+  P02; `procmon` lists processes only from I04.

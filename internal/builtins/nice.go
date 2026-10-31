@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 func init() {
@@ -18,7 +17,7 @@ func init() {
 func runNice(ctx *Context) int {
 	args := ctx.Args
 	if len(args) == 0 {
-		prio, err := syscall.Getpriority(syscall.PRIO_PROCESS, 0)
+		prio, err := currentNice()
 		if err != nil {
 			fmt.Fprintf(ctx.Stderr, "nice: %v\n", err)
 			return 1
@@ -118,7 +117,7 @@ func runNice(ctx *Context) int {
 			fmt.Fprintln(ctx.Stderr, "nice: a command must be given with an adjustment")
 			return 125
 		}
-		prio, err := syscall.Getpriority(syscall.PRIO_PROCESS, 0)
+		prio, err := currentNice()
 		if err != nil {
 			fmt.Fprintf(ctx.Stderr, "nice: %v\n", err)
 			return 1
@@ -127,18 +126,12 @@ func runNice(ctx *Context) int {
 		return 0
 	}
 
-	curPrio, err := syscall.Getpriority(syscall.PRIO_PROCESS, 0)
-	if err == nil {
-		newPrio := curPrio + adj
-		if err := syscall.Setpriority(syscall.PRIO_PROCESS, 0, newPrio); err != nil || (adj < 0 && os.Geteuid() != 0) {
-			fmt.Fprintln(ctx.Stderr, "nice: warning: setpriority: Permission denied")
-		}
-	}
+	req := niceRequestFor(ctx, adj)
 
 	subCmdName := args[cmdIdx]
 	subArgs := args[cmdIdx+1:]
 
-	return runSubCommand(ctx, subCmdName, subArgs)
+	return runSubCommand(ctx, subCmdName, subArgs, req)
 }
 
 func parseAdj(s string) (int, error) {
@@ -172,7 +165,22 @@ func isDigits(s string) bool {
 	return true
 }
 
-func runSubCommand(ctx *Context, subCmdName string, subArgs []string) int {
+// niceRequest carries a priority change to the child only: prep adjusts an
+// external command before it starts, and builtinNote is printed when the
+// command is a builtin that runs inside this process (nil prep, empty note
+// when the platform already changed the priority another way).
+type niceRequest struct {
+	prep        func(*exec.Cmd)
+	builtinNote string
+}
+
+func (r niceRequest) apply(cmd *exec.Cmd) {
+	if r.prep != nil {
+		r.prep(cmd)
+	}
+}
+
+func runSubCommand(ctx *Context, subCmdName string, subArgs []string, req niceRequest) int {
 	localPath := filepath.Join(ctx.Dir, subCmdName)
 	if info, err := os.Stat(localPath); err == nil && !info.IsDir() && info.Mode()&0111 != 0 {
 		cmd := exec.Command(localPath, subArgs...)
@@ -181,6 +189,7 @@ func runSubCommand(ctx *Context, subCmdName string, subArgs []string) int {
 		cmd.Stderr = ctx.Stderr
 		cmd.Stdin = ctx.Stdin
 		cmd.Env = ctx.Env
+		req.apply(cmd)
 		if err := cmd.Run(); err != nil {
 			if exitErr, ok := err.(*exec.ExitError); ok {
 				return exitErr.ExitCode()
@@ -195,6 +204,9 @@ func runSubCommand(ctx *Context, subCmdName string, subArgs []string) int {
 		cmd, ok = Lookup(filepath.Base(subCmdName))
 	}
 	if ok {
+		if req.builtinNote != "" {
+			fmt.Fprintln(ctx.Stderr, req.builtinNote)
+		}
 		subCtx := &Context{
 			Dir:     ctx.Dir,
 			Args:    subArgs,
@@ -215,6 +227,7 @@ func runSubCommand(ctx *Context, subCmdName string, subArgs []string) int {
 	execCmd.Stderr = ctx.Stderr
 	execCmd.Stdin = ctx.Stdin
 	execCmd.Env = ctx.Env
+	req.apply(execCmd)
 	if err := execCmd.Run(); err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return exitErr.ExitCode()

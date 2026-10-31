@@ -16,8 +16,8 @@ import (
 // procRoot is the procfs the session scan walks. Tests point it at a fake tree.
 var procRoot = "/proc"
 
-func (t *Terminal) ptyIoctl(req uint, out *int32) bool {
-	sc, err := t.ptm.SyscallConn()
+func ptyIoctl(ptm *os.File, req uint, out *int32) bool {
+	sc, err := ptm.SyscallConn()
 	if err != nil {
 		return false
 	}
@@ -30,9 +30,9 @@ func (t *Terminal) ptyIoctl(req uint, out *int32) bool {
 }
 
 // ptySession is the PTY's controlling session (TIOCGSID). A test replaces it.
-var ptySession = func(t *Terminal) (int, bool) {
+var ptySession = func(pid int, ptm *os.File) (int, bool) {
 	var tty int32
-	if t.ptm == nil || !t.ptyIoctl(unix.TIOCGSID, &tty) {
+	if ptm == nil || !ptyIoctl(ptm, unix.TIOCGSID, &tty) {
 		return 0, false
 	}
 	return int(tty), true
@@ -42,11 +42,11 @@ var ptySession = func(t *Terminal) (int, bool) {
 // Once the leader exits the PTY drops it, so TIOCGSID fails, but the leader's
 // /proc stat keeps the id until it is reaped. After setsid that id is the
 // leader's own pid.
-func (t *Terminal) session() int {
-	pid := t.cmd.Process.Pid
+func (p *unixProc) session() int {
+	pid := p.ID()
 	deadline := time.Now().Add(100 * time.Millisecond)
 	for {
-		if sid, ok := ptySession(t); ok && sid == pid {
+		if sid, ok := ptySession(pid, p.ptm); ok && sid == pid {
 			return pid
 		}
 		if sid, ok := leaderSession(pid); ok && sid == pid {
@@ -76,23 +76,23 @@ func leaderSession(pid int) (int, bool) {
 // Unreadable or missing /proc entries are skipped. If /proc itself cannot be
 // listed, the leader's process group is signalled instead. If pidfd is
 // refused (Android before 12), that pid is signalled directly.
-func (t *Terminal) killSession() {
-	sid := t.sid
+func (p *unixProc) Kill() {
+	sid := p.sid
 	if own, err := unix.Getsid(0); sid == 0 || err != nil || own == sid {
-		t.cmd.Process.Kill()
+		p.cmd.Process.Kill()
 		return
 	}
 	for i := 0; i < 3; i++ {
 		pids, err := sessionMembers(procRoot, sid)
 		if err != nil {
-			t.killLeaderGroup()
+			p.killLeaderGroup()
 			return
 		}
 		for _, pid := range pids {
 			signalMember(pid)
 		}
 	}
-	t.cmd.Process.Kill()
+	p.cmd.Process.Kill()
 }
 
 // sessionMembers returns pids whose /proc/<pid>/stat session field is sid.
@@ -135,21 +135,21 @@ func signalMember(pid int) {
 
 // killLeaderGroup is the fallback when /proc cannot be walked: the leader's
 // group and the PTY's foreground group, then the leader.
-func (t *Terminal) killLeaderGroup() {
+func (p *unixProc) killLeaderGroup() {
 	own := unix.Getpgrp()
-	for _, pg := range []int{t.cmd.Process.Pid, t.foregroundGroup()} {
+	for _, pg := range []int{p.ID(), p.foregroundGroup()} {
 		if pg > 1 && pg != own {
 			unix.Kill(-pg, unix.SIGKILL)
 		}
 	}
-	t.cmd.Process.Kill()
+	p.cmd.Process.Kill()
 }
 
-func (t *Terminal) foregroundGroup() int {
-	if t.ptm == nil {
+func (p *unixProc) foregroundGroup() int {
+	if p.ptm == nil {
 		return 0
 	}
-	sc, err := t.ptm.SyscallConn()
+	sc, err := p.ptm.SyscallConn()
 	if err != nil {
 		return 0
 	}

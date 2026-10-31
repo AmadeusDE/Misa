@@ -16,7 +16,7 @@ const modulePath = "github.com/AmadeusDE/Misa"
 var windowsTags = []string{"nough", "noweb"}
 
 // windowsProduct is the explicit set of in-module packages the reduced Windows
-// application imports, so it is also the set that must load and, in time, compile.
+// application imports, so it is also the set that must load and compile (`GOOS=windows go build -tags "nough noweb" .`).
 // It is derived from the import graph of the root package; a change here is a
 // deliberate decision to grow or shrink the Windows product.
 var windowsProduct = []string{

@@ -1,45 +1,17 @@
-//go:build unix
-
 package term
 
-import (
-	"errors"
-	"syscall"
-)
-
-// waitProcess owns the child's wait status: besides its exit, it sees the
-// child stop (^Z, SIGSTOP), which a plain Wait never reports. Continuing is
-// tracked by Continue, since Misa is what sends SIGCONT.
-func (t *Terminal) waitProcess(pid int) {
-	for {
-		var ws syscall.WaitStatus
-		_, err := syscall.Wait4(pid, &ws, syscall.WUNTRACED, nil)
-		switch {
-		case errors.Is(err, syscall.EINTR):
-			continue
-		case err != nil:
-			t.procStatus <- 1
-			return
-		case ws.Exited():
-			t.procStatus <- ws.ExitStatus()
-			return
-		case ws.Signaled():
-			t.procStatus <- 128 + int(ws.Signal())
-			return
-		}
-		t.stopped.Store(true)
-		t.markDirty()
-	}
-}
+import "errors"
 
 // Stopped reports whether the program is suspended, waiting for Continue.
 func (t *Terminal) Stopped() bool { return t.stopped.Load() }
 
-// Continue resumes a stopped program's whole process group, as fg and bg do.
+// Continue resumes a stopped program, as fg and bg do. Platforms without job
+// control report an error.
 func (t *Terminal) Continue() error {
-	if t.cmd == nil || t.cmd.Process == nil {
+	c, ok := t.proc.(continuer)
+	if !ok {
 		return errors.New("no process to continue")
 	}
 	t.stopped.Store(false)
-	return syscall.Kill(-t.cmd.Process.Pid, syscall.SIGCONT)
+	return c.Continue()
 }
