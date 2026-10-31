@@ -63,7 +63,7 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 	}
 
 	// Operators
-	if key == "d" || key == "c" || key == "y" || key == ">" || key == "<" {
+	if key == "d" || key == "c" || key == "y" || key == ">" || key == "<" || key == "!" {
 		op := key[0]
 		if e.pendingOp == op {
 			c := count
@@ -72,7 +72,11 @@ func (e *Editor) handleNormal(msg tea.KeyPressMsg) tea.Cmd {
 			} else if e.opCountGiven {
 				c = e.opCount
 			}
-			e.executeLineOp(op, c)
+			if op == '!' {
+				e.openShellFilter(e.row, min(len(e.lines)-1, e.row+min(c, len(e.lines))-1))
+			} else {
+				e.executeLineOp(op, c)
+			}
 			e.hasReg, e.pendingReg = false, 0
 			e.pendingOp = 0
 			e.opCount = 0

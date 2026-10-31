@@ -1,11 +1,7 @@
 package vi
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -75,6 +71,19 @@ func (e *Editor) executeCommand(cmd string) {
 	if e.fileCommand(rest, from, to, hasRange) {
 		return
 	}
+	if strings.HasPrefix(rest, "r ") || strings.HasPrefix(rest, "r\t") || strings.HasPrefix(rest, "read ") || strings.HasPrefix(rest, "read\t") {
+		if hasRange && (from < -1 || to < -1 || from > to || to >= len(e.lines)) {
+			e.statusMsg = "E16: Invalid range"
+			return
+		}
+		arg := strings.TrimSpace(rest[strings.IndexAny(rest, " \t"):])
+		e.readCmd(arg, to)
+		return
+	}
+	if hasRange && strings.HasPrefix(rest, "!") && (from < 0 || to < from || to >= len(e.lines)) {
+		e.statusMsg = "E16: Invalid range"
+		return
+	}
 	from, to = e.normalizeRange(from, to)
 
 	switch {
@@ -86,15 +95,12 @@ func (e *Editor) executeCommand(cmd string) {
 		e.Quit = true
 	case rest == "q!":
 		e.Quit = true
-	case strings.HasPrefix(rest, "r "):
-		e.readCmd(strings.TrimSpace(rest[2:]))
-
 	case strings.HasPrefix(rest, "!"):
 		shellArg := strings.TrimSpace(rest[1:])
 		if hasRange {
-			e.filterRange(from, to, shellArg)
+			e.startShell(shellArg, []byte(e.rangeContent(from, to)), shellFilter, from, to, false)
 		} else {
-			e.shellCmd(shellArg)
+			e.startShell(shellArg, nil, shellDisplay, 0, 0, false)
 		}
 
 	case strings.HasPrefix(rest, "s") && len(rest) > 1 && !isAlphaNum(rest[1]):
@@ -170,6 +176,31 @@ func isAlphaNum(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
 }
 
+// isCompoundShell examines only command syntax, never a substitute's text.
+func isCompoundShell(command string) bool {
+	if strings.HasPrefix(command, "!") {
+		return true
+	}
+	i := 0
+	for i < len(command) && command[i] >= 'a' && command[i] <= 'z' {
+		i++
+	}
+	verb := command[:i]
+	switch verb {
+	case "r", "read":
+	case "w", "write", "wq", "x", "xit":
+		if i < len(command) && command[i] == '!' {
+			i++
+		}
+	default:
+		return false
+	}
+	if i == len(command) || (command[i] != ' ' && command[i] != '\t') {
+		return false
+	}
+	return strings.HasPrefix(strings.TrimSpace(command[i:]), "!")
+}
+
 func (e *Editor) globalCmd(from, to int, args string, invert bool, hasRange bool) {
 	if !hasRange {
 		from = 0
@@ -193,6 +224,10 @@ func (e *Editor) globalCmd(from, to int, args string, invert bool, hasRange bool
 	}
 
 	_, _, nested, _ := e.parseRange(exCmd)
+	if isCompoundShell(nested) {
+		e.statusMsg = "Shell commands in global are unsupported"
+		return
+	}
 	if strings.HasPrefix(nested, "s") && len(nested) > 1 && !isAlphaNum(nested[1]) {
 		_, _, flags, ok := parseSubstitute(nested)
 		if ok && strings.Contains(flags, "c") {
@@ -219,109 +254,6 @@ func (e *Editor) globalCmd(from, to int, args string, invert bool, hasRange bool
 	} else {
 		e.statusMsg = fmt.Sprintf("%d lines affected", matches)
 	}
-}
-
-func (e *Editor) readCmd(arg string) {
-	if strings.HasPrefix(arg, "!") {
-		shellCmd := strings.TrimSpace(arg[1:])
-		if shellCmd == "" {
-			return
-		}
-		cmd := exec.Command("sh", "-c", shellCmd)
-		if e.filename != "" {
-			cmd.Dir = filepath.Dir(e.filename)
-		}
-		out, err := cmd.Output()
-		if err != nil {
-			e.statusMsg = "Shell error: " + err.Error()
-			return
-		}
-		e.saveUndo()
-		lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
-		for i, line := range lines {
-			e.insertLineAfter(e.row+i, line)
-		}
-		e.row += len(lines)
-		e.clampCursor()
-		e.statusMsg = fmt.Sprintf("%d lines read", len(lines))
-		return
-	}
-
-	fname := arg
-	if !filepath.IsAbs(fname) && e.filename != "" {
-		fname = filepath.Join(filepath.Dir(e.filename), fname)
-	}
-	data, err := os.ReadFile(fname)
-	if err != nil {
-		e.statusMsg = err.Error()
-		return
-	}
-	e.saveUndo()
-	text := strings.ReplaceAll(string(data), "\r\n", "\n")
-	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
-	for i, line := range lines {
-		e.insertLineAfter(e.row+i, line)
-	}
-	e.row += len(lines)
-	e.clampCursor()
-	e.statusMsg = fmt.Sprintf("\"%s\" %d lines read", filepath.Base(fname), len(lines))
-}
-
-func (e *Editor) shellCmd(cmd string) {
-	if cmd == "" {
-		return
-	}
-	c := exec.Command("sh", "-c", cmd)
-	if e.filename != "" {
-		c.Dir = filepath.Dir(e.filename)
-	}
-	out, err := c.CombinedOutput()
-	if err != nil && len(out) == 0 {
-		e.statusMsg = "Shell error: " + err.Error()
-		return
-	}
-	e.statusMsg = strings.TrimRight(string(out), "\n")
-}
-
-func (e *Editor) filterRange(from, to int, cmd string) {
-	if cmd == "" {
-		return
-	}
-	input := strings.Join(e.lines[from:to+1], "\n") + "\n"
-	c := exec.Command("sh", "-c", cmd)
-	c.Stdin = strings.NewReader(input)
-	if e.filename != "" {
-		c.Dir = filepath.Dir(e.filename)
-	}
-	var stdout, stderr bytes.Buffer
-	c.Stdout = &stdout
-	c.Stderr = &stderr
-	err := c.Run()
-	if err != nil && stdout.Len() == 0 {
-		msg := stderr.String()
-		if msg == "" {
-			msg = err.Error()
-		}
-		e.statusMsg = "Filter error: " + strings.TrimRight(msg, "\n")
-		return
-	}
-
-	e.saveUndo()
-	result := strings.TrimRight(stdout.String(), "\n")
-	newLines := strings.Split(result, "\n")
-
-	replaced := make([]string, 0, from+len(newLines)+len(e.lines)-to-1)
-	replaced = append(replaced, e.lines[:from]...)
-	replaced = append(replaced, newLines...)
-	replaced = append(replaced, e.lines[to+1:]...)
-	e.lines = replaced
-	if len(e.lines) == 0 {
-		e.lines = []string{""}
-	}
-	e.modified = true
-	e.row = from
-	e.clampCursor()
-	e.statusMsg = fmt.Sprintf("%d lines filtered", len(newLines))
 }
 
 func (e *Editor) setCmd(cmd string) {

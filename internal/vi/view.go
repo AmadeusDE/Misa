@@ -20,6 +20,12 @@ func (e *Editor) View() string {
 	if e.width == 0 || e.height <= 0 {
 		return "loading..."
 	}
+	if e.shellOutput != nil {
+		return e.renderShellOutput()
+	}
+	if e.shell != nil {
+		return lipgloss.NewStyle().Reverse(true).Render("Running shell command… Ctrl-C to cancel")
+	}
 
 	var b strings.Builder
 

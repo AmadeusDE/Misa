@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/T01/T02
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/T01/T02/T03
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -69,6 +69,7 @@ without quitting Misa and preserves its register.
 | F06: insert/Replace behavior and repeat transactions | `insert_replace_f06_test.go`, `repeat_entry_test.go`, `internal/ui/editor_repeat_regression_test.go` | Insert and Replace streams (including Backspace) repeat; `r<CR>` is supported. Each dot execution is one undo transaction; repeated insert/Replace cursor placement and standalone/mux entry paths are covered. |
 | F07: file safety (done) | `file*_f07_test.go`, `internal/ui/editor_file_f07_test.go`, `internal/ui/editor_file_regression_test.go` | Load errors, newline preservation, safe writes and external-change guards; scope and limitations below. |
 | T02: range writes and file identity (done) | Original `*t02*` regression fixtures | Numeric and Visual range writes, append, write identity, save-as and rename semantics; scope and residual deferrals below. |
+| T03: shell lifecycle and reads (done) | Original `shell*_test.go` and `internal/ui/editor_shell_regression_test.go` fixtures | Async output/cancellation, shared cwd/environment, addressed file/shell reads and failure-safe filters; limits below. |
 | T01: substitute confirmation (done) | `substitute_confirm_test.go`, `substitute_confirm_replay_test.go`, `substitute_confirm_edges_test.go`, `substitute_entry_test.go`, `internal/ui/editor_substitute_regression_test.go` | Public-event fixtures for decisions, ranges, global matches, Unicode, cursor/highlight/prompt, counts, undo/redo, no-op history, dot/register preservation, macro playback, and standalone/mux resize and return. |
 
 ### F07 file round trips and safety
@@ -126,11 +127,46 @@ reports `[Not edited]`. `:wq` and `:x` with a range or name use the same write i
 Failures retain the saved revision and dirty state. F07's safety guards and line-format handling
 remain in force.
 
-`:[range]w !cmd` uses the existing shell runner synchronously. Shell output lifecycle,
-cancellation and non-freezing execution remain T03; general Ex address grammar remains G03,
-and general alternate-buffer navigation remains H12. T02 does not claim the entire roadmap's
-range-aware read work or end-to-end tutor 5.3–5.4 conformance; read/shell lifecycle work remains
-for T03 and later tutor verification for T09. No live-terminal manual check is claimed.
+`:[range]w !cmd` now shares T03's asynchronous shell runner. General Ex address grammar
+remains G03, and general alternate-buffer navigation remains H12. Complete end-to-end tutor
+verification remains T09. No live-terminal manual check is claimed.
+
+### T03 shell command/output lifecycle
+
+`:!cmd`, `:r[ead] !cmd`, `:[range]!cmd`, and `:[range]w !cmd` run asynchronously through
+one `sh -c` runner. All use the editor's invocation/working directory, **not** the open file's
+parent directory, and the environment captured when the editor is created. Unix uses `/bin/sh`;
+other platforms look up `sh`. No interactive terminal/PTY or configurable `shell` /
+`shellcmdflag` options are provided. Commands such as `:!ls` and `:!rm FILE` invoke commands
+available in that environment; they are not editor builtins.
+
+While a command runs, the editor renders and resizes normally, but editing keys are blocked.
+Ctrl-C cancels the command; on Unix the whole shell process group is killed. Other platforms
+can only guarantee terminating the direct shell process. Output is collected until completion,
+not streamed. `:!` and `:w !` display scrollable, wrapped multiline output; Enter dismisses it.
+Stdout and stderr are captured separately and displayed in that order (not interleaved), with
+`shell returned N` for a nonzero exit, or an error/cancellation diagnostic. Terminal controls in
+displayed output are stripped rather than executed. The runner is intended for finite-output,
+noninteractive commands; output is currently collected in memory without a size cap.
+
+`:r[ead] file` and `:r[ead] !cmd` insert below the current or addressed line; `:0r` inserts
+before the first line. Relative read paths use the same editor directory. Blank lines are
+preserved, and reads use the buffer's line-ending format. Missing final newlines are preserved
+when the insertion reaches EOF; an internal boundary necessarily adds a line separator.
+Successful range filters replace the selected lines as one undo transaction, including EOF
+metadata. Undo/redo restores exact final-newline state. Unlike Vim, **any** nonzero exit,
+launch error, or cancellation leaves a filtered buffer unchanged, even if stdout was produced.
+Failures show stderr/status; successful read/filter diagnostics do not become buffer text.
+
+`!!`, counted `!!`, and `!{motion}` open a range-filter command prompt using the existing
+motion resolver. Escape cancels the prompt. Read/filter edits preserve registers and the prior
+dot change; shell commands are not dot-repeatable. Shell commands during macro playback are
+explicitly rejected; complete recording/playback remains H09. Shell commands inside `:global`
+are also rejected; general Ex composition/compound asynchronous commands remain G03. Original regression tests cover shell output, status, cwd/environment,
+exact read/filter bytes, failures, cancellation, undo/redo, and standalone/mux result delivery.
+The reference is Vim 9.1 `nocompatible` documentation (`:!`, `:r!`, `:range!`, `shell`,
+`shellcmdflag`) as specification only, with the stricter failure policy described above. No
+external implementation, fixtures, or tutor prose were copied; existing attribution is unchanged.
 
 ### Tutor mapping (selected lessons only)
 
@@ -141,7 +177,9 @@ for T03 and later tutor verification for T09. No live-terminal manual check is c
 | 3.3 | Change (`c`) | Existing `cw`/change ranges and semantic dot repeat are covered by F03/F06. |
 | 3.4 | `c` with motion | Existing change-motion ranges and semantic dot repeat are covered by F03/F06. |
 | 4.4 | Substitution | T01 covers literal substitution confirmation and cancellation, ranges, per-line/global matches, and optional trailing delimiter; full patterns/replacement grammar remain G01–G02. |
+| 5.1–5.2 | Shell listing/removal and write | T03 covers asynchronous shell command routing/output; T02/F07 cover writes. |
 | 5.3 | Write a selection | T02 covers numeric and Visual range writes and file identity; complete lesson verification remains T09. |
+| 5.4 | Read file/command output | T03 covers addressed reads, exact blank lines and EOF handling. |
 | 6.1 | Open lines | Existing insert/open-line behavior is covered where exercised by insertion fixtures; no complete lesson-parity claim. |
 | 6.2 | Append | `A` and insertion behavior are covered in F01/F06; no complete lesson-parity claim. |
 | 6.3 | Replace mode | Replace stream, Backspace and semantic repeat are covered by F06. |
@@ -202,8 +240,8 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
   F08. Dot repeats the last real change semantically, with an explicit count overriding the stored
   count; no-op commands and yanks do not replace that repeat. `r<CR>` is supported. Each dot execution
   is one undo transaction.
-- **T02 residual:** Range-aware read work and full tutor 5.3–5.4 verification are not claimed;
-  shell lifecycle/cancellation remains T03, broader Ex addressing G03, and buffer navigation H12.
+- **T02/T03 residual:** Full tutor 5.x verification remains T09; broader Ex addressing and
+  compound asynchronous command execution remain G03, and buffer navigation H12.
 - **T05:** A future `:edit` read failure must preserve the current buffer. `:e`/`:e!` is not implemented. The reload-command fixture remains skipped as `TODO(T05)`;
   F05 tests the internal buffer-history reset boundary only. This reset establishes a fresh clean
   revision and clears undo, redo, and line-restore state; file loading/protection stays in T05.

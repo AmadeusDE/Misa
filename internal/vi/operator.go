@@ -108,6 +108,11 @@ func (e *Editor) executeOperatorMotion(op byte, key string, count int, countGive
 }
 
 func (e *Editor) executeOperatorResult(op byte, key string, count int, m motionResult) {
+	if op == '!' {
+		fromR, _, toR, _, _ := e.operatorRange(m)
+		e.openShellFilter(fromR, toR)
+		return
+	}
 	if key == "n" && e.pendingOp != 0 {
 		before := slices.Clone(e.lines)
 		change := semanticChange{command: string(op), motion: key, count: count, countGiven: true, register: e.repeatRegister(), searchPat: e.searchPat, searchDir: e.searchDir}

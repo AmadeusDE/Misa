@@ -5,15 +5,20 @@ import "slices"
 const maxUndo = 200
 
 type undoEntry struct {
-	lines    []string
-	row, col int
-	revision uint64
+	lines         []string
+	row, col      int
+	revision      uint64
+	eol, newEmpty bool
 }
 
 func sameLines(a, b []string) bool { return slices.Equal(a, b) }
 
 func (e *Editor) snapshot() undoEntry {
-	return undoEntry{lines: slices.Clone(e.lines), row: e.row, col: e.col, revision: e.revision}
+	return undoEntry{lines: slices.Clone(e.lines), row: e.row, col: e.col, revision: e.revision, eol: e.file.eol, newEmpty: e.file.newEmpty}
+}
+
+func (e *Editor) sameSnapshot(b undoEntry) bool {
+	return sameLines(b.lines, e.lines) && b.eol == e.file.eol && (b.newEmpty == e.file.newEmpty || !e.file.eol || len(e.lines) != 1 || e.lines[0] != "")
 }
 
 // beginEdit and commitEdit nest; only the outermost commit publishes a change.
@@ -31,7 +36,7 @@ func (e *Editor) materializeEdit() {
 	if e.editDepth == 0 {
 		return
 	}
-	if sameLines(e.editBefore.lines, e.lines) {
+	if e.sameSnapshot(e.editBefore) {
 		e.revision = e.editBefore.revision
 	} else if e.revision == e.editBefore.revision ||
 		(e.editSavedLines != nil && e.revision == e.editSavedRevision && !sameLines(e.editSavedLines, e.lines)) {
@@ -97,7 +102,7 @@ func (e *Editor) commitEdit() {
 	before := e.editBefore
 	e.editBefore = undoEntry{}
 	e.editSavedLines = nil
-	if sameLines(before.lines, e.lines) {
+	if e.sameSnapshot(before) {
 		e.revision = before.revision
 		e.modified = e.revision != e.savedRevision
 		return
@@ -129,6 +134,7 @@ func (e *Editor) abortEdit() {
 	}
 	b := e.editBefore
 	e.lines, e.row, e.col, e.revision = b.lines, b.row, b.col, b.revision
+	e.file.eol, e.file.newEmpty = b.eol, b.newEmpty
 	e.editDepth, e.editAuto = 0, false
 	e.editBefore = undoEntry{}
 	e.editSavedLines = nil
@@ -159,6 +165,7 @@ func (e *Editor) undo() {
 	cur.row, cur.col = u.row, u.col
 	e.redoStack = append(e.redoStack, cur)
 	e.lines, e.row, e.col, e.revision = u.lines, u.row, u.col, u.revision
+	e.file.eol, e.file.newEmpty = u.eol, u.newEmpty
 	e.modified = e.revision != e.savedRevision
 	e.clampCursor()
 }
@@ -175,6 +182,7 @@ func (e *Editor) redo() {
 	cur.row, cur.col = r.row, r.col
 	e.undoStack = append(e.undoStack, cur)
 	e.lines, e.row, e.col, e.revision = r.lines, r.row, r.col, r.revision
+	e.file.eol, e.file.newEmpty = r.eol, r.newEmpty
 	e.modified = e.revision != e.savedRevision
 	e.clampCursor()
 }
