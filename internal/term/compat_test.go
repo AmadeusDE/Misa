@@ -396,6 +396,7 @@ func TestDefaultColorQueriesAnswered(t *testing.T) {
 }
 
 func TestSignalledProcessReportsShellStatus(t *testing.T) {
+	skipOnWindows(t, "128+signal shell status has no Windows equivalent")
 	tm := New(2, 10)
 	if err := tm.StartArgv(t.TempDir(), "sh", "-c", "kill -INT $$"); err != nil {
 		t.Fatal(err)

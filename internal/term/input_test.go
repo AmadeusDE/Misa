@@ -8,7 +8,7 @@ import (
 
 func TestSendBytesNeverBlocksOnBusyProgram(t *testing.T) {
 	tm := New(5, 40)
-	if err := tm.StartArgv(t.TempDir(), "sh", "-c", "stty raw -echo; sleep 3"); err != nil {
+	if err := tm.StartArgv(t.TempDir(), helperArgv(t, "sleep")...); err != nil {
 		t.Fatal(err)
 	}
 	tm.StartReader()

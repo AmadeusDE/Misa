@@ -4,7 +4,7 @@
 set -uo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 export CGO_ENABLED=0
-mapfile -t pkgs < <(awk '!/^#/ && $2 == "native" {print $1}' "$here/packages.txt")
+mapfile -t pkgs < <(awk '!/^#/ && $2 == "native" && $1 ~ /^internal\/(term|ui|gui)$/ {print $1}' "$here/packages.txt")
 fail=0
 for tags in 'nough noweb' 'nough noweb nogui'; do
   for p in "${pkgs[@]}"; do

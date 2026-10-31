@@ -9,6 +9,7 @@ import (
 )
 
 func TestStartFuncRunsOnTTY(t *testing.T) {
+	skipOnWindows(t, "StartFunc is unsupported (a ConPTY pipe pair is not a tty file)")
 	tm := New(5, 40)
 	err := tm.StartFunc(func(tty *os.File) int {
 		fmt.Fprint(tty, "hello from builtin")
@@ -28,6 +29,7 @@ func TestStartFuncRunsOnTTY(t *testing.T) {
 }
 
 func TestInterruptAbandonsBlockedBuiltin(t *testing.T) {
+	skipOnWindows(t, "StartFunc is unsupported (a ConPTY pipe pair is not a tty file)")
 	for name, fn := range map[string]func(*os.File) int{
 		"sleeping": func(*os.File) int { time.Sleep(time.Minute); return 0 },
 		"reading":  func(tty *os.File) int { io.ReadAll(tty); return 0 },
