@@ -217,9 +217,18 @@ internal/
                                  transport.go is the portable boundary (conn, proc, optional continuer, startSpec,
                                  ErrUnsupported); the core imports no platform syscall. transport_unix.go (PTY conn,
                                  wait4 with WUNTRACED, StartFunc tty), ptyfd.go (pollable master), proc_linux.go /
-                                 proc_other_unix.go (session kill); transport_other.go (!unix) returns ErrUnsupported
-                                 (Windows until ConPTY, plan P02). jobs.go: Stopped/Continue via the optional capability.
-                                 fake_transport_test.go drives the core without a PTY.
+                                 proc_other_unix.go (session kill). Windows: transport_windows.go launches ConPTY with
+                                 Unicode argv/env/cwd, suspended job assignment before resume; conpty_windows.go owns
+                                 HPCON/job and teardown, winpipe_windows.go is a pipe end whose close cancels blocked
+                                 I/O, proc_windows.go waits and kills the job (no continuer). Always Close even after
+                                 natural exit to release the retained job. Close: kill job, close input, close HPCON
+                                 while draining output, then cancel+close the pipes (each wait bounded). Output ends
+                                 with the leader; descendants live in the job until Close. Native teardown tests exist
+                                 (transport_teardown_windows_test.go); see the PR for what CI has run. StartFunc remains ErrUnsupported on !unix;
+                                 transport_unsupported.go handles !unix && !windows. winlaunch.go and ownership.go have
+                                 Linux-run pure-logic tests; transport_native*_windows_test.go needs a Windows host.
+                                 jobs.go: Stopped/Continue via the optional capability; fake_transport_test.go drives
+                                 the core without a PTY. See docs/plans/windows.md P02 for resolution limits.
                                  snapshot.go (Snapshot: cell copy for frontends; SetOSCHook for titles/OSC 52),
                                  marks.go (combining marks interned so Cell has no pointers: the GC never scans
                                  screens/scrollback — keep Cell pointer-free, a test enforces it). Scrolled-off rows

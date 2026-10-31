@@ -4,8 +4,6 @@ package term
 
 import "os"
 
-func startProcess(startSpec) (conn, proc, error) { return nil, nil, ErrUnsupported }
-
 func openFuncTTY(rows, cols int) (conn, *os.File, error) { return nil, nil, ErrUnsupported }
 
 // ExitStatus is a process's status the way a shell reports it.
