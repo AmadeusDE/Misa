@@ -123,6 +123,10 @@ internal/
     man.go install.go util.go    Misc helpers
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     gzip.go                      `gzip`, `gunzip`, `zcat` — compress/gzip with -c/-d/-k/-n/-N/-t and -1..-9 levels
+    decompress.go                Plumbing shared by gzip.go, bunzip2.go and xzcat.go: operands and stdin ("-"),
+                                 terminal refusal, stdout vs. a temp file renamed into place, suffixes, diagnostics
+    bunzip2.go                   `bunzip2 [-cfkt]`, `bzcat` — compress/bzip2, every stream of a concatenated file
+    xzcat.go                     `xzcat [FILE...]` — internal/xz, always to stdout
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options
     mines.go                     `mines` — level flags (-b/-i/-e, --width/--height/--mines) for the game
     chess.go                     `chess [variant] [-f file.yaml] [--fen pos] [-c white|black|both|none] [--level name] [--think s] [-l]`
@@ -192,6 +196,10 @@ internal/
                                  (ro.build.version.release, ro.product.model, ro.product.manufacturer)
                                  via __system_property_get (android && cgo) or /system/bin/getprop.
                                  EACCES on proc files used for memory/uptime/kernel shows "—"
+  xz/                            .xz decoder (LZMA2 + BCJ branch filters, blocks, index, concatenated streams),
+                                 ported from the public-domain XZ Embedded decoder as vendored by toybox
+                                 toys/pending/xzcat.c (0BSD); dictionary capped at 64 MiB (DefaultDictLimit),
+                                 NONE/CRC32/CRC64 checks verified, other check fields skipped; docs/plans/xz-decoder.md
   gitinfo/                       Git branch/dirty/ahead/behind detection
   help/                          TLDR downloading, man page parsing, markdown rendering
   launcher/                      Bubble Tea ExecProcess helper (unused: external programs run in-pane PTYs via Model.launch)

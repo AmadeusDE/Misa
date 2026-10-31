@@ -101,10 +101,10 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `brctl` |  | ✓ pending | ✓ |  |
 | `break` |  | ✓ pending |  |  |
 | `btop` | ✓ |  |  |  |
-| `bunzip2` |  | ✓ other | ✓ |  |
+| `bunzip2` | ✓ | ✓ other | ✓ |  |
 | `busybox` |  |  | ✓ |  |
 | `bytop` | ✓ |  |  |  |
-| `bzcat` |  | ✓ other | ✓ |  |
+| `bzcat` | ✓ | ✓ other | ✓ |  |
 | `bzip2` |  |  | ✓ |  |
 | `cal` | ✓ | ✓ posix | ✓ | ✓ util-linux |
 | `cat` | ✓ | ✓ posix | ✓ | ✓ coreutils |
@@ -647,7 +647,7 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `xargs` |  | ✓ posix | ✓ | ✓ findutils |
 | `xxd` | ✓ | ✓ other | ✓ |  |
 | `xz` |  |  | ✓ |  |
-| `xzcat` |  | ✓ pending | ✓ |  |
+| `xzcat` | ✓ | ✓ pending | ✓ |  |
 | `yes` | ✓ | ✓ other | ✓ | ✓ coreutils |
 | `zcat` | ✓ | ✓ lsb | ✓ |  |
 | `zcip` |  |  | ✓ |  |

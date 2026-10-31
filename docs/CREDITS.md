@@ -59,6 +59,16 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
   https://github.com/landley/toybox at commit
   6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb
 
+- **toybox bzcat** (`bunzip2` and `bzcat` in `internal/builtins/bunzip2.go`, following
+  `toys/other/bzcat.c`) — 0BSD
+  https://github.com/landley/toybox at commit
+  6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb
+
+- **toybox xzcat** (`xzcat` in `internal/builtins/xzcat.go` and the `internal/xz` decoder, following
+  `toys/pending/xzcat.c`, which vendors Lasse Collin's public-domain XZ Embedded decoder) — 0BSD
+  https://github.com/landley/toybox at commit
+  6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb
+
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils
 

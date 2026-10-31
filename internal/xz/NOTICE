@@ -1,0 +1,26 @@
+The XZ decoder in this directory is a Go port of the public-domain XZ Embedded
+decoder by Lasse Collin, as vendored by toybox in toys/pending/xzcat.c.
+
+Source: https://github.com/landley/toybox at commit
+        6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb (toys/pending/xzcat.c)
+
+toybox is distributed under the following licence (0BSD):
+
+  Copyright (C) 2006, 2019 by Rob Landley <rob@landley.net>
+
+  Permission to use, copy, modify, and/or distribute this software for any
+  purpose with or without fee is hereby granted.
+
+  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+  ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+The xzcat.c file itself says: "Author: Lasse Collin <xz@tukaani.org> / This
+file has been put into the public domain. You can do whatever you want with
+this file." The port keeps that attribution in each file header.
+
+See ../../THIRD_PARTY_NOTICES.md and ../../docs/CREDITS.md.
