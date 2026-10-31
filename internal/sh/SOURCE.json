@@ -38,6 +38,14 @@
         "interp/session_status.go"
       ],
       "reason": "Parse POSIX export and readonly as declarations, and permit a session host to set the last status for cancellation."
+    },
+    {
+      "kind": "session-arg0",
+      "files": [
+        "interp/api.go",
+        "interp/vars.go"
+      ],
+      "reason": "Allow an explicit shell $0, including empty, independently of source file names; retain it across reset and subshells."
     }
   ],
   "files": [
@@ -118,7 +126,7 @@
       "original": "interp/api.go",
       "local": "interp/api.go",
       "upstream_sha256": "170ca90117b58538d45b4a893baa3c8d0a212b7baba7b407e755c82494f24704",
-      "local_sha256": "27a5e6d9611d4f80a4049d4f10b72ef6b3ec56c7a16119036c75fa0c6a71b802"
+      "local_sha256": "afc2b3076fe2df85887a0fed86e76b6f2bc783d3377fb9e198f08d4731d028dd"
     },
     {
       "original": "interp/builtin.go",
@@ -172,7 +180,7 @@
       "original": "interp/vars.go",
       "local": "interp/vars.go",
       "upstream_sha256": "3ac951264cdc9ba16a049ddda068c2f3dba2fd41b6d6b2c5258b9373dddbfd99",
-      "local_sha256": "2de5a4ec629fbf284bc7c7ccdfbb0fe7d6ee7d52a7114a9e8ea2491b5bd781cd"
+      "local_sha256": "00f4ce7d35bb3d5448209869d92d61c1f4325b48fab839101632582c11d7ed8b"
     },
     {
       "original": "pattern/pattern.go",

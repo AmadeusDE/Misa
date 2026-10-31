@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/user"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/x/term"
@@ -33,22 +34,40 @@ type env struct {
 // Run connects as the command line says and returns OpenSSH's exit status:
 // the remote command's, or 255 when sshc itself fails.
 func Run(o Options, termName string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return run(o, invocationEnv(o, termName, stdin, stdout, stderr))
+}
+
+func lookupOptionEnv(environ []string, key string) string {
+	if environ == nil {
+		return os.Getenv(key)
+	}
+	prefix := key + "="
+	for _, entry := range environ {
+		if strings.HasPrefix(entry, prefix) {
+			return strings.TrimPrefix(entry, prefix)
+		}
+	}
+	return ""
+}
+
+func invocationEnv(o Options, termName string, stdin io.Reader, stdout, stderr io.Writer) env {
 	e := env{
 		SystemConfig:     "/etc/ssh/ssh_config",
 		SystemKnownHosts: []string{"/etc/ssh/ssh_known_hosts"},
-		AgentSocket:      os.Getenv("SSH_AUTH_SOCK"),
+		AgentSocket:      lookupOptionEnv(o.Env, "SSH_AUTH_SOCK"),
+		Home:             lookupOptionEnv(o.Env, "HOME"),
 		Term:             termName,
 		Stdin:            stdin,
 		Stdout:           stdout,
 		Stderr:           stderr,
 	}
-	e.Home, _ = os.UserHomeDir()
-	if u, err := user.Current(); err == nil {
+	// LookupId avoids user.Current's environment-based fallback on pure-Go builds.
+	if u, err := user.LookupId(strconv.Itoa(os.Getuid())); err == nil {
 		e.LocalUser = u.Username
 	} else {
-		e.LocalUser = os.Getenv("USER")
+		e.LocalUser = lookupOptionEnv(o.Env, "USER")
 	}
-	return run(o, e)
+	return e
 }
 
 func run(o Options, e env) int {

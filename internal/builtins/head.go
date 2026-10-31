@@ -128,7 +128,12 @@ func headQuoteString(s string) string {
 	return sb.String()
 }
 
-func runHead(ctx *Context) int {
+func runHead(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	out := &trackedOutput{writer: ctx.Stdout}
+	ctx.Stdout = out
 	var args []string
 	for _, a := range ctx.Args {
 		if a == "---presume-input-pipe" {
@@ -315,6 +320,9 @@ func runHead(ctx *Context) int {
 	isZeroCount := count == 0 && !((useBytes && negZeroC) || (!useBytes && negZeroN))
 
 	for i, name := range files {
+		if out.err != nil {
+			return 1
+		}
 		showHeader := (multi && !quiet) || verbose
 		var r io.Reader
 		var openErr error
@@ -341,7 +349,7 @@ func runHead(ctx *Context) int {
 					openErr = err
 				} else {
 					defer f.Close()
-					r = f
+					r = ContextReader(ctx.CancellationContext(), f)
 				}
 			}
 		}
@@ -371,6 +379,9 @@ func runHead(ctx *Context) int {
 			fmt.Fprintf(ctx.Stdout, "==> %s <==\n", hdr)
 		}
 
+		if out.err != nil {
+			return 1
+		}
 		if isZeroCount || isDir {
 			continue
 		}
@@ -414,6 +425,9 @@ func runHead(ctx *Context) int {
 		} else {
 			br := bufio.NewReader(r)
 			for count := int64(0); count < nLines; count++ {
+				if out.err != nil {
+					return 1
+				}
 				line, err := br.ReadBytes(lineSep)
 				if len(line) > 0 {
 					ctx.Stdout.Write(line)
@@ -423,6 +437,9 @@ func runHead(ctx *Context) int {
 				}
 			}
 		}
+	}
+	if out.err != nil {
+		return 1
 	}
 	return exitCode
 }

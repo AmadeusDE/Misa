@@ -22,7 +22,14 @@ func init() {
 	Register(Command{Name: "tac", Run: runTac})
 }
 
-func runTac(ctx *Context) int {
+func runTac(ctx *Context) (code int) {
+	originalStdin := ctx.Stdin
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	flags, err := tacSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "tac:", err)
@@ -57,7 +64,7 @@ func runTac(ctx *Context) int {
 				exitCode = 1
 				continue
 			}
-			if f, ok := ctx.Stdin.(*os.File); ok {
+			if f, ok := originalStdin.(*os.File); ok {
 				if _, err := f.Stat(); err != nil {
 					fmt.Fprintf(ctx.Stderr, "tac: read error: %s\n", fmtOsErr(err))
 					exitCode = 1
@@ -80,7 +87,7 @@ func runTac(ctx *Context) int {
 			r = f
 		}
 
-		data, err := io.ReadAll(r)
+		data, err := io.ReadAll(ContextReader(ctx.CancellationContext(), r))
 		if err != nil {
 			fmt.Fprintf(ctx.Stderr, "tac: %s: %s\n", name, fmtOsErr(err))
 			exitCode = 1
@@ -109,41 +116,61 @@ func tacString(ctx *Context, data []byte, sep string, before bool) {
 
 	if before {
 		for end > 0 {
+			if ctx.CancellationContext().Err() != nil {
+				return
+			}
 			idx := bytes.LastIndex(data[:end], sepBytes)
 			if idx < 0 {
-				ctx.Stdout.Write(data[:end])
+				if _, err := ctx.Stdout.Write(data[:end]); err != nil {
+					return
+				}
 				break
 			}
-			ctx.Stdout.Write(data[idx:end])
+			if _, err := ctx.Stdout.Write(data[idx:end]); err != nil {
+				return
+			}
 			end = idx
 		}
 	} else {
 		idx := bytes.LastIndex(data[:end], sepBytes)
 		if idx < 0 {
-			ctx.Stdout.Write(data[:end])
+			if _, err := ctx.Stdout.Write(data[:end]); err != nil {
+				return
+			}
 			return
 		}
 
 		matchEnd := idx + len(sepBytes)
 		if matchEnd < end {
-			ctx.Stdout.Write(data[matchEnd:end])
+			if _, err := ctx.Stdout.Write(data[matchEnd:end]); err != nil {
+				return
+			}
 			end = matchEnd
 		}
 
 		for end > 0 {
+			if ctx.CancellationContext().Err() != nil {
+				return
+			}
 			idx := bytes.LastIndex(data[:end], sepBytes)
 			if idx < 0 {
-				ctx.Stdout.Write(data[:end])
+				if _, err := ctx.Stdout.Write(data[:end]); err != nil {
+					return
+				}
 				break
 			}
 			matchStart := idx
 			prevIdx := bytes.LastIndex(data[:matchStart], sepBytes)
 			if prevIdx < 0 {
-				ctx.Stdout.Write(data[:end])
+				if _, err := ctx.Stdout.Write(data[:end]); err != nil {
+					return
+				}
 				break
 			}
 			prevEnd := prevIdx + len(sepBytes)
-			ctx.Stdout.Write(data[prevEnd:end])
+			if _, err := ctx.Stdout.Write(data[prevEnd:end]); err != nil {
+				return
+			}
 			end = prevEnd
 		}
 	}
@@ -239,37 +266,57 @@ func tacRegex(ctx *Context, data []byte, pattern string, before bool) {
 
 	if before {
 		for end > 0 {
+			if ctx.CancellationContext().Err() != nil {
+				return
+			}
 			mStart, _, found := findRightmostMatch(re, data, end, checkStartAnchor)
 			if !found {
-				ctx.Stdout.Write(data[:end])
+				if _, err := ctx.Stdout.Write(data[:end]); err != nil {
+					return
+				}
 				break
 			}
-			ctx.Stdout.Write(data[mStart:end])
+			if _, err := ctx.Stdout.Write(data[mStart:end]); err != nil {
+				return
+			}
 			end = mStart
 		}
 	} else {
 		_, mEnd, found := findRightmostMatch(re, data, end, checkStartAnchor)
 		if !found {
-			ctx.Stdout.Write(data[:end])
+			if _, err := ctx.Stdout.Write(data[:end]); err != nil {
+				return
+			}
 			return
 		}
 		if mEnd < end {
-			ctx.Stdout.Write(data[mEnd:end])
+			if _, err := ctx.Stdout.Write(data[mEnd:end]); err != nil {
+				return
+			}
 			end = mEnd
 		}
 
 		for end > 0 {
+			if ctx.CancellationContext().Err() != nil {
+				return
+			}
 			mStart, _, found := findRightmostMatch(re, data, end, checkStartAnchor)
 			if !found {
-				ctx.Stdout.Write(data[:end])
+				if _, err := ctx.Stdout.Write(data[:end]); err != nil {
+					return
+				}
 				break
 			}
 			_, prevEnd, prevFound := findRightmostMatch(re, data, mStart, checkStartAnchor)
 			if !prevFound {
-				ctx.Stdout.Write(data[:end])
+				if _, err := ctx.Stdout.Write(data[:end]); err != nil {
+					return
+				}
 				break
 			}
-			ctx.Stdout.Write(data[prevEnd:end])
+			if _, err := ctx.Stdout.Write(data[prevEnd:end]); err != nil {
+				return
+			}
 			end = prevEnd
 		}
 	}

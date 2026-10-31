@@ -84,3 +84,60 @@ exit/close, snapshot ownership, handler invocation, and the F02 adapter. A
 session dependency test rejects a transitive Bubble Tea dependency. Imported
 foundation patches are recorded in `internal/sh/SOURCE.json` and `NOTICE`; no
 second shell copy or dependency is introduced.
+
+## S03 — noninteractive CLI
+
+S03 adds a noninteractive shell CLI without changing the normal Misa launch: plain
+`misa` remains the TUI. The explicit command is `misa sh`; argv0 aliases `sh` and
+`misa-sh` are installed only by `misa --install-sh DIR`. Existing `--install DIR`
+behavior remains unchanged. A manual symlink to the binary is an optional
+alternative; no alias is enabled implicitly.
+
+Supported forms:
+
+```text
+misa sh -c 'cmd' [name [args...]]
+misa sh [options] script [args...]
+misa sh [options]                 # read the script from stdin
+misa sh -s [args...]              # read the script from stdin
+```
+
+The default `$0` is `sh` (or the invoked alias). In `-c`, the optional `name`
+replaces `$0`, including with an empty string; for a script operand, that operand
+is `$0`. `-e`, `-u`, `-x` and clustered switches are forwarded to the
+interpreter, and `--` ends option parsing. `-c` and `-s` are mutually exclusive.
+No startup files, `ENV` sourcing, login mode or interactive mode are part of S03.
+
+Standard input is read to EOF and then parsed as one submission, so a producer
+that keeps the pipe open after a complete command delays execution until it
+closes, and commands in that mode cannot consume further standard input (a `read`
+sees end of file). A `-` operand means standard input, like `-s`. The read
+observes cancellation (130, or 124 on deadline expiry) by abandoning the blocked
+read: a caller-owned reader cannot be interrupted or closed. TTY stdin is
+refused with a clear diagnostic and status 1; `-c` and script mode may still
+inherit a TTY as stdin for the commands they run. Those
+commands run in their own process group through F06 `commandexec`, which does not
+yet take foreground terminal ownership, so a program that reads the inherited
+terminal directly can wait for input that the terminal does not deliver. F06 owns
+that fix.
+
+The CLI composes the S02 session with `sessionbuiltins` and F06 `commandexec`; it
+never falls back to a host `/bin/sh`, and works with an empty `PATH`. A nil
+session environment inherits the process environment; a non-nil empty environment
+starts empty. The exit status is the last command's status, or `exit N`. Syntax
+errors return 2 and report `file:line:column: message`; a missing script returns
+127, other script open/read errors 126, and usage errors 1 (the pre-existing
+`--install` usage status 2 is unchanged), following Toybox conventions. A script
+operand must be readable, not executable. `--install-sh` replaces its own stale
+symlinks, refuses to overwrite a real file (creating neither alias), and reports
+each link it writes.
+
+The interpreter gained one local patch: `$0` is now set explicitly and
+independently of source names, so `-c cmd ''` can have an empty `$0` while
+diagnostics still carry the script name. It is recorded in `internal/sh/NOTICE`
+and `internal/sh/SOURCE.json`.
+
+S03 does not solve S04 command resolution or introspection. S05 interactive
+execution and S06 TUI integration remain unwired. The remaining S07–S22 roadmap
+and boundaries above are unchanged. This is not a claim of full POSIX or Bash
+parity.

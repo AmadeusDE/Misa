@@ -110,6 +110,8 @@ type Runner struct {
 	usedNew bool
 
 	filename string // only if Node was a File
+	arg0     string
+	arg0Set  bool
 
 	// >0 to break or continue out of N enclosing loops
 	breakEnclosing, contnEnclosing int
@@ -348,6 +350,15 @@ func Dir(path string) RunnerOption {
 func Interactive(enabled bool) RunnerOption {
 	return func(r *Runner) error {
 		r.opts[optExpandAliases] = enabled
+		return nil
+	}
+}
+
+// Arg0 sets the shell's $0 independently of the source file name, including
+// when value is empty. Without this option the interpreter uses its default.
+func Arg0(value string) RunnerOption {
+	return func(r *Runner) error {
+		r.arg0, r.arg0Set = value, true
 		return nil
 	}
 }
@@ -793,6 +804,8 @@ func (r *Runner) Reset() {
 	// reset the internal state
 	*r = Runner{
 		Env:            r.Env,
+		arg0:           r.arg0,
+		arg0Set:        r.arg0Set,
 		tempDir:        r.tempDir,
 		callHandler:    r.callHandler,
 		execHandler:    r.execHandler,
@@ -989,6 +1002,8 @@ func (r *Runner) subshell(background bool) *Runner {
 		stdout:         r.stdout,
 		stderr:         r.stderr,
 		filename:       r.filename,
+		arg0:           r.arg0,
+		arg0Set:        r.arg0Set,
 		opts:           r.opts,
 		usedNew:        r.usedNew,
 		exit:           r.exit,

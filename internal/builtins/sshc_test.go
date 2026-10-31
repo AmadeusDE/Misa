@@ -36,3 +36,16 @@ func TestSSHCNeedsDestination(t *testing.T) {
 		t.Errorf("code %d, stderr %q", code, errOut.String())
 	}
 }
+
+func TestSSHCInvocationEnvironment(t *testing.T) {
+	for _, env := range [][]string{nil, {}, {"HOME=/isolated", "SSH_AUTH_SOCK=/local"}} {
+		ctx := &Context{Args: []string{"host"}, Env: env}
+		o, err := sshcInvocationOptions(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(o.Env, env) {
+			t.Errorf("env = %#v, want %#v", o.Env, env)
+		}
+	}
+}

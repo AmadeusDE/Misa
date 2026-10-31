@@ -12,6 +12,7 @@ import (
 
 // Options is an sshc command line.
 type Options struct {
+	Env         []string // nil inherits the process environment; non-nil is authoritative.
 	Destination string
 	Command     []string
 	User        string

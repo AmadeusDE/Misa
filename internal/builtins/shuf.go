@@ -17,7 +17,10 @@ import (
 
 func init() { Register(Command{Name: "shuf", Run: runShuf}) }
 
-func runShuf(ctx *Context) int {
+func runShuf(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	if err := shufRun(ctx); err != nil {
 		fmt.Fprintln(ctx.Stderr, "shuf: "+err.Error())
 		return 1
@@ -91,7 +94,7 @@ func shufRun(ctx *Context) error {
 		if e != nil {
 			return nil, nil, fmt.Errorf("failed to open '%s' for writing: %s", output, fmtOsErr(e))
 		}
-		return f, f, nil
+		return ContextWriter(ctx.CancellationContext(), f), f, nil
 	}
 	if count == 0 {
 		_, f, e := openOutput()
@@ -109,7 +112,7 @@ func shufRun(ctx *Context) error {
 			return fmt.Errorf("failed to open random source '%s': %s", source, fmtOsErr(e))
 		}
 		defer f.Close()
-		rng.source = bufio.NewReader(f)
+		rng.source = bufio.NewReader(ContextReader(ctx.CancellationContext(), f))
 	} else {
 		var key [32]byte
 		if hasSeed {
@@ -133,7 +136,12 @@ func shufRun(ctx *Context) error {
 		if name == "-" {
 			data, err = io.ReadAll(ctx.Stdin)
 		} else {
-			data, err = os.ReadFile(resolvePath(ctx, name))
+			f, e := os.Open(resolvePath(ctx, name))
+			if e != nil {
+				return fmt.Errorf("%s: %s", name, fmtOsErr(e))
+			}
+			data, err = io.ReadAll(ContextReader(ctx.CancellationContext(), f))
+			f.Close()
 		}
 		if err != nil {
 			return fmt.Errorf("%s: %s", name, fmtOsErr(err))
@@ -189,6 +197,9 @@ func shufRun(ctx *Context) error {
 	// Line inputs are shuffled before writing, while numeric ranges stay sparse.
 	if !flags.Bool("r") && !isRange {
 		for i := uint64(0); i < count; i++ {
+			if err := ctx.CancellationContext().Err(); err != nil {
+				return err
+			}
 			offset, e := rng.atMost(maximum - i)
 			if e != nil {
 				return e
@@ -199,6 +210,9 @@ func shufRun(ctx *Context) error {
 	}
 	swaps := make(map[uint64]uint64)
 	for i := uint64(0); i < count; i++ {
+		if err := ctx.CancellationContext().Err(); err != nil {
+			return err
+		}
 		var value string
 		if flags.Bool("r") {
 			offset, e := rng.atMost(maximum)

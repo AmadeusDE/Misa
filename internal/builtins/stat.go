@@ -81,7 +81,7 @@ func runStat(ctx *Context) int {
 		}
 
 		if hasPrintf {
-			out, ferr := statFormat(printfFmt, name, info, st)
+			out, ferr := statFormatIn(printfFmt, name, info, st, ctx.Location())
 			if ferr != nil {
 				fmt.Fprintf(ctx.Stderr, "stat: %s\n", ferr)
 				exitCode = 1
@@ -89,7 +89,7 @@ func runStat(ctx *Context) int {
 			}
 			fmt.Fprint(ctx.Stdout, out)
 		} else if hasFormat {
-			out, ferr := statFormat(format, name, info, st)
+			out, ferr := statFormatIn(format, name, info, st, ctx.Location())
 			if ferr != nil {
 				fmt.Fprintf(ctx.Stderr, "stat: %s\n", ferr)
 				exitCode = 1
@@ -109,7 +109,7 @@ func runStat(ctx *Context) int {
 	return exitCode
 }
 
-func statFormat(format, name string, info os.FileInfo, st *syscall.Stat_t) (string, error) {
+func statFormatIn(format, name string, info os.FileInfo, st *syscall.Stat_t, loc *time.Location) (string, error) {
 	var out strings.Builder
 	i := 0
 	for i < len(format) {
@@ -221,7 +221,7 @@ func statFormat(format, name string, info os.FileInfo, st *syscall.Stat_t) (stri
 		case 'h':
 			fmt.Fprintf(&out, "%d", st.Nlink)
 		case 'x':
-			out.WriteString(formatStatTime(atim(st).Sec, atim(st).Nsec))
+			out.WriteString(formatStatTime(atim(st).Sec, atim(st).Nsec, loc))
 		case 'X':
 			sec, nsec := atim(st).Sec, atim(st).Nsec
 			if prec > 0 {
@@ -232,7 +232,7 @@ func statFormat(format, name string, info os.FileInfo, st *syscall.Stat_t) (stri
 				fmt.Fprintf(&out, "%d", sec)
 			}
 		case 'y':
-			out.WriteString(formatStatTime(mtim(st).Sec, mtim(st).Nsec))
+			out.WriteString(formatStatTime(mtim(st).Sec, mtim(st).Nsec, loc))
 		case 'Y':
 			sec, nsec := mtim(st).Sec, mtim(st).Nsec
 			if prec > 0 {
@@ -245,7 +245,7 @@ func statFormat(format, name string, info os.FileInfo, st *syscall.Stat_t) (stri
 				fmt.Fprintf(&out, "%d", sec)
 			}
 		case 'z':
-			out.WriteString(formatStatTime(ctim(st).Sec, ctim(st).Nsec))
+			out.WriteString(formatStatTime(ctim(st).Sec, ctim(st).Nsec, loc))
 		case 'Z':
 			sec, nsec := ctim(st).Sec, ctim(st).Nsec
 			if prec > 0 {
@@ -307,9 +307,9 @@ func statPrintDefault(ctx *Context, name string, info os.FileInfo, st *syscall.S
 	fmt.Fprintf(ctx.Stdout, "Access: (%04o/%s)  Uid: (%5d/ %s)   Gid: (%5d/ %s)\n",
 		info.Mode().Perm(), info.Mode().String(),
 		st.Uid, statLookupUser(st.Uid), st.Gid, statLookupGroup(st.Gid))
-	fmt.Fprintf(ctx.Stdout, "Access: %s\n", time.Unix(atim(st).Sec, atim(st).Nsec).Format("2006-01-02 15:04:05.000000000 -0700"))
-	fmt.Fprintf(ctx.Stdout, "Modify: %s\n", time.Unix(mtim(st).Sec, mtim(st).Nsec).Format("2006-01-02 15:04:05.000000000 -0700"))
-	fmt.Fprintf(ctx.Stdout, "Change: %s\n", time.Unix(ctim(st).Sec, ctim(st).Nsec).Format("2006-01-02 15:04:05.000000000 -0700"))
+	fmt.Fprintf(ctx.Stdout, "Access: %s\n", time.Unix(atim(st).Sec, atim(st).Nsec).In(ctx.Location()).Format("2006-01-02 15:04:05.000000000 -0700"))
+	fmt.Fprintf(ctx.Stdout, "Modify: %s\n", time.Unix(mtim(st).Sec, mtim(st).Nsec).In(ctx.Location()).Format("2006-01-02 15:04:05.000000000 -0700"))
+	fmt.Fprintf(ctx.Stdout, "Change: %s\n", time.Unix(ctim(st).Sec, ctim(st).Nsec).In(ctx.Location()).Format("2006-01-02 15:04:05.000000000 -0700"))
 }
 
 func statLookupUser(uid uint32) string {
@@ -326,14 +326,6 @@ func statLookupGroup(gid uint32) string {
 	return strconv.Itoa(int(gid))
 }
 
-func formatStatTime(sec, nsec int64) string {
-	t := time.Unix(sec, nsec)
-	if tz := os.Getenv("TZ"); tz != "" {
-		if strings.EqualFold(tz, "utc") {
-			t = t.UTC()
-		} else if loc, err := time.LoadLocation(tz); err == nil {
-			t = t.In(loc)
-		}
-	}
-	return t.Format("2006-01-02 15:04:05.000000000 -0700")
+func formatStatTime(sec, nsec int64, loc *time.Location) string {
+	return time.Unix(sec, nsec).In(loc).Format("2006-01-02 15:04:05.000000000 -0700")
 }

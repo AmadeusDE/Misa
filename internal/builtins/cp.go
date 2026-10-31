@@ -128,17 +128,17 @@ func subtractPreserve(base, minus preserveAttrs) preserveAttrs {
 
 // Backup control styles, resolved from --backup[=CONTROL] / -b / VERSION_CONTROL.
 
-func backupSuffix(flags *ParseResult) string {
+func backupSuffix(ctx *Context, flags *ParseResult) string {
 	if s, ok := flags.String("suffix"); ok && s != "" {
 		return s
 	}
-	if s := os.Getenv("SIMPLE_BACKUP_SUFFIX"); s != "" {
+	if s := ctx.Getenv("SIMPLE_BACKUP_SUFFIX"); s != "" {
 		return s
 	}
 	return "~"
 }
 
-func backupControl(flags *ParseResult) (control string, given bool, err error) {
+func backupControl(ctx *Context, flags *ParseResult) (control string, given bool, err error) {
 	longVal, longGiven := flags.String("backup")
 	given = flags.Bool("b") || longGiven
 	if !given {
@@ -146,7 +146,7 @@ func backupControl(flags *ParseResult) (control string, given bool, err error) {
 	}
 	val := longVal
 	if val == "" {
-		val = os.Getenv("VERSION_CONTROL")
+		val = ctx.Getenv("VERSION_CONTROL")
 		if val == "" {
 			val = "existing"
 		}
@@ -252,7 +252,11 @@ func displayBackupName(display, target, backupPath string) string {
 	return display + strings.TrimPrefix(backupPath, target)
 }
 
-func runCp(ctx *Context) int {
+func runCp(ctx *Context) (code int) {
+	stdinTerminal := isTerminal(ctx.Stdin)
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	flags, err := cpSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "cp:", err)
@@ -345,13 +349,13 @@ func runCp(ctx *Context) int {
 		}
 	}
 
-	backupCtl, backupGiven, backupErr := backupControl(flags)
+	backupCtl, backupGiven, backupErr := backupControl(ctx, flags)
 	if backupErr != nil {
 		fmt.Fprintf(ctx.Stderr, "cp: %s\n", backupErr)
 		return 1
 	}
 	backupActive := backupGiven && backupCtl != "none"
-	suffix := backupSuffix(flags)
+	suffix := backupSuffix(ctx, flags)
 
 	if backupActive && (updateMode == "none" || updateMode == "none-fail") {
 		fmt.Fprintln(ctx.Stderr, "cp: --backup is mutually exclusive with -n or --update=none-fail")
@@ -397,6 +401,9 @@ func runCp(ctx *Context) int {
 
 	exitCode := 0
 	for _, src := range sources {
+		if ctx.CancellationContext().Err() != nil {
+			return 1
+		}
 		if src == "" {
 			fmt.Fprintln(ctx.Stderr, "cp: cannot stat '': No such file or directory")
 			exitCode = 1
@@ -667,13 +674,16 @@ func runCp(ctx *Context) int {
 		}
 
 		if interactive && !srcInfo.IsDir() && targetExists {
-			if isTerminal(ctx.Stdin) {
+			if stdinTerminal {
 				fmt.Fprintf(ctx.Stderr, "cp: overwrite '%s'? ", displayTarget)
 			}
 			answeredYes := true
 			if scanner.Scan() {
 				ans := strings.TrimSpace(scanner.Text())
 				answeredYes = len(ans) > 0 && (strings.HasPrefix(ans, "y") || strings.HasPrefix(ans, "Y"))
+			}
+			if ctx.CancellationContext().Err() != nil {
+				return 1
 			}
 			if !answeredYes {
 				exitCode = 1
@@ -774,7 +784,7 @@ func runCp(ctx *Context) int {
 				continue
 			}
 		} else {
-			bpath, err := copyOneFile(srcPath, target, srcInfo, preserve, force, src, displayTarget, backupActive, suffix, backupCtl)
+			bpath, err := copyOneFile(ctx, srcPath, target, srcInfo, preserve, force, src, displayTarget, backupActive, suffix, backupCtl)
 			if err != nil {
 				fmt.Fprintln(ctx.Stderr, "cp: "+err.Error())
 				exitCode = 1
@@ -890,7 +900,7 @@ func applyCopiedAttrs(dst string, srcInfo os.FileInfo, preserve preserveAttrs) {
 // copyOneFile copies a single file (or recreates a symlink/fifo) at dst,
 // backing up an existing dst first when backupActive. It returns the
 // backup path used, if any.
-func copyOneFile(src, dst string, srcInfo os.FileInfo, preserve preserveAttrs, force bool, displaySrc, displayDst string, backupActive bool, suffix, control string) (string, error) {
+func copyOneFile(ctx *Context, src, dst string, srcInfo os.FileInfo, preserve preserveAttrs, force bool, displaySrc, displayDst string, backupActive bool, suffix, control string) (string, error) {
 	if srcInfo.Mode()&os.ModeSymlink != 0 {
 		linkTarget, err := os.Readlink(src)
 		if err != nil {
@@ -962,7 +972,7 @@ func copyOneFile(src, dst string, srcInfo os.FileInfo, preserve preserveAttrs, f
 	}
 	defer df.Close()
 
-	if _, err := io.Copy(df, sf); err != nil {
+	if _, err := CopyContext(ctx.CancellationContext(), df, sf); err != nil {
 		return bpath, fmt.Errorf("error writing '%s': %s", displayDst, fmtOsErr(err))
 	}
 
@@ -979,6 +989,9 @@ func copyDirRecursive(src, dst string, preserve preserveAttrs, noDeref, deref, i
 // (or shared with another top-level operand) are hard-linked at the
 // destination instead of duplicated, matching --preserve=links.
 func copyDirRecursiveLinked(src, dst, displaySrc, displayDst string, preserve preserveAttrs, noDeref, deref, interactive bool, ctx *Context, scanner *bufio.Scanner, backupActive bool, suffix, control string, linkMap map[inodeKey]string) error {
+	if err := ctx.CancellationContext().Err(); err != nil {
+		return err
+	}
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr, "cp: cannot stat '%s': %s\n", displaySrc, fmtOsErr(err))
@@ -1002,6 +1015,9 @@ func copyDirRecursiveLinked(src, dst, displaySrc, displayDst string, preserve pr
 
 	var hasError bool
 	for _, e := range entries {
+		if err := ctx.CancellationContext().Err(); err != nil {
+			return err
+		}
 		srcChild := filepath.Join(src, e.Name())
 		dstChild := filepath.Join(dst, e.Name())
 		displaySrcChild := filepath.Join(displaySrc, e.Name())
@@ -1050,6 +1066,10 @@ func copyDirRecursiveLinked(src, dst, displaySrc, displayDst string, preserve pr
 			}
 		}
 
+		if err := ctx.CancellationContext().Err(); err != nil {
+			return err
+		}
+
 		if info.IsDir() {
 			if err := copyDirRecursiveLinked(srcChild, dstChild, displaySrcChild, displayDstChild, preserve, noDeref, deref, interactive, ctx, scanner, backupActive, suffix, control, linkMap); err != nil {
 				hasError = true
@@ -1075,7 +1095,7 @@ func copyDirRecursiveLinked(src, dst, displaySrc, displayDst string, preserve pr
 			}
 		}
 
-		if _, err := copyOneFile(srcChild, dstChild, leafInfo, preserve, false, displaySrcChild, displayDstChild, backupActive, suffix, control); err != nil {
+		if _, err := copyOneFile(ctx, srcChild, dstChild, leafInfo, preserve, false, displaySrcChild, displayDstChild, backupActive, suffix, control); err != nil {
 			fmt.Fprintf(ctx.Stderr, "cp: %s\n", err)
 			hasError = true
 		}

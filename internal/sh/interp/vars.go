@@ -186,7 +186,9 @@ func (r *Runner) lookupVar(name string) expand.Variable {
 		vr.Kind, vr.List = expand.Indexed, r.dirStack
 	case "0":
 		vr.Kind = expand.String
-		if r.filename != "" {
+		if r.arg0Set {
+			vr.Str = r.arg0
+		} else if r.filename != "" {
 			vr.Str = r.filename
 		} else {
 			vr.Str = "gosh"

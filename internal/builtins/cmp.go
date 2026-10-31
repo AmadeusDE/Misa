@@ -31,7 +31,13 @@ func init() {
 
 const cmpBufSize = 4096
 
-func runCmp(ctx *Context) int {
+func runCmp(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	params, err := cmpParseArgs(ctx.CmdName, ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, err)
@@ -141,7 +147,9 @@ func cmpCompare(ctx *Context, p *cmpParams) (bool, error) {
 			if fa != fb {
 				different = true
 				if p.verbose {
-					cmpVerboseLine(ctx, p, fa, fb, atByte, width)
+					if err := cmpVerboseLine(ctx, p, fa, fb, atByte, width); err != nil {
+						return false, err
+					}
 				} else {
 					cmpReportDifference(ctx, p, fa, fb, atByte, atLine)
 					return false, nil
@@ -184,7 +192,7 @@ func cmpOpenReader(ctx *Context, name string, skip uint64) (*cmpReader, error) {
 			return nil, fmt.Errorf("cmp: %s: %s", name, fmtOsErr(err))
 		}
 		rd.cls = f
-		rd.r = bufio.NewReaderSize(f, cmpBufSize)
+		rd.r = bufio.NewReaderSize(ContextReader(ctx.CancellationContext(), f), cmpBufSize)
 	}
 	if skip > 0 {
 		if _, err := io.CopyN(io.Discard, rd.r, int64(skip)); err != nil && err != io.EOF {
@@ -271,12 +279,13 @@ func cmpReportEOF(ctx *Context, p *cmpParams, atByte, atLine uint64, startOfLine
 	}
 }
 
-func cmpVerboseLine(ctx *Context, p *cmpParams, fromByte, toByte byte, atByte uint64, width int) {
+func cmpVerboseLine(ctx *Context, p *cmpParams, fromByte, toByte byte, atByte uint64, width int) error {
 	if p.printBytes {
-		fmt.Fprintf(ctx.Stdout, "%*d %3o %-4s %3o %s\n", width, atByte, fromByte, cmpVisibleByte(fromByte), toByte, cmpVisibleByte(toByte))
-		return
+		_, err := fmt.Fprintf(ctx.Stdout, "%*d %3o %-4s %3o %s\n", width, atByte, fromByte, cmpVisibleByte(fromByte), toByte, cmpVisibleByte(toByte))
+		return err
 	}
-	fmt.Fprintf(ctx.Stdout, "%*d %3o %3o\n", width, atByte, fromByte, toByte)
+	_, err := fmt.Fprintf(ctx.Stdout, "%*d %3o %3o\n", width, atByte, fromByte, toByte)
+	return err
 }
 
 // cmpPosixLocale reports whether the message locale is C/POSIX, which

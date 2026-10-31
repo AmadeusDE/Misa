@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 )
 
 const chmodSpec = "R(recursive)v(verbose)c(changes)f(silent)quiet(quiet)"
@@ -299,7 +301,11 @@ func parseSymbolicMode(spec string, current os.FileMode) (os.FileMode, error) {
 		}
 	doneWho:
 		if !hasWho {
-			who = os.FileMode(07777 &^ currentUmask())
+			mask, err := proceffect.Umask()
+			if err != nil {
+				return 0, fmt.Errorf("cannot read umask: %w", err)
+			}
+			who = os.FileMode(07777 &^ mask)
 		}
 
 		for i < len(clause) {

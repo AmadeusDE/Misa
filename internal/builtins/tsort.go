@@ -28,7 +28,13 @@ type tsortNodeInfo struct {
 	indeg int
 }
 
-func runTsort(ctx *Context) int {
+func runTsort(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	flags, err := tsortSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "tsort:", err)
@@ -70,7 +76,7 @@ func runTsort(ctx *Context) int {
 	}
 
 	var tokens []string
-	sc := bufio.NewScanner(r)
+	sc := bufio.NewScanner(ContextReader(ctx.CancellationContext(), r))
 	sc.Split(bufio.ScanWords)
 	for sc.Scan() {
 		tokens = append(tokens, sc.Text())
@@ -118,7 +124,13 @@ func runTsort(ctx *Context) int {
 
 	rc := 0
 	for {
+		if ctx.CancellationContext().Err() != nil {
+			return 0
+		}
 		for len(queue) > 0 {
+			if ctx.CancellationContext().Err() != nil {
+				return 0
+			}
 			n := queue[0]
 			queue = queue[1:]
 			if done[n] {

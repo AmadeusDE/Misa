@@ -130,7 +130,14 @@ func parseSizeLines(val string) (int64, error) {
 	return n * mult, nil
 }
 
-func runSplit(ctx *Context) int {
+func runSplit(ctx *Context) (code int) {
+	originalStdin := ctx.Stdin
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	args := make([]string, 0, len(ctx.Args))
 	for i := 0; i < len(ctx.Args); i++ {
 		arg := ctx.Args[i]
@@ -460,7 +467,7 @@ func runSplit(ctx *Context) int {
 		firstOutPath := filepath.Join(ctx.Dir, firstOutName)
 
 		// Try to get inode of stdin
-		if stdinFile, ok := ctx.Stdin.(*os.File); ok {
+		if stdinFile, ok := originalStdin.(*os.File); ok {
 			stdinInfo, err := stdinFile.Stat()
 			if err == nil {
 				// Check if output file exists with same inode
@@ -475,6 +482,12 @@ func runSplit(ctx *Context) int {
 			}
 		}
 	}
+
+	inputName := "-"
+	if len(ops) > 0 {
+		inputName = ops[0]
+	}
+	r = ContextReader(ctx.CancellationContext(), r)
 
 	// Need to import syscall for Stat_t
 	_ = inputPath
@@ -543,7 +556,7 @@ func runSplit(ctx *Context) int {
 			}
 			if readErr != nil {
 				if readErr != io.EOF {
-					fmt.Fprintf(ctx.Stderr, "split: %s: %s\n", ops[0], fmtOsErr(readErr))
+					fmt.Fprintf(ctx.Stderr, "split: %s: %s\n", inputName, fmtOsErr(readErr))
 					if out != nil {
 						out.Close()
 					}
@@ -593,7 +606,7 @@ func runSplit(ctx *Context) int {
 			}
 			if err != nil {
 				if err != io.EOF {
-					fmt.Fprintf(ctx.Stderr, "split: %s: %s\n", ops[0], fmtOsErr(err))
+					fmt.Fprintf(ctx.Stderr, "split: %s: %s\n", inputName, fmtOsErr(err))
 					if out != nil {
 						out.Close()
 					}
@@ -643,7 +656,7 @@ func runSplit(ctx *Context) int {
 			}
 			if err != nil {
 				if err != io.EOF {
-					fmt.Fprintf(ctx.Stderr, "split: %s: %s\n", ops[0], fmtOsErr(err))
+					fmt.Fprintf(ctx.Stderr, "split: %s: %s\n", inputName, fmtOsErr(err))
 					if out != nil {
 						out.Close()
 					}

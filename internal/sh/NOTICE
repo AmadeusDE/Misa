@@ -3,4 +3,4 @@ revision 2f3f5e36d9b0f8f14c998d50aa20a28832205ae8 (v3.13.1).
 Copyright notices are retained in the original source files.
 The source is distributed under the BSD 3-Clause License; see LICENSE.
 See SOURCE.json for file provenance, omissions, and local patches.
-Misa patches POSIX export/readonly parsing and adds a session last-status API.
+Misa patches POSIX export/readonly parsing and adds session last-status and explicit $0 APIs.

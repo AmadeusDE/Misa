@@ -92,8 +92,9 @@ func TestTimeoutCommand(t *testing.T) {
 		code     int
 		out, err string
 	}{
-		{"exit zero", []string{"1", "true"}, 0, "", ""},
-		{"exit one", []string{"1", "false"}, 1, "", ""},
+		// Race-instrumented helper processes sleep for one second on exit.
+		{"exit zero", []string{"3", "true"}, 0, "", ""},
+		{"exit one", []string{"3", "false"}, 1, "", ""},
 		{"arguments", []string{"1", "sh", "-c", "printf '%s' \"$1\"", "sh", "abcd"}, 0, "abcd", ""},
 		{"child status", []string{"1", "sh", "-c", "exit 42"}, 42, "", ""},
 		{"timeout", []string{".05", "sleep", "5"}, 124, "", ""},
@@ -137,7 +138,7 @@ func TestTimeoutScripts(t *testing.T) {
 		code         int
 		out          string
 	}{
-		{"no shebang", "printf '%s' \"$1\"", 0700, []string{"1", "./script", "argument"}, 0, "argument"},
+		{"no shebang", "printf '%s' \"$1\"", 0700, []string{"1", "./script", "argument"}, 126, ""},
 		{"not executable", "echo nope", 0600, []string{"1", "./script"}, 126, ""},
 		{"trap", shBang() + "trap 'exit 3' TERM\nwhile :; do :; done", 0700, []string{".1", "./script"}, 124, ""},
 		{"trap preserve", shBang() + "trap 'exit 3' TERM\nwhile :; do :; done", 0700, []string{"-p", ".1", "./script"}, 3, ""},

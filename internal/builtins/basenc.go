@@ -22,7 +22,10 @@ const basencBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz
 
 func init() { Register(Command{Name: "basenc", Run: runBasenc}) }
 
-func runBasenc(ctx *Context) int {
+func runBasenc(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	spec, err := ParseSpec(basencSpec)
 	if err != nil {
 		panic(err)
@@ -71,7 +74,7 @@ func runBasenc(ctx *Context) int {
 			return 1
 		}
 		defer file.Close()
-		input = file
+		input = ContextReader(ctx.CancellationContext(), file)
 	}
 	if input == nil {
 		input = strings.NewReader("")
