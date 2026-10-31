@@ -111,6 +111,9 @@ func parseTestFile(path string) (testSuite, error) {
 		setupFiles: map[string]string{},
 		vars:       map[string]string{},
 	}
+	// $FILES points at the fixture tree vendored from toybox (tests/files in
+	// the toybox tree, 0BSD, same commit as the .test files).
+	suite.vars["FILES"] = filepath.Join(findModRoot(), "tests", "toybox", "files")
 	if suite.cmdName == "hostname" {
 		if h, err := os.Hostname(); err == nil {
 			suite.vars["HOST"] = strings.TrimSpace(h)

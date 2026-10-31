@@ -16,3 +16,5 @@ du/-H_does_not_follow_unspecified_symlinks  # du: block counts depend on the fil
 du/-LH_does_not_follow_unspecified_symlinks  # du: block counts depend on the filesystem
 du/-H_follows_specified_symlinks  # du: block counts depend on the filesystem
 env/why_is_this_allowed  # env: =BLAH (empty variable name) is rejected
+xzcat/canned_data_basic_smoketest  # fixture $FILES/tar/tar.txz is not in the toybox test tree
+xzcat/extract_tarball  # needs $FILES/tar/tar.txz, an xz binary and tar; the setup block is multi-line shell

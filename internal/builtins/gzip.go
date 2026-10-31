@@ -14,6 +14,9 @@
 //   - -c -t still discards the output, where toybox writes -t -c output to
 //     stdout.
 //   - -l (list) does not exist, in toybox or here.
+//
+// The plumbing shared with bunzip2 (-c/-f/-k/-t, stdin, the temp file and the
+// rename) lives in decompress.go.
 package builtins
 
 import (
@@ -22,14 +25,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/charmbracelet/x/term"
 )
 
 // gzipMode is the name the family was invoked under. gunzip always decompresses
@@ -80,26 +79,17 @@ func init() {
 
 const gzipNotGzip = "not in gzip format"
 
+// gzipSuffixes name the output of a decompression: the suffix is dropped, or
+// replaced (.tgz is a tarball).
+var gzipSuffixes = []suffixRule{{".gz", ""}, {".tgz", ".tar"}, {".z", ""}}
+
 type gzipOptions struct {
-	name       string // diagnostic prefix: gzip, gunzip or zcat
+	codec      codec
+	flags      streamFlags
 	decompress bool
-	toStdout   bool
-	force      bool
-	keep       bool
 	noName     bool
 	restore    bool
-	test       bool
 	level      int
-}
-
-// gzipSource is one input stream: a file operand or stdin ("-").
-type gzipSource struct {
-	display string // operand as typed, for diagnostics
-	base    string // base name stored in the header ("" for stdin)
-	reader  io.Reader
-	file    *os.File // nil for stdin
-	info    os.FileInfo
-	modTime time.Time
 }
 
 func runGzip(ctx *Context, mode gzipMode) int {
@@ -132,16 +122,18 @@ func runGzip(ctx *Context, mode gzipMode) int {
 	}
 
 	o := &gzipOptions{
-		name:       name,
+		flags: streamFlags{
+			toStdout: mode == gzipCat || flags.Bool("c"),
+			force:    flags.Bool("f"),
+			keep:     flags.Bool("k"),
+			test:     flags.Bool("t"),
+		},
 		decompress: mode != gzipCompress || flags.Bool("d") || flags.Bool("t"),
-		toStdout:   mode == gzipCat || flags.Bool("c"),
-		force:      flags.Bool("f"),
-		keep:       flags.Bool("k"),
 		noName:     flags.Bool("n"),
 		restore:    flags.Bool("N"),
-		test:       flags.Bool("t"),
 		level:      level,
 	}
+	o.codec = codec{name: name, transform: o.transform, errText: gzipErrText, suffixes: gzipSuffixes}
 
 	files := flags.Operands
 	if len(files) == 0 {
@@ -177,83 +169,23 @@ func gzipLevel(flags *ParseResult) (int, error) {
 }
 
 func (o *gzipOptions) runOne(ctx *Context, operand string) bool {
-	if operand == "-" {
-		if ctx.Stdin == nil {
-			fmt.Fprintf(ctx.Stderr, "%s: -: stdin not available\n", o.name)
-			return false
-		}
-		if isTerminal(ctx.Stdin) && !o.force {
-			fmt.Fprintf(ctx.Stderr, "%s: -: need -f to read from a terminal\n", o.name)
-			return false
-		}
-		return o.toStream(ctx, &gzipSource{display: "-", reader: ctx.Stdin})
-	}
-
-	path := resolvePath(ctx, operand)
-	f, err := os.Open(path)
-	if err != nil {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, operand, fmtOsErr(err))
+	src, ok := openInput(ctx, o.codec.name, operand, o.flags.force)
+	if !ok {
 		return false
 	}
-	defer f.Close()
+	defer src.close()
 
-	info, err := f.Stat()
-	if err != nil {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, operand, fmtOsErr(err))
-		return false
+	if src.isStdin() || o.flags.toStdout || o.flags.test {
+		return o.codec.toStream(ctx, o.flags, src, !o.decompress)
 	}
-	if info.IsDir() {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: Is a directory\n", o.name, operand)
-		return false
-	}
-
-	src := &gzipSource{
-		display: operand,
-		base:    filepath.Base(operand),
-		reader:  f,
-		file:    f,
-		info:    info,
-		modTime: info.ModTime(),
-	}
-	if o.toStdout || o.test {
-		return o.toStream(ctx, src)
-	}
+	inPath := resolvePath(ctx, operand)
 	if o.decompress {
-		return o.decompressToFile(ctx, src, path)
+		return o.decompressToFile(ctx, src, inPath)
 	}
-	return o.compressToFile(ctx, src, path)
+	return o.codec.toFile(ctx, o.flags, src, inPath, resolvePath(ctx, operand+".gz"), src.modTime)
 }
 
-// toStream writes to stdout (or nowhere with -t) and leaves every input alone.
-func (o *gzipOptions) toStream(ctx *Context, src *gzipSource) bool {
-	if o.test {
-		if err := o.transform(src, io.Discard); err != nil {
-			fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, src.display, gzipErrText(err))
-			return false
-		}
-		return true
-	}
-	if !o.decompress && !o.force && writerIsTerminal(ctx.Stdout) {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: compressed data not written to a terminal; use -f to force\n", o.name, src.display)
-		return false
-	}
-	bw := bufio.NewWriter(ctx.Stdout)
-	if err := o.transform(src, bw); err != nil {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, src.display, gzipErrText(err))
-		return false
-	}
-	if err := bw.Flush(); err != nil {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, src.display, fmtOsErr(err))
-		return false
-	}
-	return true
-}
-
-func (o *gzipOptions) compressToFile(ctx *Context, src *gzipSource, inPath string) bool {
-	return o.replaceFile(ctx, src, inPath, resolvePath(ctx, src.display+".gz"), src.info.Mode(), src.modTime)
-}
-
-func (o *gzipOptions) decompressToFile(ctx *Context, src *gzipSource, inPath string) bool {
+func (o *gzipOptions) decompressToFile(ctx *Context, src *input, inPath string) bool {
 	var header gzip.Header
 	if o.restore {
 		if h, err := peekGzipHeader(src.file); err == nil {
@@ -261,9 +193,9 @@ func (o *gzipOptions) decompressToFile(ctx *Context, src *gzipSource, inPath str
 		}
 	}
 
-	outDisplay, ok := decompressedName(src.display, header.Name, o.restore)
+	outDisplay, ok := o.decompressedName(src.display, header.Name)
 	if !ok {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: unknown suffix -- ignored (use -c to write to stdout)\n", o.name, src.display)
+		fmt.Fprintf(ctx.Stderr, "%s: %s: unknown suffix -- ignored (use -c to write to stdout)\n", o.codec.name, src.display)
 		return false
 	}
 
@@ -271,80 +203,18 @@ func (o *gzipOptions) decompressToFile(ctx *Context, src *gzipSource, inPath str
 	if o.restore && !header.ModTime.IsZero() {
 		modTime = header.ModTime
 	}
-	return o.replaceFile(ctx, src, inPath, resolvePath(ctx, outDisplay), src.info.Mode(), modTime)
-}
-
-// replaceFile streams src into a temporary file next to outPath and renames it
-// into place, so a damaged stream never leaves a half-written output. The
-// input is removed unless -k. There is no interactive prompt: stdin may not be
-// a tty, so an existing output is always refused without -f.
-func (o *gzipOptions) replaceFile(ctx *Context, src *gzipSource, inPath, outPath string, mode os.FileMode, modTime time.Time) bool {
-	if !o.force {
-		if _, err := os.Lstat(outPath); err == nil {
-			fmt.Fprintf(ctx.Stderr, "%s: %s: already exists; use -f to overwrite\n", o.name, outPath)
-			return false
-		} else if !errors.Is(err, fs.ErrNotExist) {
-			fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, outPath, fmtOsErr(err))
-			return false
-		}
-	}
-
-	tmp, err := os.CreateTemp(filepath.Dir(outPath), ".gzip-*")
-	if err != nil {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, outPath, fmtOsErr(err))
-		return false
-	}
-	tmpName := tmp.Name()
-	renamed := false
-	defer func() {
-		if !renamed {
-			tmp.Close()
-			os.Remove(tmpName)
-		}
-	}()
-
-	if err := o.transform(src, tmp); err != nil {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, src.display, gzipErrText(err))
-		return false
-	}
-	if err := tmp.Close(); err != nil {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, outPath, fmtOsErr(err))
-		return false
-	}
-
-	perm := mode & (os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky)
-	if err := os.Chmod(tmpName, perm); err != nil {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, outPath, fmtOsErr(err))
-		return false
-	}
-	if err := os.Chtimes(tmpName, modTime, modTime); err != nil {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, outPath, fmtOsErr(err))
-		return false
-	}
-	if err := os.Rename(tmpName, outPath); err != nil {
-		fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, outPath, fmtOsErr(err))
-		return false
-	}
-	renamed = true
-
-	if !o.keep {
-		if err := os.Remove(inPath); err != nil {
-			fmt.Fprintf(ctx.Stderr, "%s: %s: %s\n", o.name, src.display, fmtOsErr(err))
-			return false
-		}
-	}
-	return true
+	return o.codec.toFile(ctx, o.flags, src, inPath, resolvePath(ctx, outDisplay), modTime)
 }
 
 // transform runs the codec for one source into out.
-func (o *gzipOptions) transform(src *gzipSource, out io.Writer) error {
+func (o *gzipOptions) transform(src *input, out io.Writer) error {
 	if o.decompress {
 		return gunzipStream(src.reader, out)
 	}
 	return o.compress(src, out)
 }
 
-func (o *gzipOptions) compress(src *gzipSource, out io.Writer) error {
+func (o *gzipOptions) compress(src *input, out io.Writer) error {
 	zw, err := gzip.NewWriterLevel(out, o.level)
 	if err != nil {
 		return err
@@ -422,13 +292,11 @@ func peekGzipHeader(f *os.File) (gzip.Header, error) {
 // like toybox (.gz dropped, .tgz becomes .tar, .z dropped); with -N the name
 // stored in the header is used when the suffix says nothing, reduced to its
 // base name so it can never leave the input's directory.
-func decompressedName(display, headerName string, restore bool) (string, bool) {
-	for _, s := range []struct{ suffix, replace string }{{".gz", ""}, {".tgz", ".tar"}, {".z", ""}} {
-		if len(display) > len(s.suffix) && strings.HasSuffix(display, s.suffix) {
-			return display[:len(display)-len(s.suffix)] + s.replace, true
-		}
+func (o *gzipOptions) decompressedName(display, headerName string) (string, bool) {
+	if out, ok := o.codec.outputName(display); ok {
+		return out, true
 	}
-	if restore && headerName != "" {
+	if o.restore && headerName != "" {
 		base := filepath.Base(headerName)
 		if base != "" && base != "." && base != ".." && base != string(filepath.Separator) {
 			return filepath.Join(filepath.Dir(display), base), true
@@ -456,12 +324,4 @@ func gzipErrText(err error) string {
 		return "unexpected end of file"
 	}
 	return strings.TrimPrefix(err.Error(), "gzip: ")
-}
-
-func writerIsTerminal(w io.Writer) bool {
-	f, ok := w.(*os.File)
-	if !ok {
-		return false
-	}
-	return term.IsTerminal(f.Fd())
 }

@@ -114,8 +114,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `blockdev` | other | – | util-linux:5 | 5 | devices | uutils: Rust, 5/5 simple new_ucmd! cases parseable by tests/uutils adapter | 69 | 433 | medium |
 | `bootchartd` | pending | – | – | – | – | no tests | 277 | – | medium |
 | `brctl` | pending | – | – | – | – | no tests | 333 | – | medium |
-| `bunzip2` | other | – | – | – | – | no tests | 729 | – | heavy |
-| `bzcat` | other | 4 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 729 | – | heavy |
 | `cal` | posix | – | util-linux:12 | 12 | – | uutils: Rust, 12/12 simple new_ucmd! cases parseable by tests/uutils adapter | 144 | 355 | light |
 | `chacl` | – | – | acl:1 | 1 | – | uutils: Rust, 1/1 simple new_ucmd! cases parseable by tests/uutils adapter | – | 73 | light |
 | `chage` | – | – | shadow:14 | 0 | root | uutils: Rust, 0/14 simple new_ucmd! cases parseable by tests/uutils adapter | – | 946 | heavy |
@@ -394,5 +392,4 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `who` | posix | – | coreutils:27 | 2 | – | uutils: Rust, 2/27 simple new_ucmd! cases parseable by tests/uutils adapter | 44 | 666 | light |
 | `xargs` | posix | 35 | findutils:33 | 0 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 0/33 simple new_ucmd! cases parseable by tests/uutils adapter | 236 | – | medium |
 | `xxd` | other | 22 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 182 | – | light |
-| `xzcat` | pending | 4 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 2651 | – | heavy |
 | `zcat` | lsb | 4 | – | – | – | implemented: `internal/builtins/gzip.go`; toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
