@@ -124,6 +124,10 @@ func startProcess(spec startSpec) (conn, proc, error) {
 	var si windows.StartupInfoEx
 	si.StartupInfo.Cb = uint32(unsafe.Sizeof(si))
 	si.ProcThreadAttributeList = attrs.List()
+	// With zero std handles the pseudoconsole supplies the child's stdio. Without
+	// this flag the child inherits the parent's redirected stdout/stdin (seen on
+	// windows-latest), so its output bypasses the pipe.
+	si.StartupInfo.Flags |= windows.STARTF_USESTDHANDLES
 	job, err := windows.CreateJobObject(nil, nil)
 	if err != nil {
 		return nil, nil, err
