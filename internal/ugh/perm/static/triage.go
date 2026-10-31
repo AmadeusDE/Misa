@@ -21,8 +21,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/AmadeusDE/Misa/internal/sh/syntax"
 	"github.com/AmadeusDE/Misa/internal/ugh/perm"
-	"mvdan.cc/sh/v3/syntax"
 )
 
 // Tier names, weakest first.

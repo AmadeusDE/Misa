@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"mvdan.cc/sh/v3/syntax"
+	"github.com/AmadeusDE/Misa/internal/sh/syntax"
 )
 
 // §4.4 rules live here: a structural walk over the parsed bash AST that

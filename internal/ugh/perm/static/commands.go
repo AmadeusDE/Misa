@@ -5,7 +5,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"mvdan.cc/sh/v3/syntax"
+	"github.com/AmadeusDE/Misa/internal/sh/syntax"
 )
 
 // SimpleCommands splits a bash command line into the argv of each command

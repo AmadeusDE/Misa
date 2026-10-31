@@ -14,7 +14,9 @@
       "revision": "e96ef1dae52c71e86cf87eb594cb4917fa49aaba",
       "license": "BSD-3-Clause",
       "status": "approved",
-      "notes": "Pinned research reference; per-file and fixture provenance must be reviewed before reuse. Research also separately inspected installed module v3.13.1; import revision not yet selected."
+      "notes": "Pinned research reference remains e96ef1da; S01 imports v3.13.1 to preserve existing parser behavior after both revisions passed targeted regressions. See docs/plans/mvdan-import.md.",
+      "import_revision": "2f3f5e36d9b0f8f14c998d50aa20a28832205ae8",
+      "source_map": "internal/sh/SOURCE.json"
     },
     {
       "name": "uutils/acl",
