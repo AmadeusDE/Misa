@@ -16,6 +16,19 @@ chess --list
 every computer-controlled side. All levels support every variant, including
 custom fairy pieces; no orthodox-specific rules or external engine are used.
 
+## Stalemate rules
+
+The bundled `stalematewins` variant (Stalemate-wins Chess) uses the
+"stalemate = win" rule studied with AlphaZero: a player who has no legal move
+and is not in check loses, so the player who delivered stalemate wins. See
+Tomašev, Paquet, Hassabis and Kramnik, [*Assessing Game Balance with AlphaZero:
+Exploring Alternative Rule Sets in Chess*](https://arxiv.org/abs/2009.04374)
+(2020).
+
+Custom variant YAML can set `stalemate` to `draw`, `win`, or `loss`. The default
+when the field is omitted is `draw` (orthodox chess); `win` means the side
+delivering stalemate wins, and `loss` means the side delivering it loses.
+
 | Level | Default time ceiling | Depth cap | Node cap | Root selection |
 | --- | ---: | ---: | ---: | --- |
 | beginner | 1 s | 1 | 4,000 | 35% chance of an alternative within 200 cp |
@@ -68,6 +81,10 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
   square they pass. Rules:
   [Wikipedia](https://en.wikipedia.org/wiki/Berolina_chess),
   [Chess Variants](https://www.chessvariants.com/dif-pawn.dir/berolina.html).
+
+- **Stalemate-wins Chess** (`chess stalematewins`): orthodox chess except that
+  the side delivering stalemate wins; see
+  [Stalemate rules](#stalemate-rules).
 - Double Chess (`double`): 16×12.
 - Betza's Big Board (`bigboard`): 16×16.
 - Double Big Board (`doublebig`): 32×16.

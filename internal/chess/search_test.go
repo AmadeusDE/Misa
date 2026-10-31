@@ -20,6 +20,38 @@ func think(t *testing.T, p *Position, depth int) Result {
 
 func moveName(p *Position, m Move) string { return describe(p, m) }
 
+func TestEngineValuesStalemateAsWin(t *testing.T) {
+	v := builtin(t, "stalematewins")
+	p := fen(t, v, "7k/5Q2/6K1/8/8/8/8/8 b -")
+	e := NewEngine(v)
+	e.begin(nil, Limits{Depth: 1})
+	if score := e.negamax(p, 1, 0, -infinity, infinity, true); score >= 0 || !IsMateScore(score) {
+		t.Fatalf("stalemated side score = %d, want a mated (lost) score for the side to move", score)
+	}
+}
+
+func TestEngineSeeksStalemateWin(t *testing.T) {
+	v := builtin(t, "stalematewins")
+	p := fen(t, v, "7k/5K2/8/6P1/8/8/8/8 w -")
+	r := think(t, p, 3)
+	after := p.Apply(r.Move)
+	if len(after.Moves()) != 0 || after.InCheck() {
+		t.Fatalf("engine played %+v, which does not stalemate", r.Move)
+	}
+	if !IsMateScore(r.Score) || r.Score <= 0 {
+		t.Fatalf("score %d is not a win", r.Score)
+	}
+}
+
+func TestEngineFindsMoveFromStart(t *testing.T) {
+	v := builtin(t, "stalematewins")
+	p := NewPosition(v)
+	r := think(t, p, 2)
+	if !slices.Contains(p.Moves(), r.Move) {
+		t.Fatalf("engine returned illegal move %+v", r.Move)
+	}
+}
+
 func TestEngineMatesInOne(t *testing.T) {
 	v := builtin(t, "chess")
 	p := fen(t, v, "6k1/5ppp/8/8/8/8/8/R5K1 w -")

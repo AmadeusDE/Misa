@@ -310,6 +310,12 @@ func (e *Engine) negamax(p *Position, depth, ply, alpha, beta int, allowNull boo
 		if inCheck {
 			return -mateScore + ply
 		}
+		switch e.v.Stalemate {
+		case StalemateWin: // the stalemated side to move has lost
+			return -mateScore + ply
+		case StalemateLoss:
+			return mateScore - ply
+		}
 		return 0
 	}
 	flag := ttExact

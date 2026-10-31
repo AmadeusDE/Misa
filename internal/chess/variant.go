@@ -18,7 +18,7 @@ import (
 //go:embed variants
 var builtinFS embed.FS
 
-var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml"}
+var builtinFiles = []string{"chess.yaml", "double.yaml", "bigboard.yaml", "doublebig.yaml", "amazon.yaml", "nocastling.yaml", "capablanca.yaml", "berolina.yaml", "stalematewins.yaml"}
 
 // PieceType is one kind of piece a variant uses. Type numbers in Piece index
 // Variant.Pieces from 1, so the zero Piece is an empty square.
@@ -48,6 +48,7 @@ type Variant struct {
 	Promotion             []uint8 // piece types a pawn may become
 	PromotionZone         int     // the last n ranks promote
 	MoveLimit             int     // moves by each side without a capture or pawn move before a draw
+	Stalemate             StalemateRule
 	Setup                 string
 	Source                string
 
@@ -72,21 +73,32 @@ type castleDef struct {
 	RookTo string `yaml:"rook_to"`
 }
 
+// StalemateRule is what happens to a side with no legal move that is not in
+// check, from the point of view of the side that delivered the stalemate.
+type StalemateRule string
+
+const (
+	StalemateDraw StalemateRule = "draw"
+	StalemateWin  StalemateRule = "win"  // the side delivering stalemate wins
+	StalemateLoss StalemateRule = "loss" // the side delivering stalemate loses
+)
+
 // variantDef is a variant file. With extends, unset fields come from the named
 // variant and pieces add to or replace (by letter) the parent's.
 type variantDef struct {
-	ID            string      `yaml:"id"`
-	Name          string      `yaml:"name"`
-	Description   string      `yaml:"description"`
-	Extends       string      `yaml:"extends"`
-	Files         int         `yaml:"files"`
-	Ranks         int         `yaml:"ranks"`
-	Pieces        []pieceDef  `yaml:"pieces"`
-	Setup         string      `yaml:"setup"`
-	Castling      []castleDef `yaml:"castling"`
-	Promotion     []string    `yaml:"promotion"`
-	PromotionZone int         `yaml:"promotion_zone"`
-	MoveLimit     int         `yaml:"move_limit"`
+	ID            string        `yaml:"id"`
+	Name          string        `yaml:"name"`
+	Description   string        `yaml:"description"`
+	Extends       string        `yaml:"extends"`
+	Files         int           `yaml:"files"`
+	Ranks         int           `yaml:"ranks"`
+	Pieces        []pieceDef    `yaml:"pieces"`
+	Setup         string        `yaml:"setup"`
+	Castling      []castleDef   `yaml:"castling"`
+	Promotion     []string      `yaml:"promotion"`
+	PromotionZone int           `yaml:"promotion_zone"`
+	MoveLimit     int           `yaml:"move_limit"`
+	Stalemate     StalemateRule `yaml:"stalemate"`
 
 	source string
 }
@@ -272,6 +284,9 @@ func merge(parent, child variantDef) variantDef {
 	if child.MoveLimit != 0 {
 		d.MoveLimit = child.MoveLimit
 	}
+	if child.Stalemate != "" {
+		d.Stalemate = child.Stalemate
+	}
 	d.Pieces = slices.Clone(parent.Pieces)
 	for _, p := range child.Pieces {
 		i := slices.IndexFunc(d.Pieces, func(q pieceDef) bool { return strings.EqualFold(q.Letter, p.Letter) })
@@ -288,7 +303,7 @@ func build(d variantDef) (*Variant, error) {
 	v := &Variant{
 		ID: d.ID, Name: d.Name, Description: d.Description,
 		Files: d.Files, Ranks: d.Ranks, Setup: d.Setup, Source: d.source,
-		PromotionZone: d.PromotionZone, MoveLimit: d.MoveLimit,
+		PromotionZone: d.PromotionZone, MoveLimit: d.MoveLimit, Stalemate: d.Stalemate,
 	}
 	if v.Name == "" {
 		v.Name = v.ID
@@ -298,6 +313,12 @@ func build(d variantDef) (*Variant, error) {
 	}
 	if v.MoveLimit == 0 {
 		v.MoveLimit = 50
+	}
+	if v.Stalemate == "" {
+		v.Stalemate = StalemateDraw
+	}
+	if v.Stalemate != StalemateDraw && v.Stalemate != StalemateWin && v.Stalemate != StalemateLoss {
+		return nil, fmt.Errorf("stalemate must be draw, win, or loss")
 	}
 	// Two-letter file labels end at zz (702); large boards also incur substantial
 	// reach-table, move generation, and search costs, so keep dimensions bounded.
