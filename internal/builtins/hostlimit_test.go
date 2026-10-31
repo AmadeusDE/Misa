@@ -7,7 +7,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 )
 
@@ -30,7 +29,7 @@ func skipWithoutHardlinks(t *testing.T) {
 func skipWithoutFifos(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
-	if err := syscall.Mkfifo(filepath.Join(dir, "p"), 0o600); err != nil {
+	if err := makeFifo(filepath.Join(dir, "p"), 0o600); err != nil {
 		t.Skipf("fifos are not permitted: %v", err)
 	}
 }

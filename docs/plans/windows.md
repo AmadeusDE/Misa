@@ -2,7 +2,7 @@
 
 Status: draft, now tracked by #108, whose task IDs (F01–R02) supersede the W/UW numbering below where they differ.
 The gui core/backend split (W2, shared with Android A2) has landed; the Win32 backend is not started. #108 F01
-(package selection and the jobleader boundary) and F02 (metadata boundary) are delivered, see "F01 delivered" and "F02 delivered". Part 1 is Misa (phases W0–W6); part 2 is ugh (phases UW0–UW4), which
+(package selection and the jobleader boundary), F02 (metadata boundary) and F03 (builtin filesystem portability) are delivered, see "F01 delivered", "F02 delivered" and "F03 delivered". Part 1 is Misa (phases W0–W6); part 2 is ugh (phases UW0–UW4), which
 Misa needs before its Windows build can include the agent. The measurements below are from 2026-10-13; code
 added since then (`internal/webui`'s file lock, `internal/ughbot`, `internal/ugh/confine`) needs the same
 treatment. ughbot is out of scope for the Windows port (it is not redefined as Linux-only: it also builds for the BSDs and macOS).
@@ -574,3 +574,47 @@ vet for `windows/amd64` and `windows/arm64`. Unix (Android included) output is u
   F03/F04 (`internal/builtins`: `Stat_t`, signals in `util.go`, `Umask`, `Mkfifo`, `Getpriority`, and so on
   across `arch`, `chown`, `cp`, `du`, `mkdir`, `mv`, `nice`, `proc`, `rm`, `split`, `stat`, `sysutil`,
   `touch`, `truncate`, `umask`, `util`).
+
+## F03 delivered (#108)
+
+Builtin filesystem portability. `GOOS=windows go build -gcflags=-e ./internal/builtins` now reports only the F04
+process and I/O files: the signal table and the `/proc` process list in `util.go`, `nice.go`, `proc.go` and the
+`uname` in `sysutil.go`. Unix (Android, BSD, macOS) behaviour is unchanged; the Unix code moved into `unix`-tagged
+files.
+
+- `fsmeta.go`: `fsMeta` (dev, inode, links, blocks, block size, owner, mode, atime/mtime/ctime) with the same
+  `lscore.Fields` `Missing` convention as F02. `readFSMeta` has a Unix provider (`Stat_t`, byte-identical output), a
+  Windows provider built on `lscore.StatPath` (so one reparse-point-aware file-ID reader serves both packages) and an
+  all-missing fallback. `stat` prints `?` for a missing field in `-c`/`--printf`, `-t` and the default view; `du`,
+  `cp -d/-a`, `mv`, `split`, `truncate` and `chown -RL` read identity through `inodeKeyOf`/`inodeOf`/`sameFileInfo`
+  and treat "no identity" as "not the same file".
+- Registration policy: every command stays registered on every platform; what a platform cannot do fails with exit 1
+  and the reason, never a silent success. `support_table.go` is the record (`windowsLimits`, an untagged file so the
+  tests check it against the registry on every platform); `platformLimits` is that table on Windows and empty
+  elsewhere. `Unsupported` entries refuse (`refuseUnsupported`), `Partial` ones describe narrower semantics.
+- `touch` (Windows): `SetFileTime` on a `FILE_WRITE_ATTRIBUTES` handle, `FILE_FLAG_OPEN_REPARSE_POINT` for `-h`,
+  100 ns precision, and both times are passed explicitly so `-a`/`-m` keep the other one. The Unix `utimensat` path
+  (including the `UTIME_NOW` fallback) is untouched. Known and not changed: on Unix `touch -a`/`-m` without a stamp
+  still passes `UTIME_NOW` for both times because `specifyTimes` is false.
+- `mkdir -p` has a descriptor-walk Unix implementation and a plain one for other systems; `rm` asks `canSearch` and
+  `canWrite` (`access(2)` on Unix, the read-only attribute on Windows); `arch` maps `GOARCH` to the `uname -m` name;
+  `umask_unix.go` keeps `currentUmask` and `umask_nounix.go` returns 0 (F04 owns the `umask` builtin).
+- `chmod` on Windows reports the effective mode afterwards (`chmodResult`), since Go only maps the owner write bit to the
+  read-only attribute. `chown` and `mkfifo` are registered and refuse; `stat -f` fails with its reason.
+
+Support on Windows (everything not listed behaves as on Unix):
+
+| Command | Option | Kind | Behaviour |
+| --- | --- | --- | --- |
+| `chown` | all | unsupported | exit 1: no numeric owner or group to change |
+| `mkfifo` | all | unsupported | exit 1: no FIFO nodes |
+| `stat` | `-f` | unsupported | exit 1: statfs fields unavailable |
+| `stat` | formats | partial | `%u %g %U %G %b %o %z %Z` print `?`; `%f` is built from the Go mode |
+| `chmod` | all | partial | owner write bit only (read-only attribute) |
+| `cp` | `--preserve=ownership`, FIFOs | partial | ownership ignored; FIFOs not recreated |
+| `mv` | FIFOs | partial | not recreated across devices |
+| `du` | all | partial | apparent sizes (no allocated blocks) |
+| `ln` | `-s` | partial | needs Developer Mode or the symlink privilege; the OS error is shown |
+| `mkdir` | `-m`, `-p` | partial | read-only attribute only; parents without a descriptor walk |
+| `rm` | `-i` | partial | write protection is the read-only attribute |
+| `touch` | all | partial | change time cannot be set; 100 ns precision otherwise |

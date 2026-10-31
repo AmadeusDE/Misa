@@ -117,6 +117,8 @@ internal/
     items.go                     menuItem and fileItem types
   builtins/                      Shell built-in commands (coreutils subset + top-commands)
     registry.go                  Command registry — Register/Lookup/Names
+    fsmeta*.go support*.go       File metadata (fsMeta, Missing fields print `?`) and the per-platform support record
+                                 (`windowsLimits`): unsupported operations fail with their reason, never silently
     args.go                      POSIX/GNU option parser with compact spec strings
     topcommands.go               History analytics — ranked command frequency across shells
     simple.go                    echo, true, false, yes, printenv

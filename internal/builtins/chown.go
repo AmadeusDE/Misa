@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 const chownSpec = "R(recursive)v(verbose)f(silent)h(no-dereference)(dereference)LHP"
@@ -31,6 +30,9 @@ func runChown(ctx *Context) int {
 	}
 	if HandleHelpVersion(ctx, flags, chownSpecParsed) {
 		return 0
+	}
+	if status, refused := refuseUnsupported(ctx, "chown"); refused {
+		return status
 	}
 	if len(flags.Operands) < 2 {
 		fmt.Fprintln(ctx.Stderr, "chown: missing operand")
@@ -125,7 +127,7 @@ func chownRecursiveL(ctx *Context, path, display string, uid, gid int, verbose, 
 		return
 	}
 
-	if st, ok := info.Sys().(*syscall.Stat_t); ok {
+	if st, ok := readFSMeta(path, info); ok {
 		key := fmt.Sprintf("%d:%d", st.Dev, st.Ino)
 		if visited[key] {
 			return

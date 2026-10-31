@@ -214,9 +214,8 @@ func runMv(ctx *Context) int {
 		seenSources[canon] = true
 
 		// Check for hard links (same inode from different paths)
-		stat := srcInfo.Sys().(*syscall.Stat_t)
-		inode := stat.Ino
-		if _, isDuplicate := seenInodes[inode]; isDuplicate {
+		inode, hasInode := inodeOf(srcPath, srcInfo)
+		if _, isDuplicate := seenInodes[inode]; hasInode && isDuplicate {
 			// Same inode seen before - this is a hard link, skip it
 			kind := "file"
 			if srcInfo.IsDir() {
@@ -225,7 +224,9 @@ func runMv(ctx *Context) int {
 			fmt.Fprintf(ctx.Stderr, "mv: warning: source %s '%s' specified more than once\n", kind, src)
 			continue
 		}
-		seenInodes[inode] = canon
+		if hasInode {
+			seenInodes[inode] = canon
+		}
 
 		target := dst
 		if dstIsDir {
@@ -383,7 +384,7 @@ func crossDeviceMove(src, dst string) error {
 	}
 	if info.Mode()&os.ModeNamedPipe != 0 {
 		os.Remove(dst)
-		if err := syscall.Mkfifo(dst, uint32(info.Mode().Perm())); err != nil {
+		if err := makeFifo(dst, uint32(info.Mode().Perm())); err != nil {
 			return err
 		}
 		return os.Remove(src)

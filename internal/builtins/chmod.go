@@ -169,6 +169,7 @@ func runChmod(ctx *Context) int {
 		if err := os.Chmod(path, newMode); err != nil {
 			return err
 		}
+		newMode = chmodResult(path, newMode)
 
 		newPerm := newMode.Perm()
 		newStr := fmtPermString(newMode)

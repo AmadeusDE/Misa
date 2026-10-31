@@ -8,7 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
+
+	"github.com/AmadeusDE/Misa/internal/lscore"
 )
 
 const duSpec = "s(summarize)h(human-readable)a(all)c(total)k(kilobytes)m(megabytes)b(bytes)d(max-depth)#L(dereference)H(dereference-args)D0(null)l(count-links)A(apparent-size)S(separate-dirs)x(one-file-system)B(block-size):(inodes)(exclude):(exclude-from):(si)t(threshold):P(no-dereference)(files0-from):v(verbose)"
@@ -254,8 +255,8 @@ func runDu(ctx *Context) int {
 
 		var startDev uint64
 		if st, serr := os.Lstat(path); serr == nil {
-			if sysStat, ok := st.Sys().(*syscall.Stat_t); ok {
-				startDev = uint64(sysStat.Dev)
+			if sysStat, ok := readFSMeta(path, st); ok {
+				startDev = sysStat.Dev
 			}
 		}
 
@@ -317,7 +318,7 @@ func duExcluded(patterns []string, path string) bool {
 	return false
 }
 
-func duEntryValue(info os.FileInfo, opts *duOptions) int64 {
+func duEntryValue(path string, info os.FileInfo, opts *duOptions) int64 {
 	if opts.inodes {
 		return 1
 	}
@@ -328,7 +329,7 @@ func duEntryValue(info os.FileInfo, opts *duOptions) int64 {
 		}
 		return info.Size()
 	}
-	if st, ok := info.Sys().(*syscall.Stat_t); ok {
+	if st, ok := readFSMeta(path, info); ok && !st.lacks(lscore.FieldBlocks) {
 		return st.Blocks * 512
 	}
 	return info.Size()
@@ -388,7 +389,7 @@ func duWalk(ctx *Context, absPath, displayPath string, depth int64, opts *duOpti
 	}
 
 	if depth > 0 && opts.oneFileSystem {
-		if st, ok := info.Sys().(*syscall.Stat_t); ok && uint64(st.Dev) != startDev {
+		if st, ok := readFSMeta(absPath, info); ok && st.Dev != startDev {
 			return 0, nil
 		}
 	}
@@ -397,7 +398,7 @@ func duWalk(ctx *Context, absPath, displayPath string, depth int64, opts *duOpti
 	}
 
 	if !opts.countLinks {
-		if st, ok := info.Sys().(*syscall.Stat_t); ok {
+		if st, ok := readFSMeta(absPath, info); ok && !st.lacks(lscore.FieldInode) {
 			if visited[st.Ino] {
 				return 0, nil
 			}
@@ -406,7 +407,7 @@ func duWalk(ctx *Context, absPath, displayPath string, depth int64, opts *duOpti
 	}
 
 	if !info.IsDir() {
-		value := duEntryValue(info, opts)
+		value := duEntryValue(absPath, info, opts)
 		if opts.all || depth == 0 {
 			duPrintValue(ctx, value, displayPath, opts)
 		}
@@ -421,7 +422,7 @@ func duWalk(ctx *Context, absPath, displayPath string, depth int64, opts *duOpti
 	entries, err := os.ReadDir(realPath)
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr, "du: cannot read directory '%s': %s\n", displayPath, fmtOsErr(err))
-		value := duEntryValue(info, opts)
+		value := duEntryValue(absPath, info, opts)
 		if opts.maxDepth < 0 || depth <= opts.maxDepth {
 			duPrintValue(ctx, value, displayPath, opts)
 		}
@@ -447,7 +448,7 @@ func duWalk(ctx *Context, absPath, displayPath string, depth int64, opts *duOpti
 		}
 
 		if opts.oneFileSystem {
-			if st, ok := childInfo.Sys().(*syscall.Stat_t); ok && uint64(st.Dev) != startDev {
+			if st, ok := readFSMeta(childAbs, childInfo); ok && st.Dev != startDev {
 				continue
 			}
 		}
@@ -464,14 +465,14 @@ func duWalk(ctx *Context, absPath, displayPath string, depth int64, opts *duOpti
 			}
 		} else {
 			if !opts.countLinks {
-				if st, ok := childInfo.Sys().(*syscall.Stat_t); ok {
+				if st, ok := readFSMeta(childAbs, childInfo); ok && !st.lacks(lscore.FieldInode) {
 					if visited[st.Ino] {
 						continue
 					}
 					visited[st.Ino] = true
 				}
 			}
-			value := duEntryValue(childInfo, opts)
+			value := duEntryValue(childAbs, childInfo, opts)
 			recursiveTotal += value
 			ownTotal += value
 			if opts.all && (opts.maxDepth < 0 || depth+1 <= opts.maxDepth) {
@@ -487,7 +488,7 @@ func duWalk(ctx *Context, absPath, displayPath string, depth int64, opts *duOpti
 		dirInfo, _ = os.Lstat(absPath)
 	}
 	if dirInfo != nil {
-		dirValue := duEntryValue(dirInfo, opts)
+		dirValue := duEntryValue(absPath, dirInfo, opts)
 		recursiveTotal += dirValue
 		ownTotal += dirValue
 	}

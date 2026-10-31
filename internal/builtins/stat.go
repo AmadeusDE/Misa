@@ -6,8 +6,9 @@ import (
 	"os/user"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
+
+	"github.com/AmadeusDE/Misa/internal/lscore"
 )
 
 const statSpec = "c(format):p:(printf):f(file-system)t(terse)L(dereference)"
@@ -51,13 +52,10 @@ func runStat(ctx *Context) int {
 		path := resolvePath(ctx, name)
 
 		if isFS {
-			var stfs syscall.Statfs_t
-			if err := syscall.Statfs(path, &stfs); err != nil {
+			if err := statFileSystem(ctx.Stdout, name, path); err != nil {
 				fmt.Fprintf(ctx.Stderr, "stat: cannot read file system information for '%s': %v\n", name, err)
 				exitCode = 1
-				continue
 			}
-			printFSInfo(ctx.Stdout, name, &stfs)
 			continue
 		}
 
@@ -73,7 +71,7 @@ func runStat(ctx *Context) int {
 			exitCode = 1
 			continue
 		}
-		st, ok := info.Sys().(*syscall.Stat_t)
+		st, ok := readFSMeta(path, info)
 		if !ok {
 			fmt.Fprintf(ctx.Stderr, "stat: cannot get system info for %s\n", name)
 			exitCode = 1
@@ -97,11 +95,11 @@ func runStat(ctx *Context) int {
 			}
 			fmt.Fprintln(ctx.Stdout, out)
 		} else if terse {
-			fmt.Fprintf(ctx.Stdout, "%s %d %d %x %d %d %d %d %d %d %d %d %d %d\n",
-				name, info.Size(), st.Blocks,
-				uint32(st.Mode), st.Nlink, st.Uid, st.Gid,
-				st.Dev, st.Ino, st.Blksize,
-				atim(st).Sec, mtim(st).Sec, ctim(st).Sec, 0)
+			fmt.Fprintf(ctx.Stdout, "%s %d %s %x %s %s %s %s %s %s %s %d %s %d\n",
+				name, info.Size(), statNum(st, lscore.FieldBlocks, st.Blocks),
+				st.Mode, statNum(st, lscore.FieldNlink, st.Nlink), statNum(st, lscore.FieldOwner, st.Uid), statNum(st, lscore.FieldGroup, st.Gid),
+				statNum(st, lscore.FieldDev, st.Dev), statNum(st, lscore.FieldInode, st.Ino), statNum(st, lscore.FieldBlocks, st.Blksize),
+				statSec(st, lscore.FieldAccessTime, atim(st)), mtim(st).Sec, statSec(st, lscore.FieldChangeTime, ctim(st)), 0)
 		} else {
 			statPrintDefault(ctx, name, info, st)
 		}
@@ -109,7 +107,7 @@ func runStat(ctx *Context) int {
 	return exitCode
 }
 
-func statFormat(format, name string, info os.FileInfo, st *syscall.Stat_t) (string, error) {
+func statFormat(format, name string, info os.FileInfo, st *fsMeta) (string, error) {
 	var out strings.Builder
 	i := 0
 	for i < len(format) {
@@ -180,15 +178,19 @@ func statFormat(format, name string, info os.FileInfo, st *syscall.Stat_t) (stri
 		case 's':
 			fmt.Fprintf(&out, "%d", info.Size())
 		case 'b':
-			fmt.Fprintf(&out, "%d", st.Blocks)
+			out.WriteString(statNum(st, lscore.FieldBlocks, st.Blocks))
 		case 'B':
 			fmt.Fprintf(&out, "%d", 512)
 		case 'd':
-			fmt.Fprintf(&out, "%d", st.Dev)
+			out.WriteString(statNum(st, lscore.FieldDev, st.Dev))
 		case 'D':
-			fmt.Fprintf(&out, "%x", st.Dev)
+			if st.lacks(lscore.FieldDev) {
+				out.WriteString(statUnavailable)
+			} else {
+				fmt.Fprintf(&out, "%x", st.Dev)
+			}
 		case 'f':
-			fmt.Fprintf(&out, "%x", uint32(st.Mode))
+			fmt.Fprintf(&out, "%x", st.Mode)
 		case 'a':
 			fmt.Fprintf(&out, "%o", info.Mode().Perm())
 		case 'A':
@@ -199,30 +201,38 @@ func statFormat(format, name string, info os.FileInfo, st *syscall.Stat_t) (stri
 			// mount point — approximate with "/"
 			out.WriteString("/")
 		case 'o':
-			fmt.Fprintf(&out, "%d", st.Blksize)
+			out.WriteString(statNum(st, lscore.FieldBlocks, st.Blksize))
 		case 'u':
-			fmt.Fprintf(&out, "%d", st.Uid)
+			out.WriteString(statNum(st, lscore.FieldOwner, st.Uid))
 		case 'g':
-			fmt.Fprintf(&out, "%d", st.Gid)
+			out.WriteString(statNum(st, lscore.FieldGroup, st.Gid))
 		case 'U':
-			if u, err := user.LookupId(strconv.Itoa(int(st.Uid))); err == nil {
+			if st.lacks(lscore.FieldOwner) {
+				out.WriteString(statUnavailable)
+			} else if u, err := user.LookupId(strconv.Itoa(int(st.Uid))); err == nil {
 				out.WriteString(u.Username)
 			} else {
 				fmt.Fprintf(&out, "%d", st.Uid)
 			}
 		case 'G':
-			if g, err := user.LookupGroupId(strconv.Itoa(int(st.Gid))); err == nil {
+			if st.lacks(lscore.FieldGroup) {
+				out.WriteString(statUnavailable)
+			} else if g, err := user.LookupGroupId(strconv.Itoa(int(st.Gid))); err == nil {
 				out.WriteString(g.Name)
 			} else {
 				fmt.Fprintf(&out, "%d", st.Gid)
 			}
 		case 'i':
-			fmt.Fprintf(&out, "%d", st.Ino)
+			out.WriteString(statNum(st, lscore.FieldInode, st.Ino))
 		case 'h':
-			fmt.Fprintf(&out, "%d", st.Nlink)
+			out.WriteString(statNum(st, lscore.FieldNlink, st.Nlink))
 		case 'x':
-			out.WriteString(formatStatTime(atim(st).Sec, atim(st).Nsec))
+			out.WriteString(statTimeText(st, lscore.FieldAccessTime, atim(st)))
 		case 'X':
+			if st.lacks(lscore.FieldAccessTime) {
+				out.WriteString(statUnavailable)
+				break
+			}
 			sec, nsec := atim(st).Sec, atim(st).Nsec
 			if prec > 0 {
 				fmt.Fprintf(&out, "%d.%0*d", sec, prec, nsec/1000000000)
@@ -245,8 +255,12 @@ func statFormat(format, name string, info os.FileInfo, st *syscall.Stat_t) (stri
 				fmt.Fprintf(&out, "%d", sec)
 			}
 		case 'z':
-			out.WriteString(formatStatTime(ctim(st).Sec, ctim(st).Nsec))
+			out.WriteString(statTimeText(st, lscore.FieldChangeTime, ctim(st)))
 		case 'Z':
+			if st.lacks(lscore.FieldChangeTime) {
+				out.WriteString(statUnavailable)
+				break
+			}
 			sec, nsec := ctim(st).Sec, ctim(st).Nsec
 			if prec > 0 {
 				nsStr := fmt.Sprintf("%09d", nsec)
@@ -298,18 +312,68 @@ func statFileType(info os.FileInfo) string {
 	return "unknown"
 }
 
-func statPrintDefault(ctx *Context, name string, info os.FileInfo, st *syscall.Stat_t) {
+func statPrintDefault(ctx *Context, name string, info os.FileInfo, st *fsMeta) {
 	fmt.Fprintf(ctx.Stdout, "  File: %s\n", name)
-	fmt.Fprintf(ctx.Stdout, "  Size: %-15d Blocks: %-10d IO Block: %-6d %s\n",
-		info.Size(), st.Blocks, st.Blksize, statFileType(info))
-	fmt.Fprintf(ctx.Stdout, "Device: %xh/%-10d Inode: %-11d Links: %d\n",
-		st.Dev, st.Dev, st.Ino, st.Nlink)
-	fmt.Fprintf(ctx.Stdout, "Access: (%04o/%s)  Uid: (%5d/ %s)   Gid: (%5d/ %s)\n",
+	fmt.Fprintf(ctx.Stdout, "  Size: %-15d Blocks: %-10s IO Block: %-6s %s\n",
+		info.Size(), statNum(st, lscore.FieldBlocks, st.Blocks), statNum(st, lscore.FieldBlocks, st.Blksize), statFileType(info))
+	dev := statUnavailable
+	if !st.lacks(lscore.FieldDev) {
+		dev = fmt.Sprintf("%x", st.Dev)
+	}
+	fmt.Fprintf(ctx.Stdout, "Device: %sh/%-10s Inode: %-11s Links: %s\n",
+		dev, statNum(st, lscore.FieldDev, st.Dev), statNum(st, lscore.FieldInode, st.Ino), statNum(st, lscore.FieldNlink, st.Nlink))
+	fmt.Fprintf(ctx.Stdout, "Access: (%04o/%s)  Uid: (%5s/ %s)   Gid: (%5s/ %s)\n",
 		info.Mode().Perm(), info.Mode().String(),
-		st.Uid, statLookupUser(st.Uid), st.Gid, statLookupGroup(st.Gid))
-	fmt.Fprintf(ctx.Stdout, "Access: %s\n", time.Unix(atim(st).Sec, atim(st).Nsec).Format("2006-01-02 15:04:05.000000000 -0700"))
-	fmt.Fprintf(ctx.Stdout, "Modify: %s\n", time.Unix(mtim(st).Sec, mtim(st).Nsec).Format("2006-01-02 15:04:05.000000000 -0700"))
-	fmt.Fprintf(ctx.Stdout, "Change: %s\n", time.Unix(ctim(st).Sec, ctim(st).Nsec).Format("2006-01-02 15:04:05.000000000 -0700"))
+		statNum(st, lscore.FieldOwner, st.Uid), statOwnerName(st, st.Uid), statNum(st, lscore.FieldGroup, st.Gid), statGroupName(st, st.Gid))
+	fmt.Fprintf(ctx.Stdout, "Access: %s\n", statTimeFull(st, lscore.FieldAccessTime, atim(st)))
+	fmt.Fprintf(ctx.Stdout, "Modify: %s\n", statTimeFull(st, 0, mtim(st)))
+	fmt.Fprintf(ctx.Stdout, "Change: %s\n", statTimeFull(st, lscore.FieldChangeTime, ctim(st)))
+}
+
+// statUnavailable is what stat prints for a field the platform cannot report,
+// the same "?" lscore uses.
+const statUnavailable = "?"
+
+func statNum[T ~int64 | ~uint64 | ~uint32](st *fsMeta, f lscore.Fields, v T) string {
+	if st.lacks(f) {
+		return statUnavailable
+	}
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func statSec(st *fsMeta, f lscore.Fields, t fsTimespec) string {
+	if st.lacks(f) {
+		return statUnavailable
+	}
+	return strconv.FormatInt(t.Sec, 10)
+}
+
+func statTimeText(st *fsMeta, f lscore.Fields, t fsTimespec) string {
+	if st.lacks(f) {
+		return statUnavailable
+	}
+	return formatStatTime(t.Sec, t.Nsec)
+}
+
+func statTimeFull(st *fsMeta, f lscore.Fields, t fsTimespec) string {
+	if st.lacks(f) {
+		return statUnavailable
+	}
+	return time.Unix(t.Sec, t.Nsec).Format("2006-01-02 15:04:05.000000000 -0700")
+}
+
+func statOwnerName(st *fsMeta, uid uint32) string {
+	if st.lacks(lscore.FieldOwner) {
+		return statUnavailable
+	}
+	return statLookupUser(uid)
+}
+
+func statGroupName(st *fsMeta, gid uint32) string {
+	if st.lacks(lscore.FieldGroup) {
+		return statUnavailable
+	}
+	return statLookupGroup(gid)
 }
 
 func statLookupUser(uid uint32) string {
