@@ -58,10 +58,14 @@ type Editor struct {
 	width              int
 	height             int
 
-	mode      Mode
-	cmdBuf    string
-	statusMsg string
-	confirm   *substituteConfirm
+	mode        Mode
+	cmdBuf      string
+	statusMsg   string
+	confirm     *substituteConfirm
+	shell       *shellJob
+	shellOutput *shellOutput
+	shellEnv    []string
+	shellNext   uint64
 
 	undoStack                             []undoEntry
 	redoStack                             []undoEntry
@@ -144,7 +148,7 @@ func runBuiltin(ctx *builtins.Context) int {
 	if len(ctx.Args) > 0 {
 		filename = ctx.Args[0]
 	}
-	if err := RunStandalone(filename, ctx.Dir); err != nil {
+	if err := runStandalone(filename, ctx.Dir, ctx.Env); err != nil {
 		fmt.Fprintln(ctx.Stderr, "vi:", err)
 		return 1
 	}
@@ -160,11 +164,21 @@ func (e *Editor) Resize(w, h int) {
 	e.ensureVisible()
 }
 
-func (e *Editor) Update(msg tea.Msg) tea.Cmd {
+func (e *Editor) Update(msg tea.Msg) (cmd tea.Cmd) {
 	defer e.finishEditEvent(e.row)
+	defer func() {
+		if shellCmd := e.takeShellCommand(); shellCmd != nil {
+			if cmd == nil {
+				cmd = shellCmd
+			} else {
+				cmd = tea.Batch(cmd, shellCmd)
+			}
+		}
+	}()
+	if e.handleShellEvent(msg) {
+		return nil
+	}
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		e.Resize(msg.Width, msg.Height)
 	case tea.KeyPressMsg:
 		e.statusMsg = ""
 		if e.visual != visualNone && e.mode == ModeNormal {
@@ -908,33 +922,4 @@ func (e *Editor) handleCommand(msg tea.KeyPressMsg) tea.Cmd {
 		}
 	}
 	return nil
-}
-
-// --- Standalone ---
-
-type standaloneModel struct {
-	editor *Editor
-}
-
-func (m *standaloneModel) Init() tea.Cmd { return nil }
-
-func (m *standaloneModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	cmd := m.editor.Update(msg)
-	if m.editor.Quit {
-		return m, tea.Quit
-	}
-	return m, cmd
-}
-
-func (m *standaloneModel) View() tea.View {
-	v := tea.NewView(m.editor.View())
-	v.AltScreen = true
-	return v
-}
-
-func RunStandalone(filename, dir string) error {
-	ed := New(filename, dir)
-	p := tea.NewProgram(&standaloneModel{editor: ed})
-	_, err := p.Run()
-	return err
 }

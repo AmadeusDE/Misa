@@ -20,7 +20,7 @@ func New(filename, dir string) *Editor {
 	if abs, err := filepath.Abs(dir); err == nil {
 		dir = abs
 	}
-	e := &Editor{dir: dir, lines: []string{""}, searchDir: 1, regs: make(map[byte]*regContent), marks: make(map[byte]pos), abbrevs: make(map[string]string), file: fileState{eol: true, newEmpty: true}}
+	e := &Editor{shellEnv: os.Environ(), dir: dir, lines: []string{""}, searchDir: 1, regs: make(map[byte]*regContent), marks: make(map[byte]pos), abbrevs: make(map[string]string), file: fileState{eol: true, newEmpty: true}}
 	if filename != "" {
 		if !filepath.IsAbs(filename) {
 			filename = filepath.Join(dir, filename)

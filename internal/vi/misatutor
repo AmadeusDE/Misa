@@ -356,6 +356,27 @@ ________________________________________________________________________________
 :%!sort         sort all lines
 :%!jq .         format JSON through jq
 :5,10!sort      sort only lines 5 through 10
+!!              open a filter prompt for this line (3!! for three lines)
+!motion         open a filter prompt for the lines covered by a motion
+
+Shell commands use sh -c in the editor's starting directory, not the open file's
+directory. They inherit the environment from when the editor opened. They run in
+the background while the editor keeps drawing; editing is paused until completion.
+Press Ctrl-C to cancel (on Unix this kills the shell's process group).
+
+:! and :w ! show multiline output. Use arrows or Page Up/Down to scroll, then
+Enter to return to editing. Stderr is shown too; a nonzero exit reports its status.
+Try :!ls to list the starting directory. :!rm FILE removes FILE there: only use
+this on a disposable practice file, since shell deletions cannot be undone.
+Commands must be available on your system; interactive terminal commands are not
+supported here. Output is collected in memory until the command finishes.
+
+Reads preserve blank lines. :0r file inserts before the first line; :3r !command
+inserts after line 3. Reading at the end preserves a missing final newline; reading
+in the middle needs a separator before the following line. Reads and filters use
+the buffer's line-ending format. A successful read or filter is one undo step.
+If a filter fails or is cancelled, its input stays unchanged even if it emitted
+some output. Shell edits preserve registers and do not replace your dot change.
 ________________________________________________________________________________
 
                                Abbreviations
@@ -433,7 +454,7 @@ buffer without writing. Relative paths are resolved from the editor directory.
 w excerpt to write the selected lines. A range write never marks the buffer
 saved, even if it includes every line. A partial write to the current file
 requires !. Use :w >> file to append; creating a missing append target requires
-:w! >> file. :w !command sends the lines to a shell command synchronously.
+:w! >> file. :w !command sends the lines to the asynchronous shell runner.
 A clean buffer stays clean even after a partial write or append changes its
 current file. Use a full :w if you want the file to match the buffer again.
 

@@ -216,7 +216,8 @@ func TestT02FullExplicitRangeStaysDirty(t *testing.T) {
 func TestT02ShellWriteRange(t *testing.T) {
 	e, p := f07Editor(t, "alpha\nbeta\ngamma\n")
 	out := filepath.Join(filepath.Dir(p), "shell-output")
-	f07Keys(t, e, ":2,3w !cat > "+out+"<CR>")
+	t03Shell(t)
+	t03Keys(t, e, ":2,3w !while IFS= read -r line; do printf '%s\\n' \"$line\"; done > "+out+"<CR>")
 	b, err := os.ReadFile(out)
 	if err != nil || string(b) != "beta\ngamma\n" || e.filename != p {
 		t.Errorf("shell output=%q err=%v filename=%q status=%q", b, err, e.filename, e.statusMsg)

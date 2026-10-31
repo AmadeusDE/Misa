@@ -65,9 +65,7 @@ func (e *Editor) fileCommand(rest string, from, to int, ranged bool) bool {
 		return true
 	}
 	if strings.HasPrefix(arg, "!") && !r.rename {
-		if e.writeShell(strings.TrimSpace(arg[1:]), from, to) && quit {
-			e.Quit = true
-		}
+		e.startShell(strings.TrimSpace(arg[1:]), []byte(e.rangeContent(from, to)), shellWrite, from, to, quit)
 		return true
 	}
 	if strings.HasPrefix(arg, ">>") && !r.rename {
