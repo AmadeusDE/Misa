@@ -9,6 +9,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// assignProcess is a variable so tests can force assignment failure.
+var assignProcess = windows.AssignProcessToJobObject
+
 func startProcess(spec startSpec) (conn, proc, error) {
 	if len(spec.Argv) == 0 {
 		return nil, nil, fmt.Errorf("empty command")
@@ -121,6 +124,10 @@ func startProcess(spec startSpec) (conn, proc, error) {
 	var si windows.StartupInfoEx
 	si.StartupInfo.Cb = uint32(unsafe.Sizeof(si))
 	si.ProcThreadAttributeList = attrs.List()
+	// With zero std handles the pseudoconsole supplies the child's stdio. Without
+	// this flag the child inherits the parent's redirected stdout/stdin (seen on
+	// windows-latest), so its output bypasses the pipe.
+	si.StartupInfo.Flags |= windows.STARTF_USESTDHANDLES
 	job, err := windows.CreateJobObject(nil, nil)
 	if err != nil {
 		return nil, nil, err
@@ -146,13 +153,13 @@ func startProcess(spec startSpec) (conn, proc, error) {
 		windows.WaitForSingleObject(pi.Process, windows.INFINITE)
 		windows.CloseHandle(pi.Process)
 	})
-	if err = windows.AssignProcessToJobObject(job, pi.Process); err != nil {
+	if err = assignProcess(job, pi.Process); err != nil {
 		return nil, nil, fmt.Errorf("assign process to job: %w", err)
 	}
 	if _, err = windows.ResumeThread(pi.Thread); err != nil {
 		return nil, nil, fmt.Errorf("resume process: %w", err)
 	}
-	c := &windowsConn{in: os.NewFile(uintptr(inputWrite), "conpty input"), out: os.NewFile(uintptr(outputRead), "conpty output"), console: hpc, job: job}
+	c := newWindowsConn(inputWrite, outputRead, hpc, job)
 	inputWrite, outputRead, hpc = 0, 0, 0
 	p := &windowsProc{id: int(pi.ProcessId), process: pi.Process, conn: c, status: make(chan int, 1)}
 	job = 0

@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -63,6 +65,10 @@ func TestNativeTransportHelper(t *testing.T) {
 	if mode == "" {
 		return
 	}
+	if mode == "nestedhost" {
+		nativeNestedHost(t)
+		return
+	}
 	if err := windows.SetConsoleOutputCP(65001); err != nil {
 		os.Exit(91)
 	}
@@ -98,6 +104,19 @@ func TestNativeTransportHelper(t *testing.T) {
 		nativeSize(&p)
 		nativeEmit(p)
 		os.Exit(0)
+	case "spawn", "orphan":
+		gc := exec.Command(os.Args[0], "-test.run=^TestNativeTransportHelper$")
+		gc.Env = append(os.Environ(), nativeHelperEnv+"=sleep")
+		if err := gc.Start(); err != nil {
+			os.Exit(95)
+		}
+		nativeEmit(nativePayload{Input: strconv.Itoa(gc.Process.Pid)})
+		if mode == "orphan" {
+			os.Exit(0)
+		}
+		time.Sleep(time.Hour)
+	case "sleep":
+		time.Sleep(time.Hour)
 	default:
 		os.Exit(94)
 	}

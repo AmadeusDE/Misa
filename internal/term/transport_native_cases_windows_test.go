@@ -95,7 +95,29 @@ func TestNativeTransportInputAndResize(t *testing.T) {
 	case <-time.After(nativeTimeout):
 		t.Fatal("input write timed out")
 	}
-	second := nativeWaitMessages(t, cap, 2)[1]
+	// A resize makes ConPTY repaint the screen, which can replay the first
+	// payload, so look for the one that carries the echoed input.
+	var second nativePayload
+	ended := false
+	for deadline := time.Now().Add(nativeTimeout); second.Input == ""; {
+		msgs := nativeWaitMessages(t, cap, 1)
+		for _, m := range msgs {
+			if m.Input != "" {
+				second = m
+			}
+		}
+		if second.Input == "" {
+			if ended || time.Now().After(deadline) {
+				t.Fatalf("no payload with input; got %+v", msgs)
+			}
+			select {
+			case <-cap.notify:
+			case <-cap.done:
+				ended = true
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+	}
 	if second.Error != "" || second.Rows != 31 || second.Cols != 97 || second.Input != "hello from parent" {
 		t.Errorf("input/size: %+v", second)
 	}

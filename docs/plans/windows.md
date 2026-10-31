@@ -148,7 +148,9 @@ Goal: `GOOS=windows go build -tags nough .` and `go vet` pass, and the Linux/Ope
 
 Superseded by #108 P01–P04; see the delivered sections below for the actual interface and P02 scope.
 P01 provides the transport boundary; P02 implements native launch/read/write/resize and suspended job
-assignment. P03 owns bounded teardown, complete drain and descendant/nested-job proof. P04 owns the
+assignment. P03 delivers bounded teardown (winpipe close cancels blocked I/O; HPCON closes while output
+is drained; the job kills descendants) with native tests for descendants, nested-job hosts, full buffers
+and handle counts. P04 owns the
 protocol-fidelity probe before full Misa nesting is enabled. Tests use the native Go test executable,
 not `cmd`/`ping` scripts. `StartFunc` remains unsupported on Windows; use multicall.
 
