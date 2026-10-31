@@ -17,6 +17,10 @@ import (
 // pins the clock and the account lookups so output is deterministic.
 func installPSFixture(t *testing.T) {
 	t.Helper()
+	if _, err := os.Stat("../proc/testdata/proc"); err != nil {
+		// Device test runs (android-device.sh) stage only this package.
+		t.Skipf("proc fixture tree unavailable: %v", err)
+	}
 	oldRoot, oldNow, oldTTY := psProcRoot, psNow, psOwnTTY
 	oldUser, oldPage := psLookupUser, psPageSize
 	psProcRoot = "../proc/testdata/proc"
