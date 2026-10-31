@@ -225,3 +225,69 @@ func TestXiangqiSoldierRemainsSoldier(t *testing.T) {
 		})
 	}
 }
+
+// This behaviour is pinned on purpose: under AXF/WXF rules the side that gives
+// perpetual check (or a perpetual chase) loses, but the engine adjudicates such
+// repetition as an ordinary draw by repetition. If adjudication is ever
+// implemented, this test must be changed deliberately rather than by accident.
+func TestXiangqiPerpetualCheckIsDrawForNow(t *testing.T) {
+	v := builtin(t, "xiangqi")
+	// White's chariot shuttles between d1 and e1, checking the black general on
+	// whichever file it stands on; the general steps between e10 and d10 to
+	// escape. Both files are open, no other piece interferes, and the generals
+	// never face each other, so the position repeats forever.
+	m := NewMatch(v)
+	m.Load(xqPosition(t, v, "w", map[string]byte{"d1": 'R', "f1": 'K', "e10": 'k'}))
+
+	// play makes the one legal move between two squares.
+	play := func(from, to string) {
+		t.Helper()
+		f, _ := v.ParseSquare(from)
+		d, _ := v.ParseSquare(to)
+		var found []Move
+		for _, mv := range m.Legal() {
+			if mv.From == f && mv.To == d {
+				found = append(found, mv)
+			}
+		}
+		if len(found) != 1 {
+			t.Fatalf("%s-%s: %d matching legal moves in %v", from, to, len(found), m.Notation())
+		}
+		m.Play(found[0])
+	}
+
+	// step plays a move unless the match is already over; with check true the
+	// move must leave the black general in check.
+	checks := 0
+	step := func(from, to string, check bool) bool {
+		if m.Over() {
+			return false
+		}
+		play(from, to)
+		if check {
+			checks++
+			if !m.Position().InCheck() {
+				t.Fatalf("%s-%s does not give check", from, to)
+			}
+		}
+		return true
+	}
+
+	for cycle := 0; cycle < 5; cycle++ {
+		if !step("d1", "e1", true) || !step("e10", "d10", false) ||
+			!step("e1", "d1", true) || !step("d10", "e10", false) {
+			break
+		}
+	}
+
+	status, _ := m.Status()
+	if status != DrawRepetition {
+		t.Fatalf("status = %v, want %v: perpetual check is only a draw for now", status, DrawRepetition)
+	}
+	if m.Decisive() {
+		t.Error("a repetition draw must not be decisive")
+	}
+	if checks < 4 {
+		t.Errorf("played %d checking moves, want at least 4", checks)
+	}
+}

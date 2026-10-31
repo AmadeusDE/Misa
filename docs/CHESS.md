@@ -230,6 +230,16 @@ retains its normal move-limit draw (50 moves per side without a capture or pawn
 move) and draw when only royal pieces remain. See [Wikipedia: Xiangqi](https://en.wikipedia.org/wiki/Xiangqi)
 and [The Chess Variant Pages: Xiangqi](https://www.chessvariants.com/xiangqi.html).
 
+**Xiangqi known gaps (follow-up):** under AXF/WXF rules the side that gives
+perpetual check, or perpetual chase, loses the game (the exact rules differ
+between rulesets and versions). Misa has no such adjudication, so such a
+repetition is scored as an ordinary draw by repetition, like any other. The
+engine can therefore repeat a position it ought to avoid, and it can treat a
+repeating attack as a safe draw rather than a lost game. The current behaviour
+is pinned by `TestXiangqiPerpetualCheckIsDrawForNow` in
+`internal/chess/xiangqi_test.go`, so implementing adjudication has to be a
+deliberate change that updates that test.
+
 The variant assigns material values R=900, C=450, N=400, B=200, A=200 and
 P=100; crossing the river does not add a soldier value bonus.
 
