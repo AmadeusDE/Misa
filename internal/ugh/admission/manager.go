@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -36,6 +37,7 @@ func sanitizeAccountKey(accountID string) (key string, isFallback bool) {
 // Manager coordinates cross-process request admission.
 type Manager struct {
 	baseDir string
+	baseErr error // why no private base directory exists; every operation fails with it
 }
 
 // Option configures Manager.
@@ -44,30 +46,43 @@ type Option func(*Manager)
 // WithBaseDir sets a custom storage root directory.
 func WithBaseDir(dir string) Option {
 	return func(m *Manager) {
-		m.baseDir = dir
+		m.baseDir, m.baseErr = dir, nil
 	}
 }
 
 // DefaultBaseDir determines the default runtime admission directory.
 // It ensures that differing XDG_RUNTIME_DIR or TMPDIR does not split the quota pool
-// across processes for the same UID on the machine.
+// across processes for the same UID on the machine. It is empty when no private
+// directory could be established.
 func DefaultBaseDir() string {
+	dir, _ := defaultBaseDir()
+	return dir
+}
+
+func defaultBaseDir() (string, error) {
 	if env := os.Getenv("UGH_ADMISSION_DIR"); env != "" && filepath.IsAbs(env) {
-		return env
+		return env, nil
 	}
-	uid := os.Getuid()
-	runUser := fmt.Sprintf("/run/user/%d", uid)
+	user := privdir.UserTag()
+	runUser := "/run/user/" + user
 	if fi, err := os.Stat(runUser); err == nil && fi.IsDir() {
-		return filepath.Join(runUser, "ugh", "admission")
+		return filepath.Join(runUser, "ugh", "admission"), nil
 	}
-	return filepath.Join(privdir.Under("/tmp", fmt.Sprintf("ugh-%d", uid)), "ugh", "admission")
+	shared := "/tmp"
+	if runtime.GOOS == "windows" {
+		shared = os.TempDir()
+	}
+	dir, err := privdir.Under(shared, "ugh-"+user)
+	if err != nil {
+		return "", fmt.Errorf("%w: no private directory: %v", ErrStorageUnavailable, err)
+	}
+	return filepath.Join(dir, "ugh", "admission"), nil
 }
 
 // NewManager creates a new admission Manager.
 func NewManager(opts ...Option) *Manager {
-	m := &Manager{
-		baseDir: DefaultBaseDir(),
-	}
+	m := &Manager{}
+	m.baseDir, m.baseErr = defaultBaseDir()
 	for _, opt := range opts {
 		opt(m)
 	}
@@ -88,6 +103,9 @@ func DefaultManager() *Manager {
 }
 
 func (m *Manager) accountDir(accountID string) (dir string, isFallback bool, err error) {
+	if m.baseErr != nil {
+		return "", false, m.baseErr
+	}
 	key, isFallback := sanitizeAccountKey(accountID)
 	dir = filepath.Join(m.baseDir, "accounts", key)
 	if err := os.MkdirAll(dir, 0700); err != nil {

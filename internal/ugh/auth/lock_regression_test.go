@@ -142,7 +142,11 @@ func TestRefreshAcrossProcesses(t *testing.T) {
 func TestRefreshLockRejectsSymlink(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_RUNTIME_DIR", dir)
-	lock := filepath.Join(RuntimeDir(), "auth.lock")
+	runtime, err := RuntimeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock := filepath.Join(runtime, "auth.lock")
 	target := filepath.Join(dir, "target")
 	if err := os.WriteFile(target, []byte("safe"), 0600); err != nil {
 		t.Fatal(err)

@@ -91,7 +91,11 @@ func loginBackground(device bool) error {
 	if device {
 		args = append(args, "--device")
 	}
-	logPath := filepath.Join(auth.RuntimeDir(), "codex-login.log")
+	runtimeDir, err := auth.RuntimeDir()
+	if err != nil {
+		return err
+	}
+	logPath := filepath.Join(runtimeDir, "codex-login.log")
 	logf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return err

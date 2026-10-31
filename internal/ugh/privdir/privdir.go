@@ -1,50 +1,34 @@
 // Package privdir creates per-user directories in shared places (the temp
-// directory) and refuses ones another user could control.
+// directory) and refuses ones another user could control. On Unix a private
+// directory is mode 0700 and owned by the user; on Windows it is created with
+// a protected DACL that grants only the user's SID, and validated by handle
+// (owner, ACEs, no reparse point).
 package privdir
 
 import (
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 )
 
-// Ensure makes dir with mode 0700 unless it exists, then checks that it is a
-// real directory (not a symlink), owned by this user and closed to others.
-func Ensure(dir string) error {
-	if err := os.Mkdir(dir, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
-		return err
-	}
-	fi, err := os.Lstat(dir)
-	if err != nil {
-		return err
-	}
-	if !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("%s: not a directory", dir)
-	}
-	if fi.Mode().Perm()&0o077 != 0 {
-		return fmt.Errorf("%s: open to other users (mode %o)", dir, fi.Mode().Perm())
-	}
-	if !ownedByMe(fi) {
-		return fmt.Errorf("%s: owned by another user", dir)
-	}
-	return nil
-}
-
 // Under is base/name when that is safe, else a private directory under the
 // user's cache directory, so a directory another user planted in a shared
-// base is never used.
-func Under(base, name string) string {
+// base is never used. It returns an error, never an unvalidated path, when
+// neither location can be made private.
+func Under(base, name string) (string, error) {
 	dir := filepath.Join(base, name)
 	if Ensure(dir) == nil {
-		return dir
+		return dir, nil
 	}
 	cache, err := os.UserCacheDir()
 	if err != nil {
 		cache = filepath.Join(os.TempDir(), name+"-fallback")
 	}
 	dir = filepath.Join(cache, name)
-	_ = os.MkdirAll(filepath.Dir(dir), 0o700)
-	_ = Ensure(dir)
-	return dir
+	if err := os.MkdirAll(filepath.Dir(dir), 0o700); err != nil {
+		return "", err
+	}
+	if err := Ensure(dir); err != nil {
+		return "", err
+	}
+	return dir, nil
 }
