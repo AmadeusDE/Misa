@@ -60,6 +60,7 @@ ugh lives in this repo: `internal/ugh/*` (agent, tools, llm, perm, session, …;
 and `cmd/ugh`. Three binaries: `go build -o misa .`, `go build -o ugh ./cmd/ugh`, `go build -o ughbot ./cmd/ughbot`.
 ugh's user documentation is `docs/UGH.md`; ughbot's is `docs/ughbot/`.
 Tests must pass with no user configuration: don't depend on `~/.config`, the XDG variables or a global git config.
+Upstream adapters use `tests/testaccount`; see `docs/plans/upstream-test-accounting.md` for F07 reporting, fixture provenance and safety rules.
 Dependency direction (enforced by `internal/ugh/deps_test.go`): Misa libraries <- `internal/ugh/*` <- `internal/ughbot/*`.
 
 ## Architecture

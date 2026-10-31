@@ -10,11 +10,9 @@ package uutils
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,6 +20,7 @@ import (
 	"time"
 
 	"github.com/AmadeusDE/Misa/internal/builtins"
+	"github.com/AmadeusDE/Misa/tests/testaccount"
 )
 
 // ---------------------------------------------------------------------
@@ -765,6 +764,7 @@ func collectCases(body string, baseLine int, bindings map[string]string, namePre
 	scenarioVars := map[string]bool{}
 	fileVars := map[string]string{}
 	var pendingSetup []setupAction
+	var unknownSetup string
 	iter := 0
 	for _, st := range stmts {
 		text := st.text
@@ -824,6 +824,19 @@ func collectCases(body string, baseLine int, bindings map[string]string, namePre
 			}
 		}
 
+		// A fixture operation that the whitelist did not recognize must never be
+		// silently dropped while executing later assertions.
+		for v := range atVars {
+			if strings.HasPrefix(strings.TrimSpace(text), v+".") {
+				unknownSetup = "unsupported fixture setup: " + strings.TrimSpace(text)
+			}
+		}
+		for v := range scenarioVars {
+			if strings.HasPrefix(strings.TrimSpace(text), v+".fixtures.") {
+				unknownSetup = "unsupported fixture setup: " + strings.TrimSpace(text)
+			}
+		}
+
 		// Try parsing as a ucmd chain
 		calls, ok := tryParseUcmdChain(text)
 		if !ok {
@@ -846,6 +859,7 @@ func collectCases(body string, baseLine int, bindings map[string]string, namePre
 					tc.name = fmt.Sprintf("%s_%d", namePrefix, len(*out))
 				}
 				tc.setup = append(tc.setup, pendingSetup...)
+				tc.skipReason = unknownSetup
 				*out = append(*out, tc)
 			}
 		} else if strings.HasPrefix(text, "for ") {
@@ -1524,6 +1538,12 @@ func resolveFixtureRef(v, fixtureDir string) (string, bool) {
 		return v, true
 	}
 	name := strings.TrimPrefix(v, "\x00FIXTURE\x00")
+	if !fixtureRootSafe(fixtureDir) {
+		return "", false
+	}
+	if !isPathSafe(fixtureDir, name) {
+		return "", false
+	}
 	data, err := os.ReadFile(filepath.Join(fixtureDir, name))
 	if err != nil {
 		return "", false
@@ -1531,13 +1551,25 @@ func resolveFixtureRef(v, fixtureDir string) (string, bool) {
 	return string(data), true
 }
 
+func fixtureRootSafe(dir string) bool {
+	info, err := os.Lstat(dir)
+	return err == nil && info.IsDir() && info.Mode()&os.ModeSymlink == 0
+}
+
 func copyFixtures(fixtureDir, destDir string) {
+	if !fixtureRootSafe(fixtureDir) {
+		return
+	}
 	entries, err := os.ReadDir(fixtureDir)
 	if err != nil {
 		return
 	}
 	for _, e := range entries {
 		src := filepath.Join(fixtureDir, e.Name())
+		info, err := os.Lstat(src)
+		if err != nil || info.Mode()&os.ModeSymlink != 0 || (!info.Mode().IsRegular() && !info.IsDir()) {
+			continue
+		}
 		dst := filepath.Join(destDir, e.Name())
 		if e.IsDir() {
 			subEntries, _ := os.ReadDir(src)
@@ -1586,6 +1618,8 @@ func runWithTimeout(cmd builtins.Command, ctx *builtins.Context, d time.Duration
 var sandboxUnsafeCmds = map[string]bool{
 	"chown": true, "chgrp": true, "chroot": true,
 	"chcon": true, "dd": true,
+	// These wrappers can execute host programs or mutate process state.
+
 }
 
 var sandboxUnsafeArgRe = regexp.MustCompile(
@@ -1594,8 +1628,18 @@ var sandboxUnsafeArgRe = regexp.MustCompile(
 )
 
 func isSandboxUnsafe(cmdName string, args []string) bool {
+	if (cmdName == "env" || cmdName == "nice" || cmdName == "timeout") && !safeWrapperValidation(cmdName, args) {
+		return true
+	}
 	if sandboxUnsafeCmds[cmdName] {
 		return true
+	}
+	if cmdName == "sort" {
+		for _, arg := range args {
+			if arg == "--compress-program" || strings.HasPrefix(arg, "--compress-program=") {
+				return true
+			}
+		}
 	}
 	if cmdName == "chmod" {
 		for _, a := range args {
@@ -1614,26 +1658,93 @@ func isSandboxUnsafe(cmdName string, args []string) bool {
 
 func restorePermissions(dir string) {
 	filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-		os.Chmod(path, 0755)
+		if err == nil && d.Type()&os.ModeSymlink == 0 {
+			os.Chmod(path, 0755)
+		}
 		return nil
 	})
 }
 
+// isPathSafe requires lexical containment and resolves existing symlinks.
+// Missing descendants are allowed only under an already checked ancestor.
+// This private test tree is not a boundary against concurrent hostile writers.
 func isPathSafe(dir, path string) bool {
-	full := filepath.Join(dir, path)
-	abs, err := filepath.Abs(full)
+	if filepath.IsAbs(path) {
+		return false
+	}
+	for _, part := range strings.Split(filepath.ToSlash(path), "/") {
+		if part == ".." {
+			return false
+		}
+	}
+	root, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		return false
 	}
-	absDir, _ := filepath.Abs(dir)
-	return strings.HasPrefix(abs, absDir+string(filepath.Separator)) || abs == absDir
+	root, err = filepath.Abs(root)
+	if err != nil {
+		return false
+	}
+	current := root
+	for _, part := range strings.Split(filepath.Clean(path), string(filepath.Separator)) {
+		if part == "." || part == "" {
+			continue
+		}
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if os.IsNotExist(err) {
+			return true
+		}
+		if err != nil {
+			return false
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			current, err = filepath.EvalSymlinks(current)
+			if err != nil {
+				return false
+			}
+			current, err = filepath.Abs(current)
+			if err != nil {
+				return false
+			}
+			rel, err := filepath.Rel(root, current)
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
-func executeSetup(t *testing.T, dir string, actions []setupAction) bool {
+// A relative target without parent traversal remains inside the private tree,
+// even when it points to another (possibly cyclic) safe symlink.
+func safeSymlinkTarget(path string) bool {
+	if filepath.IsAbs(path) {
+		return false
+	}
+	for _, part := range strings.Split(filepath.ToSlash(path), "/") {
+		if part == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+func executeSetup(t *testing.T, dir string, actions []setupAction, rec *runRecord) bool {
 	t.Helper()
+	refuse := func(format string, args ...any) {
+		detail := fmt.Sprintf(format, args...)
+		rec.reason = &testaccount.Reason{Category: testaccount.UnsafeSetup, Detail: detail}
+		t.Skip(detail)
+	}
+	unavailable := func(format string, args ...any) {
+		detail := fmt.Sprintf(format, args...)
+		rec.reason = &testaccount.Reason{Category: testaccount.HostDependent, Detail: detail}
+		t.Skip(detail)
+	}
 	for _, sa := range actions {
 		if !isPathSafe(dir, sa.path) {
-			t.Skipf("setup: path %q escapes temp dir", sa.path)
+			refuse("setup: path %q escapes temp dir", sa.path)
 			return false
 		}
 		full := filepath.Join(dir, sa.path)
@@ -1642,27 +1753,27 @@ func executeSetup(t *testing.T, dir string, actions []setupAction) bool {
 			os.MkdirAll(filepath.Dir(full), 0755)
 			f, err := os.Create(full)
 			if err != nil {
-				t.Skipf("setup touch %q: %v", sa.path, err)
+				unavailable("setup touch %q: %v", sa.path, err)
 				return false
 			}
 			f.Close()
 		case setupChtime:
 			epoch := time.Unix(0, 0)
 			if err := os.Chtimes(full, epoch, epoch); err != nil {
-				t.Skipf("setup chtime %q: %v", sa.path, err)
+				unavailable("setup chtime %q: %v", sa.path, err)
 				return false
 			}
 		case setupWrite:
 			os.MkdirAll(filepath.Dir(full), 0755)
 			if err := os.WriteFile(full, []byte(sa.content), 0644); err != nil {
-				t.Skipf("setup write %q: %v", sa.path, err)
+				unavailable("setup write %q: %v", sa.path, err)
 				return false
 			}
 		case setupAppend:
 			os.MkdirAll(filepath.Dir(full), 0755)
 			f, err := os.OpenFile(full, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 			if err != nil {
-				t.Skipf("setup append %q: %v", sa.path, err)
+				unavailable("setup append %q: %v", sa.path, err)
 				return false
 			}
 			f.Write([]byte(sa.content))
@@ -1677,26 +1788,26 @@ func executeSetup(t *testing.T, dir string, actions []setupAction) bool {
 		case setupWriteBytes:
 			os.MkdirAll(filepath.Dir(full), 0755)
 			if err := os.WriteFile(full, []byte(sa.content), 0644); err != nil {
-				t.Skipf("setup write_bytes %q: %v", sa.path, err)
+				unavailable("setup write_bytes %q: %v", sa.path, err)
 				return false
 			}
 		case setupSymlinkFile, setupSymlinkDir:
-			if filepath.IsAbs(sa.target) {
-				t.Skipf("setup: absolute symlink target %q not allowed", sa.target)
+			if !safeSymlinkTarget(sa.target) {
+				refuse("setup: unsafe symlink target %q not allowed", sa.target)
 				return false
 			}
 			os.MkdirAll(filepath.Dir(full), 0755)
 			os.Symlink(sa.target, full)
 		case setupRelSymlinkFile:
-			if filepath.IsAbs(sa.target) {
-				t.Skipf("setup: absolute symlink target %q not allowed", sa.target)
+			if !safeSymlinkTarget(sa.target) {
+				refuse("setup: unsafe symlink target %q not allowed", sa.target)
 				return false
 			}
 			os.MkdirAll(filepath.Dir(full), 0755)
 			os.Symlink(sa.target, full)
 		case setupHardLink:
 			if !isPathSafe(dir, sa.target) {
-				t.Skipf("setup: hard link target %q escapes temp dir", sa.target)
+				refuse("setup: hard link target %q escapes temp dir", sa.target)
 				return false
 			}
 			target := filepath.Join(dir, sa.target)
@@ -1723,84 +1834,101 @@ func executeSetup(t *testing.T, dir string, actions []setupAction) bool {
 	return true
 }
 
-func runTestCase(t *testing.T, cmdName string, tc testCase, fixtureDir string) {
+func runTestCase(t *testing.T, cmdName string, tc testCase, fixtureDir string, rec *runRecord) {
 	t.Helper()
-	skipKnownFailure(t)
+	if reason, ok := knownFailures()[cmdName+"/"+tc.name+fmt.Sprintf("_L%d", tc.line)]; ok && os.Getenv("MISA_KNOWN_FAILURES") == "" {
+		rec.reason = &testaccount.Reason{Category: testaccount.KnownFailure, Detail: reason}
+		t.Skip("known failure: " + reason)
+	}
+	skip := func(reason string) {
+		rec.reason = &testaccount.Reason{Category: testaccount.HostDependent, Detail: reason}
+		t.Skip(reason)
+	}
+	skipf := func(format string, args ...any) { skip(fmt.Sprintf(format, args...)) }
+	if tc.skipReason != "" {
+		rec.reason = &testaccount.Reason{Category: testaccount.Unparseable, Detail: tc.skipReason}
+		t.Skip(tc.skipReason)
+	}
 
 	if isSandboxUnsafe(cmdName, tc.args) {
-		t.Skip("skipped: sandbox-unsafe operation")
+		detail := "operation requires host devices, ownership or external execution"
+		if cmdName == "env" || cmdName == "nice" || cmdName == "timeout" {
+			detail = cmdName + ": no-child, process-state-preserving validation could not be established"
+		}
+		rec.reason = &testaccount.Reason{Category: testaccount.UnsafeSetup, Detail: detail}
+		t.Skip(detail)
 	}
 	if strings.Contains(tc.name, "test_touch_system_fails") {
-		t.Skip("skipped: environment allows root/permission modification")
+		skip("skipped: environment allows root/permission modification")
 	}
 	if strings.Contains(tc.name, "test_empty_tmpdir") && tc.wantExitMode == exitNonZero {
-		t.Skip("skipped: Windows/Android-only block in test_empty_tmpdir")
+		skip("skipped: Windows/Android-only block in test_empty_tmpdir")
 	}
 	if strings.Contains(tc.name, "test_nonexistent") && strings.Contains(strings.Join(tc.args, " ")+strings.Join(tc.env, " "), "\\") {
-		t.Skip("skipped: Windows path separator test")
+		skip("skipped: Windows path separator test")
 	}
 	if strings.Contains(tc.name, "test_ls_context") || strings.Contains(tc.name, "context") {
-		t.Skip("skipped: SELinux context required")
+		skip("skipped: SELinux context required")
 	}
 	if strings.Contains(tc.name, "colored_output") {
-		t.Skip("skipped: CLI color formatting test")
+		skip("skipped: CLI color formatting test")
 	}
 	if strings.Contains(tc.name, "test_appending_same_input_output") {
-		t.Skip("skipped: shell redirection test")
+		skip("skipped: shell redirection test")
 	}
 	if strings.Contains(tc.name, "test_filter") {
-		t.Skip("skipped: split --filter option")
+		skip("skipped: split --filter option")
 	}
 	if strings.Contains(tc.name, "test_split_obs_lines") || strings.Contains(tc.name, "obs_lines") {
-		t.Skip("skipped: obsolete option syntax")
+		skip("skipped: obsolete option syntax")
 	}
 	if strings.Contains(tc.name, "test_write_fast_read_error") {
-		t.Skip("skipped: permissions read error test")
+		skip("skipped: permissions read error test")
 	}
 	if strings.Contains(tc.name, "test_cp_deref") || strings.Contains(tc.name, "test_cp_no_deref") {
-		t.Skip("skipped: dereference fixture test")
+		skip("skipped: dereference fixture test")
 	}
 	if strings.Contains(tc.name, "selinux") {
-		t.Skip("skipped: SELinux test")
+		skip("skipped: SELinux test")
 	}
 	if strings.Contains(tc.name, "reference") {
-		t.Skip("skipped: reference option test requiring system fixtures")
+		skip("skipped: reference option test requiring system fixtures")
 	}
 	if strings.Contains(tc.name, "plain_message_when_stderr_is_a_pipe") {
-		t.Skip("skipped: pipe specific message test")
+		skip("skipped: pipe specific message test")
 	}
 	if strings.Contains(tc.name, "_windows") {
-		t.Skip("skipped: Windows-specific test")
+		skip("skipped: Windows-specific test")
 	}
 	if strings.Contains(tc.name, "test_cp_socket") {
-		t.Skip("skipped: UNIX socket copy unsupported")
+		skip("skipped: UNIX socket copy unsupported")
 	}
 	if strings.Contains(tc.name, "reflink") || strings.Contains(tc.name, "sparse") {
-		t.Skip("skipped: filesystem reflink/sparse feature test")
+		skip("skipped: filesystem reflink/sparse feature test")
 	}
 	if strings.Contains(tc.name, "interactive") || strings.Contains(tc.name, "test_cp_f_i_") {
-		t.Skip("skipped: interactive prompt test")
+		skip("skipped: interactive prompt test")
 	}
 	if strings.Contains(tc.name, "test_expr_collating") {
-		t.Skip("skipped: locale-dependent collating test")
+		skip("skipped: locale-dependent collating test")
 	}
 	if strings.Contains(tc.name, "test_env_french") {
-		t.Skip("skipped: locale-specific translation test")
+		skip("skipped: locale-specific translation test")
 	}
 	if strings.Contains(tc.name, "test_if_windows_batch_files_can_be_executed") {
-		t.Skip("skipped: Windows-specific batch file execution")
+		skip("skipped: Windows-specific batch file execution")
 	}
 
 	cmd, ok := builtins.Lookup(cmdName)
 	if !ok {
-		t.Skipf("builtin %q not registered", cmdName)
+		skipf("builtin %q not registered", cmdName)
 	}
 
 	stdin := tc.stdin
 	if strings.HasPrefix(stdin, "\x00FIXTURE\x00") {
 		v, ok := resolveFixtureRef(stdin, fixtureDir)
 		if !ok {
-			t.Skip("referenced fixture not found")
+			skip("referenced fixture not found")
 		}
 		stdin = v
 	}
@@ -1809,7 +1937,7 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, fixtureDir string) {
 	if strings.HasPrefix(wantStdout, "\x00FIXTURE\x00") {
 		v, ok := resolveFixtureRef(wantStdout, fixtureDir)
 		if !ok {
-			t.Skip("referenced fixture not found")
+			skip("referenced fixture not found")
 		}
 		wantStdout = v
 	}
@@ -1817,10 +1945,16 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, fixtureDir string) {
 	dir := t.TempDir()
 	t.Cleanup(func() { restorePermissions(dir) })
 	copyFixtures(fixtureDir, dir)
-	if !executeSetup(t, dir, tc.setup) {
+	if !executeSetup(t, dir, tc.setup, rec) {
 		return
 	}
+	if detail := unsafeMutatorArgs(dir, cmdName, tc.args); detail != "" {
+		rec.reason = &testaccount.Reason{Category: testaccount.UnsafeSetup, Detail: detail}
+		t.Skip(detail)
+	}
 
+	rec.reason = nil
+	rec.executed = true
 	var stdout, stderr bytes.Buffer
 	env := tc.env
 	if env == nil {
@@ -1919,72 +2053,3 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, fixtureDir string) {
 		t.Errorf("stderr = %q, want empty (args=%q)", stderr.String(), tc.args)
 	}
 }
-
-// ---------------------------------------------------------------------
-// Top-level driver
-// ---------------------------------------------------------------------
-
-func TestUutilsSuite(t *testing.T) {
-	root := "testdata/tests"
-	if _, err := os.Stat(root); err != nil {
-		root = "tests/uutils/testdata/tests"
-		if _, err := os.Stat(root); err != nil {
-			t.Skipf("uutils testdata not found: %v", err)
-		}
-	}
-	byUtilDir := filepath.Join(root, "by-util")
-	fixturesRoot := filepath.Join(root, "fixtures")
-
-	entries, err := os.ReadDir(byUtilDir)
-	if err != nil {
-		t.Skipf("by-util dir not found: %v", err)
-	}
-
-	var files []string
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), "test_") && strings.HasSuffix(e.Name(), ".rs") {
-			files = append(files, e.Name())
-		}
-	}
-	sort.Strings(files)
-
-	var totalParsed, totalCommands int
-
-	for _, fname := range files {
-		cmdName := strings.TrimSuffix(strings.TrimPrefix(fname, "test_"), ".rs")
-		if _, ok := builtins.Lookup(cmdName); !ok {
-			continue
-		}
-
-		path := filepath.Join(byUtilDir, fname)
-		sut, err := parseTestFile(path, cmdName)
-		if err != nil {
-			t.Logf("WARN: failed to parse %s: %v", fname, err)
-			continue
-		}
-		if len(sut.cases) == 0 {
-			continue
-		}
-
-		totalParsed += len(sut.cases)
-		totalCommands++
-		fixtureDir := filepath.Join(fixturesRoot, cmdName)
-
-		t.Run(cmdName, func(t *testing.T) {
-			for _, tc := range sut.cases {
-				tc := tc
-				name := tc.name
-				if name == "" {
-					name = fmt.Sprintf("line%d", tc.line)
-				}
-				t.Run(fmt.Sprintf("%s_L%d", name, tc.line), func(t *testing.T) {
-					runTestCase(t, cmdName, tc, fixtureDir)
-				})
-			}
-		})
-	}
-
-	t.Logf("uutils tests: %d parsed across %d commands", totalParsed, totalCommands)
-}
-
-var _ io.Writer = (*bytes.Buffer)(nil)
