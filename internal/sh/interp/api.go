@@ -102,6 +102,10 @@ type Runner struct {
 	ecfg *expand.Config
 	ectx context.Context // just so that Runner.Subshell can use it again
 
+	// onChangeDir, if not nil, is told about every successful directory
+	// change made by cd, pushd or popd. Misa addition; see SetOnChangeDir.
+	onChangeDir func(oldDir, newDir string)
+
 	// didReset remembers whether the runner has ever been reset. This is
 	// used so that Reset is automatically called when running any program
 	// or node for the first time on a Runner.
@@ -830,6 +834,8 @@ func (r *Runner) Reset() {
 		origStdout: r.origStdout,
 		origStderr: r.origStderr,
 
+		onChangeDir: r.onChangeDir,
+
 		// emptied below, to reuse the space
 		Vars: r.Vars,
 
@@ -875,13 +881,31 @@ func (r *Runner) Reset() {
 			Str:      strconv.Itoa(os.Getgid()),
 		})
 	}
-	r.setVarString("PWD", r.Dir)
+	// POSIX shells export PWD so that child commands inherit it.
+	r.setVar("PWD", expand.Variable{Set: true, Kind: expand.String, Str: r.Dir, Exported: true})
 	r.setVarString("IFS", " \t\n")
 	r.setVarString("OPTIND", "1")
 
 	r.dirStack = append(r.dirStack, r.Dir)
 
 	r.didReset = true
+}
+
+// SetOnChangeDir installs a callback that every successful directory change by
+// cd, pushd or popd reports with the old and new logical directories. It is a
+// Misa addition for session hosts that mirror the shell directory. Subshells
+// created by the interpreter do not inherit the callback, so a change inside
+// "cd dir" in a subshell or process substitution is not reported. Like Run, it
+// must not be called concurrently.
+func (r *Runner) SetOnChangeDir(f func(oldDir, newDir string)) {
+	r.onChangeDir = f
+}
+
+// reportDirChange forwards a successful directory change to the installed hook.
+func (r *Runner) reportDirChange(oldDir, newDir string) {
+	if r.onChangeDir != nil && oldDir != newDir {
+		r.onChangeDir(oldDir, newDir)
+	}
 }
 
 // ExitStatus is a non-zero status code resulting from running a shell node.

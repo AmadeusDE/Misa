@@ -33,7 +33,14 @@ type Session struct {
 	// hash is the `hash` table; hashPath is the PATH value it was built from.
 	hash     map[string]string
 	hashPath string
+
+	onCwdChange func(oldDir, newDir string)
+	notifyMu    sync.Mutex
+	cwdEvents   []cwdEvent // pending changes of the running submission
 }
+
+// cwdEvent is one successful directory change reported by the interpreter.
+type cwdEvent struct{ oldDir, newDir string }
 
 // New constructs a session without changing the process environment or cwd.
 func New(o Options) (*Session, error) {
@@ -48,6 +55,7 @@ func New(o Options) (*Session, error) {
 		misaBuiltin: o.MisaBuiltin,
 		lookPath:    o.LookPath,
 		defaultPath: o.DefaultPath,
+		onCwdChange: o.OnCwdChange,
 	}
 	if s.misaBuiltin == nil {
 		s.misaBuiltin = func(string) bool { return false }
@@ -96,6 +104,10 @@ func New(o Options) (*Session, error) {
 		return nil, err
 	}
 	s.runner = r
+	r.SetOnChangeDir(func(oldDir, newDir string) {
+		// Runs while Run holds runMu, so the slice needs no extra lock.
+		s.cwdEvents = append(s.cwdEvents, cwdEvent{oldDir, newDir})
+	})
 	r.Reset()
 	// Populate the interpreter’s public Vars snapshot, including bootstrap
 	// variables, without executing a command.
@@ -117,6 +129,13 @@ func exported(env expand.Environ) []string {
 }
 
 // Run parses all source before executing it. Runs on the same session serialize.
+//
+// Options' OnCwdChange is called for every successful directory change a
+// submission made, in order, with the old and new logical directories. The
+// events are delivered after the submission finishes and outside the run lock,
+// so the callback may call Dir; it must not call Run. Changes made inside a
+// subshell or process substitution are not reported, and neither is a change
+// that lands on the directory the shell is already in.
 func (s *Session) Run(ctx context.Context, src string) Result {
 	return s.RunFile(ctx, "", src)
 }
@@ -125,7 +144,22 @@ func (s *Session) Run(ctx context.Context, src string) Result {
 // session's independent Arg0. Runs on the same session serialize.
 func (s *Session) RunFile(ctx context.Context, name, src string) Result {
 	s.runMu.Lock()
-	defer s.runMu.Unlock()
+	s.cwdEvents = nil
+	result := s.runLocked(ctx, name, src)
+	events := s.cwdEvents
+	s.cwdEvents = nil
+	s.runMu.Unlock()
+	if s.onCwdChange != nil && len(events) > 0 {
+		s.notifyMu.Lock()
+		for _, e := range events {
+			s.onCwdChange(e.oldDir, e.newDir)
+		}
+		s.notifyMu.Unlock()
+	}
+	return result
+}
+
+func (s *Session) runLocked(ctx context.Context, name, src string) Result {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()

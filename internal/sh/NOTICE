@@ -4,3 +4,6 @@ Copyright notices are retained in the original source files.
 The source is distributed under the BSD 3-Clause License; see LICENSE.
 See SOURCE.json for file provenance, omissions, and local patches.
 Misa patches POSIX export/readonly parsing and adds session last-status and explicit $0 APIs.
+Misa also patches POSIX directory and variable semantics (cd -L/-P and CDPATH,
+exported PWD/OLDPWD, readonly unset, export/readonly listings); the patched
+files are recorded in SOURCE.json.

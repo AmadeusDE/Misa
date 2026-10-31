@@ -692,6 +692,9 @@ func (r *Runner) cmd(ctx context.Context, cm syntax.Command) {
 		case "nameref":
 			valType = "-n"
 		}
+		if r.declList(cm.Variant.Value, cm.Args) {
+			return
+		}
 	assignLoop:
 		for as := range r.flattenAssigns(cm.Args) {
 			fp := flagParser{remaining: []string{as.Name.Value}}
