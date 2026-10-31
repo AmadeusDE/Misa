@@ -1,6 +1,7 @@
 package gui
 
 import (
+	_ "embed"
 	"fmt"
 	"image"
 	"image/draw"
@@ -45,6 +46,14 @@ func cellStyle(bold, italic bool) style {
 var fcStyles = [4]string{"", ":bold", ":italic", ":bold:italic"}
 
 var goMono = [4][]byte{gomono.TTF, gomonobold.TTF, gomonoitalic.TTF, gomonobolditalic.TTF}
+
+// chessGlyphs is DejaVu Sans Mono's chess symbols (U+2654-265F), the glyphs
+// the chess variants draw pieces with. Go Mono has none, and without
+// fontconfig (Android, a bare BSD) nothing else supplies them, so they would
+// draw as blank cells. See fonts/LICENSE.txt.
+//
+//go:embed fonts/chessglyphs.ttf
+var chessGlyphs []byte
 
 // fontFile is a parsed font, shared by every size made from it.
 type fontFile struct {
@@ -109,6 +118,20 @@ func (l *fontLibrary) embedded(s style) *fontFile {
 	}
 	sf, _ := sfnt.Parse(goMono[s])
 	f := &fontFile{sf: sf}
+	l.files[key] = f
+	return f
+}
+
+// symbols is the embedded chess symbols font.
+func (l *fontLibrary) symbols() *fontFile {
+	const key = "chessglyphs#0"
+	if f, ok := l.files[key]; ok {
+		return f
+	}
+	var f *fontFile
+	if sf, err := sfnt.Parse(chessGlyphs); err == nil {
+		f = &fontFile{sf: sf}
+	}
 	l.files[key] = f
 	return f
 }
@@ -371,7 +394,7 @@ func (fs *fontSet) sized(f *fontFile) (*sizedFace, error) {
 }
 
 // faceFor picks the first font that has r: the style's face, the regular
-// face, a fontconfig fallback, then Go Mono.
+// face, a fontconfig fallback, Go Mono, then the embedded chess symbols.
 func (fs *fontSet) faceFor(r rune, s style) *sizedFace {
 	for _, sf := range []*sizedFace{fs.styles[s], fs.styles[styleRegular]} {
 		if sf != nil && sf.file.has(r) {
@@ -385,6 +408,11 @@ func (fs *fontSet) faceFor(r rune, s style) *sizedFace {
 	}
 	if sf, err := fs.sized(fs.lib.embedded(styleRegular)); err == nil && sf.file.has(r) {
 		return sf
+	}
+	if f := fs.lib.symbols(); f != nil && f.has(r) {
+		if sf, err := fs.sized(f); err == nil {
+			return sf
+		}
 	}
 	return nil
 }

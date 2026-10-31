@@ -124,6 +124,12 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
   ↑/↓ or `j`/`k` (when the filter is empty) to move, enter to switch, esc to cancel.
 - `f`: flip; `t`: toggle piece letters; `q`: quit.
 
+In the GUI (`misa --gui`), standard piece glyphs come from the system font when
+it has them; otherwise Misa falls back to its embedded "Misa Chess Glyphs" font.
+That font covers only the Western chess symbols U+2654–U+265F. Shogi and
+Xiangqi pieces render as one-cell letters, so they don't need it; any future
+variant that uses other symbols needs a system font that has them.
+
 The header shows, for example, `Chess · hard · Black to move · thinking…`.
 Changing difficulty cancels the old search and starts the new policy without
 applying obsolete results. The chosen level survives new games, variant
