@@ -226,11 +226,11 @@ Notes: toybox's `[[`, `cd`, `exit` etc. are sh builtins declared via USE_SH in t
 | `ftpget` |  | ✓ net | ✓ |  |
 | `ftpput` |  | ✓ net | ✓ |  |
 | `fuser` |  |  | ✓ |  |
-| `getconf` |  | ✓ posix |  |  |
+| `getconf` | ✓ | ✓ posix |  |  |
 | `getenforce` |  | ✓ android | ✓ |  |
 | `getfacl` |  |  |  | ✓ acl |
 | `getfattr` |  | ✓ pending | ✓ |  |
-| `getopt` |  | ✓ other | ✓ |  |
+| `getopt` | ✓ | ✓ other | ✓ |  |
 | `getsebool` |  |  | ✓ |  |
 | `getty` |  | ✓ pending | ✓ |  |
 | `gitcheckout` |  | ✓ pending |  |  |
