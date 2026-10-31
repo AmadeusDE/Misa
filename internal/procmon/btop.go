@@ -449,13 +449,14 @@ func (b *BtopViewer) renderCPUBox(width, height int) []string {
 		}
 	}
 
-	la := b.cur.LoadAvg
 	total, running, _, _, _ := CountStates(b.cur.Procs)
 	right := []string{
-		btopLabelStyle.Render("Load avg ") + btopValueStyle.Render(fmt.Sprintf("%.2f %.2f %.2f", la[0], la[1], la[2])),
-		btopLabelStyle.Render("Uptime   ") + btopValueStyle.Render(FmtUptime(b.cur.Uptime)),
+		btopLabelStyle.Render("Load avg ") + btopValueStyle.Render(b.cur.LoadStr()),
+		btopLabelStyle.Render("Uptime   ") + btopValueStyle.Render(b.cur.UptimeStr()),
 		btopLabelStyle.Render("Tasks    ") + btopValueStyle.Render(fmt.Sprintf("%d", total)),
-		btopLabelStyle.Render("Running  ") + btopValueStyle.Render(fmt.Sprintf("%d", running)),
+	}
+	if StatesKnown(b.cur.Procs) {
+		right = append(right, btopLabelStyle.Render("Running  ")+btopValueStyle.Render(fmt.Sprintf("%d", running)))
 	}
 
 	rows := len(left)
@@ -481,6 +482,12 @@ func (b *BtopViewer) renderMemBox(width, height int) []string {
 	if innerW < 6 {
 		innerW = 6
 	}
+	if !b.cur.SystemAvailable {
+		return btopBox("mem", width, height, []string{
+			btopLabelStyle.Render(btopPad("Total", 6)) + btopValueStyle.Render(unavailable),
+		})
+	}
+
 	mem := b.cur.Mem
 	barW := innerW - 7
 	if barW < 3 {
@@ -522,6 +529,12 @@ func (b *BtopViewer) renderDiskBox(width, height int) []string {
 		innerW = 6
 	}
 	elapsed := b.cur.Time.Sub(b.prev.Time).Seconds()
+
+	if !b.cur.SystemAvailable {
+		return btopBox("disks", width, height, []string{
+			btopLabelStyle.Render(btopPad("IO", 6)) + btopValueStyle.Render(unavailable),
+		})
+	}
 
 	prevMap := make(map[string]DiskStat, len(b.prev.Disks))
 	for _, d := range b.prev.Disks {
@@ -568,6 +581,9 @@ func (b *BtopViewer) renderDiskBox(width, height int) []string {
 }
 
 func (b *BtopViewer) renderNetBox(width, height int) []string {
+	if !b.cur.SystemAvailable {
+		return btopBox("net", width, height, []string{btopValueStyle.Render(unavailable)})
+	}
 	elapsed := b.cur.Time.Sub(b.prev.Time).Seconds()
 	rxRate, txRate := CalcNetRates(b.prev.Net, b.cur.Net, elapsed)
 	var totalRx, totalTx uint64
@@ -655,10 +671,10 @@ func (b *BtopViewer) renderProcBox(width, height int) []string {
 		p := procs[i]
 
 		pidField := fmt.Sprintf("%*d", procColPID, p.PID)
-		userField := fmt.Sprintf("%-*s", procColUser, TruncStr(p.User, procColUser-1))
-		cpuField := fmt.Sprintf("%*.1f", procColPct, p.CPUPct)
-		memField := fmt.Sprintf("%*.1f", procColPct, p.MemPct)
-		timeField := fmt.Sprintf("%*s", procColTime, FmtCPUTime(p.CPUTime()))
+		userField := CellTextLeft(TruncStr(p.User, procColUser-1), p.HasUser(), procColUser)
+		cpuField := CellFloat(p.CPUPct, p.HasCPUTime(), procColPct, 1)
+		memField := CellFloat(p.MemPct, p.HasMemPct(), procColPct, 1)
+		timeField := CellTextRight(FmtCPUTime(p.CPUTime()), p.HasCPUTime(), procColTime)
 		cmdField := p.Comm
 
 		if i == b.selectedIdx {

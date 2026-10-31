@@ -278,7 +278,7 @@ func categorizeProcs(procs []Process) []procCategory {
 	var apps, background, system []Process
 	for _, p := range procs {
 		switch {
-		case p.UID == 0 || p.PID <= 2 || strings.HasPrefix(p.Comm, "["):
+		case (p.HasUser() && p.UID == 0) || p.PID <= 2 || strings.HasPrefix(p.Comm, "["):
 			system = append(system, p)
 		case p.HasTTY():
 			apps = append(apps, p)
@@ -318,18 +318,24 @@ func (t *TMViewer) processView() []string {
 		memPct = float64(mem.Used()) * 100 / float64(mem.Total)
 	}
 
-	elapsed := t.cur.Time.Sub(t.prev.Time).Seconds()
-	diskRead, diskWrite := CalcDiskRates(t.prev.Disks, t.cur.Disks, elapsed)
-	rxRate, txRate := CalcNetRates(t.prev.Net, t.cur.Net, elapsed)
-
 	barW := 12
 
 	var lines []string
-	summaryLine := fmt.Sprintf("  CPU %s %s    Mem %s %4.1f%%    Disk R:%s W:%s    Net ▼%s ▲%s",
-		tmBar(barW, cpuUsage), cpuText,
-		tmBar(barW, memPct), memPct,
-		FmtRate(diskRead), FmtRate(diskWrite),
-		FmtRate(rxRate), FmtRate(txRate))
+	var summaryLine string
+	if t.cur.SystemAvailable {
+		elapsed := t.cur.Time.Sub(t.prev.Time).Seconds()
+		diskRead, diskWrite := CalcDiskRates(t.prev.Disks, t.cur.Disks, elapsed)
+		rxRate, txRate := CalcNetRates(t.prev.Net, t.cur.Net, elapsed)
+		summaryLine = fmt.Sprintf("  CPU %s %s    Mem %s %4.1f%%    Disk R:%s W:%s    Net ▼%s ▲%s",
+			tmBar(barW, cpuUsage), cpuText,
+			tmBar(barW, memPct), memPct,
+			FmtRate(diskRead), FmtRate(diskWrite),
+			FmtRate(rxRate), FmtRate(txRate))
+	} else {
+		summaryLine = fmt.Sprintf("  CPU %s %s    Mem %s    Disk R:%s W:%s    Net ▼%s ▲%s",
+			tmBar(barW, cpuUsage), cpuText,
+			unavailable, unavailable, unavailable, unavailable, unavailable)
+	}
 	lines = append(lines, TruncStr(summaryLine, t.width))
 	lines = append(lines, "")
 
@@ -399,10 +405,10 @@ func (t *TMViewer) processView() []string {
 
 		if globalIdx >= t.scrollOffset {
 			p := flatList[globalIdx]
-			row := fmt.Sprintf("  %-20s %5.1f %5.1f  %7s  %7d",
+			row := fmt.Sprintf("  %-20s %s %s  %s  %7d",
 				TruncStr(p.Comm, 20),
-				p.CPUPct, p.MemPct,
-				FmtBytes(p.RSSBytes()),
+				CellFloat(p.CPUPct, p.HasCPUTime(), 5, 1), CellFloat(p.MemPct, p.HasMemPct(), 5, 1),
+				CellBytes(p.RSSBytes(), p.HasMemory(), 7),
 				p.PID)
 			row = TruncStr(row, t.width)
 			if globalIdx == t.selectedIdx {
@@ -414,9 +420,13 @@ func (t *TMViewer) processView() []string {
 	}
 
 	total, running, sleeping, stopped, zombie := CountStates(t.cur.Procs)
-	footer := tmDimStyle.Render(fmt.Sprintf(
-		"  %d processes  %d running  %d sleeping  %d stopped  %d zombie   [c]pu [m]em [n]pid [t]ree",
-		total, running, sleeping, stopped, zombie))
+	footerText := fmt.Sprintf("  %d processes", total)
+	if StatesKnown(t.cur.Procs) {
+		footerText = fmt.Sprintf(
+			"  %d processes  %d running  %d sleeping  %d stopped  %d zombie",
+			total, running, sleeping, stopped, zombie)
+	}
+	footer := tmDimStyle.Render(footerText + "   [c]pu [m]em [n]pid [t]ree")
 	lines = append(lines, "")
 	lines = append(lines, TruncStr(footer, t.width))
 
@@ -442,9 +452,8 @@ func (t *TMViewer) performanceView() []string {
 	}
 	lines = append(lines, tmSectionStyle.Render("  CPU"))
 	lines = append(lines, fmt.Sprintf("  Utilization  %s  %s", tmBar(barW, cpuUsage), cpuText))
-	lines = append(lines, fmt.Sprintf("  Cores: %d    Load: %.2f %.2f %.2f    Uptime: %s",
-		len(t.cur.CPUs), t.cur.LoadAvg[0], t.cur.LoadAvg[1], t.cur.LoadAvg[2],
-		FmtUptime(t.cur.Uptime)))
+	lines = append(lines, fmt.Sprintf("  Cores: %d    Load: %s    Uptime: %s",
+		len(t.cur.CPUs), t.cur.LoadStr(), t.cur.UptimeStr()))
 
 	twoCol := len(t.cur.CPUs) > 4
 	coreBarW := barW / 2
@@ -487,38 +496,50 @@ func (t *TMViewer) performanceView() []string {
 
 	lines = append(lines, "")
 	lines = append(lines, tmSectionStyle.Render("  MEMORY"))
-	memPct := 0.0
-	if mem.Total > 0 {
-		memPct = float64(mem.Used()) * 100 / float64(mem.Total)
-	}
-	lines = append(lines, fmt.Sprintf("  In Use   %s  %s / %s (%4.1f%%)",
-		tmBar(barW, memPct), FmtBytesShort(mem.Used()), FmtBytesShort(mem.Total), memPct))
-	lines = append(lines, fmt.Sprintf("  Available: %s    Cached: %s    Buffers: %s",
-		FmtBytesShort(mem.Available), FmtBytesShort(mem.Cached), FmtBytesShort(mem.Buffers)))
+	if !t.cur.SystemAvailable {
+		lines = append(lines, "  In Use   "+unavailable, "  Swap     "+unavailable)
+	} else {
+		memPct := 0.0
+		if mem.Total > 0 {
+			memPct = float64(mem.Used()) * 100 / float64(mem.Total)
+		}
+		lines = append(lines, fmt.Sprintf("  In Use   %s  %s / %s (%4.1f%%)",
+			tmBar(barW, memPct), FmtBytesShort(mem.Used()), FmtBytesShort(mem.Total), memPct))
+		lines = append(lines, fmt.Sprintf("  Available: %s    Cached: %s    Buffers: %s",
+			FmtBytesShort(mem.Available), FmtBytesShort(mem.Cached), FmtBytesShort(mem.Buffers)))
 
-	swapPct := 0.0
-	if mem.SwapTotal > 0 {
-		swapPct = float64(mem.SwapUsed()) * 100 / float64(mem.SwapTotal)
+		swapPct := 0.0
+		if mem.SwapTotal > 0 {
+			swapPct = float64(mem.SwapUsed()) * 100 / float64(mem.SwapTotal)
+		}
+		lines = append(lines, fmt.Sprintf("  Swap     %s  %s / %s",
+			tmBar(barW, swapPct), FmtBytesShort(mem.SwapUsed()), FmtBytesShort(mem.SwapTotal)))
 	}
-	lines = append(lines, fmt.Sprintf("  Swap     %s  %s / %s",
-		tmBar(barW, swapPct), FmtBytesShort(mem.SwapUsed()), FmtBytesShort(mem.SwapTotal)))
 
 	lines = append(lines, "")
 	lines = append(lines, tmSectionStyle.Render("  DISK"))
-	readRate, writeRate := CalcDiskRates(t.prev.Disks, t.cur.Disks, elapsed)
-	lines = append(lines, fmt.Sprintf("  Read:  %s    Write: %s", FmtRate(readRate), FmtRate(writeRate)))
-	for _, d := range t.cur.Disks[:min(3, len(t.cur.Disks))] {
-		lines = append(lines, fmt.Sprintf("    %s  total: %s read, %s written",
-			tmAccentStyle.Render(d.Name), FmtBytesShort(d.ReadBytes), FmtBytesShort(d.WriteBytes)))
+	if !t.cur.SystemAvailable {
+		lines = append(lines, "  Read:  "+unavailable+"    Write: "+unavailable)
+	} else {
+		readRate, writeRate := CalcDiskRates(t.prev.Disks, t.cur.Disks, elapsed)
+		lines = append(lines, fmt.Sprintf("  Read:  %s    Write: %s", FmtRate(readRate), FmtRate(writeRate)))
+		for _, d := range t.cur.Disks[:min(3, len(t.cur.Disks))] {
+			lines = append(lines, fmt.Sprintf("    %s  total: %s read, %s written",
+				tmAccentStyle.Render(d.Name), FmtBytesShort(d.ReadBytes), FmtBytesShort(d.WriteBytes)))
+		}
 	}
 
 	lines = append(lines, "")
 	lines = append(lines, tmSectionStyle.Render("  NETWORK"))
-	rxRate, txRate := CalcNetRates(t.prev.Net, t.cur.Net, elapsed)
-	lines = append(lines, fmt.Sprintf("  Receive: %s    Send: %s", FmtRate(rxRate), FmtRate(txRate)))
-	for _, n := range t.cur.Net {
-		lines = append(lines, fmt.Sprintf("    %s  ▼ %s  ▲ %s",
-			tmAccentStyle.Render(n.Name), FmtBytesShort(n.RxBytes), FmtBytesShort(n.TxBytes)))
+	if !t.cur.SystemAvailable {
+		lines = append(lines, "  Receive: "+unavailable+"    Send: "+unavailable)
+	} else {
+		rxRate, txRate := CalcNetRates(t.prev.Net, t.cur.Net, elapsed)
+		lines = append(lines, fmt.Sprintf("  Receive: %s    Send: %s", FmtRate(rxRate), FmtRate(txRate)))
+		for _, n := range t.cur.Net {
+			lines = append(lines, fmt.Sprintf("    %s  ▼ %s  ▲ %s",
+				tmAccentStyle.Render(n.Name), FmtBytesShort(n.RxBytes), FmtBytesShort(n.TxBytes)))
+		}
 	}
 
 	return lines

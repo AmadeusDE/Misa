@@ -10,7 +10,12 @@ import (
 
 var platformActions = Actions{
 	Signals: windowsSignals,
+	Levels:  windowsPriorityLevels,
+	renice:  setPriority,
 	send: func(pid int, _ syscall.Signal) error {
+		if pid <= 0 {
+			return ErrUnsupported
+		}
 		h, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, uint32(pid))
 		if err != nil {
 			return err

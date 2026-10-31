@@ -15,10 +15,12 @@ type signalEntry struct {
 }
 
 // Actions is what the process viewers may do to a process on this platform.
-// Signals is the menu the kill dialog offers (entry 0 is always Cancel); the
-// rest are the operations behind it.
+// Signals is the menu the kill dialog offers (entry 0 is always Cancel);
+// Levels is the set of priorities the viewers can step through — nil where the
+// platform has a continuous priority scale (nice) and the views step by one.
 type Actions struct {
 	Signals []signalEntry
+	Levels  []PriorityLevel
 	send    func(pid int, sig syscall.Signal) error
 	renice  func(pid, nice int) error
 }
@@ -41,12 +43,24 @@ func (a Actions) Send(pid int, sig signalEntry) error {
 	return a.send(pid, sig.sig)
 }
 
-// Renice sets pid's niceness.
+// Renice sets pid's niceness, or the platform's nearest priority class.
 func (a Actions) Renice(pid, nice int) error {
 	if a.renice == nil {
 		return ErrUnsupported
 	}
 	return a.renice(pid, nice)
+}
+
+// PriorityStep is the priority one step up (delta < 0) or down (delta > 0)
+// from current: a clamped nice value, or the neighbouring class where the
+// platform reports coarse priority levels.
+func (a Actions) PriorityStep(current, delta int) int {
+	return PriorityStep(a.Levels, current, delta)
+}
+
+// PriorityLevel names the level a nice-equivalent priority belongs to.
+func (a Actions) PriorityLevel(nice int) (PriorityLevel, bool) {
+	return PriorityLevelOf(a.Levels, nice)
 }
 
 // defaultSignal is the menu index the kill dialog starts on: SIGTERM, or the

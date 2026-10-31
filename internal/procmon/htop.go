@@ -300,18 +300,29 @@ func (h *HtopViewer) adjustNice(delta int) {
 		return
 	}
 	p := procs[h.selectedIdx]
-	newNice := int(p.Nice) + delta
-	if newNice < -20 {
-		newNice = -20
+	if !p.HasPriority() {
+		h.statusMsg = fmt.Sprintf("PID %d: priority unavailable", p.PID)
+		h.statusTimer = 3
+		return
 	}
-	if newNice > 19 {
-		newNice = 19
+	newNice := platformActions.PriorityStep(int(p.Nice), delta)
+	if newNice == int(p.Nice) {
+		msg := fmt.Sprintf("PID %d is already at the lowest priority", p.PID)
+		if delta < 0 {
+			msg = fmt.Sprintf("PID %d is already at the highest priority", p.PID)
+		}
+		h.statusMsg = msg
+		h.statusTimer = 3
+		return
 	}
 	err := platformActions.Renice(p.PID, newNice)
 	if err != nil {
 		h.statusMsg = fmt.Sprintf("renice PID %d: %v", p.PID, err)
 	} else {
 		h.statusMsg = fmt.Sprintf("Set PID %d nice to %d", p.PID, newNice)
+		if level, ok := platformActions.PriorityLevel(newNice); ok {
+			h.statusMsg += " (" + level.Name + ")"
+		}
 	}
 	h.statusTimer = 3
 }
@@ -529,19 +540,27 @@ func (h *HtopViewer) View() string {
 	if memBarW < 8 {
 		memBarW = 8
 	}
-	lines = append(lines, htopMemBar(sLabel.Render("Mem"), mem.Used(), mem.BuffCache(), mem.Total, memBarW))
-	lines = append(lines, htopMemBar(sLabel.Render("Swp"), mem.SwapUsed(), 0, mem.SwapTotal, memBarW))
+	if h.cur.SystemAvailable {
+		lines = append(lines, htopMemBar(sLabel.Render("Mem"), mem.Used(), mem.BuffCache(), mem.Total, memBarW))
+		lines = append(lines, htopMemBar(sLabel.Render("Swp"), mem.SwapUsed(), 0, mem.SwapTotal, memBarW))
+	} else {
+		lines = append(lines, sLabel.Render("Mem")+unavailable, sLabel.Render("Swp")+unavailable)
+	}
 
 	total, running, _, _, _ := CountStates(h.cur.Procs)
 	thrCount := 0
 	for _, p := range h.cur.Procs {
 		thrCount += p.Threads
 	}
-	taskLine := fmt.Sprintf("Tasks: "+sBold.Render("%d")+", %d thr; "+sBarUser.Render("%d running"),
-		total, thrCount, running)
-	loadLine := fmt.Sprintf("Load average: "+sBold.Render("%.2f")+" %.2f %.2f   Uptime: %s",
-		h.cur.LoadAvg[0], h.cur.LoadAvg[1], h.cur.LoadAvg[2],
-		FmtUptime(h.cur.Uptime))
+	taskLine := fmt.Sprintf("Tasks: "+sBold.Render("%d")+", %d thr", total, thrCount)
+	if StatesKnown(h.cur.Procs) {
+		taskLine += fmt.Sprintf("; "+sBarUser.Render("%d running"), running)
+	}
+	loadLine := "Load average: " + unavailable + "   Uptime: " + unavailable
+	if h.cur.SystemAvailable {
+		loadLine = fmt.Sprintf("Load average: "+sBold.Render("%.2f")+" %.2f %.2f   Uptime: %s",
+			h.cur.LoadAvg[0], h.cur.LoadAvg[1], h.cur.LoadAvg[2], h.cur.UptimeStr())
+	}
 	lines = append(lines, "  "+taskLine+"  "+loadLine)
 
 	lines = append(lines, "")
@@ -628,13 +647,14 @@ func formatProcRowPlain(p Process, width int) string {
 	if len(comm) > maxComm {
 		comm = comm[:maxComm]
 	}
-	return fmt.Sprintf("%7d %-8s %3d  %3d %7s %7s %7s %s %4.1f %4.1f %8s %s",
-		p.PID, TruncStr(p.User, 8),
-		p.Priority, p.Nice,
-		FmtBytes(p.VSize), FmtBytes(p.RSSBytes()), FmtBytes(p.SHRBytes()),
-		p.StateStr(),
-		p.CPUPct, p.MemPct,
-		FmtCPUTime(p.CPUTime()),
+	return fmt.Sprintf("%7d %s %s  %s %s %s %s %s %s %s %s %s",
+		p.PID, CellTextLeft(TruncStr(p.User, 8), p.HasUser(), 8),
+		CellInt(p.Priority, p.HasPriority(), 3), CellInt(p.Nice, p.HasPriority(), 3),
+		CellBytes(p.VSize, p.HasVirt(), 7), CellBytes(p.RSSBytes(), p.HasMemory(), 7),
+		CellBytes(p.SHRBytes(), p.HasShared(), 7),
+		CellText(p.StateStr(), p.HasState()),
+		CellFloat(p.CPUPct, p.HasCPUTime(), 4, 1), CellFloat(p.MemPct, p.HasMemPct(), 4, 1),
+		CellTextRight(FmtCPUTime(p.CPUTime()), p.HasCPUTime(), 8),
 		comm)
 }
 
@@ -660,22 +680,36 @@ func formatProcRowColored(p Process, width int) string {
 	}
 
 	userStyle := sUser
-	if p.UID == 0 {
+	if p.HasUser() && p.UID == 0 {
 		userStyle = sUserR
 	}
 
 	var stateStyle lipgloss.Style
-	switch p.State {
-	case 'R':
-		stateStyle = sStateR
-	case 'Z':
-		stateStyle = sStateZ
-	case 'D':
-		stateStyle = sStateD
-	case 'T', 't':
-		stateStyle = sStateT
-	default:
+	switch {
+	case !p.HasState():
 		stateStyle = sLabel
+	default:
+		switch p.State {
+		case 'R':
+			stateStyle = sStateR
+		case 'Z':
+			stateStyle = sStateZ
+		case 'D':
+			stateStyle = sStateD
+		case 'T', 't':
+			stateStyle = sStateT
+		default:
+			stateStyle = sLabel
+		}
+	}
+
+	cpuStyle := cpuColor(p.CPUPct)
+	if !p.HasCPUTime() {
+		cpuStyle = sLabel
+	}
+	memStyle := cpuColor(p.MemPct)
+	if !p.HasMemPct() {
+		memStyle = sLabel
 	}
 
 	commStyle := sComm
@@ -696,19 +730,22 @@ func formatProcRowColored(p Process, width int) string {
 	var b strings.Builder
 	b.WriteString(sPID.Render(fmt.Sprintf("%7d", p.PID)))
 	b.WriteString(" ")
-	b.WriteString(userStyle.Render(fmt.Sprintf("%-8s", TruncStr(p.User, 8))))
+	b.WriteString(userStyle.Render(CellTextLeft(TruncStr(p.User, 8), p.HasUser(), 8)))
 	b.WriteString(" ")
-	b.WriteString(sPriNi.Render(fmt.Sprintf("%3d  %3d", p.Priority, p.Nice)))
+	b.WriteString(sPriNi.Render(fmt.Sprintf("%s  %s",
+		CellInt(p.Priority, p.HasPriority(), 3), CellInt(p.Nice, p.HasPriority(), 3))))
 	b.WriteString(" ")
-	b.WriteString(sMem.Render(fmt.Sprintf("%7s %7s %7s", FmtBytes(p.VSize), FmtBytes(p.RSSBytes()), FmtBytes(p.SHRBytes()))))
+	b.WriteString(sMem.Render(fmt.Sprintf("%s %s %s",
+		CellBytes(p.VSize, p.HasVirt(), 7), CellBytes(p.RSSBytes(), p.HasMemory(), 7),
+		CellBytes(p.SHRBytes(), p.HasShared(), 7))))
 	b.WriteString(" ")
-	b.WriteString(stateStyle.Render(p.StateStr()))
+	b.WriteString(stateStyle.Render(CellText(p.StateStr(), p.HasState())))
 	b.WriteString(" ")
-	b.WriteString(cpuColor(p.CPUPct).Render(fmt.Sprintf("%4.1f", p.CPUPct)))
+	b.WriteString(cpuStyle.Render(CellFloat(p.CPUPct, p.HasCPUTime(), 4, 1)))
 	b.WriteString(" ")
-	b.WriteString(cpuColor(p.MemPct).Render(fmt.Sprintf("%4.1f", p.MemPct)))
+	b.WriteString(memStyle.Render(CellFloat(p.MemPct, p.HasMemPct(), 4, 1)))
 	b.WriteString(" ")
-	b.WriteString(sTime.Render(fmt.Sprintf("%8s", FmtCPUTime(p.CPUTime()))))
+	b.WriteString(sTime.Render(CellTextRight(FmtCPUTime(p.CPUTime()), p.HasCPUTime(), 8)))
 	b.WriteString(" ")
 	if treePrefix != "" {
 		b.WriteString(treePrefix)

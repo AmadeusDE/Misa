@@ -35,8 +35,8 @@ func TestPlatformActionsMenuStartsWithCancel(t *testing.T) {
 	}
 	switch runtime.GOOS {
 	case "windows":
-		if platformActions.CanRenice() || len(s) != 2 {
-			t.Errorf("windows table = %+v renice=%v", s, platformActions.CanRenice())
+		if !platformActions.CanRenice() || len(s) != 2 || len(platformActions.Levels) != len(windowsPriorityLevels) {
+			t.Errorf("windows table = %+v renice=%v levels=%+v", s, platformActions.CanRenice(), platformActions.Levels)
 		}
 	default:
 		if !platformActions.CanRenice() || s[platformActions.defaultSignal()].name != "SIGTERM" || len(s) < 30 {
