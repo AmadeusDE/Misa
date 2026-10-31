@@ -29,6 +29,9 @@ type Options struct {
 	Stdin          io.Reader
 	Stdout, Stderr io.Writer
 	Exec           ExecHandler
+	// OnCwdChange, if non-nil, is called for every directory change the
+	// session makes, after the submission that made it. See Session.Run.
+	OnCwdChange func(oldDir, newDir string)
 }
 
 // Result describes one submission. Ordinary nonzero shell statuses are not errors.

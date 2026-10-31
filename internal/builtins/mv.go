@@ -80,13 +80,13 @@ func runMv(ctx *Context) int {
 		}
 	}
 
-	backupCtl, backupGiven, backupErr := backupControl(flags)
+	backupCtl, backupGiven, backupErr := backupControl(ctx, flags)
 	if backupErr != nil {
 		fmt.Fprintf(ctx.Stderr, "mv: %s\n", backupErr)
 		return 1
 	}
 	backupActive := backupGiven && backupCtl != "none"
-	suffix := backupSuffix(flags)
+	suffix := backupSuffix(ctx, flags)
 
 	if backupActive && noClobber {
 		fmt.Fprintln(ctx.Stderr, "mv: cannot combine --backup with -n")

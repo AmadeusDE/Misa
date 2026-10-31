@@ -38,6 +38,15 @@
         "interp/session_status.go"
       ],
       "reason": "Parse POSIX export and readonly as declarations, and permit a session host to set the last status for cancellation."
+    },
+    {
+      "kind": "posix-dirs-vars",
+      "files": [
+        "interp/api.go",
+        "interp/builtin.go",
+        "interp/runner.go"
+      ],
+      "reason": "S07 POSIX directory and variable semantics: cd -L/-P with CDPATH and HOME/OLDPWD diagnostics, exported PWD/OLDPWD, unset of a readonly variable failing once with status 1, and export/readonly listings."
     }
   ],
   "files": [
@@ -118,13 +127,15 @@
       "original": "interp/api.go",
       "local": "interp/api.go",
       "upstream_sha256": "170ca90117b58538d45b4a893baa3c8d0a212b7baba7b407e755c82494f24704",
-      "local_sha256": "27a5e6d9611d4f80a4049d4f10b72ef6b3ec56c7a16119036c75fa0c6a71b802"
+      "local_sha256": "13b0f1434b5035392b481ac064fb7176a8855e65e1d8cbe1b8148527801ce193",
+      "patched": true
     },
     {
       "original": "interp/builtin.go",
       "local": "interp/builtin.go",
       "upstream_sha256": "02594f1fece943474730f53e12b597d194403ebdb34e728b221c3d3a2218c4b2",
-      "local_sha256": "fba82e48d129926749ec1f2912397ad93f052b24ca52559ebd8a11d88263f602"
+      "local_sha256": "2b6398406d2c4d9f3f209b52982b264aeb27d432d7111bf5eee32c214caa65ba",
+      "patched": true
     },
     {
       "original": "interp/handler.go",
@@ -148,7 +159,8 @@
       "original": "interp/runner.go",
       "local": "interp/runner.go",
       "upstream_sha256": "77b9521af42daff0e62270898e8d1cc0da9f3c8b5f9ece9f69bc0583bb3682e5",
-      "local_sha256": "f2d0e69578651e3a374747b72b4f15cdd5bb4f5913d591f7bf6c260db2fd6ea2"
+      "local_sha256": "ba1725085619fe49889f2a22b5ffb85f6ccc7107b5b575ccba5edb9a209ed42e",
+      "patched": true
     },
     {
       "original": "interp/test.go",

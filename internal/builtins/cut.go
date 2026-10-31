@@ -24,13 +24,7 @@ func init() {
 }
 
 func getEnv(ctx *Context, key string) string {
-	prefix := key + "="
-	for _, e := range ctx.Env {
-		if strings.HasPrefix(e, prefix) {
-			return e[len(prefix):]
-		}
-	}
-	return os.Getenv(key)
+	return ctx.Getenv(key)
 }
 
 type cutRange struct{ lo, hi int }
