@@ -26,5 +26,5 @@ var windowsLimits = []Limit{
 	{"sync", "no operands", Unsupported, "flushing every volume needs administrator rights on Windows; name the files to flush"},
 	{"sync", "--file-system", Unsupported, "Windows cannot flush the file system of a file without administrator rights"},
 	{"sync", "--data", Partial, "FlushFileBuffers writes data and metadata alike"},
-	{"which", "", Partial, "a name is found only with its extension: PATHEXT is not expanded"},
+	{"which", "", Partial, "a file counts as executable when its extension is in PATHEXT (any case); there is no execute bit to check"},
 }

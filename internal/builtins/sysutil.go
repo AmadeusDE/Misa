@@ -55,20 +55,19 @@ func runWhich(ctx *Context) int {
 
 	for _, cmdName := range flags.Operands {
 		found := false
-		if strings.Contains(cmdName, "/") {
-			if isExecutable(cmdName) {
-				fmt.Fprintln(ctx.Stdout, cmdName)
+		if hasPathSeparator(cmdName) {
+			if file, ok := whichFind("", cmdName, ctx); ok {
+				fmt.Fprintln(ctx.Stdout, file)
 				found = true
 			}
 		} else {
-			pathEnv := os.Getenv("PATH")
+			pathEnv, _ := lookupEnv(ctx, "PATH")
 			for _, dir := range filepath.SplitList(pathEnv) {
 				if dir == "" {
 					dir = "."
 				}
-				full := filepath.Join(dir, cmdName)
-				if isExecutable(full) {
-					fmt.Fprintln(ctx.Stdout, full)
+				if file, ok := whichFind(dir, cmdName, ctx); ok {
+					fmt.Fprintln(ctx.Stdout, file)
 					found = true
 					if !showAll {
 						break
@@ -83,9 +82,19 @@ func runWhich(ctx *Context) int {
 	return exitCode
 }
 
-func isExecutable(p string) bool {
-	info, err := os.Stat(p)
-	return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0
+// whichFind returns the executable that name means in dir (or as given when
+// dir is empty), trying the platform's executable spellings.
+func whichFind(dir, name string, ctx *Context) (string, bool) {
+	for _, file := range executableNames(ctx, name) {
+		if dir != "" {
+			file = filepath.Join(dir, file)
+		}
+		info, err := os.Stat(file)
+		if err == nil && info.Mode().IsRegular() && isExecutableMode(info) {
+			return file, true
+		}
+	}
+	return "", false
 }
 
 type unameInfo struct {

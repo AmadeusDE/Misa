@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -42,7 +43,17 @@ func joinRawPath(dir, rel string) string {
 	if rel == "" {
 		return dir
 	}
-	return strings.TrimRight(dir, "/") + "/" + rel
+	return strings.TrimRight(dir, pathSeps) + string(os.PathSeparator) + rel
+}
+
+// pathSeps lists the separators a path may use on this platform.
+var pathSeps = pathSeparators(runtime.GOOS == "windows")
+
+func pathSeparators(windows bool) string {
+	if windows {
+		return `/\`
+	}
+	return "/"
 }
 
 // canonicalize modes, mirroring GNU's canonicalize_filename_mode.
@@ -122,7 +133,7 @@ func runRealpath(ctx *Context) int {
 	if hasRelBase && hasRelTo {
 		cleanBase := filepath.Clean(relBase)
 		cleanTo := filepath.Clean(relTo)
-		if cleanBase != cleanTo && cleanBase != "/" && !strings.HasPrefix(cleanTo, cleanBase+"/") {
+		if cleanBase != cleanTo && !pathWithin(cleanTo, cleanBase) {
 			disableRelative = true
 		}
 	}
@@ -169,6 +180,17 @@ func runRealpath(ctx *Context) int {
 	return exitCode
 }
 
+// pathWithin reports whether clean path p is base or lies under it.
+func pathWithin(p, base string) bool {
+	if p == base {
+		return true
+	}
+	if strings.HasSuffix(base, string(os.PathSeparator)) {
+		return strings.HasPrefix(p, base)
+	}
+	return strings.HasPrefix(p, base+string(os.PathSeparator))
+}
+
 func makeRelative(path, relTo, relBase string, hasRelTo, hasRelBase bool) string {
 	if hasRelBase && !hasRelTo {
 		relTo = relBase
@@ -177,10 +199,8 @@ func makeRelative(path, relTo, relBase string, hasRelTo, hasRelBase bool) string
 	if hasRelBase {
 		cleanBase := filepath.Clean(relBase)
 		cleanPath := filepath.Clean(path)
-		if cleanBase != "/" {
-			if cleanPath != cleanBase && !strings.HasPrefix(cleanPath, cleanBase+"/") {
-				return path
-			}
+		if !pathWithin(cleanPath, cleanBase) {
+			return path
 		}
 	}
 
@@ -199,6 +219,58 @@ func makeRelative(path, relTo, relBase string, hasRelTo, hasRelBase bool) string
 // of its own); canonMissing tolerates anything, appending unresolved tails
 // literally.
 func canonicalizePath(path string, mode int) (string, error) {
+	return canonicalizeWith(path, mode, runtime.GOOS == "windows")
+}
+
+// splitVolume separates a Windows volume (drive letter, UNC share or
+// \\?\ prefix) from the rest, which is returned with "/" separators. Off
+// Windows there is no volume and rest is the path unchanged.
+func splitVolume(p string, windows bool) (vol, rest string) {
+	if !windows {
+		return "", p
+	}
+	p = strings.ReplaceAll(p, `\`, "/")
+	for _, pre := range []string{"//?/UNC/", "//./UNC/"} {
+		if strings.HasPrefix(p, pre) {
+			p = "//" + p[len(pre):]
+			break
+		}
+	}
+	for _, pre := range []string{"//?/", "//./", "/??/"} {
+		if strings.HasPrefix(p, pre) && len(p) > len(pre)+1 && p[len(pre)+1] == ':' {
+			p = p[len(pre):]
+			break
+		}
+	}
+	if len(p) >= 2 && p[1] == ':' && p[0]|0x20 >= 'a' && p[0]|0x20 <= 'z' {
+		return p[:2], p[2:]
+	}
+	if strings.HasPrefix(p, "//") && len(p) > 2 && p[2] != '/' {
+		parts := strings.SplitN(p[2:], "/", 3)
+		if len(parts) >= 2 && parts[1] != "" {
+			return "//" + parts[0] + "/" + parts[1], "/" + strings.Join(parts[2:], "")
+		}
+	}
+	return "", p
+}
+
+// canonRoot is the root directory of a volume in native syntax.
+func canonRoot(vol string, windows bool) string {
+	if !windows {
+		return "/"
+	}
+	return strings.ReplaceAll(vol, "/", `\`) + `\`
+}
+
+func canonicalizeWith(path string, mode int, windows bool) (string, error) {
+	vol, path := splitVolume(path, windows)
+	if vol == "" && windows && !strings.HasPrefix(path, "/") {
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return "", err
+		}
+		vol, path = splitVolume(abs, windows)
+	}
 	hasTrailingSlash := len(path) > 1 && strings.HasSuffix(path, "/")
 	trimmed := strings.TrimRight(path, "/")
 	if trimmed == "" {
@@ -207,7 +279,8 @@ func canonicalizePath(path string, mode int) (string, error) {
 
 	pending := strings.Split(strings.TrimPrefix(trimmed, "/"), "/")
 
-	resolved := "/"
+	root := canonRoot(vol, windows)
+	resolved := root
 	tailMissing := false
 	steps := 0
 
@@ -220,7 +293,9 @@ func canonicalizePath(path string, mode int) (string, error) {
 			continue
 		}
 		if c == ".." {
-			resolved = filepath.Dir(resolved)
+			if resolved != root {
+				resolved = filepath.Dir(resolved)
+			}
 			continue
 		}
 		if tailMissing {
@@ -251,14 +326,19 @@ func canonicalizePath(path string, mode int) (string, error) {
 			if rerr != nil {
 				return "", rerr
 			}
-			isAbsTarget := strings.HasPrefix(target, "/")
-			trimmedTarget := strings.TrimPrefix(strings.TrimRight(target, "/"), "/")
+			tvol, trest := splitVolume(target, windows)
+			if tvol != "" {
+				vol = tvol
+				root = canonRoot(vol, windows)
+			}
+			isAbsTarget := tvol != "" || strings.HasPrefix(trest, "/")
+			trimmedTarget := strings.TrimPrefix(strings.TrimRight(trest, "/"), "/")
 			var targetComps []string
 			if trimmedTarget != "" {
 				targetComps = strings.Split(trimmedTarget, "/")
 			}
 			if isAbsTarget {
-				resolved = "/"
+				resolved = root
 			}
 			pending = append(targetComps, pending...)
 			continue
@@ -276,7 +356,7 @@ func canonicalizePath(path string, mode int) (string, error) {
 	}
 
 	if resolved == "" {
-		resolved = "/"
+		resolved = root
 	}
 
 	if hasTrailingSlash && !tailMissing && mode != canonMissing {
