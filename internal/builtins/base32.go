@@ -20,7 +20,10 @@ func init() {
 	Register(Command{Name: "base32", Run: runBase32})
 }
 
-func runBase32(ctx *Context) int {
+func runBase32(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	args := normBaseEncArgs(ctx.Args)
 	flags, err := base32SpecParsed.ParseArgs(args)
 	if err != nil {

@@ -11,9 +11,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/AmadeusDE/Misa/internal/builtinexec"
 	"github.com/AmadeusDE/Misa/internal/builtins"
 	"github.com/AmadeusDE/Misa/internal/jobleader"
 	"github.com/AmadeusDE/Misa/internal/ui"
+	"golang.org/x/term"
 )
 
 func main() {
@@ -142,15 +144,23 @@ func runStandalone(name string, args []string) int {
 		return 1
 	}
 
+	cancelCtx, stopSignals := standaloneBuiltinContext(name)
+	defer stopSignals()
+	width, height, _ := term.GetSize(int(os.Stdout.Fd()))
 	ctx := &builtins.Context{
-		Dir:    dir,
-		Args:   args,
-		Width:  0,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-		Stdin:  os.Stdin,
+		Ctx:       cancelCtx,
+		Exec:      builtinexec.For(name),
+		StdinTTY:  term.IsTerminal(int(os.Stdin.Fd())),
+		StdoutTTY: term.IsTerminal(int(os.Stdout.Fd())),
+		StderrTTY: term.IsTerminal(int(os.Stderr.Fd())),
+		Height:    height,
+		Dir:       dir,
+		Args:      args,
+		Width:     width,
+		Stdout:    os.Stdout,
+		Stderr:    os.Stderr,
+		Stdin:     os.Stdin,
 	}
 
-	cmd, _ := builtins.Lookup(name)
-	return cmd.Run(ctx)
+	return builtins.Run(cancelCtx, name, ctx)
 }

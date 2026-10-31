@@ -249,7 +249,13 @@ func expandPreprocess(args []string) (processed []string, tabsVal string, isExpl
 	return out, combined, explicit
 }
 
-func runExpand(ctx *Context) int {
+func runExpand(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	processed, tabsVal, _ := expandPreprocess(ctx.Args)
 	flags, err := expandSpecParsed.ParseArgs(processed)
 	if err != nil {
@@ -324,7 +330,13 @@ func runeWidth(c rune) int {
 	return 1
 }
 
-func runUnexpand(ctx *Context) int {
+func runUnexpand(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	cleanArgs, tabsStr, hasExplicitTab := expandPreprocess(ctx.Args)
 	flags, err := unexpandSpecParsed.ParseArgs(cleanArgs)
 	if err != nil {
@@ -459,7 +471,7 @@ func expandProcessLines(ctx *Context, cmdName string, files []string, transform 
 			r = fh
 		}
 
-		br := bufio.NewReader(r)
+		br := bufio.NewReader(ContextReader(ctx.CancellationContext(), r))
 		for {
 			rawLine, readErr := br.ReadBytes('\n')
 			if len(rawLine) == 0 && readErr != nil {
@@ -475,9 +487,13 @@ func expandProcessLines(ctx *Context, cmdName string, files []string, transform 
 				content = content[:len(content)-1]
 			}
 			transformed := transform(content)
-			ctx.Stdout.Write([]byte(transformed))
+			if _, err := ctx.Stdout.Write([]byte(transformed)); err != nil {
+				return 1
+			}
 			if hasNewline {
-				ctx.Stdout.Write([]byte{'\n'})
+				if _, err := ctx.Stdout.Write([]byte{'\n'}); err != nil {
+					return 1
+				}
 			}
 			if readErr != nil {
 				if readErr != io.EOF {

@@ -83,9 +83,9 @@ func TestTarOrderedDirectoriesAndFilesFrom(t *testing.T) {
 func TestTarFailures(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "ok"), []byte("ok"), 0644)
-	for _, args := range [][]string{{"-x"}, {"-cz", "ok"}, {"-c"}, {"-c", "--owner=alice", "ok"}, {"-ct", "ok"}, {"-cO", "ok"}} {
+	for _, args := range [][]string{{"-c"}, {"-c", "--owner=alice", "ok"}, {"-ct", "ok"}, {"-cO", "ok"}} {
 		code, _, _ := tarRun(dir, nil, args...)
-		if code != 2 {
+		if code != 1 {
 			t.Errorf("%v: %d", args, code)
 		}
 	}
@@ -147,7 +147,7 @@ func TestTarArchiveFileAndNoTruncate(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "archive"), []byte("keep"), 0644)
 	code, _, _ := tarRun(dir, nil, "-cf", "archive")
 	b, _ := os.ReadFile(filepath.Join(dir, "archive"))
-	if code != 2 || string(b) != "keep" {
+	if code != 1 || string(b) != "keep" {
 		t.Fatalf("%d %q", code, b)
 	}
 	code, out, e := tarRun(dir, nil, "cfv", "archive", "file")
@@ -168,9 +168,9 @@ func TestTarListWriteErrorAndDeferred(t *testing.T) {
 	if runTar(ctx) != 2 {
 		t.Fatal("list write error ignored")
 	}
-	for _, arg := range []string{"-x", "-z", "-j", "-J", "-a", "--auto-compress"} {
+	for _, arg := range []string{"-j", "-J", "-a", "--auto-compress"} {
 		code, _, errout := tarRun(ctx.Dir, nil, "-c", arg, "file")
-		if code != 2 || !strings.Contains(errout, "U33") {
+		if code != 1 || !strings.Contains(errout, "not supported") {
 			t.Errorf("%s: %d %s", arg, code, errout)
 		}
 	}

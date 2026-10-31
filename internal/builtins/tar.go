@@ -4,7 +4,6 @@ package builtins
 import (
 	"archive/tar"
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -34,15 +33,25 @@ func tarSelected(name string, selections []string) bool {
 	}
 	return false
 }
-func runTar(ctx *Context) int {
+func runTar(ctx *Context) (code int) {
+	originalStdout := ctx.Stdout
+	ctx, cancel := streamContext(ctx)
+	defer cancel()
+	defer streamResult(ctx, &code)
 	fail := func(err error) int { fmt.Fprintln(ctx.Stderr, "tar:", err); return 2 }
+	usage := func(err error) int { fmt.Fprintln(ctx.Stderr, "tar:", err); return 1 }
+	if err := ctx.CancellationContext().Err(); err != nil {
+		return fail(err)
+	}
 	ev, err := tarScan(ctx.Args)
 	if err != nil {
-		return fail(err)
+		return usage(err)
 	}
 	mode := ""
 	archive := "-"
 	verbose, deref, numeric, null, toStdout := false, false, false, false, false
+	gzipMode, keep, samePerm, noOwner, touch := false, false, false, false, false
+	strip := 0
 	var owner, group *int
 	var excludes []string
 	for _, e := range ev {
@@ -50,11 +59,28 @@ func runTar(ctx *Context) int {
 		case "--help", "--version":
 			tarHelpVersion(ctx, e.kind)
 			return 0
-		case "x", "z", "j", "J", "a":
-			return fail(fmt.Errorf("-%s is not supported until U33", e.kind))
-		case "c", "t":
+		case "j", "J", "a":
+			return usage(fmt.Errorf("-%s is not supported", e.kind))
+		case "z":
+			gzipMode = true
+		case "k", "keep-old":
+			keep = true
+		case "overwrite":
+			keep = false
+		case "p":
+			samePerm = true
+		case "o":
+			noOwner = true
+		case "m":
+			touch = true
+		case "strip-components":
+			strip, err = strconv.Atoi(e.value)
+			if err != nil || strip < 0 {
+				return usage(fmt.Errorf("invalid strip-components: %s", e.value))
+			}
+		case "c", "t", "x":
 			if mode != "" && mode != e.kind {
-				return fail(fmt.Errorf("conflicting operation modes"))
+				return usage(fmt.Errorf("conflicting operation modes"))
 			}
 			mode = e.kind
 		case "f":
@@ -74,7 +100,7 @@ func runTar(ctx *Context) int {
 		case "owner", "group":
 			n, err := strconv.Atoi(e.value)
 			if err != nil || n < 0 {
-				return fail(fmt.Errorf("--%s requires a numeric ID", e.kind))
+				return usage(fmt.Errorf("--%s requires a numeric ID", e.kind))
 			}
 			if e.kind == "owner" {
 				owner = &n
@@ -84,17 +110,17 @@ func runTar(ctx *Context) int {
 		}
 	}
 	if mode == "" {
-		return fail(fmt.Errorf("choose -c or -t"))
+		return usage(fmt.Errorf("choose -c, -t or -x"))
 	}
-	if mode == "t" && archive == "-" {
+	if mode != "c" && archive == "-" {
 		for _, e := range ev {
 			if e.kind == "T" && e.value == "-" {
-				return fail(fmt.Errorf("cannot read both archive and file list from stdin"))
+				return usage(fmt.Errorf("cannot read both archive and file list from stdin"))
 			}
 		}
 	}
 	if mode == "c" && toStdout {
-		return fail(fmt.Errorf("-O is only supported when listing"))
+		return usage(fmt.Errorf("-O is not supported when creating"))
 	}
 	dir := ctx.Dir
 	var sources []tarx.Source
@@ -146,7 +172,7 @@ func runTar(ctx *Context) int {
 			if null {
 				delim = 0
 			}
-			br := bufio.NewReader(r)
+			br := bufio.NewReader(ContextReader(ctx.CancellationContext(), r))
 			for {
 				line, re := br.ReadString(delim)
 				line = strings.TrimSuffix(line, string(delim))
@@ -170,13 +196,13 @@ func runTar(ctx *Context) int {
 		}
 	}
 	if mode == "c" && len(sources) == 0 && !hadFilesFrom {
-		return fail(fmt.Errorf("refusing to create an empty archive"))
+		return usage(fmt.Errorf("refusing to create an empty archive"))
 	}
 	if mode == "c" {
 		var w io.Writer = ctx.Stdout
 		var f *os.File
 		var info os.FileInfo
-		if stdout, ok := w.(*os.File); ok {
+		if stdout, ok := originalStdout.(*os.File); ok {
 			info, _ = stdout.Stat()
 		}
 		if archive != "-" {
@@ -184,7 +210,7 @@ func runTar(ctx *Context) int {
 			if err != nil {
 				return fail(err)
 			}
-			w = f
+			w = ContextWriter(ctx.CancellationContext(), f)
 			info, _ = f.Stat()
 		}
 		if w == nil {
@@ -198,7 +224,16 @@ func runTar(ctx *Context) int {
 			}
 			vf = func(h *tar.Header) error { _, e := fmt.Fprintln(vw, h.Name); return e }
 		}
-		err = tarx.Create(context.Background(), w, sources, tarx.CreateOptions{Dereference: deref, NumericOwner: numeric, Owner: owner, Group: group, Exclude: excludes, ExcludeFile: info, Verbose: vf, OnError: func(name string, e error) { fmt.Fprintf(ctx.Stderr, "tar: %s: %v\n", name, e); partial = true }})
+		var gzclose func() error
+		if gzipMode {
+			w, gzclose = tarGzipWriter(w)
+		}
+		err = tarx.Create(ctx.CancellationContext(), w, sources, tarx.CreateOptions{Dereference: deref, NumericOwner: numeric, Owner: owner, Group: group, Exclude: excludes, ExcludeFile: info, Verbose: vf, OnError: func(name string, e error) { fmt.Fprintf(ctx.Stderr, "tar: %s: %v\n", name, e); partial = true }})
+		if gzclose != nil {
+			if e := gzclose(); err == nil {
+				err = e
+			}
+		}
 		if f != nil {
 			if e := f.Close(); err == nil {
 				err = e
@@ -208,43 +243,9 @@ func runTar(ctx *Context) int {
 			return fail(err)
 		}
 	} else {
-		var r io.Reader = ctx.Stdin
-		var f *os.File
-		if archive != "-" {
-			f, err = os.Open(tarPath(ctx.Dir, archive))
-			if err != nil {
-				return fail(err)
-			}
-			r = f
-		}
-		if r == nil {
-			return fail(fmt.Errorf("stdin unavailable"))
-		}
-		seen := make([]bool, len(selected))
-		err = tarx.Read(r, func(h *tar.Header, _ io.Reader) error {
-			for i, name := range selected {
-				if tarSelected(h.Name, []string{name}) {
-					seen[i] = true
-				}
-			}
-			if tarx.Excluded(h.Name, excludes) || !tarSelected(h.Name, selected) {
-				return nil
-			}
-			return tarPrintHeader(ctx.Stdout, h, verbose, numeric, owner, group)
-		})
-		if f != nil {
-			if e := f.Close(); err == nil {
-				err = e
-			}
-		}
+		err = tarReadArchive(ctx, tarReadOptions{archive: archive, dir: dir, mode: mode, gzip: gzipMode, verbose: verbose, numeric: numeric, owner: owner, group: group, selected: selected, excludes: excludes, strip: strip, keep: keep, samePerm: samePerm, noOwner: noOwner, touch: touch, toStdout: toStdout}, &partial)
 		if err != nil {
 			return fail(err)
-		}
-		for i, ok := range seen {
-			if !ok {
-				fmt.Fprintf(ctx.Stderr, "tar: %s: not found in archive\n", selected[i])
-				partial = true
-			}
 		}
 	}
 	if partial {

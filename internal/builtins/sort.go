@@ -779,7 +779,13 @@ func parsePosixKeyPos(s string, isStart bool) string {
 	return fmt.Sprintf("%d%s%s", resField, charPart, flags)
 }
 
-func runSort(ctx *Context) int {
+func runSort(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	// Parse POSIX obsolescent +POS -POS arguments if present
 	args := ctx.Args
 	var cleanArgs []string
@@ -843,7 +849,7 @@ func runSort(ctx *Context) int {
 			return 2
 		}
 		buf := make([]byte, 16)
-		n, _ := io.ReadFull(fh, buf)
+		n, _ := io.ReadFull(ContextReader(ctx.CancellationContext(), fh), buf)
 		fh.Close()
 		if n == 0 {
 			fmt.Fprintf(ctx.Stderr, "sort: '%s': end of file\n", rsFile)
@@ -1126,7 +1132,7 @@ func runSort(ctx *Context) int {
 		}
 
 		var fnList []string
-		sc := bufio.NewScanner(f0Reader)
+		sc := bufio.NewScanner(ContextReader(ctx.CancellationContext(), f0Reader))
 		sc.Split(scanZeroTerminated)
 		entryCount := 0
 		for sc.Scan() {
@@ -1144,9 +1150,10 @@ func runSort(ctx *Context) int {
 		}
 		for _, fn := range fnList {
 			var fh *os.File
+			var input io.Reader
 			var err error
 			if fn == "-" {
-				fh = os.Stdin
+				input = ctx.Stdin
 			} else {
 				p := resolvePath(ctx, fn)
 				fh, err = os.Open(p)
@@ -1155,7 +1162,10 @@ func runSort(ctx *Context) int {
 					return 2
 				}
 			}
-			fl, err := scanLines(fh, zeroTerm)
+			if fn != "-" {
+				input = ContextReader(ctx.CancellationContext(), fh)
+			}
+			fl, err := scanLines(input, zeroTerm)
 			if fn != "-" {
 				fh.Close()
 			}
@@ -1204,7 +1214,7 @@ func runSort(ctx *Context) int {
 						fmt.Fprintf(ctx.Stderr, "sort: %v\n", err)
 						return 2
 					}
-					fl, err = scanLines(fh, zeroTerm)
+					fl, err = scanLines(ContextReader(ctx.CancellationContext(), fh), zeroTerm)
 					fh.Close()
 				}
 				if err != nil {
@@ -1601,7 +1611,7 @@ func runSort(ctx *Context) int {
 			return 2
 		}
 		defer f.Close()
-		out = f
+		out = ContextWriter(ctx.CancellationContext(), f)
 	}
 
 	lineTerm := "\n"
@@ -1609,7 +1619,12 @@ func runSort(ctx *Context) int {
 		lineTerm = "\x00"
 	}
 	for _, line := range lines {
-		fmt.Fprint(out, line, lineTerm)
+		if ctx.CancellationContext().Err() != nil {
+			return 0
+		}
+		if _, err := fmt.Fprint(out, line, lineTerm); err != nil {
+			return 2
+		}
 	}
 	return 0
 }

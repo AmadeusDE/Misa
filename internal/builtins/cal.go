@@ -34,7 +34,7 @@ func calRun(ctx *Context) int {
 	if HandleHelpVersion(ctx, flags, spec) {
 		return 0
 	}
-	now := time.Now()
+	now := time.Now().In(ctx.Location())
 	date, yearMode, err := calDate(flags.Operands, now)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "cal:", err)

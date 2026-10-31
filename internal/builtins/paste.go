@@ -67,7 +67,13 @@ func pasteExpandDelims(s string) []string {
 	return delims
 }
 
-func runPaste(ctx *Context) int {
+func runPaste(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	flags, err := pasteSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "paste:", err)
@@ -117,7 +123,7 @@ func runPaste(ctx *Context) int {
 			}
 			defer fh.Close()
 			var lines []string
-			sc := bufio.NewScanner(fh)
+			sc := bufio.NewScanner(ContextReader(ctx.CancellationContext(), fh))
 			sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 			for sc.Scan() {
 				lines = append(lines, sc.Text())

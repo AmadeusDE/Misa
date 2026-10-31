@@ -55,6 +55,7 @@ type regContent struct {
 type Editor struct {
 	lines    []string
 	filename string
+	env      []string // nil inherits the process environment
 	modified bool
 
 	row, col int
@@ -131,12 +132,14 @@ func init() {
 	builtins.Register(builtins.Command{Name: "vi", Run: runBuiltin})
 }
 
+// TODO: propagate invocation streams and cancellation, and use its directory
+// consistently for shell commands.
 func runBuiltin(ctx *builtins.Context) int {
 	filename := ""
 	if len(ctx.Args) > 0 {
 		filename = ctx.Args[0]
 	}
-	if err := RunStandalone(filename, ctx.Dir); err != nil {
+	if err := runStandaloneWithEnv(filename, ctx.Dir, ctx.Env); err != nil {
 		fmt.Fprintln(ctx.Stderr, "vi:", err)
 		return 1
 	}
@@ -144,7 +147,16 @@ func runBuiltin(ctx *builtins.Context) int {
 }
 
 func New(filename, dir string) *Editor {
+	return newWithEnv(filename, dir, nil)
+}
+
+func newWithEnv(filename, dir string, env []string) *Editor {
+	var snapshot []string
+	if env != nil {
+		snapshot = append([]string{}, env...)
+	}
 	e := &Editor{
+		env:       snapshot,
 		lines:     []string{""},
 		searchDir: 1,
 		regs:      make(map[byte]*regContent),
@@ -1637,7 +1649,11 @@ func (m *standaloneModel) View() tea.View {
 }
 
 func RunStandalone(filename, dir string) error {
-	ed := New(filename, dir)
+	return runStandaloneWithEnv(filename, dir, nil)
+}
+
+func runStandaloneWithEnv(filename, dir string, env []string) error {
+	ed := newWithEnv(filename, dir, env)
 	p := tea.NewProgram(&standaloneModel{editor: ed})
 	_, err := p.Run()
 	return err

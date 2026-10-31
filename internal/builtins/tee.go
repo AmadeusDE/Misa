@@ -19,7 +19,10 @@ func init() {
 	Register(Command{Name: "tee", Run: runTee})
 }
 
-func runTee(ctx *Context) int {
+func runTee(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	flags, err := teeSpecParsed.ParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "tee:", err)
@@ -58,7 +61,7 @@ func runTee(ctx *Context) int {
 	}
 
 	w := io.MultiWriter(writers...)
-	if _, err := io.Copy(w, ctx.Stdin); err != nil {
+	if _, err := CopyContext(ctx.CancellationContext(), w, ctx.Stdin); err != nil {
 		fmt.Fprintf(ctx.Stderr, "tee: %v\n", err)
 		return 1
 	}

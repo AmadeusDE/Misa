@@ -14,7 +14,13 @@ func init() {
 	Register(Command{Name: "uudecode", Run: runUUDecode})
 }
 
-func runUUDecode(ctx *Context) int {
+func runUUDecode(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	spec, _ := ParseSpec("o:")
 	flags, err := spec.ParseArgs(ctx.Args)
 	if err != nil {
@@ -41,7 +47,7 @@ func runUUDecode(ctx *Context) int {
 	if input == nil {
 		input = strings.NewReader("")
 	}
-	err = uuDecode(ctx, bufio.NewReader(input), flags)
+	err = uuDecode(ctx, bufio.NewReader(ContextReader(ctx.CancellationContext(), input)), flags)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, "uudecode:", fmtOsErr(err))
 		return 1

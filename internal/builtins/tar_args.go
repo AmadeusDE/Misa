@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const tarSpec = "c(create)t(list)x(extract)f(file):C(directory):T(files-from):v(verbose)h(dereference)O(to-stdout)z(gzip)j(bzip2)J(xz)a(auto-compress)(null)(numeric-owner)(owner):(group):(exclude):"
+const tarSpec = "c(create)t(list)x(extract)f(file):C(directory):T(files-from):v(verbose)h(dereference)O(to-stdout)z(gzip)j(bzip2)J(xz)a(auto-compress)k(keep-old-files)(keep-old)p(same-permissions)o(no-same-owner)m(touch)(overwrite)(strip-components):(null)(numeric-owner)(owner):(group):(exclude):"
 
 var tarFlags *Spec
 
@@ -127,7 +127,7 @@ func tarHelpVersion(ctx *Context, kind string) {
 		usage := tarFlags.GenerateUsage(local.CmdName)
 		// Unlike most builtins, tar reserves -h for dereferencing symlinks.
 		fmt.Fprint(ctx.Stdout, strings.Replace(usage, "  -h, --help", "      --help", 1))
-		fmt.Fprintln(ctx.Stdout, "Supports uncompressed archive creation and listing. Extraction and compression are deferred to U33.")
+		fmt.Fprintln(ctx.Stdout, "Supports archive creation, listing and extraction, with gzip compression.")
 		return
 	}
 	HandleHelpVersion(&local, &ParseResult{VersionRequested: true}, tarFlags)

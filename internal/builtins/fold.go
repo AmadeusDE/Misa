@@ -24,7 +24,13 @@ func init() {
 	Register(Command{Name: "fold", Run: runFold})
 }
 
-func runFold(ctx *Context) int {
+func runFold(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	args := ctx.Args
 	for i, a := range args {
 		if len(a) >= 2 && a[0] == '-' && a[1] >= '0' && a[1] <= '9' {
@@ -105,7 +111,7 @@ func runFold(ctx *Context) int {
 			r = f
 		}
 
-		data, err := io.ReadAll(r)
+		data, err := io.ReadAll(ContextReader(ctx.CancellationContext(), r))
 		if err != nil {
 			fmt.Fprintf(ctx.Stderr, "fold: %v\n", err)
 			exitCode = 1
@@ -139,7 +145,9 @@ func foldData(ctx *Context, data []byte, width int, breakSpaces, byteMode, charM
 	i := 0
 	for i < len(data) {
 		if data[i] == '\n' {
-			ctx.Stdout.Write(data[lineStart : i+1])
+			if _, err := ctx.Stdout.Write(data[lineStart : i+1]); err != nil {
+				return
+			}
 			lineStart = i + 1
 			col = 0
 			i++
@@ -171,8 +179,12 @@ func foldData(ctx *Context, data []byte, width int, breakSpaces, byteMode, charM
 			if cut <= lineStart {
 				cut = i
 			}
-			ctx.Stdout.Write(data[lineStart:cut])
-			ctx.Stdout.Write([]byte{'\n'})
+			if _, err := ctx.Stdout.Write(data[lineStart:cut]); err != nil {
+				return
+			}
+			if _, err := ctx.Stdout.Write([]byte{'\n'}); err != nil {
+				return
+			}
 			lineStart = cut
 			col = 0
 			i = cut
@@ -186,6 +198,8 @@ func foldData(ctx *Context, data []byte, width int, breakSpaces, byteMode, charM
 	}
 
 	if lineStart < len(data) {
-		ctx.Stdout.Write(data[lineStart:])
+		if _, err := ctx.Stdout.Write(data[lineStart:]); err != nil {
+			return
+		}
 	}
 }

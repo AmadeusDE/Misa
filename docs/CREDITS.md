@@ -54,6 +54,11 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
 - **toybox** by Rob Landley et al. — 0BSD
   https://github.com/landley/toybox
 
+- **toybox gzip** (`gzip`, `gunzip` and `zcat` in `internal/builtins/gzip.go`, following
+  `toys/lsb/gzip.c`) — 0BSD
+  https://github.com/landley/toybox at commit
+  6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb
+
 - **uutils/coreutils** by the uutils contributors — MIT
   https://github.com/uutils/coreutils
 
@@ -160,4 +165,5 @@ Original Go implementation; rules and notation referenced from:
   and [tests/tar.test](https://github.com/landley/toybox/blob/6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb/tests/tar.test),
   commit `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb`. The test script is copied unchanged in
   `tests/toybox/tar.test`; its dedicated Go adapter explicitly identifies adapted cases and unsupported
-  fixtures. No uutils code was consulted.
+  fixtures. U33 extraction behavior extends tar.c as a behavioral reference; no code is copied. No uutils
+  code was consulted.

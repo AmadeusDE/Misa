@@ -7,17 +7,18 @@ as a multicall binary (`misa ls`) or in-process (`builtin_mode: inprocess`) on s
 Never copy code from GNU coreutils or other GPL projects. Code adapted from permissive projects needs a source
 comment, a `docs/CREDITS.md` entry and, for substantial pieces, a package `NOTICE`.
 
-## U32 — `tar` create/list baseline
+## U32/U33 — `tar` create/list/extract
 
-`tar -c` creates archives and `tar -t` lists them, using the invocation-local cwd (never a process-wide
-`chdir`) and no external archive tools. Supported options are `-f FILE` (default `-`: stdout for creation,
-stdin for listing), `-v`, positional/repeated `-C DIR`, repeated `--exclude PATTERN`, repeated
-`-T FILE`/`--files-from FILE` (`-` reads names from stdin), `--null`, `-h`/`--dereference`,
-`--numeric-owner`, and numeric-only `--owner ID`/`--group ID`. Traditional `tar cf FILE ...` syntax is
-also accepted. `-tO` still lists names, as in Toybox; `-cO` is rejected.
+`tar -c` creates archives, `tar -t` lists them, and U33 adds `tar -x` extraction, using invocation-local
+cwd (never a process-wide `chdir`) and no external archive tools. Supported options include `-f FILE`
+(default `-`: stdout for creation, stdin for listing/extraction), `-v`, positional/repeated `-C DIR`,
+repeated `--exclude PATTERN`, repeated `-T FILE`/`--files-from FILE` (`-` reads names from stdin),
+`--null`, `-h`/`--dereference`, `--numeric-owner`, and numeric-only `--owner ID`/`--group ID`.
+Traditional `tar cf FILE ...` syntax is also accepted. `-tO` still lists names, as in Toybox; `-cO` is
+rejected.
 
-Creation handles regular files, directories, modes, symbolic links and cross-directory hard links
-(Unix device/inode identity), traversing each source in sorted `internal/walk` order. Symlinks are stored
+Creation handles regular files, directories, modes, symbolic links and cross-directory hard links (Unix
+device/inode identity), traversing each source in sorted `internal/walk` order. Symlinks are stored
 without following unless `-h` is given. Writing uses USTAR where possible and PAX for long names/large
 values; reading accepts USTAR, PAX and GNU long-name records. Stored create names are normalized to
 relative paths (including removal of leading `./`); link targets themselves are preserved. Subsecond
@@ -25,16 +26,27 @@ mtime precision is omitted to permit USTAR headers. Exclude globs match path suf
 including across slashes, and excluded directories are pruned. List operands select a member or its
 descendants. Files-from records are literal names, not options; `--null` selects NUL-delimited records.
 
-Success is status 0; invalid options, archive/stream failures, missing selections and partial source
-failures return 2. Unreadable source files are diagnosed and later sources are still archived. A source
-read failure after its header has been emitted terminates creation because that stream cannot be
-repaired. Caller-owned streams are not closed. This is a baseline, not a claim of full tar parity.
+U33 extraction supports `-x`, `-z` (gzip creation/extraction; gzip magic is auto-detected for listing and
+extraction), `-k`/`--keep-old`/`--keep-old-files` (existing non-directory destinations cause errors),
+`--overwrite` (the default: atomically replace regular-file destinations), `-O`/`--to-stdout`, `-p`/`--same-permissions`, `-o`/`--no-same-owner`, `-m`/
+`--touch` (do not restore mtime), and `--strip-components N`. The final `-C DIR` selects the extraction
+destination (creation retains ordered `-C` behavior). Absolute leading slashes are stripped with a warning;
+every `..` path component is conservatively rejected. Extraction does not traverse symlink parents and only
+creates hard links whose targets remain contained. Gzip input is validated into a spool before extraction
+starts; caller-owned streams remain caller-owned. Cancellation is cooperative (F05). Usage errors return 1;
+archive and I/O errors return 2. Regular files are staged beside their destination and published only
+when complete. Extraction is not archive-wide transactional: entries already completed remain after a
+later archive error or cancellation; cancellation returns the F05 interrupt status (130).
 
-Extraction (`-x`), compression (`-z`/`-j`/`-J`/`-a`) and related options are deferred to **U33** and fail
-explicitly with status 2; there is no host-tool fallback. Sparse creation, special-file creation,
-transforms, name-based ownership overrides and other unlisted options are not implemented. **U34**
-will add cpio using the shared archive foundation. Toybox adapter skips record unsupported fixtures,
-byte-exact header differences and U33 cases explicitly rather than claiming the full suite passes.
+By default archived rwx permissions are masked by the current umask; root restores archived ownership,
+non-root does not. Directory metadata is applied after contents. Device nodes and FIFOs require privilege;
+special-node creation is supported on Linux (including Android, subject to platform restrictions) and
+returns an unsupported error elsewhere. No-follow metadata calls can also report kernel limitations.
+Unsupported compression selectors `-j`, `-J`, `-a`, sparse files, transforms, and other unlisted features
+are not implemented; there is no host-tool fallback.
+
+This is not full tar parity. The Toybox adapter skips unsupported fixtures and byte-exact header differences
+rather than claiming the full suite passes. **U34** will add cpio using the shared archive foundation.
 
 ## Known failures
 

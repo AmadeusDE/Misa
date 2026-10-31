@@ -2,6 +2,10 @@
 
 Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (toybox 6a0c0ef, uutils repos at the commits listed there). BusyBox excluded.
 
+## Implemented since this inventory
+
+`tar` has native U32–U33 coverage (create/list and extraction). Native tests and adapted upstream cases cover implemented behavior; the adapted upstream suite is not a claim that the full Toybox or uutils suite passes. Historical totals below remain unchanged.
+
 ## Method
 
 - Candidates: every utility in toybox (any category) or any uutils repo that is not in `misa --list`. toybox sh builtins declared in toys/pending/sh.c (cd, export, set, …; 28 names) are excluded since they belong to Misa's shell, not its builtin registry.
@@ -194,8 +198,8 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `grpck` | – | – | shadow:16 | 0 | root | uutils: Rust, 0/16 simple new_ucmd! cases parseable by tests/uutils adapter | – | 620 | heavy |
 | `grpconv` | – | – | shadow:– | – | – | no tests | – | 42 | light |
 | `grpunconv` | – | – | shadow:– | – | – | no tests | – | 42 | light |
-| `gunzip` | lsb | 6 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
-| `gzip` | lsb | 11 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
+| `gunzip` | lsb | 6 | – | – | – | implemented: `internal/builtins/gzip.go`; toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
+| `gzip` | lsb | 11 | – | – | – | implemented: `internal/builtins/gzip.go`; toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
 | `halt` | other | – | – | – | – | no tests | 46 | – | light |
 | `hd` | other | – | – | – | – | no tests | 62 | – | light |
 | `help` | other | – | – | – | – | no tests | 89 | – | light |
@@ -394,4 +398,4 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `xargs` | posix | 35 | findutils:33 | 0 | – | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 0/33 simple new_ucmd! cases parseable by tests/uutils adapter | 236 | – | medium |
 | `xxd` | other | 22 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 182 | – | light |
 | `xzcat` | pending | 4 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 2651 | – | heavy |
-| `zcat` | lsb | 4 | – | – | – | toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
+| `zcat` | lsb | 4 | – | – | – | implemented: `internal/builtins/gzip.go`; toybox: shell .test (runs in tests/toybox adapter) | 179 | – | light |
