@@ -374,7 +374,7 @@ func (p *Position) castles() []Move {
 		}
 		c := r.castle
 		k, rook := p.Board[c.King], p.Board[c.Rook]
-		if k.Type == 0 || rook.Type == 0 || k.Color != p.Turn || rook.Color != p.Turn || k.Moved || rook.Moved || !v.Type(k).Royal {
+		if k.Type == 0 || rook.Type == 0 || k.Color != p.Turn || rook.Color != p.Turn || k.Moved || rook.Moved || !v.castlesAs(k, c.King) {
 			continue
 		}
 		if !v.Type(k).allows(v, c.KingTo, p.Turn) || !v.Type(rook).allows(v, c.RookTo, p.Turn) {
@@ -396,7 +396,9 @@ func (p *Position) castles() []Move {
 		for sq := min(c.King, c.KingTo); sq <= max(c.King, c.KingTo); sq++ {
 			path = append(path, sq)
 		}
-		if p.castlePathAttacked(c.King, path) {
+		// A royal king may not castle out of, through or into attack; a fog
+		// variant's king is no royal, so it castles regardless of attacks.
+		if v.Type(k).Royal && p.castlePathAttacked(c.King, path) {
 			continue
 		}
 		moves = append(moves, Move{From: c.King, To: c.KingTo, Take: -1, Castle: i})

@@ -425,6 +425,18 @@ func (g *Game) opponent() string {
 	return "neither side: two players"
 }
 
+// perspective remains the human's colour while the computer thinks. With no
+// single human (hotseat or computer vs computer), show the side to move.
+func (g *Game) perspective() Color {
+	if g.computer[White] != g.computer[Black] {
+		if g.computer[White] {
+			return Black
+		}
+		return White
+	}
+	return g.match.Turn()
+}
+
 func (g *Game) computerToMove() bool { return g.computer[g.match.Turn()] }
 
 func (g *Game) engine() *Engine {
@@ -474,6 +486,10 @@ func (g *Game) thought(msg thoughtMsg) {
 	}
 	mover := g.match.Turn()
 	g.play(r.Move)
+	if g.match.Variant().Fog {
+		g.note = "Computer moved"
+		return
+	}
 	if r.Depth == 0 {
 		g.note = "Computer played " + g.match.Notation()[len(g.match.Notation())-1] + " · search stopped before analysis"
 		return

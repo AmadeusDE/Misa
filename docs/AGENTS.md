@@ -329,9 +329,11 @@ internal/
   Betza strings (`fmWfcFifmW2` pawn, `qN` rose, `mRcpR` cannon); `royal` pieces normally may never be left attacked
   (so with two kings, mating either wins), `pawn` pieces promote and take/are taken en passant. A pawn's long first step marks
   every crossed square for en passant. Castling entries are White's four squares, mirrored for Black, or dynamic
-  entries (`rook_side: left|right` with `rook_piece`) whose origins resolve from the position, as Chess960 needs. A file with
-  `extends: <id>` inherits unset fields and merges pieces by letter; `castling: []` drops inherited castling. A later
-  file with an existing id replaces it. Built-ins: chess, double (Double Chess 16×12), bigboard (Betza's 16×16),
+  entries (`rook_side: left|right` with `rook_piece`) whose origins resolve from the position, as Chess960 needs.
+  The piece that castles from an entry is the one the setup puts on its king square (`castlesAs`), so a
+  variant may castle with a non-royal king (fog); only a royal one may not castle out of, through or into
+  attack. A file with `extends: <id>` inherits unset fields and merges pieces by letter; `castling: []` drops
+  inherited castling. A later file with an existing id replaces it. Built-ins: chess, double (Double Chess 16×12), bigboard (Betza's 16×16),
   doublebig (Double Big Board 32×16), amazon (queen-replacement Amazon Chess), nocastling (orthodox chess without
   castling), capablanca (10×8 with Archbishop and Chancellor), berolina (Berolina Chess: diagonal noncapturing
   pawn moves, diagonal initial double-step, straight captures and en passant), stalematewins (Stalemate-wins
@@ -363,7 +365,12 @@ internal/
   checkmating Black, while `extinction: all` gives Black the game the moment no horde piece is left;
   `double_step_ranks: [1, 2]` replaces the Betza double step with a two-square advance from those
   side-relative ranks whether or not the piece has moved, and `ep_exempt_ranks: [1]` withholds the
-  en passant right from the rank-1 step, both `nil` unless configured and both inherited by `extends`).
+  en passant right from the rank-1 step, both `nil` unless configured and both inherited by `extends`), and
+  fog (Fog of War: `fog: true` shows a side only its own pieces and the squares they may move to or
+  capture on; the king is non-royal, so there is no check, no pin and no checkmate, castling may go
+  through attack, and `extinction: [K]` makes capturing the enemy king the win; the move list, the last
+  move and the computer's analysis stay hidden, and `Position.Visible` computes the mask for either side
+  on any board, pockets and zones included).
   `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
   and the search both honour it. `promotion_optional: true` lets a pawn stay a pawn inside `promotion_zone` (but
   not on the last rank, where promotion is forced); `promotion_captured_only: true` restricts the choices to

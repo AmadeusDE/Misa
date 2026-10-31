@@ -1,0 +1,8 @@
+id: fog
+name: Fog of War
+description: King-capture chess with visibility limited to your pieces and their destinations.
+extends: chess
+fog: true
+pieces:
+  - {letter: K, name: King, betza: K, glyph: ♚}
+extinction: [K]

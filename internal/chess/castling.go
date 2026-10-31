@@ -13,6 +13,18 @@ type resolvedCastle struct {
 // Castle returns the position's immutable, color-oriented castling squares.
 func (p *Position) Castle(i int, color Color) Castle { return p.castling[color][i].castle }
 
+// castlesAs reports whether pc standing on sq is the piece that castles from
+// there: the piece the variant sets up on that square, which is its king even
+// where that king is no royal (a fog variant's king is captured, not mated). A
+// royal king may not castle out of, through or into attack; an ordinary piece
+// may.
+func (v *Variant) castlesAs(pc Piece, sq int) bool {
+	if v.Type(pc).Royal {
+		return true
+	}
+	return sq >= 0 && sq < len(v.start) && v.start[sq].Type == pc.Type
+}
+
 func (p *Position) resolveCastles(rights string) {
 	v := p.V
 	for color := White; color <= Black; color++ {
@@ -69,7 +81,7 @@ func (p *Position) resolveCastles(rights string) {
 			}
 			if active {
 				k, r := p.Board[c.King], p.Board[c.Rook]
-				active = k.Type != 0 && r.Type != 0 && k.Color == color && r.Color == color && v.Type(k).Royal && (spec.RookSide == "" || r.Type == spec.RookType)
+				active = k.Type != 0 && r.Type != 0 && k.Color == color && r.Color == color && v.castlesAs(k, c.King) && (spec.RookSide == "" || r.Type == spec.RookType)
 				if active && rights != "" {
 					p.Board[c.King].Moved = false
 					p.Board[c.Rook].Moved = false
