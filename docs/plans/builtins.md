@@ -15,6 +15,8 @@ Grouped by cause:
 
 - **Output format**: `wc` column widths for single files and totals (10 cases); `rmdir` and `mv` message
   wording; `seq -w` padding with hex operands.
+- **Message wording**: `install -m 999` reports an invalid mode instead of repeating uutils' Rust
+  integer-parse text (`Invalid mode string: invalid digit found in string`).
 - **Missing options**: `ls --time=WORD`, `--time-style` validation; negative `nl -i`.
 - **Sorting**: `sort -V` tie order, `sort -n` accepting a leading `+`, `--random-source` read without `-R`.
 - **Locale**: `sort` collation and `numfmt` grouping need locale support; decide whether Misa supports
@@ -33,13 +35,14 @@ When a case starts passing, delete its line.
 ## Next
 
 1. **Safe in-process use.** `builtin_mode: inprocess` runs built-ins on goroutines in one process, so
-   process-wide state is shared. Remaining: `currentUmask` flips the umask off Linux; `sort
-   --compress-program` execs; not every built-in honours `ctx.Env`; no cancellation (`tail -f`, `sleep`
-   need a `context.Context` in `builtins.Context`). Then a `builtins.Run` helper usable as a library.
+   process-wide state is shared. F02–F05 provide `builtins.Run`, invocation-local environment,
+   cooperative cancellation and child-only `nice`/non-mutating umask reads (see `invocation.md`).
+   Remaining: shared launcher/process cleanup (F06), terminal-owning tools and cancellation limits;
+   do not classify every builtin as safe merely because it has a `Run` function.
 2. **Missing utilities.** `utility-comparison.md` lists every utility in toybox, BusyBox and uutils
    against Misa's (2026-10-15); `builtins-coverage.md` ranks the missing ones by how many upstream
    test cases would run unchanged and how much work they are. The POSIX ones toybox and uutils both
-   have: `test`/`[`, `od`, `dd`, `df`, `install`, `chgrp`, `nohup`, `mknod`, `who`, `renice`, `ps`,
+   have: `test`/`[`, `od`, `dd`, `df`, `nohup`, `mknod`, `who`, `renice`, `ps`,
    `pidof`, `xargs`, `find`, `grep`, `sed`, `tar`. `find` and `grep` should share a walker and matcher with ugh's search tool (`internal/search`, see
    `docs/plans/ughbot.md`). Each new command starts from its upstream tests.
 3. **`fetch` styling.** `fetch` writes raw ANSI to stdout. It is command output, not Misa UI, so this may be

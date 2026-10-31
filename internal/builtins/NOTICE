@@ -9,3 +9,14 @@ The environment reference-conflict audit also checked test_env.rs at that pin.
 F08 implementations and regression tests are native Go; no upstream algorithm
 or fixture bytes were imported. Local adapter fixture provenance is recorded
 separately in tests/provenance/fixtures.json.
+
+U13 chgrp and U14 install follow:
+- Toybox toys/posix/chgrp.c and toys/posix/cp.c (install), 6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb, 0BSD.
+- Toybox tests/chgrp.test (case list and placements ported to tests/native) and
+  tests/install.test (copied verbatim to tests/toybox/install.test) at that pin.
+- uutils/coreutils src/uu/chgrp, src/uu/install, tests/by-util/test_chgrp.rs and
+  tests/by-util/test_install.rs, fee61ff5d4f87e0f912a52e639942b5f7ad58663, MIT.
+Both implementations and their native tests are original Go: option sets,
+message wording and case placement follow the references, no upstream source or
+fixture bytes were copied. install -s is rejected by design and never runs an
+external strip program.

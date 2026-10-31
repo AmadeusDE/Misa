@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 )
 
 func init() {
@@ -35,7 +37,9 @@ func runMkfifo(ctx *Context) int {
 		mask := os.FileMode(0)
 		for _, clause := range strings.Split(modeStr, ",") {
 			if clause != "" && strings.ContainsAny(clause[:1], "+-=") {
-				mask, err = mkfifoUmask()
+				var value int
+				value, err = proceffect.Umask()
+				mask = os.FileMode(value)
 				break
 			}
 		}
@@ -114,19 +118,4 @@ func parseMkfifoMode(text string, mask os.FileMode) (os.FileMode, error) {
 		return 0, fmt.Errorf("mode must specify only file permission bits")
 	}
 	return mode, nil
-}
-
-// Reading procfs avoids the process-global side effects of syscall.Umask.
-func mkfifoUmask() (os.FileMode, error) {
-	data, err := os.ReadFile("/proc/self/status")
-	if err != nil {
-		return 0, fmt.Errorf("cannot read umask: %w", err)
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		if value, ok := strings.CutPrefix(line, "Umask:"); ok {
-			mask, err := strconv.ParseUint(strings.TrimSpace(value), 8, 32)
-			return os.FileMode(mask), err
-		}
-	}
-	return 0, fmt.Errorf("cannot read umask from /proc/self/status")
 }

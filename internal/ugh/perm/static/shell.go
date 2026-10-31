@@ -441,7 +441,7 @@ func (a *analyzer) argv(name word, rest []word) {
 		} else {
 			a.f.setExtreme("shred")
 		}
-	case "chmod", "chown":
+	case "chmod", "chown", "chgrp":
 		a.ruleChmod(base, rest)
 	case "mv":
 		if t := firstNonFlag(rest); t == "/" || strings.HasPrefix(t, "/*") {
@@ -870,7 +870,7 @@ var (
 
 func dangerousWord(b string) bool {
 	switch b {
-	case "rm", "dd", "shred", "wipefs", "chmod", "chown", "kill", "mv":
+	case "rm", "dd", "shred", "wipefs", "chmod", "chown", "chgrp", "kill", "mv":
 		return true
 	}
 	return strings.HasPrefix(b, "mkfs")

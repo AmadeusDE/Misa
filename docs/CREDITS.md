@@ -62,6 +62,13 @@ from upstream. License texts are in `THIRD_PARTY_NOTICES.md` and next to the cop
   `fee61ff5d4f87e0f912a52e639942b5f7ad58663` (MIT). The env reference-conflict
   audit also checked `test_env.rs` at that pin. Implementations and regression
   tests are native Go; no upstream algorithms or fixture bytes were imported.
+  U13 `chgrp` and U14 `install` follow Toybox `toys/posix/chgrp.c` and
+  `toys/posix/cp.c` (install) at `6a0c0ef5eeb2c43e4feef9781398c1718b8bddcb` (0BSD) and
+  uutils `src/uu/chgrp`, `src/uu/install`, `tests/by-util/test_chgrp.rs` and
+  `tests/by-util/test_install.rs` at `fee61ff5d4f87e0f912a52e639942b5f7ad58663` (MIT).
+  Toybox `tests/chgrp.test` placements are ported to `tests/native` and
+  `tests/install.test` is copied to `tests/toybox/install.test`; the
+  implementations and the remaining tests are original Go.
 
 - **uutils/diffutils** by the uutils contributors — MIT / Apache-2.0
   https://github.com/uutils/diffutils

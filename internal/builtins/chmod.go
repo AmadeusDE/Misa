@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 )
 
 const chmodSpec = "R(recursive)v(verbose)c(changes)f(silent)quiet(quiet)"
@@ -258,7 +260,19 @@ func runChmod(ctx *Context) int {
 	return exitCode
 }
 
+// parseSymbolicMode applies spec to current, with the process umask limiting a
+// clause that names no "who".
 func parseSymbolicMode(spec string, current os.FileMode) (os.FileMode, error) {
+	return parseSymbolicModeMasked(spec, current, func() (os.FileMode, error) {
+		mask, err := proceffect.Umask()
+		return os.FileMode(mask), err
+	})
+}
+
+// parseSymbolicModeMasked is parseSymbolicMode with an explicit umask source.
+// install -m passes a constant zero: an explicit mode there is not limited by
+// the umask (as in toybox and uutils).
+func parseSymbolicModeMasked(spec string, current os.FileMode, umask func() (os.FileMode, error)) (os.FileMode, error) {
 	mode := current.Perm()
 	if current&os.ModeSetuid != 0 {
 		mode |= 04000
@@ -299,7 +313,11 @@ func parseSymbolicMode(spec string, current os.FileMode) (os.FileMode, error) {
 		}
 	doneWho:
 		if !hasWho {
-			who = os.FileMode(07777 &^ currentUmask())
+			mask, err := umask()
+			if err != nil {
+				return 0, fmt.Errorf("cannot read umask: %w", err)
+			}
+			who = os.FileMode(07777 &^ mask)
 		}
 
 		for i < len(clause) {

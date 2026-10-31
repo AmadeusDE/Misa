@@ -1,6 +1,7 @@
 package builtins
 
 import (
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 	"os"
 	"path/filepath"
 	"testing"
@@ -222,6 +223,11 @@ func TestCpRemoveDestination(t *testing.T) {
 // TestCpNoPreserveModeUsesDefaultNotSourceBits ensures --no-preserve=mode
 // falls back to the umask default rather than "source mode minus umask".
 func TestCpNoPreserveModeUsesDefaultNotSourceBits(t *testing.T) {
+	if mask, err := proceffect.Umask(); err != nil || mask&0731 == 0 {
+		// With umask 0 (Android adb shells) the masked default equals the
+		// source bits, so the test cannot tell the two apart.
+		t.Skipf("umask %03o cannot distinguish default from source mode (err %v)", mask, err)
+	}
 	dir := t.TempDir()
 	writeFile(t, dir, "a", "x")
 	os.Chmod(filepath.Join(dir, "a"), 0731)

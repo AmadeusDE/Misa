@@ -42,6 +42,19 @@ func TestStatFormatPerms(t *testing.T) {
 	assertStdout(t, r, "644\n")
 }
 
+// %a is the mode as chmod takes it, so the setuid/setgid/sticky digits are part
+// of the output (toybox install.test asserts "2750" this way).
+func TestStatFormatPermsSpecialBits(t *testing.T) {
+	dir := t.TempDir()
+	p := writeFile(t, dir, "setuid", "data")
+	if err := os.Chmod(p, 0755|os.ModeSetuid|os.ModeSetgid|os.ModeSticky); err != nil {
+		t.Skipf("chmod with special bits: %v", err)
+	}
+	r := runBuiltinIn(t, dir, "stat", "-c", "%a", "setuid")
+	assertExitCode(t, r, 0)
+	assertStdout(t, r, "7755\n")
+}
+
 func TestStatFormatType(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "file.txt", "data")
