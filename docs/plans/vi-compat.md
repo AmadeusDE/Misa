@@ -1,4 +1,4 @@
-# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/G01/T01/T02/T03/T05
+# Vi compatibility ledger — F01/F02/F03/F04/F05/F06/F07/F09/G01/T01/T02/T03/T05
 
 This is an incremental compatibility ledger for issue #67, not a claim of full Vim or Neovim
 compatibility. The editor uses the same `Editor.Update` event path standalone and inside a Misa pane.
@@ -72,6 +72,7 @@ without quitting Misa and preserves its register.
 | T03: shell lifecycle and reads (done) | Original `shell*_test.go` and `internal/ui/editor_shell_regression_test.go` fixtures | Async output/cancellation, shared cwd/environment, addressed file/shell reads and failure-safe filters; limits below. |
 | T05: edit another file | Original `edit*_t05_test.go`, `edit_edges_t05_test.go`, `edit_policy_t05_test.go`, reload replay fixture, and `internal/ui/editor_edit_regression_test.go` | File switching and reload contract below; automated fixtures are being added, not a claim of manual verification. |
 | T01: substitute confirmation (done) | `substitute_confirm_test.go`, `substitute_confirm_replay_test.go`, `substitute_confirm_edges_test.go`, `substitute_entry_test.go`, `internal/ui/editor_substitute_regression_test.go` | Public-event fixtures for decisions, ranges, global matches, Unicode, cursor/highlight/prompt, counts, undo/redo, no-op history, dot/register preservation, macro playback, and standalone/mux resize and return. |
+| F09: bounded viewport and display cells (done) | `internal/vi/layout_test.go`, `display_f09_test.go`, `internal/ui/editor_display_regression_test.go` | One line-to-cells layout (`layout.go`) behind rendering, cursor, Visual/confirm highlights and `j`/`k`; scope below. |
 | G01: Vim pattern subset (done) | `internal/vi/vipat/*_test.go`, `pattern_g01_replay_test.go`, `pattern_entry_g01_test.go`, `substitute_line_test.go`, `internal/ui/editor_pattern_regression_test.go` | One parser/matcher (`vipat`) behind `/`, `?`, `n`/`N`, operator searches, `:s` (including `c`), `:g` and `:v`; scope below. |
 
 ### F07 file round trips and safety
@@ -134,6 +135,32 @@ default-case flag and `\c`/`\C` already work), the replacement grammar `&`, `\1`
 `:&`, `g&` (G02), Ex addresses and `:g` execution order/register order (G03: `:g/pat/d` still runs
 bottom-up), `*`/`#` (H02), search offsets (`/pat/e`) and history (T07). Vim 9.1 `nocompatible`
 `:help pattern` is used as specification only; no Vim, Neovim or regex-library code is used.
+
+### F09 Display cells and the bounded viewport
+
+`layout.go` turns a line into per-rune spans (display column, width) so a rune index and a display
+column convert both ways. Later work (hlsearch T04, help window T06, line numbers H11, Visual block G04,
+`wrap`/`listchars` D07) should build on `newLayout` and `lineLayout.window` rather than counting runes.
+Policies:
+
+- Width comes from `rivo/uniseg` grapheme clusters, the same measure lipgloss and `x/ansi` use. A combining
+  mark or ZWJ part shares its cluster's cells; the cursor and `h`/`l` still step per rune, and a cursor on a
+  mark highlights its cluster. Ambiguous-width characters are one cell.
+- Tabs expand to one constant (`defaultTabstop`, 8, read through `Editor.tabstop`) until a `tabstop` option exists.
+- Control characters draw as `^X` (`^?` for DEL) and C1 controls as `<85>`; invalid UTF-8 bytes are one rune
+  and one U+FFFD cell. Standalone zero-width clusters draw nothing.
+- Normal and Visual cursors sit on the last cell of a tab, as in Vim, and the ruler shows `row,col-vcol` when
+  the display column differs. Insert and Replace sit on its first cell, before the character. A wide
+  character highlights both cells.
+- `j`/`k` keep the preferred column (`goalCol`) in display columns; landing inside a tab or wide character
+  selects it.
+- Lines do not wrap: `nowrap` with Vim's `sidescroll=0` policy. When the cursor leaves the window it is
+  recentred, and it scrolls back for shorter lines. `View` never emits a line wider than the pane; a wide
+  character cut by either edge becomes a space.
+- The status line, `statusMsg` and prompt are cut to the width (the command line keeps its tail). Below
+  three rows the prompt/status share the last line (the prompt wins while active); with three or more
+  rows the text area is `rows-2` lines.
+- `Resize` re-validates the cursor row and column.
 
 ### T01 scope and limits
 
@@ -297,6 +324,9 @@ heuristics are not claimed. Arrow-driven insert undo breaks are not claimed.
   WORD motions `W`/`E`, `cW`/`dE` are not implemented (H01); `gu`/`gU`/`g~` are not existing
   normal operators here (G06). Sentence-motion/operator coverage remains limited; F04 motions are
   covered above.
+- **F09:** `wrap`, `list`/`listchars`, `number`, `tabstop`, `sidescroll`/`sidescrolloff` and `ambiwidth`
+  are not implemented (D07/H11/T06). Visual `j`/`k` does not keep a preferred column yet. Cursor steps
+  per rune, not per grapheme. Mux chrome under about five columns may itself overflow; the editor's output does not.
 - **F04:** Search offsets and command/search history (T07) are unsupported; patterns are the G01 subset.
   No `//` delimiter grammar is claimed
   (empty prompt Enter reuses the last pattern). `wrapscan`, `matchpairs`, and `cpoptions` are not

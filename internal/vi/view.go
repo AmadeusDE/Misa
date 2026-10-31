@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 var (
@@ -16,6 +17,49 @@ var (
 	visualStyle = lipgloss.NewStyle().Reverse(true)
 )
 
+func (e *Editor) viewRows() int {
+	if e.rows > 0 {
+		return e.rows
+	}
+	return e.height + 2
+}
+
+// fit cuts s to w display cells; the pane may be narrower than the text.
+func fit(s string, w int) string {
+	if w < 1 {
+		return ""
+	}
+	return ansi.Truncate(strings.ReplaceAll(s, "\n", " "), w, "")
+}
+
+func (e *Editor) promptLine() (string, bool) {
+	var s string
+	switch e.mode {
+	case ModeConfirm:
+		s = e.confirm.prompt()
+	case ModeCommand:
+		s = ":" + e.cmdBuf
+	case ModeSearch:
+		s = "/" + e.cmdBuf
+		if e.searchDir == -1 {
+			s = "?" + e.cmdBuf
+		}
+	default:
+		if e.statusMsg != "" {
+			s = e.statusMsg
+		} else if e.mode == ModeNormal {
+			s = e.pendingDisplay()
+		}
+	}
+	s = strings.ReplaceAll(s, "\n", " ")
+	if w := ansi.StringWidth(s); w > e.width && (e.mode == ModeCommand || e.mode == ModeSearch) {
+		s = ansi.TruncateLeft(s, w-e.width, "")
+	}
+	return fit(s, e.width), s != ""
+}
+
+// View draws exactly viewRows lines, none wider than the pane. Below three rows
+// the text area shrinks first, then the status line gives way to the prompt line.
 func (e *Editor) View() string {
 	if e.width == 0 || e.height <= 0 {
 		return "loading..."
@@ -24,52 +68,70 @@ func (e *Editor) View() string {
 		return e.renderShellOutput()
 	}
 	if e.shell != nil {
-		return lipgloss.NewStyle().Reverse(true).Render("Running shell command… Ctrl-C to cancel")
+		return lipgloss.NewStyle().Reverse(true).Render(fit("Running shell command… Ctrl-C to cancel", e.width))
 	}
 
-	var b strings.Builder
-
-	for i := 0; i < e.height; i++ {
+	e.ensureColumnVisible()
+	rows := e.viewRows()
+	textRows := max(0, min(e.height, rows-2))
+	var lines []string
+	for i := 0; i < textRows; i++ {
 		lineIdx := e.topLine + i
 		if lineIdx < len(e.lines) {
-			b.WriteString(e.renderTextLine(lineIdx))
+			lines = append(lines, e.renderTextLine(lineIdx))
 		} else {
-			b.WriteString(tildeStyle.Render("~"))
-		}
-		if i < e.height-1 {
-			b.WriteByte('\n')
+			lines = append(lines, tildeStyle.Render("~"))
 		}
 	}
-	b.WriteByte('\n')
-
-	b.WriteString(e.renderStatusLine())
-	b.WriteByte('\n')
-
-	switch e.mode {
-	case ModeConfirm:
-		b.WriteString(e.confirm.prompt())
-	case ModeCommand:
-		b.WriteString(":" + e.cmdBuf)
-	case ModeSearch:
-		if e.searchDir == -1 {
-			b.WriteString("?" + e.cmdBuf)
-		} else {
-			b.WriteString("/" + e.cmdBuf)
-		}
+	prompt, active := e.promptLine()
+	switch {
+	case rows >= 3:
+		lines = append(lines, e.renderStatusLine(), prompt)
+	case active:
+		lines = append(lines, prompt)
 	default:
-		if e.statusMsg != "" {
-			b.WriteString(e.statusMsg)
-		} else if e.mode == ModeNormal {
-			b.WriteString(e.pendingDisplay())
-		}
+		lines = append(lines, e.renderStatusLine())
 	}
+	return strings.Join(lines, "\n")
+}
 
-	return b.String()
+func (e *Editor) insertLike() bool { return e.mode == ModeInsert || e.mode == ModeReplace }
+
+func (e *Editor) rowLayout(row int) lineLayout {
+	if row < 0 || row >= len(e.lines) {
+		return lineLayout{}
+	}
+	return newLayout(e.lines[row], e.tabstop())
+}
+
+// cursorVCol is the 1-based display column of the cursor for the ruler: the last
+// cell of a tab in normal mode, as Vim shows it.
+func (e *Editor) cursorVCol() int {
+	start, _ := e.rowLayout(e.row).cursorCells(e.col, e.insertLike())
+	return start + 1
+}
+
+// ensureColumnVisible scrolls horizontally like Vim's 'nowrap' with sidescroll=0:
+// when the cursor leaves the window it is put in the middle of the screen. A cursor
+// wider than the pane keeps its first cell visible.
+func (e *Editor) ensureColumnVisible() {
+	if e.width <= 0 {
+		return
+	}
+	start, n := e.rowLayout(e.row).cursorCells(e.col, e.insertLike())
+	end := start + n - 1
+	if start >= e.leftCol && end < e.leftCol+e.width {
+		return
+	}
+	e.leftCol = max(0, start-e.width/2)
+	if end >= e.leftCol+e.width {
+		e.leftCol = end - e.width + 1
+	}
+	e.leftCol = max(0, min(e.leftCol, start))
 }
 
 func (e *Editor) renderTextLine(lineIdx int) string {
-	runes := []rune(e.lines[lineIdx])
-	showCursor := lineIdx == e.row
+	layout := e.rowLayout(lineIdx)
 
 	inVisual := e.visual != visualNone && e.mode == ModeNormal
 
@@ -84,7 +146,7 @@ func (e *Editor) renderTextLine(lineIdx int) string {
 		matchFrom = utf8.RuneCountInString(line[:e.confirm.start])
 		matchTo = utf8.RuneCountInString(line[:e.confirm.end])
 	}
-	isSelected := func(row, col int) bool {
+	isSelected := func(col int) bool {
 		if col >= matchFrom && col < matchTo {
 			return true
 		}
@@ -92,68 +154,39 @@ func (e *Editor) renderTextLine(lineIdx int) string {
 			return false
 		}
 		if e.visual == visualLine {
-			return row >= fromR && row <= toR
+			return lineIdx >= fromR && lineIdx <= toR
 		}
-		if row < fromR || row > toR {
+		if lineIdx < fromR || lineIdx > toR {
 			return false
 		}
 		if fromR == toR {
 			return col >= fromC && col <= toC
 		}
-		if row == fromR {
+		if lineIdx == fromR {
 			return col >= fromC
 		}
-		if row == toR {
+		if lineIdx == toR {
 			return col <= toC
 		}
 		return true
 	}
 
-	var b strings.Builder
-	dc := 0
-	for i, r := range runes {
-		if r == '\t' {
-			spaces := 8 - (dc % 8)
-			if showCursor && i == e.col {
-				b.WriteString(cursorStyle.Render(" "))
-				for j := 1; j < spaces; j++ {
-					if isSelected(lineIdx, i) {
-						b.WriteString(visualStyle.Render(" "))
-					} else {
-						b.WriteByte(' ')
-					}
-				}
-			} else if isSelected(lineIdx, i) {
-				for j := 0; j < spaces; j++ {
-					b.WriteString(visualStyle.Render(" "))
-				}
-			} else {
-				for j := 0; j < spaces; j++ {
-					b.WriteByte(' ')
-				}
-			}
-			dc += spaces
-		} else {
-			text := string(r)
-			width := 1
-			if r == '\r' {
-				text = "^M"
-				width = 2
-			}
-			if showCursor && i == e.col {
-				b.WriteString(cursorStyle.Render(text))
-			} else if isSelected(lineIdx, i) {
-				b.WriteString(visualStyle.Render(text))
-			} else {
-				b.WriteString(text)
-			}
-			dc += width
-		}
+	marks := lineMarks{selected: isSelected}
+	if lineIdx == e.row {
+		marks.cursorStart, marks.cursorN = layout.cursorCells(e.col, e.insertLike())
 	}
-	if showCursor && e.col >= len(runes) {
-		b.WriteString(cursorStyle.Render(" "))
-	} else if inVisual && e.visual == visualLine && lineIdx >= fromR && lineIdx <= toR && len(runes) == 0 {
-		b.WriteString(visualStyle.Render(" "))
+	marks.eolSelected = inVisual && e.visual == visualLine && lineIdx >= fromR && lineIdx <= toR && layout.width == 0
+
+	var b strings.Builder
+	for _, run := range layout.window(e.leftCol, e.width, marks) {
+		switch run.style {
+		case styleCursor:
+			b.WriteString(cursorStyle.Render(run.text))
+		case styleSelected:
+			b.WriteString(visualStyle.Render(run.text))
+		default:
+			b.WriteString(run.text)
+		}
 	}
 	return b.String()
 }
@@ -188,15 +221,21 @@ func (e *Editor) renderStatusLine() string {
 	}
 
 	right := fmt.Sprintf(" %d,%d ", e.row+1, e.col+1)
+	if v := e.cursorVCol(); v != e.col+1 {
+		right = fmt.Sprintf(" %d,%d-%d ", e.row+1, e.col+1, v)
+	}
 	if e.recording {
 		right = fmt.Sprintf("recording @%c  ", e.recordReg) + right
 	}
 
-	pad := e.width - lipgloss.Width(left) - lipgloss.Width(right)
-	if pad < 1 {
-		pad = 1
+	rw := ansi.StringWidth(right)
+	if e.width < rw+1 {
+		left, right = "", ""
+	} else if ansi.StringWidth(left)+rw+1 > e.width {
+		left = ansi.Truncate(left, e.width-rw-1, "")
 	}
-	return statusStyle.Render(left + strings.Repeat(" ", pad) + right)
+	pad := e.width - ansi.StringWidth(left) - ansi.StringWidth(right)
+	return statusStyle.Render(fit(left+strings.Repeat(" ", max(0, pad))+right, e.width))
 }
 
 func (e *Editor) pendingDisplay() string {
