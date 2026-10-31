@@ -129,7 +129,10 @@ func numDigits(n int) int {
 	return d
 }
 
-func runWc(ctx *Context) int {
+func runWc(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	posixlyCorrect := false
 	for _, e := range ctx.Env {
 		if strings.HasPrefix(e, "POSIXLY_CORRECT=") {
@@ -225,7 +228,7 @@ func runWc(ctx *Context) int {
 				return 1
 			}
 			defer f.Close()
-			r = f
+			r = ContextReader(ctx.CancellationContext(), f)
 		}
 		sc := bufio.NewScanner(r)
 		sc.Split(scanZeroTerminated)
@@ -299,7 +302,7 @@ func runWc(ctx *Context) int {
 				exitCode = 1
 				continue
 			}
-			r = f
+			r = ContextReader(ctx.CancellationContext(), f)
 		}
 
 		c := wcCount(r, posixlyCorrect)

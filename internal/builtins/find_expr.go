@@ -17,6 +17,7 @@ type findEntry struct {
 	follow           bool
 	prune, quit      bool
 	err              error
+	validate         func() error
 }
 
 func (e *findEntry) fail(err error) bool {

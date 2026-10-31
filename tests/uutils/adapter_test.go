@@ -1822,9 +1822,18 @@ func runTestCase(t *testing.T, cmdName string, tc testCase, fixtureDir string) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	env := tc.env
-	if env == nil {
-		env = []string{}
+	env := append([]string{}, tc.env...)
+	// Upstream timeout fixtures inherit the host PATH unless overridden. Other
+	// command fixtures keep their deliberately isolated environment.
+	hasPath := false
+	for _, e := range env {
+		if strings.HasPrefix(e, "PATH=") {
+			hasPath = true
+			break
+		}
+	}
+	if cmdName == "timeout" && !hasPath {
+		env = append(env, "PATH="+os.Getenv("PATH"))
 	}
 	ctx := &builtins.Context{
 		Dir:     dir,

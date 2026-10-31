@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -10,9 +11,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/AmadeusDE/Misa/internal/builtinexec"
 	"github.com/AmadeusDE/Misa/internal/builtins"
 	"github.com/AmadeusDE/Misa/internal/jobleader"
 	"github.com/AmadeusDE/Misa/internal/term"
+	xterm "golang.org/x/term"
 )
 
 // BuiltinExecutable is the multicall binary builtins re-exec through
@@ -58,21 +61,40 @@ func (m *Model) planCommand(command string) commandPlan {
 	return shellPlan(command)
 }
 
-func runBuiltin(p commandPlan, dir string, stdin io.Reader, out io.Writer) (code int) {
+func runBuiltin(p commandPlan, dir string, stdin io.Reader, out io.Writer) int {
+	return runBuiltinSized(p, dir, stdin, out, 0, 0)
+}
+
+func runBuiltinSized(p commandPlan, dir string, stdin io.Reader, out io.Writer, width, height int) int {
+	return runBuiltinContext(context.Background(), p, dir, stdin, out, width, height)
+}
+
+func runBuiltinContext(ctx context.Context, p commandPlan, dir string, stdin io.Reader, out io.Writer, width, height int) (code int) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(out, "%s: internal error: %v\n", p.fields[0], r)
 			code = 2
 		}
 	}()
-	return p.builtin.Run(&builtins.Context{
-		Dir:     dir,
-		Args:    p.fields[1:],
-		CmdName: p.fields[0],
-		Stdout:  out,
-		Stderr:  out,
-		Stdin:   stdin,
+	return builtins.Run(ctx, p.fields[0], &builtins.Context{
+		Exec:      builtinexec.For(p.fields[0]),
+		Width:     width,
+		Height:    height,
+		StdinTTY:  builtinStreamTTY(stdin),
+		StdoutTTY: builtinStreamTTY(out),
+		StderrTTY: builtinStreamTTY(out),
+		Dir:       dir,
+		Args:      p.fields[1:],
+		CmdName:   p.fields[0],
+		Stdout:    out,
+		Stderr:    out,
+		Stdin:     stdin,
 	})
+}
+
+func builtinStreamTTY(stream any) bool {
+	file, ok := stream.(*os.File)
+	return ok && xterm.IsTerminal(int(file.Fd()))
 }
 
 // underJobLeader runs a program as a job of the multicall binary, which gives
@@ -89,7 +111,9 @@ func (m *Model) startPlan(p commandPlan, rows, cols int) (*term.Terminal, tea.Cm
 	var err error
 	switch {
 	case p.inProcess():
-		err = t.StartFunc(func(tty *os.File) int { return runBuiltin(p, m.dir, tty, tty) })
+		err = t.StartFuncContext(context.Background(), func(ctx context.Context, tty *os.File) int {
+			return runBuiltinContext(ctx, p, m.dir, tty, tty, cols, rows)
+		})
 	case m.jobControl:
 		err = t.StartArgv(m.dir, underJobLeader(p.argv)...)
 	default:

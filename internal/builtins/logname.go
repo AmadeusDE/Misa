@@ -2,7 +2,6 @@ package builtins
 
 import (
 	"fmt"
-	"os"
 	"os/user"
 )
 
@@ -33,7 +32,7 @@ func runLogname(ctx *Context) int {
 		fmt.Fprintf(ctx.Stdout, "logname (Misa) 0.1.0\n")
 		return 0
 	}
-	name := os.Getenv("LOGNAME")
+	name := ctx.Getenv("LOGNAME")
 	if name == "" {
 		if u, err := user.Current(); err == nil {
 			name = u.Username

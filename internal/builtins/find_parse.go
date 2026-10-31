@@ -14,12 +14,14 @@ type findOptions struct {
 	minDepth                        int
 }
 type findParser struct {
-	ctx     *Context
-	args    []string
-	pos     int
-	options findOptions
-	action  bool
-	now     time.Time
+	ctx                 *Context
+	execs               []*findExec
+	hasDelete, hasPrune bool
+	args                []string
+	pos                 int
+	options             findOptions
+	action              bool
+	now                 time.Time
 }
 
 func (p *findParser) argument(name string) (string, error) {
@@ -46,6 +48,12 @@ func (p *findParser) parse() (findNode, error) {
 	}
 	if p.pos != len(p.args) {
 		return nil, fmt.Errorf("unexpected %q", p.peek())
+	}
+	if p.hasDelete && (p.options.follow || p.options.followRoot) {
+		return nil, fmt.Errorf("-delete cannot be combined with -L, -H or -follow")
+	}
+	if p.hasDelete && p.hasPrune {
+		return nil, fmt.Errorf("-delete cannot be combined with -prune")
 	}
 	return n, nil
 }
@@ -124,8 +132,15 @@ func (p *findParser) unary() (findNode, error) {
 		return n, nil
 	case ")", ",", "-a", "-and", "-o", "-or":
 		return nil, fmt.Errorf("unexpected %q", name)
-	case "-delete", "-exec", "-execdir", "-ok", "-okdir":
-		return nil, fmt.Errorf("%s not yet supported (U07)", name)
+	case "-delete":
+		p.hasDelete = true
+		p.options.depth = true
+		p.action = true
+		return findDelete, nil
+	case "-exec", "-execdir":
+		return p.execAction(name)
+	case "-ok", "-okdir":
+		return nil, fmt.Errorf("%s not supported", name)
 	case "-regextype":
 		return nil, fmt.Errorf("-regextype is not supported")
 	case "-depth":
@@ -169,7 +184,14 @@ func (p *findParser) unary() (findNode, error) {
 		}
 		return findPrintf(s)
 	case "-prune":
-		return func(e *findEntry) bool { e.prune = true; return true }, nil
+		p.hasPrune = true
+		return func(e *findEntry) bool {
+			if p.options.depth {
+				return false
+			}
+			e.prune = true
+			return true
+		}, nil
 	case "-quit":
 		return func(e *findEntry) bool { e.quit = true; return true }, nil
 	default:

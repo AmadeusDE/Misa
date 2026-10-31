@@ -2,7 +2,6 @@ package builtins
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -50,7 +49,7 @@ func runFalse(ctx *Context) int {
 }
 
 func runEcho(ctx *Context) int {
-	posix := os.Getenv("POSIXLY_CORRECT") != ""
+	posix := ctx.Getenv("POSIXLY_CORRECT") != ""
 
 	noNewline := false
 	escape := posix // POSIX mode: escapes on by default
@@ -122,7 +121,11 @@ func runEcho(ctx *Context) int {
 	return 0
 }
 
-func runYes(ctx *Context) int {
+func runYes(ctx *Context) (code int) {
+	tuiMode := isTUIMode(ctx)
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	for i, a := range ctx.Args {
 		if a == "--help" {
 			fmt.Fprintf(ctx.Stdout, "Usage: yes [STRING]...\nRepeatedly output a line with STRING, or 'y'.\n")
@@ -146,10 +149,13 @@ func runYes(ctx *Context) int {
 		word = strings.Join(ctx.Args, " ")
 	}
 	limit := 10000
-	if !isTUIMode(ctx) {
+	if !tuiMode {
 		limit = -1
 	}
 	for i := 0; limit < 0 || i < limit; i++ {
+		if err := ctx.CancellationContext().Err(); err != nil {
+			return ExitStatus(err)
+		}
 		if _, err := fmt.Fprintln(ctx.Stdout, word); err != nil {
 			fmt.Fprintf(ctx.Stderr, "yes: standard output: %s\n", fmtOsErr(err))
 			return 1
@@ -172,10 +178,7 @@ func runPrintenv(ctx *Context) int {
 		terminator = "\x00"
 	}
 
-	envList := ctx.Env
-	if len(envList) == 0 {
-		envList = os.Environ()
-	}
+	envList := ctx.Environ()
 
 	envMap := make(map[string]string)
 	var orderedList []string

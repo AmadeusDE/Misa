@@ -27,8 +27,18 @@ func runSleep(ctx *Context) int {
 		total += d
 	}
 
-	time.Sleep(total)
-	return 0
+	cancel := ctx.CancellationContext()
+	if err := cancel.Err(); err != nil {
+		return ExitStatus(err)
+	}
+	timer := time.NewTimer(total)
+	defer timer.Stop()
+	select {
+	case <-cancel.Done():
+		return ExitStatus(cancel.Err())
+	case <-timer.C:
+		return 0
+	}
 }
 
 func parseSleepDuration(s string) (time.Duration, error) {

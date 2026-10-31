@@ -30,17 +30,47 @@ Grouped by cause:
 
 When a case starts passing, delete its line.
 
+## Find actions (U07)
+
+U07 tests the existing U06 `-print0`, `-depth`, `-xdev` and `-prune` behavior and adds
+`-exec`, `-execdir` and `-delete`. For `;`, an action is true exactly when its command
+exits zero, and every literal `{}` substring is replaced. For `+`, exactly one standalone
+trailing `{}` is replaced by matching paths; the predicate is true, but any failed batch
+makes the final `find` status nonzero. Batches use a conservative 32 KiB budget including
+fixed argv, environment and pointer overhead; `-execdir` batches do not cross directories.
+Pending batches flush at traversal end or `-quit`; directory-local batches also flush before
+depth-order directory actions, so a queued command runs before that directory is deleted.
+This substitution follows the pinned MIT
+uutils findutils exec matcher, unlike the pinned Toybox implementation. `-ok` and `-okdir`
+are rejected; no interactive confirmation is simulated.
+
+`-delete` implies depth, rejects any `-prune` and `-H`/`-L`/`-follow` combination, and
+reports deletion errors while continuing. A terminal `.` is skipped successfully; a terminal
+`..` is refused. Under depth, `-prune` is false by policy. Unix
+(including Android) supplies device identities for `-xdev`; the `!unix` walker cannot
+enforce the device boundary, and the wider builtins package does not support Windows.
+The walker's opt-in `ValidateDirs` and delete's `SameFile` checks detect deterministic
+directory/symlink swaps, including a deferred `-execdir` parent swap, and report partial
+errors. Action paths retain lexical dot components until filesystem resolution; `-execdir`
+resolves its parent before dispatch rather than cleaning away a symlink followed by `..`.
+The checks are not complete protection against hostile concurrent TOCTOU races; ancestors
+preceding the traversal root are not tracked. FD-relative traversal remains U07 hardening
+follow-up. See `invocation.md` for execution and isolation boundaries. The Toybox find
+adapter passes 51 of 58 cases, with seven exclusions retained; this note makes no broader
+parity claim.
+
 ## Next
 
 1. **Safe in-process use.** `builtin_mode: inprocess` runs built-ins on goroutines in one process, so
-   process-wide state is shared. Remaining: `currentUmask` flips the umask off Linux; `sort
-   --compress-program` execs; not every built-in honours `ctx.Env`; no cancellation (`tail -f`, `sleep`
-   need a `context.Context` in `builtins.Context`). Then a `builtins.Run` helper usable as a library.
+   process-wide state is shared. F02–F05 provide `builtins.Run`, invocation-local environment,
+   cooperative cancellation and child-only `nice`/non-mutating umask reads (see `invocation.md`).
+   F06 adds the shared launcher and process cleanup. Remaining: terminal-owning tools and cancellation limits;
+   do not classify every builtin as safe merely because it has a `Run` function.
 2. **Missing utilities.** `utility-comparison.md` lists every utility in toybox, BusyBox and uutils
    against Misa's (2026-10-15); `builtins-coverage.md` ranks the missing ones by how many upstream
    test cases would run unchanged and how much work they are. The POSIX ones toybox and uutils both
    have: `test`/`[`, `od`, `dd`, `df`, `install`, `chgrp`, `nohup`, `mknod`, `who`, `renice`, `ps`,
-   `pidof`, `xargs`, `find`, `grep`, `sed`, `tar`. `find` and `grep` should share a walker and matcher with ugh's search tool (`internal/search`, see
+   `pidof`, `xargs`, `sed`, `tar`. `find` and `grep` should share a walker and matcher with ugh's search tool (`internal/search`, see
    `docs/plans/ughbot.md`). Each new command starts from its upstream tests.
 3. **`fetch` styling.** `fetch` writes raw ANSI to stdout. It is command output, not Misa UI, so this may be
    fine; if it stays, say so in the file, otherwise move it to lipgloss.

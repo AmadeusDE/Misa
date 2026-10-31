@@ -6,14 +6,16 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 )
 
 func init() { Register(Command{Name: "b2sum", Run: runB2sum}) }
 
-func runB2sum(ctx *Context) int {
+func runB2sum(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	spec, _ := ParseSpec("b(binary)t(text)c(check)l(length):z(zero)(tag)(quiet)(status)(strict)w(warn)")
 	flags, err := spec.ParseArgs(ctx.Args)
 	if err != nil {
@@ -82,7 +84,7 @@ func runB2sum(ctx *Context) int {
 
 func b2sumRead(ctx *Context, name string) ([]byte, error) {
 	if name != "-" {
-		return os.ReadFile(resolvePath(ctx, name))
+		return ReadFileContext(ctx.CancellationContext(), resolvePath(ctx, name))
 	}
 	if ctx.Stdin == nil {
 		return nil, fmt.Errorf("stdin not available")

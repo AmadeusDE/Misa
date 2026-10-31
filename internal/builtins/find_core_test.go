@@ -40,7 +40,7 @@ func TestFindExpressionCore(t *testing.T) {
 }
 func TestFindParserErrors(t *testing.T) {
 	dir := t.TempDir()
-	for _, args := range [][]string{{"("}, {")"}, {"-true", "-o"}, {"-a", "-true"}, {"-true", ")"}, {"-maxdepth"}, {"-mindepth", "-1"}, {"-maxdepth", "x"}, {"-printf"}, {"-delete"}, {"-exec"}, {"-regextype", "posix"}, {"-unknown"}} {
+	for _, args := range [][]string{{"("}, {")"}, {"-true", "-o"}, {"-a", "-true"}, {"-true", ")"}, {"-maxdepth"}, {"-mindepth", "-1"}, {"-maxdepth", "x"}, {"-printf"}, {"-exec"}, {"-regextype", "posix"}, {"-unknown"}} {
 		out, err, code := findTestRun(t, dir, args...)
 		if code == 0 || err == "" || out != "" {
 			t.Errorf("%v: %q %q %d", args, out, err, code)
@@ -231,7 +231,7 @@ func TestFindCancellation(t *testing.T) {
 	cctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	var out, stderr bytes.Buffer
-	c := &Context{Dir: t.TempDir(), Stdout: &out, Stderr: &stderr, Cancellation: cctx}
+	c := &Context{Dir: t.TempDir(), Stdout: &out, Stderr: &stderr, Ctx: cctx}
 	if code := runFind(c); code != 1 || out.Len() != 0 || !strings.Contains(stderr.String(), "context canceled") {
 		t.Fatalf("%q %q %d", out.String(), stderr.String(), code)
 	}

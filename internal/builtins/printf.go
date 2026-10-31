@@ -64,7 +64,10 @@ func printfParseFloat(s string) (float64, error) {
 	return strconv.ParseFloat(s, 64)
 }
 
-func runPrintf(ctx *Context) int {
+func runPrintf(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	pArgs := ctx.Args
 	if len(pArgs) > 0 && pArgs[0] == "--" {
 		pArgs = pArgs[1:]
@@ -92,13 +95,18 @@ func runPrintf(ctx *Context) int {
 		startArgIdx := argIdx
 		i := 0
 		for i < len(format) {
+			if err := ctx.CancellationContext().Err(); err != nil {
+				return ExitStatus(err)
+			}
 			if format[i] == '\\' {
 				ch, n, stop := printfEscape(format[i:])
 				if ch == "\\x" && n == 2 {
 					fmt.Fprintln(ctx.Stderr, "printf: missing hexadecimal number in escape")
 					return 1
 				}
-				fmt.Fprint(ctx.Stdout, ch)
+				if _, err := fmt.Fprint(ctx.Stdout, ch); err != nil {
+					return 1
+				}
 				if stop {
 					return exitCode
 				}
@@ -114,7 +122,9 @@ func runPrintf(ctx *Context) int {
 
 				spec, n := parsePrintfSpec(format[i:])
 				if spec == "%%" {
-					fmt.Fprint(ctx.Stdout, "%")
+					if _, err := fmt.Fprint(ctx.Stdout, "%"); err != nil {
+						return 1
+					}
 					i += n
 					continue
 				}
@@ -141,7 +151,9 @@ func runPrintf(ctx *Context) int {
 				}
 				arg := nextArg()
 				result, stopped := applyPrintfSpec(ctx, resolvedSpec, arg, &exitCode)
-				fmt.Fprint(ctx.Stdout, result)
+				if _, err := fmt.Fprint(ctx.Stdout, result); err != nil {
+					return 1
+				}
 				if stopped {
 					return exitCode
 				}
@@ -150,7 +162,9 @@ func runPrintf(ctx *Context) int {
 			}
 
 			r, size := utf8.DecodeRuneInString(format[i:])
-			fmt.Fprint(ctx.Stdout, string(r))
+			if _, err := fmt.Fprint(ctx.Stdout, string(r)); err != nil {
+				return 1
+			}
 			i += size
 		}
 

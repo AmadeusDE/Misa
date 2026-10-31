@@ -60,25 +60,37 @@ roots:
 	}
 	status := 0
 	for _, root := range paths {
+		if p.hasDelete && filepath.Base(root) == ".." {
+			fmt.Fprintf(ctx.Stderr, "find: %s: refusing to delete ..\n", root)
+			status = 1
+			continue
+		}
 		if root == "" {
 			fmt.Fprintln(ctx.Stderr, "find: '': empty path")
 			status = 1
 			continue
 		}
-		err = walk.Walk(ctx.DoneContext(), root, walk.Options{Base: ctx.Dir, FollowLinks: p.options.follow, FollowRoot: p.options.followRoot, PostOrder: p.options.depth, MaxDepth: p.options.maxDepth, SameDevice: p.options.xdev, DanglingLinks: true}, func(w walk.Entry) error {
+		err = walk.Walk(ctx.DoneContext(), root, walk.Options{Base: ctx.Dir, FollowLinks: p.options.follow, FollowRoot: p.options.followRoot, PostOrder: p.options.depth, MaxDepth: p.options.maxDepth, SameDevice: p.options.xdev, DanglingLinks: true, LiteralPaths: p.hasDelete || len(p.execs) > 0, ValidateDirs: (p.hasDelete || len(p.execs) > 0) && !p.options.follow && !p.options.followRoot}, func(w walk.Entry) error {
 			if w.Err != nil {
 				fmt.Fprintf(ctx.Stderr, "find: %s: %v\n", w.Path, w.Err)
 				status = 1
 				return nil
 			}
+			full := w.Path
+			if p.hasDelete || len(p.execs) > 0 {
+				full = findFullPath(ctx.Dir, w.Path)
+			} else if !filepath.IsAbs(full) {
+				full = filepath.Join(ctx.Dir, full)
+			}
+			if p.options.depth && w.Info.IsDir() {
+				if physical, err := filepath.EvalSymlinks(full); err == nil {
+					p.flushExecDir(physical)
+				}
+			}
 			if w.Depth < p.options.minDepth {
 				return nil
 			}
-			full := w.Path
-			if !filepath.IsAbs(full) {
-				full = filepath.Join(ctx.Dir, full)
-			}
-			e := &findEntry{ctx: ctx, path: w.Path, full: full, root: root, info: w.Info, depth: w.Depth, now: p.now, follow: p.options.follow || (w.Depth == 0 && p.options.followRoot)}
+			e := &findEntry{ctx: ctx, path: w.Path, full: full, root: root, info: w.Info, depth: w.Depth, now: p.now, follow: p.options.follow || (w.Depth == 0 && p.options.followRoot), validate: w.Validate}
 			node(e)
 			if e.err != nil {
 				fmt.Fprintf(ctx.Stderr, "find: %s: %v\n", w.Path, e.err)
@@ -100,6 +112,9 @@ roots:
 			status = 1
 			break
 		}
+	}
+	if p.flushExec() {
+		status = 1
 	}
 	return status
 }

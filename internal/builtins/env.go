@@ -1,12 +1,14 @@
 package builtins
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/AmadeusDE/Misa/internal/commandexec"
+	"github.com/AmadeusDE/Misa/internal/proceffect"
 )
 
 const envSpec = "i(ignore-environment)u(unset):0(null)"
@@ -29,7 +31,7 @@ func runEnv(ctx *Context) int {
 	unsetMap := make(map[string]bool)
 	var envAssignments []string
 
-	args := ctx.Args
+	args := append([]string(nil), ctx.Args...)
 	cmdIdx := len(args)
 	workDir := ctx.Dir
 	options := true
@@ -124,10 +126,7 @@ func runEnv(ctx *Context) int {
 			// Construct current envMap for variable expansion in -S
 			currentEnvMap := make(map[string]string)
 			if !ignoreEnv {
-				sourceEnv := ctx.Env
-				if len(sourceEnv) == 0 {
-					sourceEnv = os.Environ()
-				}
+				sourceEnv := ctx.Environ()
 				for _, e := range sourceEnv {
 					if eqIdx := strings.IndexByte(e, '='); eqIdx >= 0 {
 						key := e[:eqIdx]
@@ -183,10 +182,7 @@ func runEnv(ctx *Context) int {
 
 	envMap := make(map[string]string)
 	if !ignoreEnv {
-		sourceEnv := ctx.Env
-		if len(sourceEnv) == 0 {
-			sourceEnv = os.Environ()
-		}
+		sourceEnv := ctx.Environ()
 		for _, e := range sourceEnv {
 			eqIdx := strings.IndexByte(e, '=')
 			if eqIdx >= 0 {
@@ -230,76 +226,45 @@ func runEnv(ctx *Context) int {
 		subCmdName := args[cmdIdx]
 		subArgs := args[cmdIdx+1:]
 
-		localPath := filepath.Join(workDir, subCmdName)
-		if info, err := os.Stat(localPath); err == nil && !info.IsDir() && info.Mode()&0111 == 0 {
-			fmt.Fprintf(ctx.Stderr, "env: '%s': Permission denied\n", subCmdName)
-			return 126
-		} else if err == nil && !info.IsDir() {
-			cmd := exec.Command(localPath, subArgs...)
-			cmd.Dir = workDir
-			cmd.Stdout = ctx.Stdout
-			cmd.Stderr = ctx.Stderr
-			cmd.Stdin = ctx.Stdin
-			envList := make([]string, 0, len(envMap))
-			for k, v := range envMap {
-				envList = append(envList, k+"="+v)
-			}
-			cmd.Env = envList
-			if err := cmd.Run(); err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					return exitErr.ExitCode()
-				}
-				return 1
-			}
-			return 0
+		subCtx := *ctx
+		subCtx.Dir, subCtx.Args, subCtx.CmdName = workDir, subArgs, subCmdName
+		subCtx.Env = make([]string, 0, len(envMap))
+		for k, v := range envMap {
+			subCtx.Env = append(subCtx.Env, k+"="+v)
+		}
+		if ctx.Exec != nil {
+			return ctx.Exec(ctx.CancellationContext(), subCmdName, &subCtx)
 		}
 
-		cmd, ok := Lookup(subCmdName)
-		if !ok {
-			cmd, ok = Lookup(filepath.Base(subCmdName))
+		if !strings.ContainsAny(subCmdName, `/\`) {
+			if _, ok := Lookup(subCmdName); ok {
+				return proceffect.Run(ctx.CancellationContext(), proceffect.Request{
+					DispatchOnly: true, Argv: append([]string{subCmdName}, subArgs...),
+				}, proceffect.Invocation{Dir: workDir, Env: subCtx.Env, Stdin: ctx.Stdin, Stdout: ctx.Stdout, Stderr: ctx.Stderr})
+			}
 		}
-		if ok {
-			oldEnv := os.Environ()
-			os.Clearenv()
-			for k, v := range envMap {
-				if !strings.HasPrefix(k, "=") {
-					os.Setenv(k, v)
-				}
-			}
-			defer func() {
-				os.Clearenv()
-				for _, e := range oldEnv {
-					parts := strings.SplitN(e, "=", 2)
-					if len(parts) == 2 {
-						os.Setenv(parts[0], parts[1])
-					}
-				}
-			}()
-
-			subEnvList := make([]string, 0, len(envMap))
-			for k, v := range envMap {
-				subEnvList = append(subEnvList, k+"="+v)
-			}
-
-			subCtx := &Context{
-				Dir:     workDir,
-				Args:    subArgs,
-				CmdName: subCmdName,
-				Width:   ctx.Width,
-				Height:  ctx.Height,
-				Stdout:  ctx.Stdout,
-				Stderr:  ctx.Stderr,
-				Stdin:   ctx.Stdin,
-				Env:     subEnvList,
-			}
-			return cmd.Run(subCtx)
+		child, err := commandexec.Start(ctx.CancellationContext(), subCmdName, commandexec.Invocation{
+			Dir: workDir, Env: subCtx.Env, Stdin: ctx.Stdin, Stdout: ctx.Stdout, Stderr: ctx.Stderr,
+			Args: subArgs, Argv0: subCmdName,
+		}, commandexec.Options{})
+		if err == nil {
+			return child.Wait()
 		}
-		if strings.HasPrefix(subCmdName, "'-") || (strings.HasPrefix(subCmdName, "'") && strings.Contains(subCmdName, "-")) {
+		if ctx.CancellationContext().Err() != nil {
+			return ExitStatus(ctx.CancellationContext().Err())
+		}
+		status := commandexec.ErrorStatus(err)
+		switch {
+		case status == 127 && strings.HasPrefix(subCmdName, "'") && strings.Contains(subCmdName, "-"):
 			fmt.Fprintf(ctx.Stderr, "env: %s: No such file or directory\nenv: use -[v]S to pass options in shebang lines\n", subCmdName)
-			return 127
+		case status == 127:
+			fmt.Fprintf(ctx.Stderr, "env: '%s': No such file or directory\n", subCmdName)
+		case errors.Is(err, os.ErrPermission):
+			fmt.Fprintf(ctx.Stderr, "env: '%s': Permission denied\n", subCmdName)
+		default:
+			fmt.Fprintf(ctx.Stderr, "env: '%s': %v\n", subCmdName, err)
 		}
-		fmt.Fprintf(ctx.Stderr, "env: '%s': No such file or directory\n", subCmdName)
-		return 127
+		return status
 	}
 
 	var keys []string
