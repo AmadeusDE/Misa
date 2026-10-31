@@ -82,6 +82,11 @@ type Editor struct {
 	visual visualKind
 	visRow int
 	visCol int
+	// visObj is the Visual selection a word object produced, visBack that it
+	// grows to the left, and visObjValid that a selection is being tracked.
+	visObj      textSpan
+	visBack     bool
+	visObjValid bool
 
 	pendingOp    byte
 	pendingKey   string

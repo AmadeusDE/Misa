@@ -84,6 +84,11 @@ You can replace an entire line with R, replace this one with "vi is great"
 You can combine the c command with movement commands like so:
 change a typoed word like this oen with cw.
 
+To change the word under the cursor, even from its middle, use ciw, type the
+replacement, then press esc. diw deletes that word; daw also includes adjacent
+whitespace. For a whitespace-delimited WORD (including punctuation), use iW
+or aW instead. These objects can also be used in Visual mode.
+
 You can use C to change until end of the line.
 
 You can replace a character and keep typing with s, fix this dpo.
@@ -511,6 +516,7 @@ Normal mode:
   hjkl          move cursor
   w b e         word forward, backward, end
   W B E         WORD forward, backward, end (whitespace-delimited)
+  iw aw iW aW   word / WORD text objects (with operators or Visual mode)
   0 $ ^         line start, end, first non-blank
   G gg          go to end/start of file
   x X           delete char forward/backward
