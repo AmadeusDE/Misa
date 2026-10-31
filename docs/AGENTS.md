@@ -290,6 +290,13 @@ internal/
 - **Config `*bool` pattern**: `BoolDefault()`/`BoolPtr()` helpers for settings that default to true.
 - **Configurable colors**: All colors configurable via `colors:` (info items) and `ui:` (prompt, divider, ghost, etc.) in config.yaml. Defaults are gruvbox.
 - **Builtins**: Registered via `init()` with `Register(Command{...})`. Each uses the `Spec`/`ParseArgs` option parser. Context provides Dir, Args, Width, Height, Stdout/Stderr/Stdin.
+- **`rename` and `shred`**: `rename [-vnolas] EXPRESSION REPLACEMENT FILE…` is the util-linux form, not the Perl one: it works
+  on bytes, replaces the first occurrence in the final path component only (the whole path when EXPRESSION or
+  REPLACEMENT contains a slash), and exits 0/1/2/4 for the renamed/failed mixes. `-s` rewrites a link's target
+  text instead of the link's name, and only `-o`/`-i` look at the destination at all. `shred [-fvxz] [-n N] [-s SIZE]
+  [-u[=unlink|wipe|wipesync]]` writes `crypto/rand` passes (or `--random-source=FILE`), refuses directories, and its
+  `--help` says plainly that overwriting is not erasure on COW, journaled/log-structured, compressed, snapshot,
+  RAID and SSD/flash storage; `-` needs standard output to be a regular file and is never removed or renamed.
 - **History format**: Zsh-style (`: timestamp:0;command`). Import from bash/zsh is read-only — never writes to external history files. Entries without timestamps (bash imports) sort to the front.
 - **Companion setup**: Moods, pronouns, call terms, prefixes, items/parts, emotes, kemonos, modifiers. Thirsty unlocks NSFW `{part}` (original mommy: milk, cock, cum, mouth); otherwise `{part}` uses SFW items. Modifiers can add combo lines when other modifiers are also selected. Texts load from embedded yaml under `internal/companion/data/`.
 - **Root view**: `Model.View()` returns a `tea.View` (alt screen, `MouseModeAllMotion`) only for the root; panes compose through `render() string`.
