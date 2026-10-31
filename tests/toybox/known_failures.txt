@@ -17,3 +17,7 @@ du/-LH_does_not_follow_unspecified_symlinks  # du: block counts depend on the fi
 du/-H_follows_specified_symlinks  # du: block counts depend on the filesystem
 env/why_is_this_allowed  # env: =BLAH (empty variable name) is rejected
 env/norecurse  # builtin-first policy (F06): env does not bypass Misa builtins for PATH-shadowed names; see docs F06/S04
+xargs/max-proc=2  # U08 is serial only; -P >1 is rejected until U09 (parallel xargs)
+xargs/max-proc=3  # U08 is serial only; -P >1 is rejected until U09 (parallel xargs)
+xargs/--process-slot-var  # U09 (parallel xargs) option, not implemented in serial U08
+xargs/exit_255_aborts  # integer launcher status cannot tell a child's own exit 234 from signal 106; treated as a signal (125) until a structured launcher result exists
