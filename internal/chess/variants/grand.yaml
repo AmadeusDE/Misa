@@ -1,0 +1,24 @@
+id: grand
+name: Grand Chess
+description: Christian Freeling, 1984. Ten pieces a side on 10×10 with a marshal and a cardinal; no castling, and a pawn may promote only to a piece that was captured.
+extends: chess
+files: 10
+ranks: 10
+# H. G. Muller's values, nudged for ten files: a rook buys more here and the
+# bishops and knights a little less. The pawn and the king come from chess.
+pieces:
+  - {letter: Q, name: Queen, betza: Q, glyph: ♛, value: 950}
+  - {letter: R, name: Rook, betza: R, glyph: ♜, value: 500}
+  - {letter: B, name: Bishop, betza: B, glyph: ♝, value: 350}
+  - {letter: N, name: Knight, betza: N, glyph: ♞, value: 300}
+  - {letter: M, name: Marshal, betza: RN, value: 900}
+  - {letter: C, name: Cardinal, betza: BN, value: 875}
+setup: r8r/1nbqkmcbn1/pppppppppp/10/10/10/10/PPPPPPPPPP/1NBQKMCBN1/R8R
+# Grand Chess has no castling; the empty list drops the inherited entries.
+castling: []
+promotion: [Q, R, B, N, M, C]
+# Pawns promote from their eighth rank on, may decline inside the zone but not
+# on the last rank, and only to a piece their side has lost.
+promotion_zone: 3
+promotion_optional: true
+promotion_captured_only: true

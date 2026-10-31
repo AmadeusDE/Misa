@@ -323,10 +323,13 @@ internal/
   pawn moves, diagonal initial double-step, straight captures and en passant), stalematewins (Stalemate-wins
   Chess: delivering stalemate wins), selfcapture (Self-capture Chess: `self_capture: true` in the variant
   YAML lets a side capture its own non-royal pieces with normal capture moves; Tomašev et al., arXiv:2009.04374),
-  and kingofthehill (chess plus `goal: [d4, d5, e4, e5]`: a royal arriving on one of those absolute, unmirrored
-  squares wins).
+  kingofthehill (chess plus `goal: [d4, d5, e4, e5]`: a royal arriving on one of those absolute, unmirrored
+  squares wins), and grand (Freeling's 10×10 with marshal `RN` and cardinal `BN`, no castling).
   `stalemate:` is `draw` (default), `win` (the side delivering stalemate wins) or `loss`; Match.Status/Decisive
-  and the search both honour it.
+  and the search both honour it. `promotion_optional: true` lets a pawn stay a pawn inside `promotion_zone` (but
+  not on the last rank, where promotion is forced); `promotion_captured_only: true` restricts the choices to
+  piece types its side has fewer of than in the setup, i.e. to captured pieces, and blocks the last rank when
+  none is available. Grand uses both with `promotion_zone: 3`.
   Movement is checked by perft (`position_test.go`), so run the chess tests after touching move generation.
   The engine only uses what variants define (values, royal/pawn flags, ranks to promotion), so new pieces need at
   most a `value:`. Search runs off the UI goroutine on immutable Positions; cancel() sets the Stop flag and bumps

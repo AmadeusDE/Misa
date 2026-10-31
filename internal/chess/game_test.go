@@ -200,6 +200,11 @@ func TestCycleVariantAndUndo(t *testing.T) {
 	if got := g.match.Variant().ID; got != "selfcapture" {
 		t.Fatalf("picker selected %s, want selfcapture", got)
 	}
+	// grand: 'g' filters when the filter is empty (only j/k navigate there).
+	keys(g, "v", "g", "r", "a", "n", "d", "enter")
+	if got := g.match.Variant().ID; got != "grand" {
+		t.Fatalf("picker selected %s, want grand", got)
+	}
 }
 
 func TestLettersToggle(t *testing.T) {

@@ -98,12 +98,12 @@ const promoPrefix = "Promote to: "
 
 // promoChoice returns which promotion choice a click on the status line hit.
 func (l layout) promoChoice(g *Game, x, y int) int {
-	if !l.fits || y != l.statusY() {
+	if !l.fits || y != l.statusY() || x < l.left {
 		return -1
 	}
 	at := l.left + len(promoPrefix)
-	for i, mv := range g.promo {
-		w := lipgloss.Width(g.choiceLabel(mv))
+	for i, label := range g.promoLabels(l) {
+		w := lipgloss.Width(label)
 		if x >= at && x < at+w {
 			return i
 		}
@@ -112,9 +112,55 @@ func (l layout) promoChoice(g *Game, x, y int) int {
 	return -1
 }
 
-func (g *Game) choiceLabel(mv Move) string {
-	t := g.match.Variant().Pieces[mv.Promote-1]
-	return " " + g.glyph(t, g.match.Turn()) + " " + t.Name + " "
+// promoLabels is one label per choice, so the drawing and the click targets
+// agree: names when the whole prompt fits, glyphs alone when it does not, and
+// only the choices that fit after that.
+func (g *Game) promoLabels(l layout) []string {
+	var labels []string
+	for _, compact := range []bool{false, true} {
+		labels = labels[:0]
+		at := l.left + len(promoPrefix)
+		for _, mv := range g.promo {
+			label := g.choiceLabel(mv, compact)
+			w := lipgloss.Width(label)
+			if at+w > g.width {
+				break
+			}
+			at += w + 1
+			labels = append(labels, label)
+		}
+		if len(labels) == len(g.promo) {
+			return labels
+		}
+	}
+	return labels
+}
+
+// choiceLabel names one promotion choice, showing the piece the pawn becomes;
+// the plain move that stays a pawn shows the pawn itself.
+func (g *Game) choiceLabel(mv Move, compact bool) string {
+	t := g.choiceType(mv)
+	if t == nil {
+		return " keep "
+	}
+	glyph := g.glyph(t, g.match.Turn())
+	if compact {
+		return " " + glyph + " "
+	}
+	return " " + glyph + " " + t.Name + " "
+}
+
+// choiceType is the piece a choice shows: the piece the pawn becomes, or the
+// pawn itself for the plain move that declines promotion.
+func (g *Game) choiceType(mv Move) *PieceType {
+	v := g.match.Variant()
+	if mv.Promote != 0 {
+		return v.Pieces[mv.Promote-1]
+	}
+	if pc := g.match.Position().Board[mv.From]; pc.Type != 0 {
+		return v.Type(pc)
+	}
+	return nil
 }
 
 func (g *Game) View() string {
@@ -139,7 +185,7 @@ func (g *Game) View() string {
 		}
 		lines = append(lines, pad+row)
 	}
-	status := pad + g.promoLine()
+	status := pad + g.promoLine(l)
 	if g.promo == nil {
 		status = g.place(l, statusSt, g.status())
 	}
@@ -345,14 +391,23 @@ func (g *Game) place(l layout, st lipgloss.Style, text string) string {
 	return strings.Repeat(" ", left) + st.Render(text)
 }
 
-func (g *Game) promoLine() string {
+// promoLine draws the promotion prompt, dropping choices that do not fit so a
+// narrow terminal never wraps the status line.
+func (g *Game) promoLine(l layout) string {
+	room := g.width - l.left
+	if room <= 0 {
+		return ""
+	}
+	if room < len(promoPrefix) {
+		return statusSt.Render(truncate(promoPrefix, room))
+	}
 	var b strings.Builder
 	b.WriteString(statusSt.Render(promoPrefix))
-	for i, mv := range g.promo {
+	for i, label := range g.promoLabels(l) {
 		if i > 0 {
 			b.WriteByte(' ')
 		}
-		b.WriteString(choiceSt.Render(g.choiceLabel(mv)))
+		b.WriteString(choiceSt.Render(label))
 	}
 	return b.String()
 }

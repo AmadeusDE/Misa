@@ -114,7 +114,21 @@ oracle. Each weak search has fresh tables and locally seeded randomness.
 
 - **King of the Hill** (`kingofthehill`): 8×8, orthodox chess where a royal
   reaching `d4`, `d5`, `e4` or `e5` wins at once; otherwise plain chess, so mate,
-  stalemate, repetition and move-limit endings still apply.
+  stalemate, repetition and move-limit endings still apply. See
+  [Variant files](#variant-files) for the `goal` key.
+
+- **Grand Chess** (`grand`): Christian Freeling, 1984: ten pieces a side on
+  10×10 with a marshal (rook + knight) and a cardinal (bishop + knight), no
+  castling. Pawns promote from their eighth rank on, may decline inside the
+  zone, and only to a piece their side has captured (see
+  [Variant files](#variant-files)). Rules:
+  [Wikipedia](https://en.wikipedia.org/wiki/Grand_chess),
+  [Chess Variants](https://www.chessvariants.com/large.dir/freeling.html).
+
+`chess --list` prints them and `chess <id|name>` starts one; `v`/`V` opens the
+variant picker during play. A variant file in `chess/*.yaml` next to the binary
+or in `~/.config/misa/chess/` joins the list, and a file whose `id` matches an
+earlier variant replaces it.
 
 ## During play
 
@@ -143,10 +157,13 @@ an unanalysed legal fallback is labelled instead of showing a fabricated score.
 
 ## Variant files
 
-A file with `extends: <id>` inherits every unset field from that variant and
-merges pieces by letter; `castling: []` drops inherited castling. A later file
-with an existing id replaces it. Files are read from the embedded set, then
-`chess/*.yaml` next to the binary, then `~/.config/misa/chess/`.
+Every rule comes from YAML: pieces are Betza strings, `setup` is FEN, `castling`
+lists White's four squares (Black's mirror them), and `promotion` lists the
+pieces a pawn may become. A file with `extends: <id>` inherits every unset field
+from that variant and merges pieces by letter; `castling: []` drops inherited
+castling. A later file with an existing id replaces it. Files are read from the
+embedded set, then `chess/*.yaml` next to the binary, then
+`~/.config/misa/chess/`.
 
 `goal` names **absolute** squares, not White's squares: a royal piece arriving
 on any of them wins immediately, for either side, and that arrival outranks a
@@ -163,7 +180,28 @@ goal: [d4, d5, e4, e5]
 
 Each entry accepts a square label as for `castling` (e.g. `d4`). A variant
 without `goal` has no goal squares: it is won only by checkmate and otherwise
-ends in stalemate, repetition or the move limit.
+ends in stalemate, repetition or the move limit. Grand Chess, for one, sets no
+goal.
+
+Promotion is governed by four keys:
+
+- `promotion` — the piece types a pawn may become, in prompt order.
+- `promotion_zone` (default 1) — how many ranks from the far edge promote.
+- `promotion_optional: true` — inside the zone a pawn may decline promotion and
+  stay a pawn; on the last rank promotion is still mandatory.
+- `promotion_captured_only: true` — a pawn may only promote to a piece type its
+  side has fewer of on the board than in the starting setup, that is, only to a
+  piece that has been captured. If no such piece is available the pawn cannot
+  promote, and therefore cannot move onto the last rank, where promotion is
+  forced.
+
+Grand Chess sets `promotion_zone: 3` with both flags: its pawns promote from
+their eighth rank on and may wait for a captured piece, and a side never owns
+two queens or two marshals.
+
+Where a variant lets a pawn decline, the prompt lists the pawn first: press its
+letter (`p`) or click it to leave the pawn as it is. Long prompt lists fall back
+to glyphs on a narrow terminal.
 
 ## Custom board dimensions
 

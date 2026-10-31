@@ -160,7 +160,7 @@ setup: knx2/5/5/5/2XNK
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []string{"double", "bigboard"} {
+	for _, id := range []string{"double", "bigboard", "grand"} {
 		vs = append(vs, builtin(t, id))
 	}
 	for _, v := range vs {
