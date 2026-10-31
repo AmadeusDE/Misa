@@ -120,6 +120,10 @@ internal/
     rm.go mkdir.go touch.go      File operations
     chmod.go chown.go link.go    Permissions and links
     tail.go proc.go sysutil.go   System utilities
+    csplit.go csplit_patterns.go csplit_name.go
+                                 `csplit [-ksqz] [-f PREFIX] [-b FORMAT] [-n N] [--suppress-matched] FILE PATTERN...` — line,
+                                 /BRE/ and %BRE% patterns with offsets, {N}/{*} repeats, output files and
+                                 byte counts
     man.go install.go util.go    Misc helpers
     fetch.go                     System fetch builtin — ASCII art + info display (mfetch-style)
     sshc.go                      `sshc` — OpenSSH-style flags mapped onto sshclient.Options

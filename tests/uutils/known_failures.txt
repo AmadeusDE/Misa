@@ -1,5 +1,6 @@
 # uutils cases Misa does not pass yet. Each line: <command>/<case>  # reason
 # They are skipped; MISA_KNOWN_FAILURES=1 runs them. Remove a line once it passes.
+csplit/test_named_pipe_input_file_0_L1535  # adapter: can't feed a fifo (upstream test needs a writer process)
 id/test_id_digital_username_0_L580  # adapter: upstream test only runs when a user named 200 exists
 ln/test_symlink_remove_existing_same_src_and_dest_0_L971  # ln -sf a a: should fail like GNU
 ls/test_invalid_value_returns_1_7_L10  # ls: --time doesn't take a value yet

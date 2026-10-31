@@ -136,7 +136,6 @@ Generated 2026-10-15 from the same source checkouts as `utility-comparison.md` (
 | `crc32` | posix | – | – | – | – | no tests | 77 | – | light |
 | `crond` | pending | – | – | – | – | no tests | 672 | – | heavy |
 | `crontab` | pending | – | – | – | – | no tests | 366 | – | medium |
-| `csplit` | pending | – | coreutils:105 | 8 | root | uutils: Rust, 8/105 simple new_ucmd! cases parseable by tests/uutils adapter | 173 | 1939 | medium |
 | `ctrlaltdel` | – | – | util-linux:1 | 1 | – | uutils: Rust, 1/1 simple new_ucmd! cases parseable by tests/uutils adapter | – | 140 | light |
 | `dd` | posix | 51 | coreutils:165 | 114 | devices, kernel/fs, root, tty | toybox: shell .test (runs in tests/toybox adapter); uutils: Rust, 114/165 simple new_ucmd! cases parseable by tests/uutils adapter | 292 | 5023 | heavy |
 | `deallocvt` | other | – | – | – | – | no tests | 115 | – | light |
