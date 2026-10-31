@@ -18,7 +18,13 @@ type xxdOptions struct {
 	plain, include, reverse, little bool
 }
 
-func runXXD(ctx *Context) int {
+func runXXD(ctx *Context) (code int) {
+	originalInput := ctx.Stdin
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	out := &trackedOutput{writer: ctx.Stdout}
+	ctx.Stdout = out
 	o, names, err := xxdParse(ctx.Args)
 	if err != nil {
 		fmt.Fprintf(ctx.Stderr, "xxd: %v\n", err)
@@ -43,7 +49,8 @@ func runXXD(ctx *Context) int {
 			return 2
 		}
 		defer f.Close()
-		input = f
+		originalInput = f
+		input = ContextReader(ctx.CancellationContext(), f)
 	}
 	if input == nil {
 		input = strings.NewReader("")
@@ -51,11 +58,14 @@ func runXXD(ctx *Context) int {
 	var data []byte
 	if o.skip > 0 {
 		o.offset += o.skip
-		if seeker, ok := input.(io.Seeker); ok {
+		if seeker, ok := originalInput.(io.Seeker); ok {
 			_, _ = seeker.Seek(o.skip, io.SeekStart)
 		} else {
 			_, _ = io.CopyN(io.Discard, input, o.skip)
 		}
+	}
+	if o.limit > 0 {
+		input = io.LimitReader(input, int64(o.limit))
 	}
 	data, err = io.ReadAll(input)
 	if err != nil {
@@ -74,9 +84,15 @@ func runXXD(ctx *Context) int {
 			includeCols = 12
 		}
 		xxdInclude(ctx.Stdout, data, includeCols, name == "-")
+		if out.err != nil {
+			return 1
+		}
 		return 0
 	}
 	xxdDump(ctx.Stdout, data, o)
+	if out.err != nil {
+		return 1
+	}
 	return 0
 }
 
@@ -162,6 +178,9 @@ func xxdDump(w io.Writer, data []byte, o xxdOptions) {
 		cols = 30
 	}
 	for pos := 0; pos < len(data); pos += cols {
+		if out, ok := w.(*trackedOutput); ok && out.err != nil {
+			return
+		}
 		end := pos + cols
 		if end > len(data) {
 			end = len(data)
@@ -226,6 +245,9 @@ func xxdInclude(w io.Writer, data []byte, cols int, stdin bool) {
 		cols = 12
 	}
 	for i, b := range data {
+		if out, ok := w.(*trackedOutput); ok && out.err != nil {
+			return
+		}
 		if i%cols == 0 {
 			fmt.Fprint(w, "  ")
 		} else {

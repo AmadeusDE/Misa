@@ -55,7 +55,10 @@ func isErrRange(err error, ne **strconv.NumError) bool {
 	return false
 }
 
-func runTail(ctx *Context) int {
+func runTail(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	mode := "lines"
 	count := int64(10)
 	fromStart := false
@@ -282,10 +285,15 @@ func runTail(ctx *Context) int {
 	exitCode := 0
 
 	for fi, name := range files {
+		if err := ctx.CancellationContext().Err(); err != nil {
+			return ExitStatus(err)
+		}
 		showHeader := (multi && !quiet) || verbose
 		if showHeader {
 			if fi > 0 {
-				fmt.Fprintln(ctx.Stdout)
+				if _, err := fmt.Fprintln(ctx.Stdout); err != nil {
+					return 1
+				}
 			}
 			hdr := name
 			if hdr == "-" {
@@ -293,7 +301,9 @@ func runTail(ctx *Context) int {
 			} else {
 				hdr = headQuoteString(hdr)
 			}
-			fmt.Fprintf(ctx.Stdout, "==> %s <==\n", hdr)
+			if _, err := fmt.Fprintf(ctx.Stdout, "==> %s <==\n", hdr); err != nil {
+				return 1
+			}
 		}
 
 		var data []byte
@@ -303,7 +313,11 @@ func runTail(ctx *Context) int {
 				exitCode = 1
 				continue
 			}
-			data, _ = io.ReadAll(ctx.Stdin)
+			var err error
+			data, err = io.ReadAll(ctx.Stdin)
+			if err != nil {
+				return 1
+			}
 		} else {
 			path := name
 			if !filepath.IsAbs(path) {
@@ -321,7 +335,13 @@ func runTail(ctx *Context) int {
 				continue
 			}
 			var readErr error
-			data, readErr = os.ReadFile(path)
+			f, openErr := os.Open(path)
+			if openErr != nil {
+				readErr = openErr
+			} else {
+				data, readErr = io.ReadAll(ContextReader(ctx.CancellationContext(), f))
+				f.Close()
+			}
 			if readErr != nil {
 				fmt.Fprintf(ctx.Stderr, "tail: error reading '%s': %s\n", name, fmtOsErr(readErr))
 				exitCode = 1
@@ -358,6 +378,9 @@ func runTail(ctx *Context) int {
 				}
 				cur := 0
 				for j := 0; j < lineIdx && cur < len(data); j++ {
+					if err := ctx.CancellationContext().Err(); err != nil {
+						return ExitStatus(err)
+					}
 					nl := bytes.IndexByte(data[cur:], lineSep)
 					if nl < 0 {
 						cur = len(data)
@@ -369,13 +392,26 @@ func runTail(ctx *Context) int {
 					result = data[cur:]
 				}
 			} else {
-				lines := countSep(data, lineSep)
+				lines := 0
+				for start := 0; start < len(data); start += 32768 {
+					if err := ctx.CancellationContext().Err(); err != nil {
+						return ExitStatus(err)
+					}
+					end := min(start+32768, len(data))
+					lines += bytes.Count(data[start:end], []byte{lineSep})
+				}
+				if len(data) > 0 && data[len(data)-1] != lineSep {
+					lines++
+				}
 				if int(count) >= lines {
 					result = data
 				} else {
 					skip := lines - int(count)
 					cur := 0
 					for j := 0; j < skip; j++ {
+						if err := ctx.CancellationContext().Err(); err != nil {
+							return ExitStatus(err)
+						}
 						nl := bytes.IndexByte(data[cur:], lineSep)
 						if nl < 0 {
 							cur = len(data)
@@ -388,7 +424,9 @@ func runTail(ctx *Context) int {
 			}
 		}
 
-		ctx.Stdout.Write(result)
+		if _, err := ctx.Stdout.Write(result); err != nil {
+			return 1
+		}
 	}
 
 	if follow {
@@ -423,23 +461,33 @@ func runTail(ctx *Context) int {
 		}
 
 		for {
-			time.Sleep(50 * time.Millisecond)
+			select {
+			case <-ctx.CancellationContext().Done():
+				return ExitStatus(ctx.CancellationContext().Err())
+			case <-time.After(50 * time.Millisecond):
+			}
 			for i := 0; i < len(fstates); i++ {
+				if err := ctx.CancellationContext().Err(); err != nil {
+					return ExitStatus(err)
+				}
 				idx := (lastHeaderIdx + i) % len(fstates)
 				fs := &fstates[idx]
 				st, err := os.Stat(fs.path)
 				if err != nil {
 					continue
 				}
-				if st.Size() > fs.offset {
+				for st.Size() > fs.offset {
 					f, err := os.Open(fs.path)
 					if err != nil {
 						continue
 					}
 					f.Seek(fs.offset, io.SeekStart)
-					buf := make([]byte, st.Size()-fs.offset)
-					n, _ := f.Read(buf)
+					buf := make([]byte, min(st.Size()-fs.offset, 32*1024))
+					n, _ := ContextReader(ctx.CancellationContext(), f).Read(buf)
 					f.Close()
+					if n == 0 {
+						break
+					}
 					if n > 0 {
 						if len(fstates) > 1 && fstates[lastHeaderIdx].name != fs.name {
 							hdr := fs.name
@@ -448,9 +496,13 @@ func runTail(ctx *Context) int {
 							} else {
 								hdr = headQuoteString(hdr)
 							}
-							fmt.Fprintf(ctx.Stdout, "\n==> %s <==\n", hdr)
+							if _, err := fmt.Fprintf(ctx.Stdout, "\n==> %s <==\n", hdr); err != nil {
+								return 1
+							}
 						}
-						ctx.Stdout.Write(buf[:n])
+						if _, err := ctx.Stdout.Write(buf[:n]); err != nil {
+							return 1
+						}
 						fs.offset += int64(n)
 						lastHeaderIdx = idx
 					}

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -64,14 +65,18 @@ func runBuiltin(p commandPlan, dir string, stdin io.Reader, out io.Writer) int {
 	return runBuiltinSized(p, dir, stdin, out, 0, 0)
 }
 
-func runBuiltinSized(p commandPlan, dir string, stdin io.Reader, out io.Writer, width, height int) (code int) {
+func runBuiltinSized(p commandPlan, dir string, stdin io.Reader, out io.Writer, width, height int) int {
+	return runBuiltinContext(context.Background(), p, dir, stdin, out, width, height)
+}
+
+func runBuiltinContext(ctx context.Context, p commandPlan, dir string, stdin io.Reader, out io.Writer, width, height int) (code int) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(out, "%s: internal error: %v\n", p.fields[0], r)
 			code = 2
 		}
 	}()
-	return builtins.Run(nil, p.fields[0], &builtins.Context{
+	return builtins.Run(ctx, p.fields[0], &builtins.Context{
 		Exec:      builtinexec.For(p.fields[0]),
 		Width:     width,
 		Height:    height,
@@ -106,7 +111,9 @@ func (m *Model) startPlan(p commandPlan, rows, cols int) (*term.Terminal, tea.Cm
 	var err error
 	switch {
 	case p.inProcess():
-		err = t.StartFunc(func(tty *os.File) int { return runBuiltinSized(p, m.dir, tty, tty, cols, rows) })
+		err = t.StartFuncContext(context.Background(), func(ctx context.Context, tty *os.File) int {
+			return runBuiltinContext(ctx, p, m.dir, tty, tty, cols, rows)
+		})
 	case m.jobControl:
 		err = t.StartArgv(m.dir, underJobLeader(p.argv)...)
 	default:

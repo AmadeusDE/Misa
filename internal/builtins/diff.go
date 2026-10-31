@@ -12,7 +12,13 @@ import (
 
 func init() { Register(Command{Name: "diff", Run: diffRun}) }
 
-func diffRun(ctx *Context) int {
+func diffRun(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	opts, flags, err := diffParseArgs(ctx.Args)
 	if err != nil {
 		fmt.Fprintln(ctx.Stderr, err)
@@ -54,6 +60,9 @@ func diffRun(ctx *Context) int {
 }
 
 func diffCompare(ctx *Context, a, b string, o diffOptions, nested bool, seen map[string]bool) int {
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	ai, ae := os.Stat(resolvePath(ctx, a))
 	bi, be := os.Stat(resolvePath(ctx, b))
 	if a == "-" && b == "-" || a != "-" && b != "-" && ae == nil && be == nil && os.SameFile(ai, bi) {
@@ -194,7 +203,7 @@ func diffRead(ctx *Context, name string) ([]byte, error) {
 		}
 		return io.ReadAll(ctx.Stdin)
 	}
-	return os.ReadFile(resolvePath(ctx, name))
+	return ReadFileContext(ctx.CancellationContext(), resolvePath(ctx, name))
 }
 
 func diffReadError(ctx *Context, name string, err error) {

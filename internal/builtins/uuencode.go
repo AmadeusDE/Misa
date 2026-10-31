@@ -14,7 +14,13 @@ func init() {
 	Register(Command{Name: "uuencode", Run: runUUEncode})
 }
 
-func runUUEncode(ctx *Context) int {
+func runUUEncode(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	spec, _ := ParseSpec("m")
 	flags, err := spec.ParseArgs(ctx.Args)
 	if err != nil {
@@ -47,6 +53,7 @@ func runUUEncode(ctx *Context) int {
 	if input == nil {
 		input = strings.NewReader("")
 	}
+	input = ContextReader(ctx.CancellationContext(), input)
 	output := bufio.NewWriter(ctx.Stdout)
 	header, terminator, width := "begin", "end", 45
 	if flags.Bool("m") {

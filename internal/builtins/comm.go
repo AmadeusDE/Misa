@@ -11,7 +11,13 @@ func init() {
 	Register(Command{Name: "comm", Run: runComm})
 }
 
-func runComm(ctx *Context) int {
+func runComm(ctx *Context) (code int) {
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
+	if ctx.CancellationContext().Err() != nil {
+		return 0
+	}
 	suppress := [3]bool{}
 	var files []string
 	optionsEnded := false
@@ -65,19 +71,29 @@ func runComm(ctx *Context) int {
 	i, j := 0, 0
 	for i < len(lines1) || j < len(lines2) {
 		if i >= len(lines1) {
-			commPrint(ctx, suppress, 1, lines2[j])
+			if !commPrint(ctx, suppress, 1, lines2[j]) {
+				return 1
+			}
 			j++
 		} else if j >= len(lines2) {
-			commPrint(ctx, suppress, 0, lines1[i])
+			if !commPrint(ctx, suppress, 0, lines1[i]) {
+				return 1
+			}
 			i++
 		} else if lines1[i] < lines2[j] {
-			commPrint(ctx, suppress, 0, lines1[i])
+			if !commPrint(ctx, suppress, 0, lines1[i]) {
+				return 1
+			}
 			i++
 		} else if lines1[i] > lines2[j] {
-			commPrint(ctx, suppress, 1, lines2[j])
+			if !commPrint(ctx, suppress, 1, lines2[j]) {
+				return 1
+			}
 			j++
 		} else {
-			commPrint(ctx, suppress, 2, lines1[i])
+			if !commPrint(ctx, suppress, 2, lines1[i]) {
+				return 1
+			}
 			i++
 			j++
 		}
@@ -110,19 +126,29 @@ func commSameStdin(ctx *Context, suppress [3]bool) int {
 			break
 		}
 		if !have1 {
-			commPrint(ctx, suppress, 1, line2)
+			if !commPrint(ctx, suppress, 1, line2) {
+				return 1
+			}
 			have2 = false
 		} else if !have2 {
-			commPrint(ctx, suppress, 0, line1)
+			if !commPrint(ctx, suppress, 0, line1) {
+				return 1
+			}
 			have1 = false
 		} else if line1 < line2 {
-			commPrint(ctx, suppress, 0, line1)
+			if !commPrint(ctx, suppress, 0, line1) {
+				return 1
+			}
 			have1 = false
 		} else if line1 > line2 {
-			commPrint(ctx, suppress, 1, line2)
+			if !commPrint(ctx, suppress, 1, line2) {
+				return 1
+			}
 			have2 = false
 		} else {
-			commPrint(ctx, suppress, 2, line1)
+			if !commPrint(ctx, suppress, 2, line1) {
+				return 1
+			}
 			have1 = false
 			have2 = false
 		}
@@ -130,9 +156,9 @@ func commSameStdin(ctx *Context, suppress [3]bool) int {
 	return 0
 }
 
-func commPrint(ctx *Context, suppress [3]bool, col int, line string) {
+func commPrint(ctx *Context, suppress [3]bool, col int, line string) bool {
 	if suppress[col] {
-		return
+		return true
 	}
 	tabs := 0
 	for c := 0; c < col; c++ {
@@ -140,7 +166,8 @@ func commPrint(ctx *Context, suppress [3]bool, col int, line string) {
 			tabs++
 		}
 	}
-	fmt.Fprintf(ctx.Stdout, "%s%s\n", strings.Repeat("\t", tabs), line)
+	_, err := fmt.Fprintf(ctx.Stdout, "%s%s\n", strings.Repeat("\t", tabs), line)
+	return err == nil
 }
 
 func readAllLines(ctx *Context, name string) ([]string, error) {
@@ -157,7 +184,7 @@ func readAllLines(ctx *Context, name string) ([]string, error) {
 			return nil, err
 		}
 		defer f.Close()
-		scanner = bufio.NewScanner(f)
+		scanner = bufio.NewScanner(ContextReader(ctx.CancellationContext(), f))
 	}
 
 	var lines []string

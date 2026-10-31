@@ -121,7 +121,11 @@ func runEcho(ctx *Context) int {
 	return 0
 }
 
-func runYes(ctx *Context) int {
+func runYes(ctx *Context) (code int) {
+	tuiMode := isTUIMode(ctx)
+	ctx, cleanup := streamContext(ctx)
+	defer cleanup()
+	defer streamResult(ctx, &code)
 	for i, a := range ctx.Args {
 		if a == "--help" {
 			fmt.Fprintf(ctx.Stdout, "Usage: yes [STRING]...\nRepeatedly output a line with STRING, or 'y'.\n")
@@ -145,10 +149,13 @@ func runYes(ctx *Context) int {
 		word = strings.Join(ctx.Args, " ")
 	}
 	limit := 10000
-	if !isTUIMode(ctx) {
+	if !tuiMode {
 		limit = -1
 	}
 	for i := 0; limit < 0 || i < limit; i++ {
+		if err := ctx.CancellationContext().Err(); err != nil {
+			return ExitStatus(err)
+		}
 		if _, err := fmt.Fprintln(ctx.Stdout, word); err != nil {
 			fmt.Fprintf(ctx.Stderr, "yes: standard output: %s\n", fmtOsErr(err))
 			return 1
