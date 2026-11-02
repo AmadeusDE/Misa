@@ -207,7 +207,8 @@ internal/
                                  EACCES on proc files used for memory/uptime/kernel shows "—"
   gitinfo/                       Git branch/dirty/ahead/behind detection
   help/                          TLDR downloading, man page parsing, markdown rendering
-  launcher/                      Bubble Tea ExecProcess helper (unused: external programs run in-pane PTYs via Model.launch)
+  launcher/                      Bubble Tea ExecProcess helper; imgview uses exclusive terminal ownership,
+                                 other external programs run in-pane PTYs via Model.launch
   jobleader/                     `misa --job-leader cmd…`: session leader that runs cmd in its own foreground process
                                  group so ^Z stops it; SuspendOnCtrlZ for multicall builtins
   kittygfx/                      Bounded direct Kitty graphics protocol: parse/encode, limits and immutable rasters
@@ -493,14 +494,16 @@ Commit trailers for agent-made commits:
   `pkg-frontend.md`.
 - `SECURITY.md`, `CONTRIBUTING.md` — Reporting vulnerabilities; how changes are made here.
 - **Image viewer**: `internal/imageframe` owns transport-neutral scene and bounded `FrameSource`
-  contracts; `internal/imageout` currently renders half-block cells, and the viewer's own Kitty
-  renderer remains disabled. The Wayland/Android GUI composites the terminal's stored placements
+  contracts; `internal/imageout` encodes direct Kitty RGB/RGBA output and half-block
+  cells. `imgview.Run` owns its tty directly, with no Bubble Tea program/renderer;
+  the Misa prompt self-execs it through `tea.ExecProcess`. Its loop serializes frames,
+  probes Kitty support and restores tty state on exit. Thumbnail grids remain half-blocks. The Wayland/Android GUI composites the terminal's stored placements
   (`internal/gui/images.go`); mux pane terminals stay graphics-disabled.
   `internal/imgview` is the read-only viewer/static decode pipeline. Its `collect.go` expands
   directory operands (natural sort, hidden and non-image filtering, bounded depth/entry/image
   counts) into the ordered collection. Its `animdecode` package indexes
   GIF/APNG/WebP into on-demand, immutable full-canvas frames with bounded work/index storage and
-  format-correct disposal/blending. The viewer schedules animated half-block playback with a bounded
+  format-correct disposal/blending. The viewer schedules animation in both renderers with a bounded
   decoder and injectable clock; in-process owner visibility conservatively pauses unfocused panes.
   Layout is in physical pixels: the viewer resolves a cell size from `imageviewer.yaml`, a
   `TIOCGWINSZ` measurement or a 10x20 fallback, and `internal/term` hands the GUI font metrics to

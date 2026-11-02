@@ -1,23 +1,87 @@
 # Image viewer
 
 `imgview [-r|--recursive] [--thumbnail] [--renderer auto|halfblock|kitty] FILE|DIR...`
-opens files in order, either as an in-pane Misa viewer for simple invocations or
-as a standalone terminal program. `--` ends option parsing. Relative paths are
+opens files in order as a standalone full-screen terminal program. `--` ends
+option parsing. Relative paths are
 resolved against the shell's working directory. A directory operand is expanded
 into the images it contains (see [Directories](#directories)). Missing or
 unreadable files remain in the collection and show an error in the status line.
 
-Rendering currently uses colored half-block cells, including when `auto` is
-selected. Kitty graphics transport is not implemented: requesting `kitty` in
-configuration or on the command line safely falls back to half-blocks and
-shows a warning in the status line. No terminal graphics escapes are emitted.
+The viewer owns its terminal directly: raw input, alternate screen, mouse and
+focus reporting, and one serialized write for each output frame. It does **not**
+run a Bubble Tea program or renderer. At the Misa prompt a simple `imgview ...`
+invocation re-executes the Misa binary with `tea.ExecProcess`: Bubble Tea releases
+the terminal while the viewer runs, then restores and repaints when it exits.
+The child's working directory is the shell's current directory, not necessarily
+the directory in which Misa started. If the binary cannot be resolved or executed,
+Misa retains the embedded half-block viewer and shows a visible notice.
+
+`--renderer auto` probes the actual terminal with a bounded Kitty graphics query
+followed by DA1. A matching `OK` before the DA1 reply enables pixels; no positive
+reply within about 300 ms selects colored half-block cells. `--renderer kitty`
+forces direct Kitty output without probing, and `--renderer halfblock` disables
+it. Single-image pixels work in the Misa Wayland GUI, kitty, and other terminals
+that answer this query and implement the direct RGB/RGBA protocol. Thumbnail
+grids remain half-blocks, even in Kitty mode.
+
+Mux pane PTYs are deliberately graphics-disabled and do not answer the Kitty
+query: a viewer started **inside a pane's shell/program** falls back to half-blocks.
+No mux graphics forwarding, tmux/screen passthrough or Unicode placeholders are
+implemented. A simple `imgview` command handled by Misa's own prompt temporarily
+takes over the host terminal rather than drawing inside one pane.
 The viewer is read-only: rotations, flips and marks exist only for the session.
 Static PNG, JPEG, GIF, WebP, BMP and TIFF are supported. Animated GIF, WebP and
 APNG use bounded animation decoders, full-canvas compositing and application
-scheduled playback; they play, pause and step in the half-block renderer. APNG
+scheduled playback; they play, pause and step in both renderers. APNG
 prefers a separate default poster when present (the poster is not included in
 the animation sequence). SVG, editing, file-browser previews and external
 viewer launching are not implemented.
+
+## Terminal ownership and pixel output
+
+The standalone runner restores raw mode, focus/mouse modes, cursor visibility
+and the alternate screen on normal exit, handled signals and panic. When launched
+from a normal shell, Ctrl+z restores the terminal before suspending, then redraws
+after continuation. When launched by Misa's prompt, Ctrl+z instead shows a hint
+to use `q`: suspending the child would strand its waiting Misa parent, and GUI
+sessions have no outer shell to foreground the job. Only
+the viewer's own image id is deleted on exit; it does not globally delete
+another application's graphics.
+
+Images are transformed, scaled and clipped on the viewer side to the visible
+pixel rectangle, with the status row excluded. Direct `a=T,t=d` RGB/RGBA data is
+base64-chunked (at most 4096 bytes per chunk, or less for local limits), quiet
+(`q=2`), with `C=1` so image
+placement does not move the cursor. Animation replaces the same image id; a
+status-only change does not re-transmit unchanged pixels. Help, thumbnails,
+navigation and exit remove obsolete placements. No native Kitty animation,
+filesystem/shared-memory image transfer or terminal-side image decoder is used.
+The viewer additionally caps each transmitted raster at 64 MiB, below the
+terminal's default 256 MiB per-image limit. It respects lower shared local
+`graphics.yaml` limits by reducing the raster and chunk size; when even a minimal
+transfer cannot fit, it visibly falls back to half-blocks.
+
+A headless developer check runs the real standalone viewer in the same terminal
+store and software compositor as the GUI, then optionally writes its actual
+canvas to a PNG (the parent asserts red and blue pixels, not glyph colours):
+
+```sh
+MISA_IMGSHOT="$PWD/.cache/imgview-gui.png" go test ./internal/gui \
+  -run 'TestImgviewRealGUIPixels|TestImgviewGraphicsDisabledFallsBack' -count=1 -v
+```
+
+Create the output directory first. The PNG dump is opt-in; ordinary tests write
+no persistent screenshot. The PTY-child tests skip on Android and Windows.
+This checks the shared GUI pixel path without requiring a Wayland display; it
+is not a physical-display or APK/device smoke test.
+
+Validation for this change includes the graphics-enabled GUI terminal and real
+software compositor (pixels, resize, next/previous, animation, focus, exit and
+reduced limits), plus kitty **0.49.2** under Xvfb/software GL. The kitty check used
+a generated red/blue PNG, both directly and through Misa's `ExecProcess` launch,
+including a mark-only redraw and returning to Misa with `q`. Native Wayland
+window presentation and an APK/device run were not performed; the shared pixel
+path and Android arm64 pure-Go typechecking do not substitute for those checks.
 
 ## Directories
 
@@ -72,8 +136,8 @@ Fit modes, zoom, panning, the thumbnail grid and the half-block output all work
 in physical pixels, so images are not stretched for any cell size. `f` (actual
 size) and `W` (shrink-only) mean one image pixel per physical pixel when the
 cell size is known, and per assumed pixel otherwise; the status line's
-percentage is relative to that. The cell size is read when the viewer opens, so
-a font-size change in the GUI applies to the next viewer.
+percentage is relative to that. The standalone viewer re-measures the terminal
+on resize, so GUI font-size changes update the current image geometry too.
 
 ## Controls
 
@@ -125,8 +189,9 @@ whose poster is a separate image (APNG) present frame 0 as soon as it decodes.
 Until that first frame is committed the status line claims no frame number and
 says `4 frames · loading` instead. `animation_loops` can override the file's
 play count with `once` or `infinite`; otherwise the file's own count and the GIF
-repeat convention described below apply. `halfblock_animation_fps` caps
-presentation: when short frames would exceed it, frames are skipped so overall
+repeat convention described below apply. `animation_fps` caps Kitty presentation;
+`halfblock_animation_fps` caps half-block presentation: when short frames would
+exceed it, frames are skipped so overall
 timing is preserved rather than playback slowing down. Frame delays are never
 shorter than `animation_min_delay_ms`.
 
@@ -135,8 +200,11 @@ coalesce to the latest needed one instead of queueing, and a heavy sequence
 cannot starve key handling. A boundary starts only once the frame it follows is
 on screen: a decode slower than the frame delay delays the animation instead of
 skipping frames, so the opening frame and a finite sequence's last frame are
-always presented. Frames are dropped only when `halfblock_animation_fps` samples
-them. The sequence is indexed only for the visible single-image item; the
+always presented. The Kitty byte budget (`animation_transport_mib_s`) adds a
+minimum presentation interval based on the visible raster's base64 payload size,
+recomputed on resize and zoom. This may be slower than one frame per second for
+large rasters and small budgets. Obsolete presentations are skipped, not queued;
+source delays and loop semantics remain authoritative. The sequence is indexed only for the visible single-image item; the
 poster is decoded first, and switching images, entering the grid, reloading
 (`r`), or quitting stops and closes the sequence. A decode or index failure is
 reported as `animation: <reason>` and leaves the poster visible.
@@ -203,11 +271,10 @@ external_command: []           # argv, e.g. ["viewer", "{file}"]
 On Android the animation fps defaults are 20, 8 and 8 respectively; animation
 cache defaults to 24 MiB, frame limit to 2000, metadata to 2 MiB and transport
 to 4 MiB/s. Animation decode limits, delay policies, `animation_autoplay`,
-`animation_loops`, the half-block presentation cap
-(`halfblock_animation_fps`) and the three directory collection bounds are
-active. The remaining values belong to later work: `animation_fps` and
-`animation_transport_mib_s` to the pixel renderers,
-and `preview`, `preview_delay_ms`, `preview_animation`, `preview_animation_fps`
+`animation_loops`, the renderer presentation caps, Kitty transport byte budget
+and the three directory collection bounds are active. The remaining values
+belong to later work: `preview`, `preview_delay_ms`, `preview_animation`,
+`preview_animation_fps`
 and `open_mode` to file-browser previews and external opening. There are no
 image-viewer controls in the settings screen yet; these options are YAML-only.
 `external_command` is stored as an argument vector, not a shell command;
@@ -319,8 +386,8 @@ disabled terminals consume graphics APCs without displaying payload text,
 storing images or answering queries positively. The Wayland and Android GUI
 enables them for the terminal that runs the Misa UI (or a requested program) as
 its child, so a child writing the supported subset gets pixels. Mux pane
-terminals inside the UI stay disabled, so an image written in a pane is still
-swallowed. This does not enable `renderer: kitty` in the viewer. See
+terminals inside the UI stay disabled and the viewer auto-selects half-blocks
+there instead of sending images that would be swallowed. See
 [the supported protocol subset](../internal/kittygfx/README.md) for formats,
 limits and lifecycle semantics.
 
@@ -360,7 +427,7 @@ animation actions (`a=f`/`a=a`/`a=c`) and Unicode placeholders stay refused, so
 animation is application-scheduled frame replacement, and a placement that
 scrolled out is not re-shown from scrollback.
 
-The viewer itself still emits only half-blocks (`renderer: kitty` falls back);
+The standalone viewer writes direct Kitty transfers into this outer terminal;
 pane terminals are not forwarded into this layer. Android lifecycle and
 playback controls are described below; system-viewer integration remains
 separate work.
@@ -371,9 +438,12 @@ The APK runs each tab through `gui.RunSession` and the shared compositor, not a
 separate image widget. It draws premultiplied RGBA into `RGBA_8888` native-window
 buffers; the existing blit swaps red/blue only for a BGRA source. Density,
 font-size and inset changes use the same physical cell metrics as terminal text.
-This validates rendering of supported graphics sent by a child; it does **not**
-make `imgview` emit Kitty graphics or enable graphics forwarding from mux panes.
-The viewer itself still uses animated half-blocks.
+The APK starts its Misa child from the executable native-library `libmisa.so`.
+When `os.Executable()` resolves to that executable, the same self-exec path runs
+standalone `imgview` and can use the shared pixel compositor. If it is not an
+executable file, Misa visibly falls back to the embedded half-block viewer.
+Graphics forwarding from mux panes remains disabled. This is a shared code
+path, not a claim of an APK/device smoke test for this change.
 
 The Activity sends foreground/background (`onStart`/`onStop`) and actual window
 focus separately through JNI to the session manager. A child is focused only
@@ -412,10 +482,10 @@ They are global keyboard shortcuts, not viewer-only actions; outside the viewer
 the current application receives those chords. Numeric prefixes still work for
 frame stepping. Pinch remains global terminal font scaling, not image zoom.
 
-Android defaults are 20 fps for future pixel presentation, 8 fps for half-block
+Android defaults are 20 fps for pixel presentation, 8 fps for half-block
 playback and previews, and one decode worker (the current viewer also serializes
-its frame requests). Preview/pixel settings remain reserved until those output
-paths land. No wake locks or background animation jobs are added; the existing
+its frame requests). Preview settings remain reserved until that output
+path lands. No wake locks or background animation jobs are added; the existing
 session service still keeps terminal sessions alive. The Activity's session-label
 poll stops on `onStop` and refreshes immediately on `onStart`. An external terminal
 that does not report focus cannot provide automatic background pausing. The
@@ -466,18 +536,12 @@ release snapshots promptly. No terminal-side animation timer is started.
 
 ## Remaining later work
 
-The viewer deliberately stops at half-block playback. These parts are not
-implemented yet and should not be assumed from this document:
+These parts are not implemented yet and should not be assumed from this document:
 
-* Host-Kitty graphics transport and capability probing. `renderer: kitty` still
-  falls back to half-blocks with a status warning, so the viewer emits no Kitty
-  graphics itself. The emulator's image store is enabled only by the Wayland
-  and Android GUI's own terminal.
-* Pixel output from the viewer and in nested mux panes. The GUI and the APK
-  composite the placements a child stores and repaint one whose pixels changed,
-  which is enough for application-scheduled animation, but a pane has no
-  compositor and the byte-rate limit (`animation_transport_mib_s`) belongs to
-  the missing pixel renderers.
+* Graphics forwarding inside nested mux pane terminals. Direct standalone
+  Kitty output works through the host terminal, while pane PTYs deliberately
+  select the half-block fallback. Unicode-placeholder and tmux/screen
+  passthrough support are not implemented.
 * File-browser integration: opening images from the browser, thumbnail
   previews and opt-in animated previews. `preview`, `preview_delay_ms`,
   `preview_animation` and `preview_animation_fps` are reserved for that work,
@@ -494,6 +558,6 @@ implemented yet and should not be assumed from this document:
   AVIF/HEIC/JPEG XL and MNG, video containers, slideshow,
   editing/saving transforms and freedesktop thumbnail-cache interoperability
   are out of scope rather than pending work.
-* Optional native Kitty animation offload. Even on Kitty, the intended baseline
+* Optional native Kitty animation offload. Even on Kitty, the implemented baseline
   is application-scheduled frame replacement so pause, stepping and loop status
   stay authoritative.

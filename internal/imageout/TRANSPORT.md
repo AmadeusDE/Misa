@@ -1,7 +1,32 @@
-# Image output transport investigation
+# Image output transport
 
-This is a source investigation and a contract target, not an implemented
-transport. Misa pins `charm.land/bubbletea/v2` **v2.0.7** and
+## Standalone imgview: no Bubble Tea frame hook needed
+
+`imgview.Run` owns the terminal directly. It reuses the viewer's state and
+`tea.Msg`/`tea.Cmd` types, but runs neither `tea.Program` nor Bubble Tea's
+renderer. Its input loop consumes the Kitty query replies, keys, mouse, focus
+and resize events. Its output loop buffers the text chrome and direct Kitty
+transfers/deletions into one frame write. Decoding and timer workers return
+messages; they never write terminal output.
+
+At Misa's prompt, `internal/ui/imageviewer.go` launches the same binary as
+`misa imgview ...` with `tea.ExecProcess`. Bubble Tea releases the terminal, so
+the child writes directly to the terminal hosting Misa (including the GUI's
+outer `term.Terminal`). Bubble Tea restores its terminal and repaints after
+exit. The GUI enables its bounded image store because its shared compositor
+consumes the placements. Mux pane terminals remain graphics-disabled: their
+children get the animated half-block fallback, not a swallowed pixel path.
+
+This deliberately drops the frame-hook requirement **for imgview**. No
+Bubble Tea fork, output-writer boundary inference or APCs in `View()` strings
+are needed. The portable in-UI viewer still renders only half-block cells.
+`imageout.Session` and `Probe` remain separate abstract contracts; the standalone
+runtime does not pretend they bind a Bubble Tea frame hook.
+
+## Historical Bubble Tea investigation
+
+The following source findings still apply to future *embedded* graphics; they
+are not blockers for the standalone viewer. Misa pins `charm.land/bubbletea/v2` **v2.0.7** and
 `github.com/charmbracelet/ultraviolet` **v0.0.0-20260525132238-948f4557a654**
 (`go.mod`). References below are to those versions unless a Misa path is given.
 
@@ -101,19 +126,16 @@ Candidate ways to obtain the missing boundary need separate evaluation:
 These are candidates, not proof that any particular integration is safe.
 No raw graphics sequences belong in UI styling or pane view strings.
 
-## Scope and verification status
+## Remaining scope
 
-Kitty capability must remain disabled until the output boundary and query path
-are proven end to end; use half-block cells as the safe fallback. This
-investigation does not add runtime hooks or change mux behavior. Graphics
-protocol implementation, terminal image storage, GUI compositing, nested PTY
-forwarding and viewer features are later work and must not be inferred from
-this document.
+The standalone loop supplies the missing exclusive frame boundary for this
+viewer. Its tests exercise exact wire bytes and a real PTY child through the
+GUI terminal store and software compositor, including query fallback, resize,
+navigation and cleanup. See `docs/IMAGE_VIEWER.md` for the pixel-dump helper and
+platform verification limits.
 
-Tests against a fake transaction adapter can establish the intended ordering,
-owner isolation, stale-generation handling and backpressure contract. They do
-**not** prove the pinned Bubble Tea runtime supplies the required ordering.
-Runtime acceptance needs tests against the actual integrated boundary, including
-unchanged and coalesced frames, image-only changes, resize, exit, cursor state,
-errors and query replies, plus terminal interoperability tests. This document
-records source inspection only; it is not a runtime experiment.
+An embedded Bubble Tea pixel viewer or nested mux graphics forwarding would
+still require a supported composed-frame boundary, root geometry/clipping and
+resource ownership. Those features are not implemented by this PR. Fake-sink
+contract tests establish ordering within their adapter only; they do not prove
+that Bubble Tea exposes a corresponding runtime hook.
