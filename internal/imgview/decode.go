@@ -7,30 +7,31 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
 	"image/draw"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
-	"io"
-	"os"
 	"runtime"
+
+	"github.com/AmadeusDE/Misa/internal/imgview/animdecode"
+	"github.com/AmadeusDE/Misa/internal/imgview/webpcodec"
 
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/tiff"
 	_ "golang.org/x/image/webp"
 )
 
-var ErrAnimationPending = errors.New("animated image support is pending")
 var ErrLimit = errors.New("image exceeds configured limit")
 
 // Limits bounds encoded input and decoded dimensions. Zero fields use defaults.
 type Limits struct {
 	MaxEncodedBytes int64
 	MaxPixels       int64
+	Animation       animdecode.Limits
+	workCache       *Cache
 }
 
-func DefaultLimits() Limits { return Limits{64 << 20, 32_000_000} }
+func DefaultLimits() Limits { return Limits{MaxEncodedBytes: 64 << 20, MaxPixels: 32_000_000} }
 func (l Limits) normalized() Limits {
 	d := DefaultLimits()
 	if l.MaxEncodedBytes <= 0 {
@@ -60,55 +61,16 @@ func DecodeContext(ctx context.Context, path string, limits Limits) (Decoded, er
 	if err := ctx.Err(); err != nil {
 		return Decoded{}, err
 	}
-	st, err := os.Stat(path)
+	b, err := readEncoded(ctx, path, l)
 	if err != nil {
-		return Decoded{}, err
-	}
-	if !st.Mode().IsRegular() {
-		return Decoded{}, errors.New("not a regular file")
-	}
-	if st.Size() > l.MaxEncodedBytes {
-		return Decoded{}, ErrLimit
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return Decoded{}, err
-	}
-	defer f.Close()
-	fst, err := f.Stat()
-	if err != nil {
-		return Decoded{}, err
-	}
-	if !fst.Mode().IsRegular() || !os.SameFile(st, fst) {
-		return Decoded{}, errors.New("file changed while opening")
-	}
-	// Avoid overflowing LimitReader's extra byte.
-	if l.MaxEncodedBytes == int64(^uint64(0)>>1) {
-		return Decoded{}, ErrLimit
-	}
-	b, err := io.ReadAll(io.LimitReader(f, l.MaxEncodedBytes+1))
-	if err != nil {
-		return Decoded{}, err
-	}
-	if int64(len(b)) > l.MaxEncodedBytes {
-		return Decoded{}, ErrLimit
-	}
-	end, err := f.Stat()
-	if err != nil {
-		return Decoded{}, err
-	}
-	if fst.Size() != end.Size() || !fst.ModTime().Equal(end.ModTime()) {
-		return Decoded{}, errors.New("file changed while reading")
-	}
-	if err = ctx.Err(); err != nil {
 		return Decoded{}, err
 	}
 	animated, err := isAnimated(b)
 	if err != nil {
 		return Decoded{}, err
 	}
-	if animated && len(b) >= 12 && string(b[:4]) == "RIFF" && string(b[8:12]) == "WEBP" {
-		return decodeAnimatedWebP(ctx, b, l)
+	if animated {
+		return decodeAnimationPoster(ctx, b, l)
 	}
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
 	if err != nil {
@@ -117,7 +79,30 @@ func DecodeContext(ctx context.Context, path string, limits Limits) (Decoded, er
 	if !validDimensions(cfg.Width, cfg.Height, l) {
 		return Decoded{}, ErrLimit
 	}
-	src, format2, err := image.Decode(bytes.NewReader(b))
+	var src image.Image
+	format2 := format
+	if format == "webp" {
+		if err := validateStaticWebP(b, cfg); err != nil {
+			return Decoded{}, err
+		}
+		release, err := reserveAnimationWork(l)
+		if err != nil {
+			return Decoded{}, err
+		}
+		defer release()
+		budget := animationWorkLimit(l)
+		// Keep the returned NRGBA conversion within the same working budget.
+		outputBytes := int64(cfg.Width) * int64(cfg.Height) * 4
+		if outputBytes >= budget {
+			return Decoded{}, ErrLimit
+		}
+		src, err = webpcodec.Decode(bytes.NewReader(b), budget-outputBytes)
+		if errors.Is(err, webpcodec.ErrLimit) {
+			return Decoded{}, ErrLimit
+		}
+	} else {
+		src, format2, err = image.Decode(bytes.NewReader(b))
+	}
 	if err != nil {
 		return Decoded{}, fmt.Errorf("image decode: %w", err)
 	}
@@ -158,42 +143,4 @@ func DefaultWorkers() int {
 
 func validDimensions(w, h int, l Limits) bool {
 	return w > 0 && h > 0 && int64(w) <= l.MaxPixels/int64(h) && int64(w) <= int64(int(^uint(0)>>1))/4/int64(h)
-}
-
-// decodeAnimatedWebP reconstructs a static WebP from the first ANMF payload.
-func decodeAnimatedWebP(ctx context.Context, b []byte, l Limits) (Decoded, error) {
-	canvas, frame, bg, err := webpPoster(b)
-	if err != nil {
-		return Decoded{}, err
-	}
-	if !validDimensions(canvas.Dx(), canvas.Dy(), l) {
-		return Decoded{}, ErrLimit
-	}
-	// Check the compressed frame dimensions independently of the VP8X header,
-	// which would otherwise hide mismatches and permit an oversized allocation.
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(frame.raw))
-	if err != nil {
-		return Decoded{}, fmt.Errorf("webp frame header: %w", err)
-	}
-	if cfg.Width != frame.rect.Dx() || cfg.Height != frame.rect.Dy() {
-		return Decoded{}, errors.New("webp frame dimensions differ from header")
-	}
-	src, _, err := image.Decode(bytes.NewReader(frame.data))
-	if err != nil {
-		return Decoded{}, fmt.Errorf("webp frame decode: %w", err)
-	}
-	if err := ctx.Err(); err != nil {
-		return Decoded{}, err
-	}
-	dst := image.NewNRGBA(canvas)
-	draw.Draw(dst, canvas, &image.Uniform{C: color.NRGBA(bg)}, image.Point{}, draw.Src)
-	op := draw.Over
-	if frame.noBlend {
-		op = draw.Src
-	}
-	draw.Draw(dst, frame.rect, src, src.Bounds().Min, op)
-	if err := ctx.Err(); err != nil {
-		return Decoded{}, err
-	}
-	return Decoded{Pixels: dst, Format: "webp", Animated: true}, nil
 }

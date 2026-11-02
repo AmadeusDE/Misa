@@ -7,11 +7,13 @@ import (
 	"image"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/AmadeusDE/Misa/internal/config"
+	"github.com/AmadeusDE/Misa/internal/imgview/animdecode"
 )
 
 type viewerItem struct {
@@ -79,7 +81,14 @@ func NewConfigured(paths []string, thumbnail bool, renderer string, cfg config.I
 	// Map the nominal 128px default to the historical 16-cell grid width.
 	thumb := max(8, min(128, cfg.ThumbnailSize/8))
 	m := &Viewer{grid: thumbnail || cfg.InitialMode == "thumbnails", fit: fit, initialFit: fit, thumb: thumb,
-		cache: NewCache(int64(cfg.CacheMiB) << 20), limits: Limits{MaxEncodedBytes: int64(cfg.MaxFileMiB) << 20, MaxPixels: int64(cfg.MaxPixels)}}
+		cache: NewCache(int64(cfg.CacheMiB) << 20), limits: Limits{MaxEncodedBytes: int64(cfg.MaxFileMiB) << 20, MaxPixels: int64(cfg.MaxPixels), Animation: animdecode.Limits{
+			MaxWorkingBytes:  int64(cfg.AnimationCacheMiB) << 20,
+			MaxMetadataBytes: int64(cfg.AnimationMetadataMiB) << 20,
+			MaxFrames:        cfg.AnimationMaxFrames,
+			MinDelay:         time.Duration(cfg.AnimationMinDelayMS) * time.Millisecond,
+			GIFShortDelay:    time.Duration(cfg.GIFShortDelayMS) * time.Millisecond,
+		}}}
+	m.limits.workCache = m.cache
 	if renderer == "kitty" {
 		m.rendererWarning = "kitty unavailable; using halfblock"
 	}

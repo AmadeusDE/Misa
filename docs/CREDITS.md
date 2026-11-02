@@ -112,7 +112,7 @@ Original Go implementation; rules and notation referenced from:
 - **x/crypto** (ssh, ssh/agent, ssh/knownhosts) by The Go Authors — BSD-3-Clause
   https://cs.opensource.google/go/x/crypto
 
-- **x/image** (font/opentype, font/sfnt, Go Mono fonts) by The Go Authors / Bigelow & Holmes — BSD-3-Clause
+- **x/image** (font/opentype, font/sfnt, Go Mono fonts, raster codecs, bounded WebP/VP8L adaptation and WebP test fixtures) by The Go Authors / Bigelow & Holmes — BSD-3-Clause
   https://cs.opensource.google/go/x/image
 
 - **Glamour** by Charmbracelet — MIT
@@ -147,3 +147,20 @@ Original Go implementation; rules and notation referenced from:
 
 - **qr** by The Go Authors — BSD-3-Clause
   https://github.com/rsc/qr
+
+### Image animation fixtures
+
+The GIF/APNG fixtures and tiny uniform-color WebP fixtures are original synthetic
+patterns. WebP fixtures encoded with ffmpeg/libwebp or Pillow/libwebp contain generated image data,
+not code from those projects; tests do not invoke either tool.
+The base64 WebP fixture in `internal/imgview/decode_test.go` and
+`internal/imgview/animdecode/webp_test.go` is
+`golang.org/x/image v0.38.0/testdata/gopher-doc.1bpp.lossless.webp` by The Go Authors
+(BSD-3-Clause; SHA-256 `335348a182a3fc65e0a1a59a53555cdea0c2cd60373acf44b091a0304ff2504a`).
+See `THIRD_PARTY_NOTICES.md` for its license.
+
+The bounded WebP/VP8L codec adapter in `internal/imgview/webpcodec` is adapted from
+The Go Authors' `golang.org/x/image v0.38.0/webp` and `vp8l` (BSD-3-Clause), with
+local allocation checks. Its package `NOTICE` identifies the source and changes;
+its `LICENSE` preserves the upstream license. Animation demuxers and compositor
+are original Misa implementations, not adaptations of another viewer.

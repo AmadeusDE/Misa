@@ -478,3 +478,9 @@ Commit trailers for agent-made commits:
   `builtins.md` (with `utility-comparison.md` and `builtins-coverage.md`), `windows.md`, `android.md`,
   `pkg-frontend.md`.
 - `SECURITY.md`, `CONTRIBUTING.md` — Reporting vulnerabilities; how changes are made here.
+- **Image viewer**: `internal/imageframe` owns transport-neutral scene and bounded `FrameSource`
+  contracts; `internal/imageout` currently renders half-block cells (Kitty remains disabled).
+  `internal/imgview` is the read-only viewer/static decode pipeline. Its `animdecode` package indexes
+  GIF/APNG/WebP into on-demand, immutable full-canvas frames with bounded work/index storage and
+  format-correct disposal/blending. The viewer still shows posters only; playback belongs to the next
+  PR. Keep decoders independent of Bubble Tea, GUI and terminal packages. See `docs/IMAGE_VIEWER.md`.
