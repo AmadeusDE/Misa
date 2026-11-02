@@ -486,4 +486,7 @@ Commit trailers for agent-made commits:
   GIF/APNG/WebP into on-demand, immutable full-canvas frames with bounded work/index storage and
   format-correct disposal/blending. The viewer schedules animated half-block playback with a bounded
   decoder and injectable clock; in-process owner visibility conservatively pauses unfocused panes.
+  Layout is in physical pixels: the viewer resolves a cell size from `imageviewer.yaml`, a
+  `TIOCGWINSZ` measurement or a 10x20 fallback, and `internal/term` hands the GUI font metrics to
+  its children (winsize pixels, `CSI 14t`/`CSI 16t`).
   Keep decoders independent of Bubble Tea, GUI and terminal packages. See `docs/IMAGE_VIEWER.md`.

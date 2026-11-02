@@ -100,3 +100,41 @@ func TestImageViewerIgnoresCWD(t *testing.T) {
 		t.Fatalf("loaded from cwd: %s", got)
 	}
 }
+
+func TestImageViewerCellSizeOverrides(t *testing.T) {
+	c := DefaultImageViewer()
+	if c.CellAspect != 0 || len(c.CellPixels) != 0 {
+		t.Fatalf("defaults: %+v", c)
+	}
+	if got := c.Validate(); len(got) != 0 {
+		t.Fatalf("defaults warn: %v", got)
+	}
+	c.CellAspect, c.CellPixels = 0.45, []int{9, 20}
+	if got := c.Validate(); len(got) != 0 || c.CellAspect != 0.45 || c.CellPixels[1] != 20 {
+		t.Fatalf("valid overrides: %v %+v", got, c)
+	}
+	c.CellAspect, c.CellPixels = -1, []int{9}
+	warnings := c.Validate()
+	if len(warnings) != 2 || c.CellAspect != 0 || c.CellPixels != nil {
+		t.Fatalf("invalid overrides: %v %+v", warnings, c)
+	}
+	c.CellAspect, c.CellPixels = 99, []int{900, 20}
+	warnings = c.Validate()
+	if len(warnings) != 2 || c.CellAspect != 4 || c.CellPixels != nil {
+		t.Fatalf("clamped overrides: %v %+v", warnings, c)
+	}
+}
+
+func TestImageViewerCellSizeFromFile(t *testing.T) {
+	path := imageConfigDir(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("cell_aspect: 0.45\ncell_pixels: [9, 20]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	got := LoadImageViewer()
+	if got.CellAspect != 0.45 || len(got.CellPixels) != 2 || got.CellPixels[0] != 9 || got.CellPixels[1] != 20 {
+		t.Fatalf("cell overrides: %+v", got)
+	}
+}

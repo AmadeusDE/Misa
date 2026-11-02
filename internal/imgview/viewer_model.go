@@ -48,6 +48,8 @@ type Viewer struct {
 	fit                  fitMode
 	zoom                 float64
 	pan                  image.Point
+	cellPixels           image.Point
+	exactCellPixels      bool
 	thumb                int
 	note                 string
 	notice               string
@@ -85,10 +87,11 @@ func NewConfigured(paths []string, thumbnail bool, renderer string, cfg config.I
 	}
 	fits := map[string]fitMode{"shrink": fitNoUpscale, "contain": fitWhole, "width": fitWidth, "height": fitHeight, "actual": fitActual}
 	fit := fits[cfg.Fit]
-	// Thumbnail size is configured in pixels; half-block cells are 1x2 samples.
-	// Map the nominal 128px default to the historical 16-cell grid width.
+	// Thumbnail size is configured in pixels; a cell holds one sample column and
+	// two sample rows. Map the nominal 128px default to the historical 16-cell
+	// grid width.
 	thumb := max(8, min(128, cfg.ThumbnailSize/8))
-	m := &Viewer{grid: thumbnail || cfg.InitialMode == "thumbnails", fit: fit, initialFit: fit, thumb: thumb,
+	m := &Viewer{grid: thumbnail || cfg.InitialMode == "thumbnails", fit: fit, initialFit: fit, thumb: thumb, cellPixels: defaultCellPixels,
 		cache: NewCache(int64(cfg.CacheMiB) << 20), limits: Limits{MaxEncodedBytes: int64(cfg.MaxFileMiB) << 20, MaxPixels: int64(cfg.MaxPixels), Animation: animdecode.Limits{
 			MaxWorkingBytes:  int64(cfg.AnimationCacheMiB) << 20,
 			MaxMetadataBytes: int64(cfg.AnimationMetadataMiB) << 20,

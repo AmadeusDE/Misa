@@ -61,6 +61,9 @@ func ImgviewViewer(args []string, dir string) (*imgview.Viewer, error) {
 		return nil, err
 	}
 	viewer.SetNotice(collection.Warning)
+	// A configured cell override wins; otherwise measure the host terminal,
+	// which is how the Misa GUI reports its font metrics to this process.
+	viewer.SetCellSize(imgview.CellPixelsFor(cfg, imgview.MeasureCellPixels()))
 	return viewer, nil
 }
 

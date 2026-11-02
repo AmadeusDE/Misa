@@ -51,6 +51,30 @@ collecting (a depth bound prunes only the deeper subtree) and shows one
 status-line warning such as `showing first 10000 images; limit reached`; it is
 not an error, and the images already collected stay usable.
 
+## Cell aspect
+
+A half-block cell carries one sample per column and two per row, so the image
+only keeps its shape when the viewer knows the cell's real pixel size. It
+resolves the size in this order:
+
+1. `cell_pixels: [9, 20]` in `imageviewer.yaml`: an exact cell width and height.
+2. `cell_aspect: 0.45`, the cell's width divided by its height, when only the
+   ratio is known; the height is then taken as 20 pixels.
+3. The host terminal's `TIOCGWINSZ` pixel dimensions. Misa's own terminal fills
+   `ws_xpixel`/`ws_ypixel` from the GUI font metrics and answers `CSI 16t` (cell
+   size) and `CSI 14t` (text area size), so a viewer started inside Misa, in a
+   pane or in the Wayland/Android GUI, uses the real font metrics. Terminals
+   that report nothing, including most plain consoles, leave the size unknown.
+4. Otherwise a 10x20 cell, twice as tall as wide, which is what earlier versions
+   assumed unconditionally.
+
+Fit modes, zoom, panning, the thumbnail grid and the half-block output all work
+in physical pixels, so images are not stretched for any cell size. `f` (actual
+size) and `W` (shrink-only) mean one image pixel per physical pixel when the
+cell size is known, and per assumed pixel otherwise; the status line's
+percentage is relative to that. The cell size is read when the viewer opens, so
+a font-size change in the GUI applies to the next viewer.
+
 ## Controls
 
 | Key | Action |
@@ -63,7 +87,7 @@ not an error, and the images already collected stay usable.
 | Arrows or `h`, `j`, `k`, `l` | Pan in single view; select in grid |
 | `+` / `=`, `-` | Zoom in / out; change thumbnail size in grid |
 | `w`, `W`, `e`, `E` | Fit whole, shrink only, fit width, fit height |
-| `f` | Toggle actual size / fit whole |
+| `f` | Toggle actual size (one image pixel per physical pixel) / fit whole |
 | `<`, `>` | Rotate left / right |
 | `?`, `\|` | Flip horizontally / vertically |
 | `m`, `M` | Toggle current mark / invert all marks |
@@ -151,6 +175,8 @@ renderer: auto                 # auto | kitty | halfblock
 initial_mode: single           # single | thumbnails
 fit: shrink                    # shrink | contain | width | height | actual
 thumbnail_size: 128
+cell_aspect: 0                 # cell width/height; 0 measures the terminal
+cell_pixels: []                # exact cell size in pixels, e.g. [9, 20]
 preview: true
 preview_delay_ms: 120
 animation_autoplay: true
@@ -187,7 +213,12 @@ image-viewer controls in the settings screen yet; these options are YAML-only.
 `external_command` is stored as an argument vector, not a shell command;
 external opening is not yet implemented by this configuration alone.
 
-Numeric bounds: thumbnail size 32–1024 pixels; preview delay 0–60000 ms;
+`cell_pixels`, `cell_aspect` and the measured terminal size decide the cell shape
+described above; the first two are the user's override and win over any
+measurement.
+
+Numeric bounds: thumbnail size 32–1024 pixels; cell aspect 0.1–4 (or 0 to
+measure); cell pixels 1–256 per axis; preview delay 0–60000 ms;
 fps 1–120; frame delays 1–60000 ms; cache 1–1024 MiB; animation cache 1 MiB
 through the cache limit; frame count 1–10000; metadata 1–64 MiB; transport
 1–256 MiB/s; file size 1–1024 MiB; pixels 1–32000000; collected images
