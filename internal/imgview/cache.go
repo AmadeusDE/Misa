@@ -8,10 +8,10 @@ import (
 // Cache is a concurrency-safe, byte-budgeted LRU. Keys must include file
 // identity, transformation and output settings. Values must remain immutable.
 type Cache struct {
-	mu           sync.Mutex
-	budget, used int64
-	entries      map[string]*list.Element
-	order        list.List
+	mu                     sync.Mutex
+	budget, used, reserved int64
+	entries                map[string]*list.Element
+	order                  list.List
 }
 type cacheEntry struct {
 	key   string
@@ -50,10 +50,10 @@ func (c *Cache) Put(key string, v Decoded) bool {
 		return false
 	}
 	n := int64(len(v.Pixels.Pix))
-	if n > c.budget {
+	if n > c.budget-c.reserved {
 		return false
 	}
-	for c.used > c.budget-n {
+	for c.used > c.budget-c.reserved-n {
 		c.remove(c.order.Back())
 	}
 	c.entries[key] = c.order.PushFront(cacheEntry{key, v, n})
@@ -68,3 +68,21 @@ func (c *Cache) Delete(key string) {
 	}
 }
 func (c *Cache) Bytes() int64 { c.mu.Lock(); defer c.mu.Unlock(); return c.used }
+
+// reserve temporarily shares the raster budget with animation decode work.
+// Readers may retain already-published immutable rasters; the cache itself
+// releases its references before the worker allocates animation canvases.
+func (c *Cache) reserve(n int64) (func(), error) {
+	c.mu.Lock()
+	if n < 0 || n > c.budget-c.reserved {
+		c.mu.Unlock()
+		return nil, ErrLimit
+	}
+	c.reserved += n
+	for c.used > c.budget-c.reserved {
+		c.remove(c.order.Back())
+	}
+	c.mu.Unlock()
+	var once sync.Once
+	return func() { once.Do(func() { c.mu.Lock(); c.reserved -= n; c.mu.Unlock() }) }, nil
+}

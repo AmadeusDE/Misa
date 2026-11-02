@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
-	"hash/crc32"
 	"image"
 	"image/color"
 	"image/gif"
@@ -15,6 +14,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/AmadeusDE/Misa/internal/imgview/animdecode"
 
 	"golang.org/x/image/bmp"
 	"golang.org/x/image/tiff"
@@ -66,25 +67,12 @@ func TestAnimationDetection(t *testing.T) {
 	if err := gif.EncodeAll(&g, &gif.GIF{Image: []*image.Paletted{frame, frame}, Delay: []int{1, 1}, Config: image.Config{Width: 3, Height: 3, ColorModel: pal}}); err != nil {
 		t.Fatal(err)
 	}
-	img := image.NewNRGBA(image.Rect(0, 0, 3, 2))
-	img.SetNRGBA(0, 0, color.NRGBA{R: 255, A: 255})
-	var pngData bytes.Buffer
-	if err := png.Encode(&pngData, img); err != nil {
-		t.Fatal(err)
-	}
-	// acTL before IDAT: standard PNG decoders retain the default poster.
-	actl := make([]byte, 20)
-	binary.BigEndian.PutUint32(actl, 8)
-	copy(actl[4:], "acTL")
-	binary.BigEndian.PutUint32(actl[8:], 2)
-	binary.BigEndian.PutUint32(actl[16:], crc32.ChecksumIEEE(actl[4:16]))
-	apng := append(append(append([]byte{}, pngData.Bytes()[:33]...), actl...), pngData.Bytes()[33:]...)
 	for _, tc := range []struct {
 		name  string
 		data  []byte
 		size  image.Point
 		pixel image.Point
-	}{{"gif", g.Bytes(), image.Pt(3, 3), image.Pt(1, 1)}, {"apng", apng, image.Pt(3, 2), image.Pt(0, 0)}} {
+	}{{"gif", g.Bytes(), image.Pt(3, 3), image.Pt(1, 1)}, {"apng", integrationAPNG(t), image.Pt(1, 1), image.Pt(0, 0)}} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "image")
 			if err := os.WriteFile(path, tc.data, 0600); err != nil {
@@ -97,7 +85,7 @@ func TestAnimationDetection(t *testing.T) {
 			if d.Pixels.NRGBAAt(tc.pixel.X, tc.pixel.Y).A != 255 {
 				t.Fatal("missing poster pixel")
 			}
-			if _, err := Decode(path, Limits{MaxPixels: 1}); !errors.Is(err, ErrLimit) {
+			if _, err := Decode(path, Limits{MaxPixels: 1, Animation: animdecode.Limits{MaxWorkingBytes: 1}}); !errors.Is(err, ErrLimit) {
 				t.Fatalf("limit: %v", err)
 			}
 		})
@@ -245,3 +233,5 @@ func FuzzOrientation(f *testing.F) {
 	f.Add([]byte("Exif"))
 	f.Fuzz(func(t *testing.T, b []byte) { _ = tiffOrientation(b); _ = exifOrientation(b); _, _ = isAnimated(b) })
 }
+
+func put24(b []byte, n uint32) { b[0] = byte(n); b[1] = byte(n >> 8); b[2] = byte(n >> 16) }

@@ -1,0 +1,28 @@
+WebP/VP8L decoder attribution
+============================
+
+The following files are adapted from golang.org/x/image v0.38.0:
+
+  decode.go                         from webp/decode.go
+  internal/vp8l/decode.go            from vp8l/decode.go
+  internal/vp8l/huffman.go           from vp8l/huffman.go
+  internal/vp8l/transform.go         from vp8l/transform.go
+
+Upstream: https://cs.opensource.google/go/x/image/+/v0.38.0:
+Copyright 2011, 2014 The Go Authors. All rights reserved.
+License: BSD-3-Clause; the complete upstream license is in LICENSE.
+Original copyright and license headers are retained in each derived file.
+
+Local changes introduce a cumulative decoder allocation budget before allocating
+Huffman groups/nodes/codes, color caches, image/transform/meta-image buffers,
+alpha planes and VP8 partition/frame storage. The WebP adapter no longer
+registers an unrestricted global image decoder. It checks alpha/frame size
+agreement. VP8 and RIFF implementations remain the pinned x/image dependency.
+The VP8 reservation formula must be re-audited when that dependency is upgraded.
+
+The testdata/*.webp images are original synthetic patterns created for Misa,
+encoded once using Pillow/libwebp. They contain no third-party image assets.
+No encoder is needed for builds or tests. Lossless rgba pixels are:
+  R=x*16, G=y*16, B=(x+y)*8, A=32+(x+y)*7, for 0<=x,y<16.
+RGB/RGBA lossy fixtures encode the same pattern. Palette fixtures cycle n colors
+for n=2,4,16,256 with R=i*255/(n-1), G=(i*97)%256, B=(i*53)%256.

@@ -23,6 +23,7 @@ from their own repositories and carry their own licenses (see `go.mod` and `docs
 | [Wayland (wayland.xml)](https://gitlab.freedesktop.org/wayland/wayland) | Opcodes and message layouts in `internal/wayland` and `internal/gui` follow the protocol XML. | MIT |
 | [gobox pkg/args](https://github.com/mveety/gobox) | The option parser in `internal/builtins/args.go`. | 0BSD |
 | [DejaVu fonts](https://dejavu-fonts.github.io/) | `internal/gui/fonts/chessglyphs.ttf`, the chess symbols (U+2654-265F) of DejaVu Sans Mono, renamed "Misa Chess Glyphs" (see `internal/gui/fonts/LICENSE.txt`). | Bitstream Vera / public domain |
+| [Go x/image](https://cs.opensource.google/go/x/image) | WebP fixture embedded in `internal/imgview/decode_test.go` and `internal/imgview/animdecode/webp_test.go` (see `docs/CREDITS.md`). Bounded WebP/VP8L reader adaptation and compatibility fixtures under `internal/imgview/webpcodec` (see its `NOTICE` and `LICENSE`); other raster decoders use the existing module dependency. | BSD-3-Clause |
 
 ---
 
@@ -877,4 +878,41 @@ otherwise to promote the sale, use or other dealings in this Font Software
 without prior written authorization from the Gnome Foundation or Bitstream
 Inc., respectively. For further information, contact: fonts at gnome dot
 org.
+```
+
+
+---
+
+## Go x/image
+
+https://cs.opensource.google/go/x/image (v0.38.0)
+
+```
+Copyright 2009 The Go Authors.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google LLC nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
