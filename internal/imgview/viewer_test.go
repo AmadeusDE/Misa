@@ -179,6 +179,19 @@ func TestViewerStaleLoadAndTransformGeneration(t *testing.T) {
 	}
 }
 
+func TestNoticeInStatus(t *testing.T) {
+	v, _ := New([]string{"one", "two"}, false, "auto")
+	v.Resize(200, 4)
+	v.SetNotice("showing first 2 images; limit reached")
+	if got := ansi.Strip(v.View()); !strings.Contains(got, "showing first 2 images; limit reached") {
+		t.Fatalf("notice missing: %q", got)
+	}
+	v.SetNotice("")
+	if got := ansi.Strip(v.View()); strings.Contains(got, "limit reached") {
+		t.Fatalf("notice not cleared: %q", got)
+	}
+}
+
 func TestKittyFallbackWarning(t *testing.T) {
 	for _, renderer := range []string{"kitty", "auto", "halfblock"} {
 		v, err := New([]string{"one", "two"}, false, renderer)

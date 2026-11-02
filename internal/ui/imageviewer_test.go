@@ -30,6 +30,46 @@ func TestImageViewerWords(t *testing.T) {
 	}
 }
 
+func TestImageViewerDirectoryOperand(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	dir := t.TempDir()
+	for _, name := range []string{"b.png", "a.png", "notes.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "sub"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "sub", "c.png"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	m := New(dir)
+	m.width, m.height = 80, 24
+	if ok, _ := m.handleBuiltinCmd("imgview ."); !ok {
+		t.Fatal("directory operand did not dispatch")
+	}
+	v, ok := m.procViewer.(*imgview.Viewer)
+	if !ok {
+		t.Fatalf("not an image viewer: %T", m.procViewer)
+	}
+	if got := v.Paths(); !reflect.DeepEqual(got, []string{filepath.Join(dir, "a.png"), filepath.Join(dir, "b.png")}) {
+		t.Fatalf("directory expansion: %v", got)
+	}
+	recursive := New(dir)
+	recursive.width, recursive.height = 80, 24
+	if ok, _ := recursive.handleBuiltinCmd("imgview -r ."); !ok {
+		t.Fatal("recursive operand did not dispatch")
+	}
+	v, _ = recursive.procViewer.(*imgview.Viewer)
+	if v == nil {
+		t.Fatalf("not an image viewer: %T", recursive.procViewer)
+	}
+	if got := v.Paths(); len(got) != 3 || got[2] != filepath.Join(dir, "sub", "c.png") {
+		t.Fatalf("recursive expansion: %v", got)
+	}
+}
+
 func TestImageViewerDispatch(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	m := New(t.TempDir())

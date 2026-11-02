@@ -34,12 +34,15 @@ type ImageViewerConfig struct {
 	CacheMiB               int      `yaml:"cache_mib"`
 	MaxFileMiB             int      `yaml:"max_file_mib"`
 	MaxPixels              int      `yaml:"max_pixels"`
+	MaxImages              int      `yaml:"max_images"`
+	MaxDirectoryDepth      int      `yaml:"max_directory_depth"`
+	MaxDirectoryEntries    int      `yaml:"max_directory_entries"`
 	ExternalCommand        []string `yaml:"external_command"`
 }
 
 // DefaultImageViewer returns platform-specific defaults.
 func DefaultImageViewer() ImageViewerConfig {
-	c := ImageViewerConfig{OpenMode: "builtin", Renderer: "auto", InitialMode: "single", Fit: "shrink", ThumbnailSize: 128, Preview: true, PreviewDelayMS: 120, AnimationAutoplay: true, AnimationLoops: "file", AnimationFPS: 30, HalfblockAnimationFPS: 10, PreviewAnimationFPS: 10, AnimationMinDelayMS: 20, GIFShortDelayMS: 100, AnimationCacheMiB: 64, AnimationMaxFrames: 10000, AnimationMetadataMiB: 8, AnimationTransportMiBS: 16, CacheMiB: 128, MaxFileMiB: 64, MaxPixels: 32000000}
+	c := ImageViewerConfig{OpenMode: "builtin", Renderer: "auto", InitialMode: "single", Fit: "shrink", ThumbnailSize: 128, Preview: true, PreviewDelayMS: 120, AnimationAutoplay: true, AnimationLoops: "file", AnimationFPS: 30, HalfblockAnimationFPS: 10, PreviewAnimationFPS: 10, AnimationMinDelayMS: 20, GIFShortDelayMS: 100, AnimationCacheMiB: 64, AnimationMaxFrames: 10000, AnimationMetadataMiB: 8, AnimationTransportMiBS: 16, CacheMiB: 128, MaxFileMiB: 64, MaxPixels: 32000000, MaxImages: 10000, MaxDirectoryDepth: 32, MaxDirectoryEntries: 200000}
 	if runtime.GOOS == "android" {
 		c.AnimationFPS, c.HalfblockAnimationFPS, c.PreviewAnimationFPS = 20, 8, 8
 		c.AnimationCacheMiB, c.AnimationMaxFrames, c.AnimationMetadataMiB, c.AnimationTransportMiBS = 24, 2000, 2, 4
@@ -92,6 +95,9 @@ func (c *ImageViewerConfig) Validate() []string {
 	clamp("animation_transport_mib_s", &c.AnimationTransportMiBS, 1, 256)
 	clamp("max_file_mib", &c.MaxFileMiB, 1, 1024)
 	clamp("max_pixels", &c.MaxPixels, 1, 32000000)
+	clamp("max_images", &c.MaxImages, 1, 1000000)
+	clamp("max_directory_depth", &c.MaxDirectoryDepth, 1, 256)
+	clamp("max_directory_entries", &c.MaxDirectoryEntries, 1, 10000000)
 	return warnings
 }
 
