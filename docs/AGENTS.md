@@ -184,7 +184,8 @@ internal/
   clipboard/                     Host clipboard: atotto on Linux/BSD/macOS, termux-clipboard-* when on
                                  PATH, ErrUnavailable so the UI emits OSC 52. APK JNI replaces it later
   color/                         Color palette loading, hex-to-ANSI, color translation
-  config/                        YAML config — config.yaml (menu, ascii, colors, ui, statusbar), mux.yaml, fetch.yaml, gui.yaml
+  config/                        YAML config — config.yaml (menu, ascii, colors, ui, statusbar), mux.yaml, fetch.yaml, gui.yaml,
+                                 graphics.yaml (shared terminal Kitty resource limits; does not enable graphics)
   companion/                     Encouraging messages after command (cargo-mommy derived)
     companion.go                 Respond(), template vars ({role}, {part}, {item}, {prefix}…)
     config.go                    companion.yaml selections + write-ins
@@ -209,11 +210,15 @@ internal/
   launcher/                      Bubble Tea ExecProcess helper (unused: external programs run in-pane PTYs via Model.launch)
   jobleader/                     `misa --job-leader cmd…`: session leader that runs cmd in its own foreground process
                                  group so ^Z stops it; SuspendOnCtrlZ for multicall builtins
+  kittygfx/                      Bounded direct Kitty graphics protocol: parse/encode, limits and immutable rasters
+                                 (RGB/RGBA only; no files, compression or native animation)
   term/                          VT emulator + PTY: reader goroutine, DEC 2026 sync buffering, session-wide kill on Close.
                                  terminal.go (sessions, StartArgv/StartFunc), parser.go, screen.go, sgr.go, charset.go,
                                  reports.go, render.go, mouse.go, input.go (async PTY writes), ptyfd.go (pollable master),
                                  jobs.go (wait4 with WUNTRACED: Stopped/Continue)
-                                 snapshot.go (Snapshot: cell copy for frontends; SetOSCHook for titles/OSC 52),
+                                 snapshot.go (Snapshot: cell copy for frontends, immutable graphics placements and generation;
+                                 off until a consumer enables them: the GUI does, mux panes do not), graphics*.go (bounded
+                                 screen-local Kitty store and atomic frame replacement), SetOSCHook for titles/OSC 52,
                                  marks.go (combining marks interned so Cell has no pointers: the GC never scans
                                  screens/scrollback — keep Cell pointer-free, a test enforces it). Scrolled-off rows
                                  move into scrollback and evicted/discarded rows are recycled (blankRow), so steady
@@ -243,6 +248,9 @@ internal/
     render.go canvas.go          Cells → premultiplied pixels, row damage against what each buffer last
                                  showed. Canvas order follows PixelFormat. Only the default background
                                  takes `opacity` (default 0.55; ARGB8888 buffers unless it is 1)
+    images.go                    Kitty placements: cell metrics and clip, nearest neighbour scaling, alpha
+                                 over the canvas, per-buffer placement damage. The GUI terminal enables
+                                 graphics for its child; mux panes stay disabled
     font.go                      fc-match when it is on PATH; otherwise `$PREFIX/share/fonts` (Termux)
                                  and `/system/fonts`, then the embedded Go Mono
     boxdraw.go                   Procedural box drawing, arcs, blocks, braille so borders join seamlessly
@@ -315,6 +323,7 @@ internal/
   OS-neutral core (`internal/gui`) owns that session; the Wayland backend (`wl_*.go`, `unix && !android`) is the
   only platform window so far. Protocol objects are raw opcodes against `internal/wayland`, from wayland.xml/xdg-shell.xml
   (no generated bindings). The loop draws only on terminal dirty + frame callback; damage is computed per row.
+  Image placements add their own rectangles to that damage.
   Keys go keymap → keysym (`internal/xkb`, no dead keys/compose) → `tea.Key` → `ui.KeyBytes`, so the xterm encoding
   lives in one place. The core draws premultiplied pixels straight into the buffer in the backend's order
   (BGRA on Wayland, RGBA on Android). Requires a compositor with
@@ -479,7 +488,9 @@ Commit trailers for agent-made commits:
   `pkg-frontend.md`.
 - `SECURITY.md`, `CONTRIBUTING.md` — Reporting vulnerabilities; how changes are made here.
 - **Image viewer**: `internal/imageframe` owns transport-neutral scene and bounded `FrameSource`
-  contracts; `internal/imageout` currently renders half-block cells (Kitty remains disabled).
+  contracts; `internal/imageout` currently renders half-block cells, and the viewer's own Kitty
+  renderer remains disabled. The Wayland/Android GUI composites the terminal's stored placements
+  (`internal/gui/images.go`); mux pane terminals stay graphics-disabled.
   `internal/imgview` is the read-only viewer/static decode pipeline. Its `collect.go` expands
   directory operands (natural sort, hidden and non-image filtering, bounded depth/entry/image
   counts) into the ordered collection. Its `animdecode` package indexes

@@ -12,25 +12,39 @@ type cursorState struct {
 	focused  bool
 }
 
-// frame is what a buffer last showed, so the next draw into it repaints
-// only rows that changed.
+// cellMetrics is the cell geometry a buffer was drawn with. A change moves
+// every glyph and every image, so the buffer has to be redrawn whole.
+type cellMetrics struct {
+	w, h, pad int
+}
+
+// frame is what a buffer last showed, so the next draw into it repaints only
+// what changed. Each rotating backend buffer has its own frame.
 type frame struct {
-	cells      []term.Cell
-	rows, cols int
-	cursor     cursorState
-	valid      bool
+	cells   []term.Cell
+	rows    int
+	cols    int
+	cursor  cursorState
+	metrics cellMetrics
+	gfx     []gfxDrawn
+	valid   bool
 }
 
 type renderer struct {
 	fonts *fontSet
 	pal   palette
 	pad   int
+	gfx   compositor
+}
+
+func (r *renderer) metrics() cellMetrics {
+	return cellMetrics{w: r.fonts.cellW, h: r.fonts.cellH, pad: r.pad}
 }
 
 // changedRows lists the rows of snap that differ from what prev holds; full
 // means prev is unusable and everything must be drawn.
-func changedRows(snap *term.Snapshot, cur cursorState, prev *frame) (rows []int, full bool) {
-	if !prev.valid || prev.rows != snap.Rows || prev.cols != snap.Cols {
+func changedRows(snap *term.Snapshot, cur cursorState, prev *frame, m cellMetrics) (rows []int, full bool) {
+	if !prev.valid || prev.metrics != m || prev.rows != snap.Rows || prev.cols != snap.Cols {
 		return nil, true
 	}
 	for row := 0; row < snap.Rows; row++ {
@@ -54,48 +68,82 @@ func rowChanged(line []term.Cell, prev *frame, row int, cur cursorState) bool {
 	return false
 }
 
-func (f *frame) record(snap *term.Snapshot, cur cursorState) {
+// record remembers what f showed, so the next draw into the same buffer only
+// repaints what changed since. drawn is owned by the frame from here on.
+func (f *frame) record(snap *term.Snapshot, cur cursorState, drawn []gfxDrawn, m cellMetrics) {
 	f.cells = append(f.cells[:0], snap.Cells...)
-	f.rows, f.cols, f.cursor, f.valid = snap.Rows, snap.Cols, cur, true
+	f.rows, f.cols, f.cursor, f.metrics, f.gfx, f.valid = snap.Rows, snap.Cols, cur, m, drawn, true
 }
 
 // draw brings c, which last showed prev, up to snap.
 func (r *renderer) draw(c *canvas, snap *term.Snapshot, cur cursorState, prev *frame) {
-	rows, full := changedRows(snap, cur, prev)
+	rows, full := changedRows(snap, cur, prev, r.metrics())
+	drawn := r.drawn(snap)
 	if full {
-		c.fillAlpha(c.bounds(), r.pal.bg, r.pal.alpha)
-		for row := 0; row < snap.Rows; row++ {
-			rows = append(rows, row)
+		r.repaint(c, snap, cur, c.bounds())
+	} else {
+		for _, row := range rows {
+			r.repaint(c, snap, cur, r.rowBand(row, c.bounds()))
+		}
+		for _, rect := range gfxDamage(prev, drawn) {
+			r.repaint(c, snap, cur, rect)
 		}
 	}
-	for _, row := range rows {
-		line := snap.Cells[row*snap.Cols : (row+1)*snap.Cols]
-		y := r.pad + row*r.fonts.cellH
-		c.fillAlpha(image.Rect(r.pad, y, r.pad+snap.Cols*r.fonts.cellW, y+r.fonts.cellH), r.pal.bg, r.pal.alpha)
-		r.drawRow(c, line, y, cursorCol(cur, row))
-		if cur.visible && !cur.focused && cur.row == row {
-			r.drawHollowCursor(c, cur.col, y)
-		}
-	}
-	prev.record(snap, cur)
+	prev.record(snap, cur, drawn, r.metrics())
 }
 
-// damage turns changed rows into buffer rectangles, merging adjacent ones.
-func (r *renderer) damage(rows []int, full bool, bounds image.Rectangle) []image.Rectangle {
+// repaint redraws every layer inside region: the cell backgrounds, the images
+// over them, then the glyphs and the cursor of the rows it touches.
+func (r *renderer) repaint(c *canvas, snap *term.Snapshot, cur cursorState, region image.Rectangle) {
+	region = region.Intersect(c.bounds())
+	if region.Empty() || snap.Rows <= 0 || snap.Cols <= 0 {
+		return
+	}
+	c.fillAlpha(region, r.pal.bg, r.pal.alpha)
+	first, last := r.rowRange(snap, region)
+	for row := first; row <= last; row++ {
+		r.drawBackgrounds(c, snap, row, region)
+	}
+	r.drawImages(c, snap, region)
+	for row := first; row <= last; row++ {
+		r.drawText(c, snap, row, cur, region)
+	}
+}
+
+// rowBand is the buffer band one cell row occupies, padding included.
+func (r *renderer) rowBand(row int, bounds image.Rectangle) image.Rectangle {
+	y := r.pad + row*r.fonts.cellH
+	return image.Rect(bounds.Min.X, y, bounds.Max.X, y+r.fonts.cellH)
+}
+
+// rowRange is the first and last cell row region touches.
+func (r *renderer) rowRange(snap *term.Snapshot, region image.Rectangle) (first, last int) {
+	first = max(0, (region.Min.Y-r.pad)/r.fonts.cellH)
+	last = min(snap.Rows-1, (region.Max.Y-r.pad-1)/r.fonts.cellH)
+	return first, last
+}
+
+// damage is what the backend is told to repaint: the whole buffer, or the
+// changed row bands and the placement rectangles.
+func (r *renderer) damage(rows []int, rects []image.Rectangle, full bool, bounds image.Rectangle) []image.Rectangle {
 	if full {
 		return []image.Rectangle{bounds}
 	}
-	var rects []image.Rectangle
+	var out []image.Rectangle
 	for _, row := range rows {
-		y := r.pad + row*r.fonts.cellH
-		band := image.Rect(0, y, bounds.Dx(), y+r.fonts.cellH)
-		if n := len(rects); n > 0 && rects[n-1].Max.Y == band.Min.Y {
-			rects[n-1].Max.Y = band.Max.Y
+		band := r.rowBand(row, bounds)
+		if n := len(out); n > 0 && out[n-1].Max.Y == band.Min.Y && out[n-1].Min.X == band.Min.X && out[n-1].Max.X == band.Max.X {
+			out[n-1].Max.Y = band.Max.Y
 			continue
 		}
-		rects = append(rects, band)
+		out = append(out, band)
 	}
-	return rects
+	for _, rect := range rects {
+		if rect = rect.Intersect(bounds); !rect.Empty() {
+			out = append(out, rect)
+		}
+	}
+	return out
 }
 
 // cursorCol is the column of a solid cursor on row, or -1.
@@ -118,53 +166,69 @@ func span(line []term.Cell, col int) int {
 	return 1
 }
 
-// drawRow paints backgrounds first, then glyphs, so a glyph spilling into a
-// blank neighbour is not painted over.
-func (r *renderer) drawRow(c *canvas, line []term.Cell, y, cursor int) {
-	colors := func(col int) (fg, bg rgb, defaultBG bool) {
-		fg, bg, defaultBG = r.pal.cellColors(&line[col])
-		if col == cursor || (cursor == col+1 && span(line, col) == 2) {
-			return bg, r.pal.cursor, false
-		}
-		return fg, bg, defaultBG
-	}
+// drawBackgrounds paints the non-default cell backgrounds of one row. The
+// default background is already there.
+func (r *renderer) drawBackgrounds(c *canvas, snap *term.Snapshot, row int, clip image.Rectangle) {
+	line := snap.Cells[row*snap.Cols : (row+1)*snap.Cols]
+	y := r.pad + row*r.fonts.cellH
 	for col := 0; col < len(line); col++ {
 		if line[col].Continuation() && col > 0 {
 			continue
 		}
-		if _, bg, defaultBG := colors(col); !defaultBG {
-			c.fill(r.cellRect(col, y, span(line, col)), bg)
+		if _, bg, defaultBG := r.pal.cellColors(&line[col]); !defaultBG {
+			c.fill(r.cellRect(col, y, span(line, col)).Intersect(clip), bg)
 		}
 	}
+}
+
+// drawText paints the glyphs, combining marks, underlines and cursor of one
+// row, clipped to clip.
+func (r *renderer) drawText(c *canvas, snap *term.Snapshot, row int, cur cursorState, clip image.Rectangle) {
+	line := snap.Cells[row*snap.Cols : (row+1)*snap.Cols]
+	y := r.pad + row*r.fonts.cellH
+	cursor := cursorCol(cur, row)
+	lw := r.fonts.lineWidth
 	for col := 0; col < len(line); col++ {
 		cell := &line[col]
 		if cell.Continuation() || cell.Hidden {
 			continue
 		}
-		fg, _, _ := colors(col)
+		fg, bg, _ := r.pal.cellColors(cell)
 		n := span(line, col)
 		rect := r.cellRect(col, y, n)
-		clip := rect
+		box := rect
 		if col+n < len(line) && blank(&line[col+n]) {
-			clip.Max.X += r.fonts.cellW
+			box.Max.X += r.fonts.cellW
+		}
+		if box = box.Intersect(clip); box.Empty() {
+			continue
+		}
+		// The cursor block is part of the text layer, so it covers an image
+		// under the cell instead of being hidden by it, and the glyph inverts
+		// to the cell's own background.
+		if col == cursor || (cursor == col+1 && n == 2) {
+			c.fill(rect.Intersect(clip), r.pal.cursor)
+			fg = bg
 		}
 		s := cellStyle(cell.Bold, cell.Italic)
 		if g := r.fonts.glyph(cell.Ch, s, n); g != nil {
-			c.blend(g.mask, rect.Min, clip, fg)
+			c.blend(g.mask, rect.Min, box, fg)
 		}
 		for _, mark := range cell.Marks() {
 			if g := r.fonts.glyph(mark, s, n); g != nil {
-				c.blend(g.mask, rect.Min, rect, fg)
+				c.blend(g.mask, rect.Min, rect.Intersect(clip), fg)
 			}
 		}
-		lw := r.fonts.lineWidth
 		if cell.Under {
-			c.fill(image.Rect(rect.Min.X, y+r.fonts.underline, rect.Max.X, y+r.fonts.underline+lw), fg)
+			c.fill(image.Rect(rect.Min.X, y+r.fonts.underline, rect.Max.X, y+r.fonts.underline+lw).Intersect(clip), fg)
 		}
 		if cell.Strike {
 			mid := y + r.fonts.cellH/2
-			c.fill(image.Rect(rect.Min.X, mid, rect.Max.X, mid+lw), fg)
+			c.fill(image.Rect(rect.Min.X, mid, rect.Max.X, mid+lw).Intersect(clip), fg)
 		}
+	}
+	if cur.visible && !cur.focused && cur.row == row {
+		r.drawHollowCursor(c, cur.col, y, clip)
 	}
 }
 
@@ -172,7 +236,7 @@ func blank(c *term.Cell) bool {
 	return (c.Ch == ' ' || c.Ch == 0) && !c.HasBG && !c.Reverse && c.Marks() == ""
 }
 
-func (r *renderer) drawHollowCursor(c *canvas, col, y int) {
+func (r *renderer) drawHollowCursor(c *canvas, col, y int, clip image.Rectangle) {
 	rect := r.cellRect(col, y, 1)
 	lw := r.fonts.lineWidth
 	for _, edge := range []image.Rectangle{
@@ -181,6 +245,6 @@ func (r *renderer) drawHollowCursor(c *canvas, col, y int) {
 		{rect.Min, image.Pt(rect.Min.X+lw, rect.Max.Y)},
 		{image.Pt(rect.Max.X-lw, rect.Min.Y), rect.Max},
 	} {
-		c.fill(edge, r.pal.cursor)
+		c.fill(edge.Intersect(clip), r.pal.cursor)
 	}
 }
