@@ -1,11 +1,14 @@
 # Image viewer
 
-`imgview [-r|--recursive] [--thumbnail] [--renderer auto|halfblock|kitty] FILE|DIR...`
+`imgview [-r|--recursive] [--thumbnail] [--renderer auto|halfblock|kitty] [--start FILE] FILE|DIR...`
 opens files in order as a standalone full-screen terminal program. `--` ends
 option parsing. Relative paths are
 resolved against the shell's working directory. A directory operand is expanded
 into the images it contains (see [Directories](#directories)). Missing or
 unreadable files remain in the collection and show an error in the status line.
+`--start FILE` selects an initial image from the expanded paths. Its path is
+resolved against the shell's working directory and must exist among those paths;
+it does not change directory expansion to retain an excluded file.
 
 The viewer owns its terminal directly: raw input, alternate screen, mouse and
 focus reporting, and one serialized write for each output frame. It does **not**
@@ -82,6 +85,43 @@ a generated red/blue PNG, both directly and through Misa's `ExecProcess` launch,
 including a mark-only redraw and returning to Misa with `q`. Native Wayland
 window presentation and an APK/device run were not performed; the shared pixel
 path and Android arm64 pure-Go typechecking do not substitute for those checks.
+
+## File browser
+
+Press Enter on an image or activate it with a repeated click to open the
+standalone viewer through `tea.ExecProcess`, giving it terminal ownership just
+as at the Misa prompt. Directories and text files retain their usual browser and
+editor actions. If the Misa binary is unavailable, the existing in-UI
+half-block viewer remains available with a visible notice; a failed launch is
+reported in the browser status.
+
+The viewer receives the selected image and eligible sibling images in the same
+case-sensitive lexical order as the file browser: `img10.png` comes before
+`img2.png`. With an active filter, only its visible matches are passed, in
+the same ranked order the browser shows. This differs from the natural sorting
+of ordinary directory operands [described below](#directories). Collection is nonrecursive and skips hidden
+siblings. Candidates need a supported extension and must pass a small bounded
+content sniff of at most 512 bytes; huge, unreadable, special and non-image
+siblings are skipped. Activating an oversized, unreadable or special image-named
+file reports a browser error instead of reading it into the editor. A recognized
+header with corrupt image data opens the viewer's error placeholder.
+The selected image is always included and opened initially using `--start`.
+If `max_images`, `max_directory_entries` or the conservative 64 KiB path-argument
+cap limits collection, a bounded window around the selection preserves the
+browser order. The viewer and the returning browser show a truncation notice.
+
+On quitting the viewer, the browser reloads its list and restores the same
+directory, filter and selection. The real-UI GUI pixel check can dump its actual
+composited canvas (create the output directory first):
+
+```sh
+MISA_FILEBROWSER_IMGSHOT="$PWD/.cache/filebrowser-imgview-gui.png" go test -race ./internal/gui \
+  -run '^TestFilebrowserRealGUIPixels$' -count=3 -v
+```
+
+The file-browser flow was also checked in kitty **0.49.2** on Xvfb with software
+GL: Enter on the second PNG produced green/yellow pixels, `p` and `n` switched
+between it and a red/blue sibling, and `q` returned with the second PNG selected.
 
 ## Directories
 
@@ -542,10 +582,10 @@ These parts are not implemented yet and should not be assumed from this document
   Kitty output works through the host terminal, while pane PTYs deliberately
   select the half-block fallback. Unicode-placeholder and tmux/screen
   passthrough support are not implemented.
-* File-browser integration: opening images from the browser, thumbnail
-  previews and opt-in animated previews. `preview`, `preview_delay_ms`,
-  `preview_animation` and `preview_animation_fps` are reserved for that work,
-  and the full viewer's playback state will stay independent of any preview.
+* File-browser thumbnail previews and opt-in animated previews. `preview`,
+  `preview_delay_ms`, `preview_animation` and `preview_animation_fps` are
+  reserved for that work, and the full viewer's playback state will stay
+  independent of any preview.
 * External/default viewer opening: the `o` key only reports that it is
   unavailable, and `open_mode` and `external_command` are not wired to a
   launcher.

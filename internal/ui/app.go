@@ -95,12 +95,14 @@ type Model struct {
 	viRegister   []string
 	viRegLine    bool
 
-	procViewer    procmon.Viewer
-	procMonReturn screen
-	procVisible   bool // last visibility pushed to procViewer
-	paneShown     bool // nested: the parent's active tag shows this pane
-	paneFocused   bool // nested: the parent pane owns the keyboard
-	windowFocused bool // root: the terminal window has focus
+	procViewer           procmon.Viewer
+	browserViewerName    string
+	browserViewerLimited bool
+	procMonReturn        screen
+	procVisible          bool // last visibility pushed to procViewer
+	paneShown            bool // nested: the parent's active tag shows this pane
+	paneFocused          bool // nested: the parent pane owns the keyboard
+	windowFocused        bool // root: the terminal window has focus
 
 	mux     muxState
 	extInfo sysinfo.ExtendedInfo
