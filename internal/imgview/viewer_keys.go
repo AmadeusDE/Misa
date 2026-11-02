@@ -35,7 +35,8 @@ func (m *Viewer) key(k tea.KeyPressMsg) {
 		m.prefix = min(9999, m.prefix*10+int(s[0]-'0'))
 		return
 	}
-	n := max(1, m.prefix)
+	prefix := m.prefix
+	n := max(1, prefix)
 	m.prefix = 0
 	if s == "q" {
 		m.quit = true
@@ -165,6 +166,12 @@ func (m *Viewer) key(k tea.KeyPressMsg) {
 	case "|":
 		it.flipY = !it.flipY
 		it.appearance++
+	case "ctrl+a":
+		m.toggleAnimation(prefix)
+	case "ctrl+n":
+		m.stepAnimation(n)
+	case "ctrl+p":
+		m.stepAnimation(-n)
 	case "r":
 		it.loaded = false
 		m.cache.Delete(m.cacheKey(m.index))

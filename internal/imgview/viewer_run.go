@@ -16,6 +16,8 @@ func (s *standalone) View() tea.View {
 	v := tea.NewView(s.viewer.View())
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
+	// Focus reporting lets a host terminal pause playback while it is unfocused.
+	v.ReportFocus = true
 	return v
 }
 

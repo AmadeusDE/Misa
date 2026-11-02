@@ -103,7 +103,7 @@ func (m *Model) tryImageViewer(input string) (bool, tea.Cmd) {
 		m.updateShellView()
 		return true, nil
 	}
-	m.enterProcMon(viewer)
+	enter := m.enterProcMon(viewer)
 	m.cmdInput.SetValue("")
-	return true, m.procViewer.Init()
+	return true, tea.Batch(enter, m.procViewer.Init())
 }

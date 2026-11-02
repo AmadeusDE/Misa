@@ -13,10 +13,10 @@ configuration or on the command line safely falls back to half-blocks and
 shows a warning in the status line. No terminal graphics escapes are emitted.
 The viewer is read-only: rotations, flips and marks exist only for the session.
 Static PNG, JPEG, GIF, WebP, BMP and TIFF are supported. Animated GIF, WebP and
-APNG use bounded animation decoders and full-canvas compositing. The viewer
-still shows a still poster with a status notice; playback, timers and animation
-keys are not implemented yet. APNG prefers a separate default poster when present
-(the poster is not included in the animation sequence). SVG, editing, file-browser previews and external
+APNG use bounded animation decoders, full-canvas compositing and application
+scheduled playback; they play, pause and step in the half-block renderer. APNG
+prefers a separate default poster when present (the poster is not included in
+the animation sequence). SVG, editing, file-browser previews and external
 viewer launching are not implemented.
 
 ## Controls
@@ -37,13 +37,71 @@ viewer launching are not implemented.
 | `m`, `M` | Toggle current mark / invert all marks |
 | Ctrl+u, Ctrl+m | Clear marks |
 | `N`, `P` | Next / previous marked image |
-| `r` | Reload current image |
+| Ctrl+a | Toggle animation playback (grid: no action) |
+| Ctrl+n, Ctrl+p | Pause and step one frame forward / backward; a numeric prefix steps N |
+| `r` | Reload current image and restart its animation |
 | `o` | Show external-viewer-unavailable notice |
 
-A numeric prefix applies to next/previous navigation. In the grid, click to
-select and click the same item again to open it. In single view, drag to pan.
-The mouse wheel navigates images (rows in the grid); Ctrl+wheel zooms or
-changes thumbnail size.
+A numeric prefix (at most 9999) applies to next/previous navigation and to
+Ctrl+n/Ctrl+p. Ctrl+a discards a pending prefix with a status hint instead of
+consuming it. In the grid, click to select and click the same item again to open
+it. In single view, drag to pan. The mouse wheel navigates images (rows in the
+grid); Ctrl+wheel zooms or changes thumbnail size.
+
+## Animation playback
+
+Animated GIF, WebP and APNG play in the single-image view by re-rendering the
+composited frame on the viewer's own clock; no terminal animation protocol is
+used. Autoplay follows `animation_autoplay`; with autoplay off the sequence starts
+paused. Ctrl+a toggles playback. After a finite sequence has ended Ctrl+a
+restarts it from the first frame, otherwise it resumes at the saved position.
+Ctrl+n/Ctrl+p pause and step forward/backward, honouring a numeric prefix.
+Stepping clamps at the first and last frame, never changes the play counter and
+keeps the paused state. Static images only show a brief status hint. Ctrl+a in
+the grid reports that thumbnails stay still; frame stepping has no effect
+there, and entering the grid suspends playback.
+
+The status line reports the committed frame, not a requested decode:
+`frame 3/24 · playing`, `paused` or `ended`, plus the loop counter (`loop 2/5`,
+`loop ∞` when the sequence is unbounded). Frame 0 is decoded like any other
+frame, so a paused animation never leaves a still poster on screen: formats
+whose poster is a separate image (APNG) present frame 0 as soon as it decodes.
+Until that first frame is committed the status line claims no frame number and
+says `4 frames · loading` instead. `animation_loops` can override the file's
+play count with `once` or `infinite`; otherwise the file's own count and the GIF
+repeat convention described below apply. `halfblock_animation_fps` caps
+presentation: when short frames would exceed it, frames are skipped so overall
+timing is preserved rather than playback slowing down. Frame delays are never
+shorter than `animation_min_delay_ms`.
+
+At most one frame decode and one clock boundary are outstanding, so slow frames
+coalesce to the latest needed one instead of queueing, and a heavy sequence
+cannot starve key handling. A boundary starts only once the frame it follows is
+on screen: a decode slower than the frame delay delays the animation instead of
+skipping frames, so the opening frame and a finite sequence's last frame are
+always presented. Frames are dropped only when `halfblock_animation_fps` samples
+them. The sequence is indexed only for the visible single-image item; the
+poster is decoded first, and switching images, entering the grid, reloading
+(`r`), or quitting stops and closes the sequence. A decode or index failure is
+reported as `animation: <reason>` and leaves the poster visible.
+
+Playback pauses, with no timer and no new decode, while the viewer is hidden or
+unfocused: blur, another Misa screen or tag, an unfocused split pane, or the
+viewer's own grid or help overlay. Revealing resumes with the remaining delay
+and keeps the position and loop counter; a user's own pause survives
+visibility changes. Hiding cancels the pending boundary, so the reveal returns
+the command that arms the next one: `SetVisible` hands it to the host, which
+returns it from its own `Update`. Without it playback would stay frozen until an
+unrelated message happened to reach the viewer.
+
+Terminal focus messages reach one pane at a time, so a viewer blurred while it
+was active keeps its own focus flag when the active pane changes underneath it.
+A host reports visible only for a screen that is on screen and owns the keyboard,
+so that push also settles focus and the revealed viewer resumes; hiding leaves
+focus alone. In-pane Misa computes visibility from the active tag, pane focus and
+window focus. The standalone program has no host: it enables terminal focus
+reporting and relies on those messages alone. A terminal that never reports
+focus is treated as focused, so the animation keeps playing there.
 
 ## Configuration
 
@@ -83,8 +141,13 @@ external_command: []           # argv, e.g. ["viewer", "{file}"]
 
 On Android the animation fps defaults are 20, 8 and 8 respectively; animation
 cache defaults to 24 MiB, frame limit to 2000, metadata to 2 MiB and transport
-to 4 MiB/s. Animation decode limits and delay policies are active. Playback, preview and
-`open_mode` options are reserved for later integration.
+to 4 MiB/s. Animation decode limits, delay policies, `animation_autoplay`,
+`animation_loops` and the half-block presentation cap
+(`halfblock_animation_fps`) are active. The remaining values belong to later
+work: `animation_fps` and `animation_transport_mib_s` to the pixel renderers,
+and `preview`, `preview_delay_ms`, `preview_animation`, `preview_animation_fps`
+and `open_mode` to file-browser previews and external opening. There are no
+image-viewer controls in the settings screen yet; these options are YAML-only.
 `external_command` is stored as an argument vector, not a shell command;
 external opening is not yet implemented by this configuration alone.
 
@@ -97,12 +160,16 @@ bounds, not a guarantee that all allowed files can be decoded on every device.
 
 ## Animation decoding and limits
 
-`internal/imgview/animdecode` provides an on-demand `imageframe.FrameSource`.
+`internal/imgview/animdecode` provides an on-demand `imageframe.FrameSource`;
 `imgview.OpenAnimation` opens a regular local file and returns a source owned by
-its caller; callers serialize access and close the source. Frames are immutable,
+its caller, which serializes access and closes it. Frames are immutable,
 full-canvas NRGBA images. Encoded and effective delays are available separately.
-The half-block viewer only requests a poster and closes its source immediately;
-no animation state, background goroutines or clocks are retained.
+The viewer decodes the poster first and indexes the sequence only when the item
+is the visible single image; navigation, entering the grid, reload and exit
+close it. At most one frame decode and one clock boundary are outstanding, so
+slow frames coalesce to the latest needed one instead of queueing. Stepping
+backward may need to replay earlier frames to rebuild the canvas, so it can take
+longer than stepping forward; the work stays bounded either way.
 
 The original GIF/APNG/WebP container parsers validate the complete index before
 publishing a source. GIF uses Go's LZW/image decoder, APNG reconstructs streaming
@@ -126,7 +193,8 @@ GIF encoded 0/10 ms delays default to 100 ms; APNG's zero denominator means 100,
 and APNG/WebP short delays default to a 20 ms floor. The configured minimum also
 acts as a safety floor. GIF positive loop counts become repeats + 1 total plays;
 APNG/WebP positive counts already mean total plays. Zero means infinite; an
-absent GIF loop extension means once. No loop is played in this PR.
+absent GIF loop extension means once. `animation_loops` can override the file's
+count with `once` or `infinite`.
 
 Desktop defaults are 10,000 frames, 8 MiB index metadata and 64 MiB animation
 working storage; Android uses 2,000, 2 MiB and 24 MiB. Encoded input (64 MiB) and
@@ -172,3 +240,32 @@ pinned dependency while imposing explicit cumulative allocation limits. See its
 `NOTICE`/`LICENSE` and compatibility tests; future x/image upgrades must review
 these guards rather than blindly replace the local files. This does not make
 in-process decoding a sandbox or promise allocator-exact RSS bounds.
+
+## Remaining later work
+
+The viewer deliberately stops at half-block playback. These parts are not
+implemented yet and should not be assumed from this document:
+
+* Kitty graphics transport and capability probing. `renderer: kitty` still
+  falls back to half-blocks with a status warning, and Misa's terminal
+  emulator and GUI do not consume image escapes.
+* Pixel animation in Misa's Wayland GUI, the Android APK and nested mux panes,
+  including the shared compositor, damage tracking and byte-rate limits.
+* File-browser integration: opening images from the browser, thumbnail
+  previews and opt-in animated previews. `preview`, `preview_delay_ms`,
+  `preview_animation` and `preview_animation_fps` are reserved for that work,
+  and the full viewer's playback state will stay independent of any preview.
+* External/default viewer opening: the `o` key only reports that it is
+  unavailable, and `open_mode` and `external_command` are not wired to a
+  launcher.
+* Android-specific lifecycle visibility, playback extra-key controls and
+  handing the original file to a system viewer through a content URI.
+* Settings-screen controls for image-viewer options; only `imageviewer.yaml`
+  configures them today.
+* SVG support, which remains an optional follow-up. Sixel, animated
+  AVIF/HEIC/JPEG XL and MNG, video containers, recursive scanning, slideshow,
+  editing/saving transforms and freedesktop thumbnail-cache interoperability
+  are out of scope rather than pending work.
+* Optional native Kitty animation offload. Even on Kitty, the intended baseline
+  is application-scheduled frame replacement so pause, stepping and loop status
+  stay authoritative.

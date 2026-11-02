@@ -103,15 +103,23 @@ func (h *HalfBlockRenderer) Prepare(ctx context.Context, s imageframe.Scene) (im
 		work += area
 		xdraw.ApproxBiLinear.Scale(canvas.SubImage(clip).(*image.RGBA), dst, p.Raster.Pixels, p.Source, draw.Over, nil)
 	}
+	// The canvas is opaque by construction, so its premultiplied bytes are
+	// already the cell colors. Going through color.Color would allocate twice
+	// per sample, which an animation frame cannot afford.
 	cells := make([]imageframe.Cell, w*height)
+	pix, stride := canvas.Pix, canvas.Stride
 	for y := 0; y < height; y++ {
 		if err := ctx.Err(); err != nil {
 			return imageframe.Frame{}, err
 		}
+		row := y * 2 * stride
 		for x := 0; x < w; x++ {
-			top := color.NRGBAModel.Convert(canvas.At(x, 2*y)).(color.NRGBA)
-			bottom := color.NRGBAModel.Convert(canvas.At(x, 2*y+1)).(color.NRGBA)
-			cells[y*w+x] = imageframe.Cell{Text: "▀", Foreground: top, Background: bottom}
+			i := row + x*4
+			cells[y*w+x] = imageframe.Cell{
+				Text:       "▀",
+				Foreground: color.NRGBA{R: pix[i], G: pix[i+1], B: pix[i+2], A: pix[i+3]},
+				Background: color.NRGBA{R: pix[i+stride], G: pix[i+stride+1], B: pix[i+stride+2], A: pix[i+stride+3]},
+			}
 		}
 	}
 	f.Cells = &imageframe.CellLayer{Bounds: v.Cells, Cells: cells}
