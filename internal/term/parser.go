@@ -274,9 +274,7 @@ func (t *Terminal) handleCSI(final byte) {
 			t.respond("\x1b[?1;2c")
 		}
 	case 't':
-		if t.p(0, 0) == 18 {
-			t.respond(fmtSizeReport(t.Rows, t.Cols))
-		}
+		t.reportSize()
 	case 's':
 		t.saveCursor()
 	case 'u':

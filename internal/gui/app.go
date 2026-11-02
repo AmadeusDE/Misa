@@ -331,6 +331,9 @@ func (a *app) resizeTerminal() {
 		a.startTerminal(rows, cols)
 		return
 	}
+	// Before the grid comparison: a font or scale change moves the cell size
+	// but not necessarily the row/column count, and the child has to hear both.
+	a.term.SetCellPixels(a.rend.fonts.cellW, a.rend.fonts.cellH)
 	if rows != a.term.Rows || cols != a.term.Cols {
 		a.term.Resize(rows, cols)
 	}
@@ -339,6 +342,9 @@ func (a *app) resizeTerminal() {
 func (a *app) startTerminal(rows, cols int) {
 	t := term.New(rows, cols)
 	t.SetOSCHook(a.osc.push)
+	// Pixel dimensions come from the renderer's font metrics, the only place
+	// that knows how big a cell really is.
+	t.SetCellPixels(a.rend.fonts.cellW, a.rend.fonts.cellH)
 	pal := a.rend.pal
 	term.SetHostForeground(color.RGBA{pal.fg.r, pal.fg.g, pal.fg.b, 0xff})
 	term.SetHostBackground(color.RGBA{pal.bg.r, pal.bg.g, pal.bg.b, 0xff})

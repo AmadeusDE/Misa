@@ -117,6 +117,8 @@ type Terminal struct {
 	syncPending []byte
 	synced      bool
 	syncGen     uint64 // bumped per frame, so a stale timeout does nothing
+	cellW       int    // physical pixels of one host cell, 0: unknown
+	cellH       int
 
 	ptm        *os.File
 	cmd        *exec.Cmd
@@ -189,10 +191,8 @@ func (t *Terminal) StartArgv(dir string, argv ...string) error {
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 
-	f, err := pty.StartWithSize(cmd, &pty.Winsize{
-		Rows: uint16(t.Rows),
-		Cols: uint16(t.Cols),
-	})
+	cellW, cellH := t.CellPixels()
+	f, err := pty.StartWithSize(cmd, ptySize(t.Rows, t.Cols, cellW, cellH))
 	if err != nil {
 		return err
 	}
@@ -215,7 +215,8 @@ func (t *Terminal) StartFunc(fn func(tty *os.File) int) error {
 	if err != nil {
 		return err
 	}
-	pty.Setsize(ptm, &pty.Winsize{Rows: uint16(t.Rows), Cols: uint16(t.Cols)})
+	cellW, cellH := t.CellPixels()
+	pty.Setsize(ptm, ptySize(t.Rows, t.Cols, cellW, cellH))
 	if t.ptm, err = pollable(ptm); err != nil {
 		tty.Close()
 		return err
@@ -365,9 +366,10 @@ func (t *Terminal) Resize(rows, cols int) {
 	t.wrapNext = false
 	t.curRow, t.curCol = t.clampPos(t.curRow, t.curCol)
 	t.saved.row, t.saved.col = t.clampPos(t.saved.row, t.saved.col)
+	cellW, cellH := t.cellW, t.cellH
 	t.mu.Unlock()
 	if t.ptm != nil {
-		setWinsize(t.ptm, rows, cols)
+		setWinsize(t.ptm, ptySize(rows, cols, cellW, cellH))
 	}
 }
 
