@@ -252,6 +252,7 @@ func (t *Terminal) scrollRegionUp(top, n int, toScrollback bool) {
 	for r := bot - n + 1; r <= bot; r++ {
 		t.cells[r] = t.blankRow()
 	}
+	t.gfx.scroll(t.shownScreen(), top, n, bot, t.Cols, true)
 }
 
 func (t *Terminal) scrollRegionDown(top, n int) {
@@ -267,6 +268,7 @@ func (t *Terminal) scrollRegionDown(top, n int) {
 	for r := top; r < top+n; r++ {
 		t.cells[r] = t.blankRow()
 	}
+	t.gfx.scroll(t.shownScreen(), top, n, bot, t.Cols, false)
 }
 
 func (t *Terminal) insertLines(n int) {
@@ -363,5 +365,6 @@ func (t *Terminal) reset() {
 	t.bracketedPaste = false
 	t.cursorHidden = false
 	t.mouse = MouseMode{}
+	t.dropGraphics()
 	t.clearRange(0, 0, t.Rows-1, t.Cols-1)
 }
