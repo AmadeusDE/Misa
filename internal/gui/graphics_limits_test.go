@@ -3,10 +3,14 @@ package gui
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
 func TestGUITerminalUsesGraphicsLimitsWithoutEnablingGraphics(t *testing.T) {
+	if runtime.GOOS == "android" {
+		t.Skip("starting a PTY child via os.Args[0] is not supported on the Android emulator")
+	}
 	base := t.TempDir()
 	t.Setenv("HOME", base)
 	t.Setenv("XDG_CONFIG_HOME", base)
