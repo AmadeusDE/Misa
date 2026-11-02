@@ -48,6 +48,28 @@ func TestImageViewerValidation(t *testing.T) {
 	}
 }
 
+func TestImageViewerCollectionBounds(t *testing.T) {
+	c := DefaultImageViewer()
+	if c.MaxImages != 10000 || c.MaxDirectoryDepth != 32 || c.MaxDirectoryEntries != 200000 {
+		t.Fatalf("defaults: %+v", c)
+	}
+	c.MaxImages, c.MaxDirectoryDepth, c.MaxDirectoryEntries = 0, 0, 0
+	if warnings := c.Validate(); len(warnings) != 3 || c.MaxImages != 1 || c.MaxDirectoryDepth != 1 || c.MaxDirectoryEntries != 1 {
+		t.Fatalf("clamps: %v %+v", warnings, c)
+	}
+	path := imageConfigDir(t)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("max_images: 5\nmax_directory_depth: 2\nmax_directory_entries: 7\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	got := LoadImageViewer()
+	if got.MaxImages != 5 || got.MaxDirectoryDepth != 2 || got.MaxDirectoryEntries != 7 {
+		t.Fatalf("yaml: %+v", got)
+	}
+}
+
 func TestImageViewerSaveLoadAndMalformed(t *testing.T) {
 	path := imageConfigDir(t)
 	c := DefaultImageViewer()

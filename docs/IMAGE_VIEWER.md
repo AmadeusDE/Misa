@@ -1,11 +1,11 @@
 # Image viewer
 
-`imgview [--thumbnail] [--renderer auto|halfblock|kitty] FILE...` opens
-files in order, either as an in-pane Misa viewer for simple invocations or as a
-standalone terminal program. `--` ends option parsing. Relative paths are
-resolved against the shell's working directory. Directories and recursive
-scanning are not supported. Missing or unreadable files remain in the collection
-and show an error in the status line.
+`imgview [-r|--recursive] [--thumbnail] [--renderer auto|halfblock|kitty] FILE|DIR...`
+opens files in order, either as an in-pane Misa viewer for simple invocations or
+as a standalone terminal program. `--` ends option parsing. Relative paths are
+resolved against the shell's working directory. A directory operand is expanded
+into the images it contains (see [Directories](#directories)). Missing or
+unreadable files remain in the collection and show an error in the status line.
 
 Rendering currently uses colored half-block cells, including when `auto` is
 selected. Kitty graphics transport is not implemented: requesting `kitty` in
@@ -18,6 +18,38 @@ scheduled playback; they play, pause and step in the half-block renderer. APNG
 prefers a separate default poster when present (the poster is not included in
 the animation sequence). SVG, editing, file-browser previews and external
 viewer launching are not implemented.
+
+## Directories
+
+Directory operands follow the sxiv/nsxiv convention. Each one is expanded in
+place, so `imgview a.png DIR b.gif` opens the explicit files around the images
+found in `DIR`, in that order. Operands given explicitly are always kept — even
+with an unusual extension, a leading dot, or when they do not exist — while
+entries found inside a directory are filtered quietly:
+
+* Only names with a supported image extension are collected (`.png`, `.jpg`,
+  `.jpeg`, `.gif`, `.webp`, `.bmp`, `.tif`, `.tiff`, case-insensitive).
+  Detection is extension-based; a file with an image extension that does not
+  decode stays in the collection and reports the error in its status line.
+  Other entries, unreadable entries and permission errors are skipped without
+  a per-file message.
+* Hidden entries (a leading dot) are skipped inside a directory. A hidden file
+  or hidden directory that the user names explicitly is still opened or scanned.
+* Only direct children are scanned by default. `-r`/`--recursive` descends into
+  subdirectories. Symlinked directories are never followed, so a link loop
+  cannot recurse; a symlink to a regular image file is accepted.
+* The images of each directory are sorted naturally and case-insensitively by
+  their path relative to that directory (`img2.png` before `img10.png`), so
+  recursive results are grouped per directory deterministically.
+* If nothing is left to show, `imgview` fails once with `imgview: no images
+  found` instead of opening an empty viewer.
+
+The walk is bounded so a huge or deep tree cannot stall the command:
+`max_images` images (10000), `max_directory_depth` levels (32) and
+`max_directory_entries` directory entries (200000). Reaching a bound stops
+collecting (a depth bound prunes only the deeper subtree) and shows one
+status-line warning such as `showing first 10000 images; limit reached`; it is
+not an error, and the images already collected stay usable.
 
 ## Controls
 
@@ -136,15 +168,19 @@ animation_transport_mib_s: 16
 cache_mib: 128
 max_file_mib: 64
 max_pixels: 32000000
+max_images: 10000              # images collected from directory operands
+max_directory_depth: 32        # levels scanned below a directory operand
+max_directory_entries: 200000  # directory entries read while walking
 external_command: []           # argv, e.g. ["viewer", "{file}"]
 ```
 
 On Android the animation fps defaults are 20, 8 and 8 respectively; animation
 cache defaults to 24 MiB, frame limit to 2000, metadata to 2 MiB and transport
 to 4 MiB/s. Animation decode limits, delay policies, `animation_autoplay`,
-`animation_loops` and the half-block presentation cap
-(`halfblock_animation_fps`) are active. The remaining values belong to later
-work: `animation_fps` and `animation_transport_mib_s` to the pixel renderers,
+`animation_loops`, the half-block presentation cap
+(`halfblock_animation_fps`) and the three directory collection bounds are
+active. The remaining values belong to later work: `animation_fps` and
+`animation_transport_mib_s` to the pixel renderers,
 and `preview`, `preview_delay_ms`, `preview_animation`, `preview_animation_fps`
 and `open_mode` to file-browser previews and external opening. There are no
 image-viewer controls in the settings screen yet; these options are YAML-only.
@@ -154,8 +190,10 @@ external opening is not yet implemented by this configuration alone.
 Numeric bounds: thumbnail size 32–1024 pixels; preview delay 0–60000 ms;
 fps 1–120; frame delays 1–60000 ms; cache 1–1024 MiB; animation cache 1 MiB
 through the cache limit; frame count 1–10000; metadata 1–64 MiB; transport
-1–256 MiB/s; file size 1–1024 MiB; pixels 1–32000000. These are configuration
-bounds, not a guarantee that all allowed files can be decoded on every device.
+1–256 MiB/s; file size 1–1024 MiB; pixels 1–32000000; collected images
+1–1000000; directory depth 1–256; directory entries 1–10000000. These are
+configuration bounds, not a guarantee that all allowed files can be decoded on
+every device.
 
 
 ## Animation decoding and limits
@@ -263,7 +301,7 @@ implemented yet and should not be assumed from this document:
 * Settings-screen controls for image-viewer options; only `imageviewer.yaml`
   configures them today.
 * SVG support, which remains an optional follow-up. Sixel, animated
-  AVIF/HEIC/JPEG XL and MNG, video containers, recursive scanning, slideshow,
+  AVIF/HEIC/JPEG XL and MNG, video containers, slideshow,
   editing/saving transforms and freedesktop thumbnail-cache interoperability
   are out of scope rather than pending work.
 * Optional native Kitty animation offload. Even on Kitty, the intended baseline

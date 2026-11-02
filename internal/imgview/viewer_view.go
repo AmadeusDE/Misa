@@ -99,6 +99,9 @@ func (m *Viewer) View() string {
 			status += " · " + m.note
 		}
 	}
+	if m.notice != "" {
+		status = safeText(m.notice) + " · " + status
+	}
 	if m.rendererWarning != "" {
 		status = m.rendererWarning + " · " + status
 	}

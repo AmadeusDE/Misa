@@ -480,7 +480,9 @@ Commit trailers for agent-made commits:
 - `SECURITY.md`, `CONTRIBUTING.md` — Reporting vulnerabilities; how changes are made here.
 - **Image viewer**: `internal/imageframe` owns transport-neutral scene and bounded `FrameSource`
   contracts; `internal/imageout` currently renders half-block cells (Kitty remains disabled).
-  `internal/imgview` is the read-only viewer/static decode pipeline. Its `animdecode` package indexes
+  `internal/imgview` is the read-only viewer/static decode pipeline. Its `collect.go` expands
+  directory operands (natural sort, hidden and non-image filtering, bounded depth/entry/image
+  counts) into the ordered collection. Its `animdecode` package indexes
   GIF/APNG/WebP into on-demand, immutable full-canvas frames with bounded work/index storage and
   format-correct disposal/blending. The viewer schedules animated half-block playback with a bounded
   decoder and injectable clock; in-process owner visibility conservatively pauses unfocused panes.

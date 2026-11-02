@@ -3,14 +3,13 @@ package builtins
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/AmadeusDE/Misa/internal/config"
 	"github.com/AmadeusDE/Misa/internal/imgview"
 )
 
-var imgviewSpec = mustSpec("(thumbnail)(renderer):")
+var imgviewSpec = mustSpec("(thumbnail)(renderer):r(recursive)")
 
 // ErrImgviewInfo indicates that help or version output was requested.
 var ErrImgviewInfo = errors.New("help or version requested")
@@ -45,13 +44,24 @@ func ImgviewViewer(args []string, dir string) (*imgview.Viewer, error) {
 		if !filepath.IsAbs(path) && dir != "" {
 			path = filepath.Join(dir, path)
 		}
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			return nil, fmt.Errorf("%s: directories are not supported", flags.Operands[i])
-		}
 		paths[i] = path
 	}
+	collection, err := imgview.CollectPaths(paths, imgview.CollectOptions{
+		Recursive:         flags.Bool("r"),
+		MaxFiles:          cfg.MaxImages,
+		MaxDepth:          cfg.MaxDirectoryDepth,
+		MaxEntriesScanned: cfg.MaxDirectoryEntries,
+	})
+	if err != nil {
+		return nil, err
+	}
 	thumbnail := flags.Bool("thumbnail") || cfg.InitialMode == "thumbnails"
-	return imgview.NewConfigured(paths, thumbnail, renderer, cfg)
+	viewer, err := imgview.NewConfigured(collection.Paths, thumbnail, renderer, cfg)
+	if err != nil {
+		return nil, err
+	}
+	viewer.SetNotice(collection.Warning)
+	return viewer, nil
 }
 
 func runImgview(ctx *Context) int {
@@ -63,7 +73,7 @@ func runImgview(ctx *Context) int {
 	flags, err := imgviewSpec.ParseArgs(ctx.Args)
 	if err == nil && HandleHelpVersion(ctx, flags, imgviewSpec) {
 		if flags.HelpRequested {
-			fmt.Fprintln(ctx.Stdout, "\nOpen FILEs in order. --renderer accepts auto, halfblock, or kitty (falls back to halfblock).")
+			fmt.Fprintln(ctx.Stdout, "\nOpen FILEs, or the images inside DIRs, in order. -r/--recursive also descends\ninto subdirectories; hidden entries are skipped. --renderer accepts auto,\nhalfblock, or kitty (falls back to halfblock).")
 		}
 		return 0
 	}

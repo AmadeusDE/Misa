@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -18,7 +19,7 @@ func TestImgviewArguments(t *testing.T) {
 		{nil, "FILE"},
 		{[]string{"--renderer=bad", "a"}, "unknown renderer"},
 		{[]string{"--renderer"}, "requires"},
-		{[]string{"."}, "directories"},
+		{[]string{"."}, "no images"},
 		{[]string{"--unknown", "a"}, "unknown"},
 	} {
 		_, err := ImgviewViewer(tt.args, dir)
@@ -53,6 +54,44 @@ func TestImgviewHelpVersionAndErrors(t *testing.T) {
 	}
 	if _, ok := Lookup("imgview"); !ok {
 		t.Fatal("imgview not registered")
+	}
+}
+
+func TestImgviewDirectoryAndRecursive(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	root := t.TempDir()
+	write := func(name string) string {
+		t.Helper()
+		p := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, nil, 0644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	a, b, c := write("a.png"), write("b.png"), write("sub/c.png")
+	odd := write("odd.ext")
+	for _, tt := range []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{"directory", []string{"."}, []string{a, b}},
+		{"short flag", []string{"-r", "."}, []string{a, b, c}},
+		{"long flag", []string{"--recursive", "."}, []string{a, b, c}},
+		{"mixed operands", []string{"b.png", ".", "odd.ext"}, []string{b, a, b, odd}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			viewer, err := ImgviewViewer(tt.args, root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := viewer.Paths(); !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

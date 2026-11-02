@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"path/filepath"
+	"strings"
 )
 
 // isAnimated detects required animation containers before the static decoder.
@@ -104,4 +106,16 @@ func animatedGIF(b []byte) (bool, error) {
 		}
 	}
 	return false, errors.New("truncated GIF")
+}
+
+// imageExtensions are the extensions the registered decoders can read.
+var imageExtensions = []string{".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
+
+func isImageName(name string) bool {
+	for _, ext := range imageExtensions {
+		if strings.EqualFold(filepath.Ext(name), ext) {
+			return true
+		}
+	}
+	return false
 }

@@ -50,6 +50,7 @@ type Viewer struct {
 	pan                  image.Point
 	thumb                int
 	note                 string
+	notice               string
 	rendererWarning      string
 	policy               PlaybackPolicy
 	clock                imageframe.Clock
@@ -124,6 +125,20 @@ func (m *Viewer) pixels(i int) *image.NRGBA {
 func (m *Viewer) Index() int      { return m.index }
 func (m *Viewer) Thumbnail() bool { return m.grid }
 func (m *Viewer) IsQuit() bool    { return m.quit }
+
+// Paths returns the collected image paths in presentation order.
+func (m *Viewer) Paths() []string {
+	paths := make([]string, len(m.items))
+	for i, it := range m.items {
+		paths[i] = it.path
+	}
+	return paths
+}
+
+// SetNotice sets a persistent status-line notice from the host, such as a
+// truncated directory listing. An empty string clears it.
+func (m *Viewer) SetNotice(text string) { m.notice = text }
+
 func (m *Viewer) MarkedCount() (n int) {
 	for _, i := range m.items {
 		if i.marked {
