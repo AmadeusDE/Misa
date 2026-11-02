@@ -30,26 +30,26 @@ func TestChangedRowsAndDamage(t *testing.T) {
 	c := canvasFor(r, 3, 4)
 	var prev frame
 	cur := cursorState{}
-	if _, full := changedRows(screen(3, 4, "ab"), cur, &prev); !full {
+	if _, full := changedRows(screen(3, 4, "ab"), cur, &prev, r.metrics()); !full {
 		t.Fatal("empty frame not full")
 	}
 	r.draw(c, screen(3, 4, "ab"), cur, &prev)
-	rows, full := changedRows(screen(3, 4, "ab\r\n\r\nX"), cur, &prev)
+	rows, full := changedRows(screen(3, 4, "ab\r\n\r\nX"), cur, &prev, r.metrics())
 	if full || len(rows) != 1 || rows[0] != 2 {
 		t.Fatalf("rows = %v full %v", rows, full)
 	}
 	y := r.pad + 2*r.fonts.cellH
 	want := image.Rect(0, y, c.w, y+r.fonts.cellH)
-	if d := r.damage(rows, false, c.bounds()); len(d) != 1 || d[0] != want {
+	if d := r.damage(rows, nil, false, c.bounds()); len(d) != 1 || d[0] != want {
 		t.Fatalf("damage = %v, want %v", d, want)
 	}
-	if d := r.damage([]int{0, 1}, false, c.bounds()); len(d) != 1 || d[0].Dy() != 2*r.fonts.cellH {
+	if d := r.damage([]int{0, 1}, nil, false, c.bounds()); len(d) != 1 || d[0].Dy() != 2*r.fonts.cellH {
 		t.Fatalf("adjacent rows not merged: %v", d)
 	}
-	if rows, _ := changedRows(screen(3, 4, "ab"), cur, &prev); len(rows) != 0 {
+	if rows, _ := changedRows(screen(3, 4, "ab"), cur, &prev, r.metrics()); len(rows) != 0 {
 		t.Fatalf("unchanged screen reports %v", rows)
 	}
-	if _, full := changedRows(screen(2, 4, "ab"), cur, &prev); !full {
+	if _, full := changedRows(screen(2, 4, "ab"), cur, &prev, r.metrics()); !full {
 		t.Fatal("resize not full")
 	}
 }
@@ -77,7 +77,7 @@ func TestCursorMoveDamagesBothRows(t *testing.T) {
 	var prev frame
 	s := screen(3, 2, "")
 	r.draw(c, s, cursorState{row: 0, visible: true, focused: true}, &prev)
-	rows, _ := changedRows(s, cursorState{row: 2, visible: true, focused: true}, &prev)
+	rows, _ := changedRows(s, cursorState{row: 2, visible: true, focused: true}, &prev, r.metrics())
 	if len(rows) != 2 || rows[0] != 0 || rows[1] != 2 {
 		t.Fatalf("rows = %v", rows)
 	}

@@ -89,6 +89,9 @@ func underJobLeader(argv []string) []string {
 func (m *Model) startPlan(p commandPlan, rows, cols int) (*term.Terminal, tea.Cmd, error) {
 	t := term.New(rows, cols)
 	t.SetGraphicsLimits(config.LoadGraphics().Kitty.Limits())
+	// A pane has no pixel compositor, so graphics stay disabled here: an image
+	// a pane program writes is swallowed instead of half-shown. Only the GUI's
+	// own terminal (internal/gui) enables them.
 	// A program in the pane sees the host's real cell size, so anything that
 	// draws pixels keeps its aspect ratio inside Misa too.
 	cell := imgview.MeasureCellPixels()

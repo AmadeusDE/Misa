@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestGUITerminalUsesGraphicsLimitsWithoutEnablingGraphics(t *testing.T) {
+func TestGUITerminalAppliesGraphicsLimitsAndEnablesGraphics(t *testing.T) {
 	if runtime.GOOS == "android" {
 		t.Skip("starting a PTY child via os.Args[0] is not supported on the Android emulator")
 	}
@@ -37,7 +37,7 @@ func TestGUITerminalUsesGraphicsLimitsWithoutEnablingGraphics(t *testing.T) {
 	if limits.MaxImages != 9 || limits.MaxPayload != 2048 {
 		t.Fatalf("configured limits not applied: %+v", limits)
 	}
-	if a.term.GraphicsEnabled() {
-		t.Fatal("config enabled graphics without a compositor")
+	if !a.term.GraphicsEnabled() {
+		t.Fatal("the GUI composites images but left graphics disabled")
 	}
 }
