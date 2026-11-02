@@ -33,6 +33,10 @@ public final class Native {
 
     public static native void onLowMemory();
 
+    public static native void onVisibility(boolean visible);
+
+    public static native void onFocus(boolean hasFocus);
+
     public static native int newSession();
 
     public static native void closeSession(int id);
@@ -42,4 +46,6 @@ public final class Native {
     public static native int activeSession();
 
     public static native int sessionCount();
+
+    public static native int[] sessionIds();
 }

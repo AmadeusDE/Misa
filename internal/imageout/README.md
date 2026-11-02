@@ -1,4 +1,14 @@
-# PR 1 contract boundaries
+# Image output
+
+Standalone `imgview` uses `kitty.go` to query and emit bounded direct Kitty
+RGB/RGBA transfers, chunked base64, explicit placements and owned-image deletion.
+`halfblock.go` provides the portable fallback and thumbnail presentation. The
+standalone runner owns all writes and needs no Bubble Tea renderer hook; see
+[TRANSPORT.md](TRANSPORT.md) and [the viewer documentation](../../docs/IMAGE_VIEWER.md).
+
+The following contracts are separate from that standalone runtime.
+
+## PR 1 contract boundaries
 
 `imageframe` defines immutable prepared scenes, owner-local resource identities,
 viewport geometry, presentation versions and acknowledgements. A lifecycle epoch
@@ -44,12 +54,11 @@ stopping GUI repainting does not pause a child scheduler.
 Capability probing is also a state-machine seam, not a live wire probe. It has a
 250 ms deadline, per-session caching and correlated positive/negative response
 handling. Its caller must supply unique tokens, bounded reply decoding and a
-scheduled deadline check. No query encoder or input interception ships here.
+scheduled deadline check. The standalone runtime has its own wire query and
+bounded input decoder.
 `internal/ui/imageoutput.go` leaves all transport/consumer/input gates closed,
-even for opt-in, so the current runtime cannot select Kitty.
+even for opt-in, so the embedded runtime cannot select Kitty.
 
-See [TRANSPORT.md](TRANSPORT.md) for the pinned Bubble Tea v2.0.7 blocker,
-source evidence and candidate integration options. There is deliberately no
-program-construction or mux runtime change until a supported frame boundary is
-proven. Half-block is the safe capability result; its actual renderer and viewer
-are PR 2, not an implemented feature of these contracts.
+These contracts do not enable embedded Kitty output or mux forwarding.
+[TRANSPORT.md](TRANSPORT.md) records the pinned Bubble Tea v2.0.7 investigation
+and why the standalone viewer no longer needs that hook.

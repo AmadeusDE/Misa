@@ -184,7 +184,8 @@ internal/
   clipboard/                     Host clipboard: atotto on Linux/BSD/macOS, termux-clipboard-* when on
                                  PATH, ErrUnavailable so the UI emits OSC 52. APK JNI replaces it later
   color/                         Color palette loading, hex-to-ANSI, color translation
-  config/                        YAML config — config.yaml (menu, ascii, colors, ui, statusbar), mux.yaml, fetch.yaml, gui.yaml
+  config/                        YAML config — config.yaml (menu, ascii, colors, ui, statusbar), mux.yaml, fetch.yaml, gui.yaml,
+                                 graphics.yaml (shared terminal Kitty resource limits; does not enable graphics)
   companion/                     Encouraging messages after command (cargo-mommy derived)
     companion.go                 Respond(), template vars ({role}, {part}, {item}, {prefix}…)
     config.go                    companion.yaml selections + write-ins
@@ -206,14 +207,20 @@ internal/
                                  EACCES on proc files used for memory/uptime/kernel shows "—"
   gitinfo/                       Git branch/dirty/ahead/behind detection
   help/                          TLDR downloading, man page parsing, markdown rendering
-  launcher/                      Bubble Tea ExecProcess helper (unused: external programs run in-pane PTYs via Model.launch)
+  launcher/                      Bubble Tea ExecProcess helper; imgview uses exclusive terminal ownership,
+                                 other external programs run in-pane PTYs via Model.launch
   jobleader/                     `misa --job-leader cmd…`: session leader that runs cmd in its own foreground process
                                  group so ^Z stops it; SuspendOnCtrlZ for multicall builtins
+  kittygfx/                      Bounded direct Kitty graphics protocol: parse/encode, limits and immutable rasters
+                                 (RGB/RGBA only; no files, compression or native animation)
   term/                          VT emulator + PTY: reader goroutine, DEC 2026 sync buffering, session-wide kill on Close.
                                  terminal.go (sessions, StartArgv/StartFunc), parser.go, screen.go, sgr.go, charset.go,
-                                 reports.go, render.go, mouse.go, input.go (async PTY writes), ptyfd.go (pollable master),
+                                 reports.go, focus.go (mode 1004 host focus/visibility, late-subscriber replay),
+                                 render.go, mouse.go, input.go (async PTY writes), ptyfd.go (pollable master),
                                  jobs.go (wait4 with WUNTRACED: Stopped/Continue)
-                                 snapshot.go (Snapshot: cell copy for frontends; SetOSCHook for titles/OSC 52),
+                                 snapshot.go (Snapshot: cell copy for frontends, immutable graphics placements and generation;
+                                 off until a consumer enables them: the GUI does, mux panes do not), graphics*.go (bounded
+                                 screen-local Kitty store and atomic frame replacement), SetOSCHook for titles/OSC 52,
                                  marks.go (combining marks interned so Cell has no pointers: the GC never scans
                                  screens/scrollback — keep Cell pointer-free, a test enforces it). Scrolled-off rows
                                  move into scrollback and evicted/discarded rows are recycled (blankRow), so steady
@@ -243,6 +250,10 @@ internal/
     render.go canvas.go          Cells → premultiplied pixels, row damage against what each buffer last
                                  showed. Canvas order follows PixelFormat. Only the default background
                                  takes `opacity` (default 0.55; ARGB8888 buffers unless it is 1)
+    invalidate.go                Reconstructible GUI cache eviction and full redraw from the live terminal store
+    images.go                    Kitty placements: cell metrics and clip, nearest neighbour scaling, alpha
+                                 over the canvas, per-buffer placement damage. The GUI terminal enables
+                                 graphics for its child; mux panes stay disabled
     font.go                      fc-match when it is on PATH; otherwise `$PREFIX/share/fonts` (Termux)
                                  and `/system/fonts`, then the embedded Go Mono
     boxdraw.go                   Procedural box drawing, arcs, blocks, braille so borders join seamlessly
@@ -253,7 +264,10 @@ internal/
                                  `ANativeWindow_setBuffersGeometry(..., WINDOW_FORMAT_RGBA_8888)`,
                                  lock with the damage rect, copy rows at `buffer.stride`,
                                  unlockAndPost. Density is the core's buffer scale. Insets
-                                 shrink the grid. Sessions survive surface loss
+                                 shrink the grid. Sessions survive surface loss. visibility.go gates presentation
+                                 and child focus on Activity/window/surface/tab state; sessions.go lists tabs
+                                 without activating them. eventqueue.go preserves lifecycle events on overflow.
+                                 Low memory invalidates GUI caches, never protocol images
   cmd/misagui/                   `libmisagui.so` (`-buildmode=c-shared`, `android && cgo`).
                                  `JNI_OnLoad` in `jni_onload.c` calls `RegisterNatives` on
                                  `app/misa/Native` (`MISA_JNI_CLASS` overrides it). A4 loads
@@ -263,7 +277,7 @@ internal/
   android/                       APK shell (`app.misa`), pure Java, no AndroidX. `MisaActivity`
                                  (SurfaceView, InputConnection, extra-keys row with a latched
                                  Ctrl/Alt that applies to IME text, a MUX row of one-tap
-                                 multiplexer buttons, insets, pinch),
+                                 multiplexer buttons, image pause/step chords, lifecycle/focus callbacks, insets, pinch),
                                  `SessionService` (foreground `specialUse` notification, Stop),
                                  `Bootstrap` (D10 env, `filesDir/bin` symlinks to `libmisa.so`,
                                  first-run config). `Native` loads `libmisagui` from its static
@@ -315,6 +329,7 @@ internal/
   OS-neutral core (`internal/gui`) owns that session; the Wayland backend (`wl_*.go`, `unix && !android`) is the
   only platform window so far. Protocol objects are raw opcodes against `internal/wayland`, from wayland.xml/xdg-shell.xml
   (no generated bindings). The loop draws only on terminal dirty + frame callback; damage is computed per row.
+  Image placements add their own rectangles to that damage.
   Keys go keymap → keysym (`internal/xkb`, no dead keys/compose) → `tea.Key` → `ui.KeyBytes`, so the xterm encoding
   lives in one place. The core draws premultiplied pixels straight into the buffer in the backend's order
   (BGRA on Wayland, RGBA on Android). Requires a compositor with
@@ -479,12 +494,16 @@ Commit trailers for agent-made commits:
   `pkg-frontend.md`.
 - `SECURITY.md`, `CONTRIBUTING.md` — Reporting vulnerabilities; how changes are made here.
 - **Image viewer**: `internal/imageframe` owns transport-neutral scene and bounded `FrameSource`
-  contracts; `internal/imageout` currently renders half-block cells (Kitty remains disabled).
+  contracts; `internal/imageout` encodes direct Kitty RGB/RGBA output and half-block
+  cells. `imgview.Run` owns its tty directly, with no Bubble Tea program/renderer;
+  the Misa prompt self-execs it through `tea.ExecProcess`. Its loop serializes frames,
+  probes Kitty support and restores tty state on exit. Thumbnail grids remain half-blocks. The Wayland/Android GUI composites the terminal's stored placements
+  (`internal/gui/images.go`); mux pane terminals stay graphics-disabled.
   `internal/imgview` is the read-only viewer/static decode pipeline. Its `collect.go` expands
   directory operands (natural sort, hidden and non-image filtering, bounded depth/entry/image
   counts) into the ordered collection. Its `animdecode` package indexes
   GIF/APNG/WebP into on-demand, immutable full-canvas frames with bounded work/index storage and
-  format-correct disposal/blending. The viewer schedules animated half-block playback with a bounded
+  format-correct disposal/blending. The viewer schedules animation in both renderers with a bounded
   decoder and injectable clock; in-process owner visibility conservatively pauses unfocused panes.
   Layout is in physical pixels: the viewer resolves a cell size from `imageviewer.yaml`, a
   `TIOCGWINSZ` measurement or a 10x20 fallback, and `internal/term` hands the GUI font metrics to

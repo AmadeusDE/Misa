@@ -2,12 +2,15 @@ package ui
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"unicode"
 
 	tea "charm.land/bubbletea/v2"
-
 	"github.com/AmadeusDE/Misa/internal/builtins"
+	"github.com/AmadeusDE/Misa/internal/imgview"
 )
 
 // imageViewerWords handles shell quoting for a simple imgview invocation. It
@@ -92,7 +95,7 @@ func (m *Model) tryImageViewer(input string) (bool, tea.Cmd) {
 	if !ok || len(words) == 0 || words[0] != "imgview" {
 		return false, nil
 	}
-	viewer, err := builtins.ImgviewViewer(words[1:], m.dir)
+	_, err := builtins.ImgviewViewer(words[1:], m.dir)
 	if errors.Is(err, builtins.ErrImgviewInfo) {
 		return false, nil // the builtin prints help and version
 	}
@@ -103,7 +106,112 @@ func (m *Model) tryImageViewer(input string) (bool, tea.Cmd) {
 		m.updateShellView()
 		return true, nil
 	}
-	enter := m.enterProcMon(viewer)
 	m.cmdInput.SetValue("")
-	return true, tea.Batch(enter, m.procViewer.Init())
+	return true, m.launchImageViewer(m.dir, words[1:])
+}
+
+// Injectable process boundary keeps tests from ever executing the test binary.
+var imageViewerExecutable = os.Executable
+var imageViewerExecProcess = tea.ExecProcess
+
+type imageViewerFinished struct {
+	owner       *Model
+	dir         string
+	args        []string
+	err         error
+	startFailed bool
+	browserName string
+	limited     bool
+}
+
+// launchImageViewer hands the terminal to the standalone multicall viewer.
+// The caller validates arguments first; the file browser can reuse this seam.
+func (m *Model) launchImageViewer(dir string, args []string) tea.Cmd {
+	return m.launchImageViewerFrom(dir, args, "", false)
+}
+
+func (m *Model) launchBrowserImageViewer(dir string, args []string, name, notice string) tea.Cmd {
+	return m.launchImageViewerFrom(dir, args, name, notice != "")
+}
+
+func (m *Model) launchImageViewerFrom(dir string, args []string, browserName string, limited bool) tea.Cmd {
+	args = append([]string(nil), args...)
+	exe, err := imageViewerExecutable()
+	if err == nil {
+		var info os.FileInfo
+		info, err = os.Stat(exe)
+		if err == nil && (!info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0) {
+			err = fmt.Errorf("%s is not an executable file", exe)
+		}
+	}
+	if err != nil {
+		return m.imageViewerFallbackFrom(dir, args, err, browserName, limited)
+	}
+	cmd := exec.Command(exe, append([]string{"imgview"}, args...)...)
+	cmd.Dir = dir
+	limitedEnv := "MISA_IMGVIEW_LIMITED=0"
+	if limited {
+		limitedEnv = "MISA_IMGVIEW_LIMITED=1"
+	}
+	cmd.Env = append(os.Environ(), "MISA_IMGVIEW_EMBEDDED=1", limitedEnv)
+	return imageViewerExecProcess(cmd, func(err error) tea.Msg {
+		return imageViewerFinished{owner: m, dir: dir, args: args, err: err, startFailed: err != nil && cmd.Process == nil, browserName: browserName, limited: limited}
+	})
+}
+
+func (m *Model) imageViewerFallback(dir string, args []string, cause error) tea.Cmd {
+	return m.imageViewerFallbackFrom(dir, args, cause, "", false)
+}
+
+func (m *Model) imageViewerFallbackFrom(dir string, args []string, cause error, browserName string, limited bool) tea.Cmd {
+	viewer, err := builtins.ImgviewViewer(args, dir)
+	if err != nil {
+		if browserName != "" {
+			m.reloadBrowserSelection(browserName)
+			m.status = "imgview: " + err.Error()
+			return nil
+		}
+		m.shellBuffer = append(m.shellBuffer, "imgview: "+err.Error())
+		m.lastExitCode = 1
+		m.updateShellView()
+		return nil
+	}
+	m.browserViewerName = browserName
+	m.browserViewerLimited = limited
+	notice := "standalone imgview unavailable; using in-UI viewer: " + cause.Error()
+	if limited {
+		notice += " · " + imgview.BrowserCollectionWarning
+	}
+	viewer.SetNotice(notice)
+	enter := m.enterProcMon(viewer)
+	return tea.Batch(enter, viewer.Init())
+}
+
+func (m *Model) updateImageViewerFinished(msg imageViewerFinished) (tea.Model, tea.Cmd) {
+	if msg.browserName != "" {
+		m.reloadBrowserSelection(msg.browserName)
+		if msg.limited {
+			m.status = imgview.BrowserCollectionWarning
+		}
+		if msg.err != nil {
+			m.status = "imgview: " + msg.err.Error()
+		}
+		return m, nil
+	}
+	if msg.err == nil {
+		m.lastExitCode = 0
+		return m, nil
+	}
+	if msg.startFailed {
+		return m, m.imageViewerFallback(msg.dir, msg.args, msg.err)
+	}
+	m.lastExitCode = 1
+	m.shellBuffer = append(m.shellBuffer, "imgview: "+msg.err.Error()+" (check terminal and image files)")
+	m.status = "imgview: " + msg.err.Error()
+	if m.screen == screenShell {
+		m.updateFullShellVP()
+	} else {
+		m.updateShellView()
+	}
+	return m, nil
 }

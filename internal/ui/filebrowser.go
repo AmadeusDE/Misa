@@ -38,6 +38,11 @@ func (m *Model) reloadFileList() tea.Cmd {
 }
 
 func (m *Model) updateFileBrowser(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.fileList.SettingFilter() {
+		var cmd tea.Cmd
+		m.fileList, cmd = m.fileList.Update(msg)
+		return m, cmd
+	}
 	switch msg := msg.(type) {
 	case mouseMsg:
 		return m.handleFileBrowserMouse(msg)
@@ -50,20 +55,7 @@ func (m *Model) updateFileBrowser(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "enter":
-			it, ok := m.fileList.SelectedItem().(fileItem)
-			if !ok {
-				return m, nil
-			}
-			if it.name == ".." {
-				m.dir = filepath.Dir(m.dir)
-				return m, m.reloadFileList()
-			}
-			if it.isDir {
-				m.dir = filepath.Join(m.dir, it.name)
-				return m, m.reloadFileList()
-			}
-			m.openInEditor(filepath.Join(m.dir, it.name))
-			return m, nil
+			return m.activateBrowserItem()
 
 		case "n":
 			m.screen = screenNewFile
@@ -143,23 +135,15 @@ func (m *Model) handleFileBrowserMouse(msg mouseMsg) (tea.Model, tea.Cmd) {
 		if m.fileList.FilteringEnabled() {
 			startY = 4
 		}
-		idx := listClickIndex(m.fileList, msg.Y, startY)
-		if idx >= 0 && idx < len(m.fileList.Items()) {
+		idx := -1
+		row := msg.Y - startY
+		pg := m.fileList.Paginator
+		if row >= 0 && row < pg.ItemsOnPage(len(m.fileList.VisibleItems())) {
+			idx = pg.Page*pg.PerPage + row
+		}
+		if idx >= 0 && idx < len(m.fileList.VisibleItems()) {
 			if idx == m.fileList.Index() {
-				it, ok := m.fileList.SelectedItem().(fileItem)
-				if !ok {
-					return m, nil
-				}
-				if it.name == ".." {
-					m.dir = filepath.Dir(m.dir)
-					return m, m.reloadFileList()
-				}
-				if it.isDir {
-					m.dir = filepath.Join(m.dir, it.name)
-					return m, m.reloadFileList()
-				}
-				m.openInEditor(filepath.Join(m.dir, it.name))
-				return m, nil
+				return m.activateBrowserItem()
 			}
 			m.fileList.Select(idx)
 		}
@@ -172,7 +156,7 @@ func (m *Model) handleFileBrowserMouse(msg mouseMsg) (tea.Model, tea.Cmd) {
 				m.fileList.Select(idx - 3)
 			}
 		} else {
-			total := len(m.fileList.Items())
+			total := len(m.fileList.VisibleItems())
 			if idx < total-1 {
 				next := idx + 3
 				if next >= total {
@@ -188,7 +172,7 @@ func (m *Model) handleFileBrowserMouse(msg mouseMsg) (tea.Model, tea.Cmd) {
 
 func fileHelpKeys() []key.Binding {
 	return []key.Binding{
-		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open/cd")),
+		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "view/edit/cd")),
 		key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new file")),
 		key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "delete")),
 		key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),

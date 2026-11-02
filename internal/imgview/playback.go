@@ -30,19 +30,21 @@ type frameTiming interface {
 // Advance, so at most one boundary and one decode are outstanding. It is not
 // concurrency-safe: call it from the UI loop that owns the sequence.
 type playbackController struct {
-	timing   frameTiming
-	clock    imageframe.Clock
-	frames   int
-	total    uint64        // total plays; zero is infinite
-	window   time.Duration // fps presentation window; zero presents every frame
-	visible  bool
-	playing  bool // user intent, independent of visibility
-	frame    int  // frame the viewer should present next
-	plays    uint64
-	ended    bool
-	base     time.Duration // delay served for the current frame
-	waiting  bool
-	deadline time.Time // absolute due time of the armed boundary
+	timing      frameTiming
+	clock       imageframe.Clock
+	frames      int
+	total       uint64        // total plays; zero is infinite
+	window      time.Duration // effective presentation window
+	fpsWindow   time.Duration
+	minInterval time.Duration
+	visible     bool
+	playing     bool // user intent, independent of visibility
+	frame       int  // frame the viewer should present next
+	plays       uint64
+	ended       bool
+	base        time.Duration // delay served for the current frame
+	waiting     bool
+	deadline    time.Time // absolute due time of the armed boundary
 }
 
 var _ animationPlayback = (*playbackController)(nil)
@@ -70,11 +72,37 @@ func newPlaybackController(timing frameTiming, policy PlaybackPolicy, clock imag
 		p.total = 0
 	}
 	if policy.FPS > 0 {
-		p.window = time.Second / time.Duration(policy.FPS)
+		p.fpsWindow = time.Second / time.Duration(policy.FPS)
 	}
+	p.minInterval = max(0, policy.MinInterval)
+	p.window = max(p.fpsWindow, p.minInterval)
 	p.playing = policy.Autoplay
 	p.base = p.initialDelay()
 	return p
+}
+
+// SetMinInterval updates the bandwidth window while preserving time already
+// spent on the current boundary. A host's already-armed timer may fire early;
+// PresentationPending tells it to re-arm instead of advancing prematurely.
+func (p *playbackController) SetMinInterval(d time.Duration) {
+	d = max(0, d)
+	if d == p.minInterval {
+		return
+	}
+	old := p.initialDelay()
+	p.minInterval = d
+	p.window = max(p.fpsWindow, d)
+	delta := p.initialDelay() - old
+	if p.waiting {
+		p.deadline = p.deadline.Add(delta)
+	} else {
+		p.base = max(0, p.base+delta)
+	}
+}
+
+// PresentationPending reports an old timer firing before a revised deadline.
+func (p *playbackController) PresentationPending() bool {
+	return p.waiting && p.clock.Now().Before(p.deadline)
 }
 
 func (p *playbackController) Frames() int { return p.frames }
@@ -201,7 +229,7 @@ func (p *playbackController) Advance() bool {
 		// once instead of drifting or queueing a burst of catch-up frames.
 		wait = p.deadline.Add(wait).Sub(now)
 	}
-	p.base = max(wait, minFrameDelay)
+	p.base = max(wait, minFrameDelay, p.minInterval)
 	return true
 }
 
@@ -259,7 +287,7 @@ func (p *playbackController) boundary() boundaryStep {
 }
 
 func (p *playbackController) initialDelay() time.Duration {
-	return max(p.boundary().wait, minFrameDelay)
+	return max(p.boundary().wait, minFrameDelay, p.minInterval)
 }
 
 func (p *playbackController) frameDelay(i int) time.Duration {

@@ -139,6 +139,18 @@ static void jni_onLowMemory(JNIEnv *env, jclass cls) {
     misaOnLowMemory();
 }
 
+static void jni_onVisibility(JNIEnv *env, jclass cls, jboolean visible) {
+    (void)env;
+    (void)cls;
+    misaOnVisibility(visible ? 1 : 0);
+}
+
+static void jni_onFocus(JNIEnv *env, jclass cls, jboolean hasFocus) {
+    (void)env;
+    (void)cls;
+    misaOnFocus(hasFocus ? 1 : 0);
+}
+
 static jint jni_newSession(JNIEnv *env, jclass cls) {
     (void)env;
     (void)cls;
@@ -169,6 +181,21 @@ static jint jni_sessionCount(JNIEnv *env, jclass cls) {
     return (jint)misaSessionCount();
 }
 
+// One Go snapshot, so ids cannot shift between counting and filling. A failed
+// snapshot leaves n at 0, and NewIntArray keeps its own OutOfMemoryError; the
+// buffer is freed either way.
+static jintArray jni_sessionIds(JNIEnv *env, jclass cls) {
+    (void)cls;
+    jint n = 0;
+    jint *ids = misaSessionIDs(&n);
+    jintArray arr = (*env)->NewIntArray(env, ids ? n : 0);
+    if (arr && ids) {
+        (*env)->SetIntArrayRegion(env, arr, 0, n, ids);
+    }
+    free(ids);
+    return arr;
+}
+
 jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     (void)reserved;
     JNIEnv *env = NULL;
@@ -197,11 +224,14 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
         {"onMotion", "(IFFI)V", (void *)jni_onMotion},
         {"onPinch", "(F)V", (void *)jni_onPinch},
         {"onLowMemory", "()V", (void *)jni_onLowMemory},
+        {"onVisibility", "(Z)V", (void *)jni_onVisibility},
+        {"onFocus", "(Z)V", (void *)jni_onFocus},
         {"newSession", "()I", (void *)jni_newSession},
         {"closeSession", "(I)V", (void *)jni_closeSession},
         {"switchSession", "(I)V", (void *)jni_switchSession},
         {"activeSession", "()I", (void *)jni_activeSession},
         {"sessionCount", "()I", (void *)jni_sessionCount},
+        {"sessionIds", "()[I", (void *)jni_sessionIds},
     };
     if ((*env)->RegisterNatives(env, cls, methods, sizeof methods / sizeof methods[0]) != 0) {
         (*env)->ExceptionClear(env);

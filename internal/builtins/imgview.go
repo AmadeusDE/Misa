@@ -3,13 +3,14 @@ package builtins
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/AmadeusDE/Misa/internal/config"
 	"github.com/AmadeusDE/Misa/internal/imgview"
 )
 
-var imgviewSpec = mustSpec("(thumbnail)(renderer):r(recursive)")
+var imgviewSpec = mustSpec("(thumbnail)(renderer):(start):r(recursive)")
 
 // ErrImgviewInfo indicates that help or version output was requested.
 var ErrImgviewInfo = errors.New("help or version requested")
@@ -60,7 +61,19 @@ func ImgviewViewer(args []string, dir string) (*imgview.Viewer, error) {
 	if err != nil {
 		return nil, err
 	}
-	viewer.SetNotice(collection.Warning)
+	if start, ok := flags.String("start"); ok {
+		if start != "" && !filepath.IsAbs(start) && dir != "" {
+			start = filepath.Join(dir, start)
+		}
+		if err := viewer.SetStartPath(start); err != nil {
+			return nil, err
+		}
+	}
+	notice := collection.Warning
+	if os.Getenv("MISA_IMGVIEW_EMBEDDED") == "1" && os.Getenv("MISA_IMGVIEW_LIMITED") == "1" {
+		notice = imgview.BrowserCollectionWarning
+	}
+	viewer.SetNotice(notice)
 	// A configured cell override wins; otherwise measure the host terminal,
 	// which is how the Misa GUI reports its font metrics to this process.
 	viewer.SetCellSize(imgview.CellPixelsFor(cfg, imgview.MeasureCellPixels()))
@@ -76,7 +89,7 @@ func runImgview(ctx *Context) int {
 	flags, err := imgviewSpec.ParseArgs(ctx.Args)
 	if err == nil && HandleHelpVersion(ctx, flags, imgviewSpec) {
 		if flags.HelpRequested {
-			fmt.Fprintln(ctx.Stdout, "\nOpen FILEs, or the images inside DIRs, in order. -r/--recursive also descends\ninto subdirectories; hidden entries are skipped. --renderer accepts auto,\nhalfblock, or kitty (falls back to halfblock).")
+			fmt.Fprintln(ctx.Stdout, "\nOpen FILEs, or the images inside DIRs, in order. -r/--recursive also descends\ninto subdirectories; hidden entries are skipped. --start FILE selects an item\nin that collection without reordering it. --renderer accepts auto,\nhalfblock, or kitty (forced pixels); auto probes the terminal.")
 		}
 		return 0
 	}

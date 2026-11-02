@@ -3,6 +3,7 @@ package ui
 import (
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/AmadeusDE/Misa/internal/imgview"
 	"github.com/AmadeusDE/Misa/internal/procmon"
 )
 
@@ -29,6 +30,16 @@ func (m *Model) updateProcMon(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.procViewer = nil
 		m.procVisible = false
 		m.resize()
+		if m.browserViewerName != "" {
+			name := m.browserViewerName
+			m.browserViewerName = ""
+			m.reloadBrowserSelection(name)
+			if m.browserViewerLimited {
+				m.status = imgview.BrowserCollectionWarning
+			}
+			m.browserViewerLimited = false
+			return m, nil
+		}
 		m.updateShellView()
 		return m, nil
 	}

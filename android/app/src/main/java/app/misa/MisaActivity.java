@@ -86,7 +86,6 @@ public final class MisaActivity extends Activity implements ExtraKeys.Listener {
         registerExit();
         requestNotifications();
         startSessionService();
-        handler.post(tick);
     }
 
     @Override
@@ -94,6 +93,27 @@ public final class MisaActivity extends Activity implements ExtraKeys.Listener {
         handler.removeCallbacks(tick);
         unregisterReceiver(exitReceiver);
         super.onDestroy();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Native.onVisibility(true);
+        handler.removeCallbacks(tick);
+        tick.run();
+    }
+
+    @Override
+    protected void onStop() {
+        handler.removeCallbacks(tick);
+        Native.onVisibility(false);
+        super.onStop();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        Native.onFocus(hasFocus);
     }
 
     @Override
@@ -292,27 +312,10 @@ public final class MisaActivity extends Activity implements ExtraKeys.Listener {
     }
 
     private void reconcileSessions() {
-        int count = Native.sessionCount();
-        int current = Native.activeSession();
-        if (sessionIds.size() == count && (count == 0 || sessionIds.contains(current))) {
-            return;
-        }
-        ArrayList<Integer> live = new ArrayList<>();
-        for (int id = 1; live.size() < count && id < 100000; id++) {
-            if (id == current) {
-                live.add(id);
-                continue;
-            }
-            Native.switchSession(id);
-            if (Native.activeSession() == id) {
-                live.add(id);
-            }
-        }
-        if (current != 0 && Native.activeSession() != current) {
-            Native.switchSession(current);
-        }
         sessionIds.clear();
-        sessionIds.addAll(live);
+        for (int id : Native.sessionIds()) {
+            sessionIds.add(id);
+        }
     }
 
     private void fillSessionRow() {

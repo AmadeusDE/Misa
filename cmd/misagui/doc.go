@@ -24,11 +24,14 @@
 //	    public static native void onMotion(int action, float x, float y, int buttonState);
 //	    public static native void onPinch(float scale);
 //	    public static native void onLowMemory();
+//	    public static native void onVisibility(boolean visible);
+//	    public static native void onFocus(boolean hasFocus);
 //	    public static native int newSession();
 //	    public static native void closeSession(int id);
 //	    public static native void switchSession(int id);
 //	    public static native int activeSession();
 //	    public static native int sessionCount();
+//	    public static native int[] sessionIds();
 //	}
 //
 // onMotion: for ACTION_SCROLL (8), x and y are wheel steps (positive down
@@ -37,6 +40,11 @@
 // point size. onText's meta is the latched Ctrl/Alt state (0 sends the
 // commit as text). muxAction names a multiplexer button (internal/gui/android
 // MuxChords). onCreate's env entries are KEY=VALUE; exePath is libmisa.so.
+// onVisibility follows Activity onStart/onStop: a backgrounded Activity
+// suspends animation and presents. onFocus is the real window focus from
+// onWindowFocusChanged, never faked on start. sessionIds is a read-only
+// snapshot in creation order; the Activity lists tabs with it instead of
+// probing switchSession, which would focus and resume a hidden tab.
 //
 // Build (API 26, the APK minSdk; -tags nough because the agent runs in the
 // child): ANDROID_NDK_HOME=... just android-lib

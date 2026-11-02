@@ -12,7 +12,6 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-
 	"github.com/AmadeusDE/Misa/internal/ascii"
 	"github.com/AmadeusDE/Misa/internal/battleship"
 	"github.com/AmadeusDE/Misa/internal/builtins"
@@ -96,12 +95,14 @@ type Model struct {
 	viRegister   []string
 	viRegLine    bool
 
-	procViewer    procmon.Viewer
-	procMonReturn screen
-	procVisible   bool // last visibility pushed to procViewer
-	paneShown     bool // nested: the parent's active tag shows this pane
-	paneFocused   bool // nested: the parent pane owns the keyboard
-	windowFocused bool // root: the terminal window has focus
+	procViewer           procmon.Viewer
+	browserViewerName    string
+	browserViewerLimited bool
+	procMonReturn        screen
+	procVisible          bool // last visibility pushed to procViewer
+	paneShown            bool // nested: the parent's active tag shows this pane
+	paneFocused          bool // nested: the parent pane owns the keyboard
+	windowFocused        bool // root: the terminal window has focus
 
 	mux     muxState
 	extInfo sysinfo.ExtendedInfo
@@ -667,6 +668,12 @@ func (m *Model) updateMuxRoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleTermExit(msg.t, msg.exitCode)
 		return m, nil
 
+	case imageViewerFinished:
+		if msg.owner == m {
+			return m.updateImageViewerFinished(msg)
+		}
+		return m.updateOwnedPane(paneMsg{owner: msg.owner, msg: msg})
+
 	case paneMsg:
 		if c, ok := msg.msg.(muxConfigChanged); ok {
 			return m.Update(c)
@@ -835,6 +842,9 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cmdInput.SetValue("")
 		}
 		return m, nil
+
+	case imageViewerFinished:
+		return m.updateImageViewerFinished(msg)
 
 	case launcher.Finished:
 		if msg.Err != nil {
@@ -1451,6 +1461,7 @@ func (m *Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeAllMotion
+	v.ReportFocus = true
 	return v
 }
 

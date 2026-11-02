@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-
 	"github.com/AmadeusDE/Misa/internal/procmon"
 )
 
@@ -325,6 +324,7 @@ func TestViewerWithoutVisibilitySeamIsLeftAlone(t *testing.T) {
 // only paused would leave playback frozen after a reveal until some unrelated
 // message happened to reach it.
 func TestRealImageViewerUsesTheResumingSeam(t *testing.T) {
+	forceImageViewerFallback(t)
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	m := newRoot(t, 80, 24)
 	if ok, _ := m.handleBuiltinCmd("imgview a.png"); !ok {
@@ -383,6 +383,7 @@ func TestPaneRegainingFocusAfterBlurIsRevealed(t *testing.T) {
 }
 
 func TestImageViewerVisibilityWithRealViewer(t *testing.T) {
+	forceImageViewerFallback(t)
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	m := newRoot(t, 80, 24)
 	if ok, _ := m.handleBuiltinCmd("imgview a.png"); !ok {

@@ -68,6 +68,8 @@ func (t *Terminal) armSyncTimeout() {
 
 // expireSync shows a frame that is still open after syncTimeout.
 func (t *Terminal) expireSync(gen uint64) {
+	t.processMu.Lock()
+	defer t.processMu.Unlock()
 	t.mu.Lock()
 	if !t.synced || t.syncGen != gen {
 		t.mu.Unlock()
@@ -78,6 +80,7 @@ func (t *Terminal) expireSync(gen uint64) {
 	t.synced = false
 	t.processVT(chunk)
 	t.mu.Unlock()
+	t.drainGraphics()
 	t.markDirty()
 }
 
