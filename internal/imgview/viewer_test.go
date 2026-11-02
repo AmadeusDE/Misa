@@ -48,7 +48,9 @@ func TestLayoutAndTransform(t *testing.T) {
 	if len(s.Placements) != 1 {
 		t.Fatal(s)
 	}
-	if got := s.Placements[0].Dest; got != image.Rect(0, 5, 20, 15) {
+	// A 20x11 cell viewport is 200x200 physical pixels at the default 10x20
+	// cell; shrink-only leaves the 40x20 image at 1:1, centred.
+	if got := s.Placements[0].Dest; got != image.Rect(80, 90, 120, 110) {
 		t.Fatal(got)
 	}
 	v.Update(key(">"))

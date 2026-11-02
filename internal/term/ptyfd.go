@@ -5,6 +5,7 @@ package term
 import (
 	"os"
 
+	"github.com/creack/pty"
 	"golang.org/x/sys/unix"
 )
 
@@ -38,14 +39,16 @@ func pollable(f *os.File) (*os.File, error) {
 
 // setWinsize resizes through the poller so the master stays non-blocking
 // (pty.Setsize would call Fd and switch it back to blocking mode).
-func setWinsize(f *os.File, rows, cols int) error {
+func setWinsize(f *os.File, ws *pty.Winsize) error {
 	sc, err := f.SyscallConn()
 	if err != nil {
 		return err
 	}
 	var ioErr error
 	err = sc.Control(func(fd uintptr) {
-		ioErr = unix.IoctlSetWinsize(int(fd), unix.TIOCSWINSZ, &unix.Winsize{Row: uint16(rows), Col: uint16(cols)})
+		ioErr = unix.IoctlSetWinsize(int(fd), unix.TIOCSWINSZ, &unix.Winsize{
+			Row: ws.Rows, Col: ws.Cols, Xpixel: ws.X, Ypixel: ws.Y,
+		})
 	})
 	if err != nil {
 		return err

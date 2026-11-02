@@ -29,13 +29,28 @@ func (m *Viewer) imageSize() image.Point {
 	}
 	return s
 }
+
+// viewportPixels is the drawing area in physical pixels. The bottom cell row is
+// reserved for the status line.
+func (m *Viewer) viewportPixels() image.Point {
+	c := m.cellSize()
+	return image.Pt(max(0, m.width)*c.X, max(0, m.height-1)*c.Y)
+}
+
+// panStep is one pan keypress: four cells across and two cells down, matching
+// the shape of a half-block sample.
+func (m *Viewer) panStep() image.Point {
+	c := m.cellSize()
+	return image.Pt(4*c.X, 2*c.Y)
+}
+
 func (m *Viewer) scale() float64 {
 	s := m.imageSize()
 	if s.X == 0 || s.Y == 0 {
 		return 1
 	}
-	w, h := float64(m.width), float64(max(0, m.height-1)*2)
-	x, y := w/float64(s.X), h/float64(s.Y)
+	v := m.viewportPixels()
+	x, y := float64(v.X)/float64(s.X), float64(v.Y)/float64(s.Y)
 	switch m.fit {
 	case fitNoUpscale:
 		return min(1, min(x, y))
@@ -54,8 +69,9 @@ func (m *Viewer) scale() float64 {
 func (m *Viewer) clampPan() {
 	s := m.imageSize()
 	z := m.scale()
-	x := max(0, (int(float64(s.X)*z)-m.width)/2)
-	y := max(0, (int(float64(s.Y)*z)-max(0, m.height-1)*2)/2)
+	v := m.viewportPixels()
+	x := max(0, (int(float64(s.X)*z)-v.X)/2)
+	y := max(0, (int(float64(s.Y)*z)-v.Y)/2)
 	m.pan.X = max(-x, min(x, m.pan.X))
 	m.pan.Y = max(-y, min(y, m.pan.Y))
 }
@@ -95,11 +111,14 @@ func transformed(it *viewerItem, src *image.NRGBA) *image.NRGBA {
 	return dst
 }
 
-// Scene returns viewport-local placements; the bottom row is reserved for status.
+// Scene returns viewport-local placements in physical pixels; the bottom row is
+// reserved for status. CellPixels carries the real cell size, so a half-block
+// sample keeps the image's shape instead of assuming square samples.
 func (m *Viewer) Scene(owner, generation uint64) imageframe.Scene {
-	w, h := m.width, max(0, m.height-1)
-	s := imageframe.Scene{Owner: owner, Generation: generation, Viewport: imageframe.Viewport{Cells: image.Rect(0, 0, w, h), PixelSize: image.Pt(w, h*2), CellPixels: image.Pt(1, 2)}}
-	if w == 0 || h == 0 || len(m.items) == 0 {
+	cell := m.cellSize()
+	view := m.viewportPixels()
+	s := imageframe.Scene{Owner: owner, Generation: generation, Viewport: imageframe.Viewport{Cells: image.Rect(0, 0, m.width, max(0, m.height-1)), PixelSize: view, CellPixels: cell, ExactPixels: m.exactCellPixels}}
+	if view.X == 0 || view.Y == 0 || len(m.items) == 0 {
 		return s
 	}
 	add := func(i int, box image.Rectangle, z float64, pan image.Point) {
@@ -119,15 +138,16 @@ func (m *Viewer) Scene(owner, generation uint64) imageframe.Scene {
 		s.Placements = append(s.Placements, imageframe.Placement{ID: uint64(i + 1), Raster: r, Source: pix.Bounds(), Dest: image.Rect(x, y, x+dw, y+dh), Clip: box})
 	}
 	if !m.grid {
-		add(m.index, image.Rect(0, 0, w, h*2), m.scale(), m.pan)
+		add(m.index, image.Rectangle{Max: view}, m.scale(), m.pan)
 	} else {
 		start, end := m.visibleRange()
 		cols := m.columns()
 		rowh := m.thumb/2 + 2
 		for i := start; i < end; i++ {
-			x := (i - start) % cols * m.thumb
-			y := (i - start) / cols * rowh * 2
-			add(i, image.Rect(x+1, y+2, min(w, x+m.thumb-1), min(h*2, y+rowh*2-2)), 0, image.Point{})
+			x := (i - start) % cols * m.thumb * cell.X
+			y := (i - start) / cols * rowh * cell.Y
+			// Labels sit in the cell row below each box, outside the image.
+			add(i, image.Rect(x+cell.X, y+cell.Y, min(view.X, x+(m.thumb-1)*cell.X), min(view.Y, y+(rowh-1)*cell.Y)), 0, image.Point{})
 		}
 	}
 	return s

@@ -38,8 +38,9 @@ func (m *Viewer) motion(p tea.Mouse) {
 	if !m.drag || m.grid {
 		return
 	}
-	m.pan.X -= p.X - m.dragAt.X
-	m.pan.Y -= (p.Y - m.dragAt.Y) * 2
+	c := m.cellSize()
+	m.pan.X -= (p.X - m.dragAt.X) * c.X
+	m.pan.Y -= (p.Y - m.dragAt.Y) * c.Y
 	m.dragAt = image.Pt(p.X, p.Y)
 	m.clampPan()
 }

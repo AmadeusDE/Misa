@@ -2,6 +2,7 @@ package builtins
 
 import (
 	"bytes"
+	"image"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -141,5 +142,24 @@ func TestImgviewConfigAndOverrides(t *testing.T) {
 	viewer, err = ImgviewViewer([]string{"--thumbnail", "--renderer=auto", "a.png"}, dir)
 	if err != nil || !viewer.Thumbnail() {
 		t.Fatalf("CLI thumbnail override: %v", err)
+	}
+}
+
+func TestImgviewCellSizeFromConfig(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	path := filepath.Join(dir, "misa", "imageviewer.yaml")
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("cell_pixels: [9, 20]\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	viewer, err := ImgviewViewer([]string{"a.png"}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := viewer.CellPixels(); got != image.Pt(9, 20) {
+		t.Fatalf("cell pixels %v, want the configured 9x20", got)
 	}
 }

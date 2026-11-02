@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/AmadeusDE/Misa/internal/builtins"
+	"github.com/AmadeusDE/Misa/internal/imgview"
 	"github.com/AmadeusDE/Misa/internal/jobleader"
 	"github.com/AmadeusDE/Misa/internal/term"
 )
@@ -86,6 +87,10 @@ func underJobLeader(argv []string) []string {
 
 func (m *Model) startPlan(p commandPlan, rows, cols int) (*term.Terminal, tea.Cmd, error) {
 	t := term.New(rows, cols)
+	// A program in the pane sees the host's real cell size, so anything that
+	// draws pixels keeps its aspect ratio inside Misa too.
+	cell := imgview.MeasureCellPixels()
+	t.SetCellPixels(cell.X, cell.Y)
 	var err error
 	switch {
 	case p.inProcess():

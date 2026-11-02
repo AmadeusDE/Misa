@@ -17,6 +17,8 @@ type ImageViewerConfig struct {
 	InitialMode            string   `yaml:"initial_mode"`
 	Fit                    string   `yaml:"fit"`
 	ThumbnailSize          int      `yaml:"thumbnail_size"`
+	CellAspect             float64  `yaml:"cell_aspect"`
+	CellPixels             []int    `yaml:"cell_pixels"`
 	Preview                bool     `yaml:"preview"`
 	PreviewDelayMS         int      `yaml:"preview_delay_ms"`
 	AnimationAutoplay      bool     `yaml:"animation_autoplay"`
@@ -82,6 +84,23 @@ func (c *ImageViewerConfig) Validate() []string {
 	enum("fit", &c.Fit, d.Fit, "shrink", "contain", "width", "height", "actual")
 	enum("animation_loops", &c.AnimationLoops, d.AnimationLoops, "file", "once", "infinite")
 	clamp("thumbnail_size", &c.ThumbnailSize, 32, 1024)
+	if c.CellAspect < 0 {
+		warnings = append(warnings, fmt.Sprintf("cell_aspect: %g is negative; measuring the cell instead", c.CellAspect))
+		c.CellAspect = 0
+	}
+	if c.CellAspect > 0 {
+		old := c.CellAspect
+		c.CellAspect = min(max(c.CellAspect, 0.1), 4)
+		if old != c.CellAspect {
+			warnings = append(warnings, fmt.Sprintf("cell_aspect: %g out of range; using %g", old, c.CellAspect))
+		}
+	}
+	if len(c.CellPixels) > 0 {
+		if len(c.CellPixels) != 2 || c.CellPixels[0] < 1 || c.CellPixels[1] < 1 || c.CellPixels[0] > 256 || c.CellPixels[1] > 256 {
+			warnings = append(warnings, fmt.Sprintf("cell_pixels: %v is not a cell width and height in 1..256; measuring the cell instead", c.CellPixels))
+			c.CellPixels = nil
+		}
+	}
 	clamp("preview_delay_ms", &c.PreviewDelayMS, 0, 60000)
 	clamp("animation_fps", &c.AnimationFPS, 1, 120)
 	clamp("halfblock_animation_fps", &c.HalfblockAnimationFPS, 1, 120)

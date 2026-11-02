@@ -17,6 +17,34 @@ func fmtSizeReport(rows, cols int) string {
 	return fmt.Sprintf("\x1b[8;%d;%dt", rows, cols)
 }
 
+// fmtTextAreaReport answers CSI 14t: the text area in pixels, height first.
+func fmtTextAreaReport(w, h int) string {
+	return fmt.Sprintf("\x1b[4;%d;%dt", h, w)
+}
+
+// fmtCellSizeReport answers CSI 16t: one cell in pixels, height first.
+func fmtCellSizeReport(w, h int) string {
+	return fmt.Sprintf("\x1b[6;%d;%dt", h, w)
+}
+
+// reportSize answers the window/dimension queries (CSI Ps t). Pixel answers
+// need a cell size from the host; without one the query stays unanswered
+// rather than inventing a geometry.
+func (t *Terminal) reportSize() {
+	switch t.p(0, 0) {
+	case 14:
+		if t.cellW > 0 && t.cellH > 0 {
+			t.respond(fmtTextAreaReport(t.Cols*t.cellW, t.Rows*t.cellH))
+		}
+	case 16:
+		if t.cellW > 0 && t.cellH > 0 {
+			t.respond(fmtCellSizeReport(t.cellW, t.cellH))
+		}
+	case 18:
+		t.respond(fmtSizeReport(t.Rows, t.Cols))
+	}
+}
+
 // reportMode answers DECRQM (CSI ? Ps $ p): 1 set, 2 reset, 0 unknown.
 func (t *Terminal) reportMode() {
 	mode := t.p(0, 0)

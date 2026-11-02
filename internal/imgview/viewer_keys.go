@@ -100,8 +100,9 @@ func (m *Viewer) key(k tea.KeyPressMsg) {
 			cols := m.columns()
 			m.selectIndex(m.index + dx + dy*cols)
 		} else {
-			m.pan.X += dx * 4
-			m.pan.Y += dy * 4
+			step := m.panStep()
+			m.pan.X += dx * step.X
+			m.pan.Y += dy * step.Y
 			m.clampPan()
 		}
 	case "+", "=", "-":
