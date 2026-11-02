@@ -1147,6 +1147,9 @@ func (m *Model) handleBuiltinCmd(input string) (bool, tea.Cmd) {
 	if len(fields) == 0 {
 		return false, nil
 	}
+	if fields[0] == "imgview" {
+		return m.tryImageViewer(input)
+	}
 	if fields[0] != "alias" && fields[0] != "unalias" && isCompound(input) {
 		return false, nil
 	}
