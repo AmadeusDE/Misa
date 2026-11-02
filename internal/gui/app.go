@@ -143,6 +143,9 @@ func (a *app) Handle(ev Event) {
 		a.closed = true
 	case EventFocus:
 		a.focused = ev.Focused
+		if a.term != nil {
+			a.term.SetFocused(ev.Focused)
+		}
 		a.requestDraw()
 	case EventKey:
 		a.onKey(ev)
@@ -154,6 +157,8 @@ func (a *app) Handle(ev Event) {
 		a.onScroll(ev)
 	case EventFont:
 		a.onFont(ev)
+	case EventInvalidate:
+		a.invalidate()
 	}
 }
 
@@ -341,6 +346,12 @@ func (a *app) resizeTerminal() {
 
 func (a *app) startTerminal(rows, cols int) {
 	t := term.New(rows, cols)
+	t.SetGraphicsLimits(config.LoadGraphics().Kitty.Limits())
+	// This frontend composites the terminal's images (images.go), so the child
+	// may speak the Kitty subset and get pixels instead of silence. Mux pane
+	// terminals inside the child stay disabled: a pane has no compositor yet.
+	t.SetGraphicsEnabled(true)
+	t.SetFocused(a.focused)
 	t.SetOSCHook(a.osc.push)
 	// Pixel dimensions come from the renderer's font metrics, the only place
 	// that knows how big a cell really is.
@@ -419,9 +430,11 @@ func (a *app) requestDraw() {
 	pw, ph := a.pixelSize()
 	a.term.Snapshot(&a.snap)
 	cur := cursorState{row: a.snap.CursorRow, col: a.snap.CursorCol, visible: a.snap.CursorVisible, focused: a.focused}
-	rows, full := changedRows(&a.snap, cur, &a.shown)
+	drawn := a.rend.drawn(&a.snap)
+	rows, full := changedRows(&a.snap, cur, &a.shown, a.rend.metrics())
 	full = full || a.shownW != pw || a.shownH != ph
-	if !full && len(rows) == 0 {
+	rects := gfxDamage(&a.shown, drawn)
+	if !full && len(rows) == 0 && len(rects) == 0 {
 		a.drawPending = false
 		if a.commitPending {
 			a.be.Commit()
@@ -439,9 +452,9 @@ func (a *app) requestDraw() {
 		prev = a.frameFor(t.ID)
 	}
 	a.rend.draw(&c, &a.snap, cur, prev)
-	a.shown.record(&a.snap, cur)
+	a.shown.record(&a.snap, cur, drawn, a.rend.metrics())
 	a.shownW, a.shownH = pw, ph
-	a.be.Present(t.Pix, t.Stride, a.be.Format(), a.rend.damage(rows, full, c.bounds()))
+	a.be.Present(t.Pix, t.Stride, a.be.Format(), a.rend.damage(rows, rects, full, c.bounds()))
 	a.drawPending, a.commitPending = false, false
 }
 

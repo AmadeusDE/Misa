@@ -310,16 +310,174 @@ pinned dependency while imposing explicit cumulative allocation limits. See its
 these guards rather than blindly replace the local files. This does not make
 in-process decoding a sandbox or promise allocator-exact RSS bounds.
 
+## Terminal graphics store
+
+Misa's terminal emulator has an opt-in bounded Kitty-protocol image store and
+immutable snapshot placements for a pixel compositor. Graphics are **disabled
+by default**, and a frontend enables them only when it can draw the placements:
+disabled terminals consume graphics APCs without displaying payload text,
+storing images or answering queries positively. The Wayland and Android GUI
+enables them for the terminal that runs the Misa UI (or a requested program) as
+its child, so a child writing the supported subset gets pixels. Mux pane
+terminals inside the UI stay disabled, so an image written in a pane is still
+swallowed. This does not enable `renderer: kitty` in the viewer. See
+[the supported protocol subset](../internal/kittygfx/README.md) for formats,
+limits and lifecycle semantics.
+
+### Misa GUI (Wayland and Android)
+
+`internal/gui/images.go` composites every placement of the terminal snapshot,
+in the order the program made them; the store keeps one layer and ignores `z`.
+The layer order is fixed: cell backgrounds first, then the images, then the
+glyphs, underline, strike, combining marks and the cursor. The cursor block is
+part of the text layer, so it is drawn over an image under its cell.
+
+A placement's cell rectangle is mapped through the renderer's real cell metrics
+and padding, shifted by the pixel offset inside the first cell, and clipped to
+the terminal's clip rectangle and the window. Those metrics already include the
+buffer scale, so it is counted once. Sampling is nearest neighbour: a placement
+is sized in cells, so the correction is at most one cell, and an image that is
+a whole number of cells is a 1:1 copy. Images are composited over the
+premultiplied canvas (BGRA on Wayland, RGBA on Android) with the same alpha-over
+formula the glyph blending uses, and `f=24` RGB images are opaque.
+
+Each rotating backend buffer remembers the cell grid, the cursor, the cell
+metrics and the placements it drew (image id, placement id, image generation,
+geometry and buffer rectangle). A draw repaints the changed rows plus the old
+and new rectangles of every placement that appeared, vanished, moved or was
+replaced; a placement that only changed pixels (same id, new generation)
+repaints just its own rectangle. An image-only change presents a frame even
+when no cell changed, while an unchanged snapshot presents nothing and starts
+no timer. A cell-metric change (font or buffer scale) or a new or recreated
+buffer redraws the whole buffer.
+
+Android uses the same code path through `gui.RunSession`, so the APK composites
+too. There is no new dependency, no cgo, no Wayland extension and no GPU:
+scaling stays in the compositor. A raster is copied into a scratch buffer
+before it is drawn, because `kittygfx.Raster` exposes no pixel slice, and that
+copy is reused for the next placement of the same raster in the frame. Native
+animation actions (`a=f`/`a=a`/`a=c`) and Unicode placeholders stay refused, so
+animation is application-scheduled frame replacement, and a placement that
+scrolled out is not re-shown from scrollback.
+
+The viewer itself still emits only half-blocks (`renderer: kitty` falls back);
+pane terminals are not forwarded into this layer. Android lifecycle and
+playback controls are described below; system-viewer integration remains
+separate work.
+
+### Android rendering and lifecycle
+
+The APK runs each tab through `gui.RunSession` and the shared compositor, not a
+separate image widget. It draws premultiplied RGBA into `RGBA_8888` native-window
+buffers; the existing blit swaps red/blue only for a BGRA source. Density,
+font-size and inset changes use the same physical cell metrics as terminal text.
+This validates rendering of supported graphics sent by a child; it does **not**
+make `imgview` emit Kitty graphics or enable graphics forwarding from mux panes.
+The viewer itself still uses animated half-blocks.
+
+The Activity sends foreground/background (`onStart`/`onStop`) and actual window
+focus separately through JNI to the session manager. A child is focused only
+when its tab is current, the Activity is visible, a surface exists and the
+window has keyboard focus. A hidden tab, absent surface, background Activity or
+screen-off transition sends focus-out. Foregrounding or creating a surface does
+not invent keyboard focus for a hidden session. Tab-list reconciliation reads a
+snapshot of session ids without switching through the hidden tabs. If the input
+queue fills, lifecycle events retain the latest focus state, one invalidation and
+close rather than letting ordinary input evict them.
+
+The GUI forwards focus through terminal mode 1004: a child that enables
+`DECSET 1004` gets `CSI I` / `CSI O`. Reports are de-duplicated, suppressed while
+the mode is disabled, and the current host state is reported once when the child
+enables it, including when it starts hidden. The same path forwards Wayland
+window focus. Both Misa's UI and standalone `imgview` request these reports, so
+blur suspends playback and new decode work instead of merely stopping GUI
+presents. Focus resumes the saved frame, remaining delay and loop count without
+undoing a user pause. Already-running codec calls cannot be forcibly interrupted;
+cancellation prevents queued work and stale results from restarting playback.
+This is deliberately conservative: a visible but unfocused session pauses too.
+
+Surface loss preserves the PTY and the terminal's bounded protocol image store.
+A recreated surface reconstructs the current image from that store without
+requiring the child to transmit it again. Low-memory callbacks invalidate
+reconstructible GUI state for every session: framebuffers, frame histories,
+retained snapshots and compositor scratch copies. They never evict the only
+protocol image bytes. A hidden session stays draw-pending without rendering
+offscreen; when revealed it rebuilds once, and an unchanged frame needs no
+repaint timer.
+
+The scrollable extra-keys row has `⏯` (Ctrl+a, playback toggle), `◀F` (Ctrl+p,
+previous frame) and `F▶` (Ctrl+n, next frame). They send the same keyboard chords
+as a hardware keyboard and clear, rather than inherit, latched Ctrl/Alt state.
+They are global keyboard shortcuts, not viewer-only actions; outside the viewer
+the current application receives those chords. Numeric prefixes still work for
+frame stepping. Pinch remains global terminal font scaling, not image zoom.
+
+Android defaults are 20 fps for future pixel presentation, 8 fps for half-block
+playback and previews, and one decode worker (the current viewer also serializes
+its frame requests). Preview/pixel settings remain reserved until those output
+paths land. No wake locks or background animation jobs are added; the existing
+session service still keeps terminal sessions alive. The Activity's session-label
+poll stops on `onStop` and refreshes immediately on `onStart`. An external terminal
+that does not report focus cannot provide automatic background pausing. The
+ACTION_VIEW broker, content provider, sharing and manifest changes belong to the
+separate Android external-open PR, not this rendering/lifecycle work.
+
+Pure-Go terminal/GUI/manager tests run on Linux and Android. Linux integration
+tests additionally run a PTY child through the Android backend to check RGBA
+channel order/alpha, density changes, tab switches, surface recreation and
+low-memory reconstruction; tests that execute a PTY child skip on Android.
+Device rotation/background/screen-off checks, idle-wakeup/RSS measurements, APK
+build/lint and both-ABI native builds still require an Android SDK/NDK and device
+or emulator; source-contract tests alone do not replace that validation.
+
+### Terminal graphics limits
+
+`graphics.yaml` is shared by Misa panes and GUI terminals. It follows the normal
+configuration search order (next to the executable, then the Misa user config
+directory, never the working directory). These settings change resource limits,
+**not** capability gating: they cannot enable graphics without a consumer.
+
+```yaml
+kitty:
+  max_width: 16384           # pixels per image
+  max_height: 16384
+  max_image_mib: 256         # decoded bytes per image, binary MiB
+  max_terminal_mib: 512      # stored decoded bytes, both screens combined
+  max_images: 256            # both screens combined
+  max_placements: 1024       # both screens combined
+  max_in_flight_mib: 360     # encoded bytes in an incomplete transfer
+  max_payload: 8192          # bytes per graphics APC body
+```
+
+Every field accepts zero for its default. Negative values fall back to defaults
+with a diagnostic; values above the validated maxima are clamped with a
+diagnostic. Maximum configurable dimensions are 1,048,576 pixels per axis;
+byte budgets are 65,536 MiB each; image and placement counts are 1,000,000 each;
+APC bodies are at most 16 MiB. These maxima allow raising the defaults, not a
+promise that allocating that much memory is safe on a particular device. The
+dimension and byte caps both apply: a 16384×16384 RGBA image needs 1024 MiB and
+is rejected by the default 256 MiB image budget before allocation. Arithmetic
+and platform-addressability checks still apply with raised limits.
+
+The stored-byte budget is not a peak-process-RSS limit: a completed transfer
+also temporarily holds its encoded payload and decoded replacement; retained
+snapshots can keep older immutable rasters alive. Consumers should reuse or
+release snapshots promptly. No terminal-side animation timer is started.
+
 ## Remaining later work
 
 The viewer deliberately stops at half-block playback. These parts are not
 implemented yet and should not be assumed from this document:
 
-* Kitty graphics transport and capability probing. `renderer: kitty` still
-  falls back to half-blocks with a status warning, and Misa's terminal
-  emulator and GUI do not consume image escapes.
-* Pixel animation in Misa's Wayland GUI, the Android APK and nested mux panes,
-  including the shared compositor, damage tracking and byte-rate limits.
+* Host-Kitty graphics transport and capability probing. `renderer: kitty` still
+  falls back to half-blocks with a status warning, so the viewer emits no Kitty
+  graphics itself. The emulator's image store is enabled only by the Wayland
+  and Android GUI's own terminal.
+* Pixel output from the viewer and in nested mux panes. The GUI and the APK
+  composite the placements a child stores and repaint one whose pixels changed,
+  which is enough for application-scheduled animation, but a pane has no
+  compositor and the byte-rate limit (`animation_transport_mib_s`) belongs to
+  the missing pixel renderers.
 * File-browser integration: opening images from the browser, thumbnail
   previews and opt-in animated previews. `preview`, `preview_delay_ms`,
   `preview_animation` and `preview_animation_fps` are reserved for that work,
@@ -327,8 +485,9 @@ implemented yet and should not be assumed from this document:
 * External/default viewer opening: the `o` key only reports that it is
   unavailable, and `open_mode` and `external_command` are not wired to a
   launcher.
-* Android-specific lifecycle visibility, playback extra-key controls and
-  handing the original file to a system viewer through a content URI.
+* Android external-open integration: handing the original file to a system
+  viewer through an authenticated broker and read-only content URI (separate
+  from the implemented rendering/lifecycle and extra-key controls).
 * Settings-screen controls for image-viewer options; only `imageviewer.yaml`
   configures them today.
 * SVG support, which remains an optional follow-up. Sixel, animated

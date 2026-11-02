@@ -70,6 +70,8 @@ func (t *Terminal) modeState(mode int) (set, known bool) {
 		return t.altScreen, true
 	case 2004:
 		return t.bracketedPaste, true
+	case 1004:
+		return t.focus.mode, true
 	case 2026:
 		return t.synced, true
 	case 9, 1000, 1002, 1003:

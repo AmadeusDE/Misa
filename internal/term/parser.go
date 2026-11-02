@@ -51,8 +51,10 @@ func (t *Terminal) processByte(b byte) {
 			t.startCSI()
 		case ']':
 			t.startOSC()
-		case 'P', '_', '^', 'X':
+		case 'P', '^', 'X':
 			t.state = stString
+		case '_':
+			t.startAPC()
 		case '7':
 			t.saveCursor()
 		case '8':
@@ -98,6 +100,40 @@ func (t *Terminal) processByte(b byte) {
 	case stString:
 		if b == '\x1b' {
 			t.state = stEscape
+		}
+
+	case stAPC:
+		t.apcByte(b)
+
+	case stAPCEsc:
+		// An escape inside an APC is not a command the program gets to run:
+		// only ST ends the string and ESC c, a deliberate reset, does more.
+		switch b {
+		case '\\':
+			t.finishAPC()
+			t.state = stNormal
+		case 'c':
+			t.abortAPC()
+			t.reset()
+			t.state = stNormal
+		default:
+			t.abortAPC()
+			t.state = stAPCAbort
+		}
+
+	case stAPCAbort:
+		switch b {
+		case '\x1b':
+			t.state = stAPCAbortEsc
+		case '\a':
+			t.state = stNormal
+		}
+
+	case stAPCAbortEsc:
+		if b == '\\' {
+			t.state = stNormal
+		} else {
+			t.state = stAPCAbort
 		}
 	}
 }
@@ -316,6 +352,8 @@ func (t *Terminal) privateMode(set bool) {
 			}
 		case 2004:
 			t.bracketedPaste = set
+		case 1004:
+			t.setFocusReporting(set)
 		case 9, 1000, 1002, 1003, 1006:
 			t.setMouseMode(p, set)
 		}
@@ -338,8 +376,13 @@ func (t *Terminal) enterAlt() {
 		return
 	}
 	t.altScreen = true
+	t.gfx.dropScreen(screenAlt)
 	t.cells, t.altCells = t.altCells, t.cells
 	t.clearRange(0, 0, t.Rows-1, t.Cols-1)
+	// The visible graphics changed even if no cell did: the other screen has
+	// its own images, and a transfer cannot span the switch.
+	t.gfx.gen++
+	t.gfx.transfer = nil
 }
 
 func (t *Terminal) exitAlt() {
@@ -348,6 +391,8 @@ func (t *Terminal) exitAlt() {
 	}
 	t.altScreen = false
 	t.cells, t.altCells = t.altCells, t.cells
+	t.gfx.gen++
+	t.gfx.transfer = nil
 }
 
 // mainCells is the normal-screen grid whether or not the alt screen is shown.
