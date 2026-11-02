@@ -13,7 +13,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-
 	"github.com/AmadeusDE/Misa/internal/imgview"
 	"github.com/AmadeusDE/Misa/internal/term"
 )
@@ -60,6 +59,7 @@ func (f *focusRoot) View() tea.View { return f.m.View() }
 // terminal bytes Bubble Tea decodes to the visibility the root pushes into the
 // in-process image viewer.
 func TestMainUIFocusReportsPauseTheImageViewer(t *testing.T) {
+	forceImageViewerFallback(t)
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	m := newRoot(t, 80, 24)
 	m.muxAutoPane = false // a pane would replace the root's own screen

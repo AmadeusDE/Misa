@@ -12,7 +12,6 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-
 	"github.com/AmadeusDE/Misa/internal/ascii"
 	"github.com/AmadeusDE/Misa/internal/battleship"
 	"github.com/AmadeusDE/Misa/internal/builtins"
@@ -667,6 +666,12 @@ func (m *Model) updateMuxRoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.handleTermExit(msg.t, msg.exitCode)
 		return m, nil
 
+	case imageViewerFinished:
+		if msg.owner == m {
+			return m.updateImageViewerFinished(msg)
+		}
+		return m.updateOwnedPane(paneMsg{owner: msg.owner, msg: msg})
+
 	case paneMsg:
 		if c, ok := msg.msg.(muxConfigChanged); ok {
 			return m.Update(c)
@@ -835,6 +840,9 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cmdInput.SetValue("")
 		}
 		return m, nil
+
+	case imageViewerFinished:
+		return m.updateImageViewerFinished(msg)
 
 	case launcher.Finished:
 		if msg.Err != nil {
