@@ -184,7 +184,8 @@ internal/
   clipboard/                     Host clipboard: atotto on Linux/BSD/macOS, termux-clipboard-* when on
                                  PATH, ErrUnavailable so the UI emits OSC 52. APK JNI replaces it later
   color/                         Color palette loading, hex-to-ANSI, color translation
-  config/                        YAML config — config.yaml (menu, ascii, colors, ui, statusbar), mux.yaml, fetch.yaml, gui.yaml
+  config/                        YAML config — config.yaml (menu, ascii, colors, ui, statusbar), mux.yaml, fetch.yaml, gui.yaml,
+                                 graphics.yaml (shared terminal Kitty resource limits; does not enable graphics)
   companion/                     Encouraging messages after command (cargo-mommy derived)
     companion.go                 Respond(), template vars ({role}, {part}, {item}, {prefix}…)
     config.go                    companion.yaml selections + write-ins
@@ -209,11 +210,15 @@ internal/
   launcher/                      Bubble Tea ExecProcess helper (unused: external programs run in-pane PTYs via Model.launch)
   jobleader/                     `misa --job-leader cmd…`: session leader that runs cmd in its own foreground process
                                  group so ^Z stops it; SuspendOnCtrlZ for multicall builtins
+  kittygfx/                      Bounded direct Kitty graphics protocol: parse/encode, limits and immutable rasters
+                                 (RGB/RGBA only; no files, compression or native animation)
   term/                          VT emulator + PTY: reader goroutine, DEC 2026 sync buffering, session-wide kill on Close.
                                  terminal.go (sessions, StartArgv/StartFunc), parser.go, screen.go, sgr.go, charset.go,
                                  reports.go, render.go, mouse.go, input.go (async PTY writes), ptyfd.go (pollable master),
                                  jobs.go (wait4 with WUNTRACED: Stopped/Continue)
-                                 snapshot.go (Snapshot: cell copy for frontends; SetOSCHook for titles/OSC 52),
+                                 snapshot.go (Snapshot: cell copy for frontends, immutable graphics placements and generation;
+                                 graphics disabled until a consumer explicitly enables them), graphics*.go (bounded screen-local
+                                 Kitty store and atomic frame replacement), SetOSCHook for titles/OSC 52,
                                  marks.go (combining marks interned so Cell has no pointers: the GC never scans
                                  screens/scrollback — keep Cell pointer-free, a test enforces it). Scrolled-off rows
                                  move into scrollback and evicted/discarded rows are recycled (blankRow), so steady

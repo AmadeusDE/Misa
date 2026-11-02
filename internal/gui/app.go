@@ -341,6 +341,7 @@ func (a *app) resizeTerminal() {
 
 func (a *app) startTerminal(rows, cols int) {
 	t := term.New(rows, cols)
+	t.SetGraphicsLimits(config.LoadGraphics().Kitty.Limits())
 	t.SetOSCHook(a.osc.push)
 	// Pixel dimensions come from the renderer's font metrics, the only place
 	// that knows how big a cell really is.

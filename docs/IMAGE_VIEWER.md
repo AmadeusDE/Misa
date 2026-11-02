@@ -310,14 +310,59 @@ pinned dependency while imposing explicit cumulative allocation limits. See its
 these guards rather than blindly replace the local files. This does not make
 in-process decoding a sandbox or promise allocator-exact RSS bounds.
 
+## Terminal graphics store
+
+Misa's terminal emulator has an opt-in bounded Kitty-protocol image store and
+immutable snapshot placements for a future pixel compositor. Graphics are
+**disabled by default**, and no frontend enables them yet: disabled terminals
+consume graphics APCs without displaying payload text, storing images or
+answering queries positively. This does not enable `renderer: kitty` in the
+viewer. Host-Kitty output/runtime integration is PR 5b; GUI and mux pixel
+composition is PR 6. See [the supported protocol subset](../internal/kittygfx/README.md)
+for formats, limits and lifecycle semantics.
+
+### Terminal graphics limits
+
+`graphics.yaml` is shared by Misa panes and GUI terminals. It follows the normal
+configuration search order (next to the executable, then the Misa user config
+directory, never the working directory). These settings change resource limits,
+**not** capability gating: they cannot enable graphics without a consumer.
+
+```yaml
+kitty:
+  max_width: 16384           # pixels per image
+  max_height: 16384
+  max_image_mib: 256         # decoded bytes per image, binary MiB
+  max_terminal_mib: 512      # stored decoded bytes, both screens combined
+  max_images: 256            # both screens combined
+  max_placements: 1024       # both screens combined
+  max_in_flight_mib: 360     # encoded bytes in an incomplete transfer
+  max_payload: 8192          # bytes per graphics APC body
+```
+
+Every field accepts zero for its default. Negative values fall back to defaults
+with a diagnostic; values above the validated maxima are clamped with a
+diagnostic. Maximum configurable dimensions are 1,048,576 pixels per axis;
+byte budgets are 65,536 MiB each; image and placement counts are 1,000,000 each;
+APC bodies are at most 16 MiB. These maxima allow raising the defaults, not a
+promise that allocating that much memory is safe on a particular device. The
+dimension and byte caps both apply: a 16384×16384 RGBA image needs 1024 MiB and
+is rejected by the default 256 MiB image budget before allocation. Arithmetic
+and platform-addressability checks still apply with raised limits.
+
+The stored-byte budget is not a peak-process-RSS limit: a completed transfer
+also temporarily holds its encoded payload and decoded replacement; retained
+snapshots can keep older immutable rasters alive. Consumers should reuse or
+release snapshots promptly. No terminal-side animation timer is started.
+
 ## Remaining later work
 
 The viewer deliberately stops at half-block playback. These parts are not
 implemented yet and should not be assumed from this document:
 
-* Kitty graphics transport and capability probing. `renderer: kitty` still
-  falls back to half-blocks with a status warning, and Misa's terminal
-  emulator and GUI do not consume image escapes.
+* Host-Kitty graphics transport and capability probing. `renderer: kitty` still
+  falls back to half-blocks with a status warning. The emulator's opt-in image
+  store is not enabled by any consumer; the GUI does not display image escapes.
 * Pixel animation in Misa's Wayland GUI, the Android APK and nested mux panes,
   including the shared compositor, damage tracking and byte-rate limits.
 * File-browser integration: opening images from the browser, thumbnail

@@ -40,6 +40,12 @@ func (t *Terminal) SetCellPixels(w, h int) {
 	t.mu.Lock()
 	changed := t.cellW != w || t.cellH != h
 	t.cellW, t.cellH = w, h
+	if changed {
+		// Placements were measured in cells with the old metrics, and a decode
+		// running outside the lock used them too: drop that work and redraw.
+		t.gfx.epoch++
+		t.gfx.gen++
+	}
 	rows, cols := t.Rows, t.Cols
 	t.mu.Unlock()
 	// A font change leaves the grid alone, so the child needs a fresh ioctl to

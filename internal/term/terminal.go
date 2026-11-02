@@ -102,6 +102,14 @@ type Terminal struct {
 	cursorHidden   bool
 	mouse          MouseMode
 
+	processMu   sync.Mutex // serializes VT processing so graphics jobs keep their order
+	gfx         graphicsStore
+	gfxJobs     []gfxJob
+	apc         []byte
+	apcGfx      bool
+	apcDecided  bool
+	apcOverflow bool
+
 	state         int
 	params        []int
 	csiPrivate    byte
@@ -144,7 +152,11 @@ const (
 	stOSC
 	stCharset
 	stEscInter
-	stString // DCS, APC, PM, SOS: ignored up to ST
+	stString      // DCS, PM, SOS: ignored up to ST
+	stAPC         // APC: only Kitty graphics is interpreted, see graphics.go
+	stAPCEsc      // ESC inside an APC: ST ends it, ESC c resets, the rest aborts
+	stAPCAbort    // an APC that was abandoned: swallowed up to ST or BEL
+	stAPCAbortEsc // ESC while swallowing an abandoned APC
 )
 
 const maxOSC = 1 << 20 // room for OSC 52 clipboard payloads
@@ -165,6 +177,8 @@ func New(rows, cols int) *Terminal {
 	}
 	t.cells = makeGrid(rows, cols)
 	t.altCells = makeGrid(rows, cols)
+	t.gfx.limits = defaultGraphicsLimits
+	t.gfx.rows, t.gfx.cols = rows, cols
 	return t
 }
 
@@ -349,8 +363,10 @@ func (t *Terminal) Resize(rows, cols int) {
 		cols = 1
 	}
 	t.mu.Lock()
+	shift := 0
 	if !t.altScreen && t.curRow >= rows {
-		t.pushTopRows(t.curRow - rows + 1)
+		shift = t.curRow - rows + 1
+		t.pushTopRows(shift)
 	}
 	nc := makeGrid(rows, cols)
 	copyGrid(nc, t.cells, rows, cols, t.Rows, t.Cols)
@@ -366,6 +382,7 @@ func (t *Terminal) Resize(rows, cols int) {
 	t.wrapNext = false
 	t.curRow, t.curCol = t.clampPos(t.curRow, t.curCol)
 	t.saved.row, t.saved.col = t.clampPos(t.saved.row, t.saved.col)
+	t.gfx.resize(shift, rows, cols)
 	cellW, cellH := t.cellW, t.cellH
 	t.mu.Unlock()
 	if t.ptm != nil {
@@ -427,6 +444,9 @@ func (t *Terminal) Close() {
 	if t.ptm != nil {
 		t.ptm.Close()
 	}
+	t.mu.Lock()
+	t.closeGraphics()
+	t.mu.Unlock()
 	t.reap()
 }
 
@@ -481,15 +501,19 @@ func (t *Terminal) ProcessOutput(data []byte) {
 
 // processChunk reports whether the visible screen may have changed.
 func (t *Terminal) processChunk(data []byte) bool {
+	t.processMu.Lock()
+	defer t.processMu.Unlock()
 	t.mu.Lock()
-	defer t.mu.Unlock()
-	return t.feedSync(data)
+	dirty := t.feedSync(data)
+	t.mu.Unlock()
+	return t.drainGraphics() || dirty
 }
 
 // Finish applies any output still held back by an unterminated sync block.
 func (t *Terminal) Finish() {
+	t.processMu.Lock()
+	defer t.processMu.Unlock()
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	pending := append(t.utf8Tail, t.syncPending...)
 	t.syncPending = nil
 	t.utf8Tail = nil
@@ -499,6 +523,8 @@ func (t *Terminal) Finish() {
 		t.utf8Tail = nil
 		t.processRune(utf8.RuneError)
 	}
+	t.mu.Unlock()
+	t.drainGraphics()
 }
 
 // processVT interprets data, holding back a UTF-8 sequence split across reads
