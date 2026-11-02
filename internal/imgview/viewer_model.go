@@ -13,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/AmadeusDE/Misa/internal/config"
+	"github.com/AmadeusDE/Misa/internal/imageframe"
 	"github.com/AmadeusDE/Misa/internal/imgview/animdecode"
 )
 
@@ -21,6 +22,7 @@ type viewerItem struct {
 	err                     error
 	loaded, loading, marked bool
 	animated                bool
+	animErr                 error
 	rotation                int
 	flipX, flipY            bool
 	version, appearance     uint64
@@ -49,6 +51,11 @@ type Viewer struct {
 	thumb                int
 	note                 string
 	rendererWarning      string
+	policy               PlaybackPolicy
+	clock                imageframe.Clock
+	newPlayback          playbackFactory
+	visible, focused     bool // host visibility; focused is settled by a visible push
+	anim                 *animation
 }
 type fitMode int
 
@@ -89,6 +96,9 @@ func NewConfigured(paths []string, thumbnail bool, renderer string, cfg config.I
 			GIFShortDelay:    time.Duration(cfg.GIFShortDelayMS) * time.Millisecond,
 		}}}
 	m.limits.workCache = m.cache
+	m.policy = PlaybackPolicy{Autoplay: cfg.AnimationAutoplay, Loops: loopModeFromConfig(cfg.AnimationLoops), FPS: cfg.HalfblockAnimationFPS}
+	m.newPlayback = newPlayback
+	m.visible, m.focused = true, true
 	if renderer == "kitty" {
 		m.rendererWarning = "kitty unavailable; using halfblock"
 	}
@@ -100,6 +110,11 @@ func NewConfigured(paths []string, thumbnail bool, renderer string, cfg config.I
 
 func (m *Viewer) cacheKey(i int) string { return fmt.Sprint(i) }
 func (m *Viewer) pixels(i int) *image.NRGBA {
+	// The grid always shows still posters; the single view shows the committed
+	// animation frame once one has been decoded.
+	if a := m.anim; a != nil && a.item == i && a.frame != nil && !m.grid {
+		return a.frame
+	}
 	d, ok := m.cache.Get(m.cacheKey(i))
 	if !ok {
 		return nil
@@ -219,6 +234,10 @@ func (m *Viewer) Update(msg tea.Msg) tea.Cmd {
 		m.Resize(v.Width, v.Height)
 	case tea.KeyPressMsg:
 		m.key(v)
+	case tea.FocusMsg:
+		m.focused = true
+	case tea.BlurMsg:
+		m.focused = false
 	case tea.MouseClickMsg:
 		m.click(v.Mouse())
 	case tea.MouseWheelMsg:
@@ -228,37 +247,56 @@ func (m *Viewer) Update(msg tea.Msg) tea.Cmd {
 	case tea.MouseReleaseMsg:
 		m.drag = false
 	case viewerLoaded:
-		m.inFlight = false
+		m.loaded(v)
+	case viewerAnimation:
+		m.animationOpened(v)
+	case viewerFrame:
+		m.frameDecoded(v)
+	case viewerTick:
+		m.tick(v)
+	}
+	if a := m.anim; a != nil && (a.item != m.index || a.version != m.items[a.item].version) {
+		m.stopAnimation()
+	}
+	if m.quit {
+		m.stopAnimation()
 		if m.cancel != nil {
 			m.cancel()
-			m.cancel = nil
 		}
-		if v.index >= 0 && v.index < len(m.items) {
-			it := &m.items[v.index]
-			if it.version == v.version {
-				if v.decoded.Pixels == nil {
-					m.SetImage(v.index, nil, v.err)
-				} else {
-					m.SetImage(v.index, v.decoded.Pixels, v.err)
-				}
-				it.animated = v.decoded.Animated
-				// Stop filling this page when admitting a new image displaced one.
-				if m.grid {
-					start, end := m.visibleRange()
-					for j := start; j < end; j++ {
-						if j != v.index && m.items[j].loaded && m.items[j].err == nil && m.pixels(j) == nil {
-							m.gridFull = true
-							break
-						}
-					}
-				}
+	}
+	m.syncAnimation()
+	return tea.Batch(m.load(), m.ensureAnimation(), m.animCmd())
+}
+
+func (m *Viewer) loaded(v viewerLoaded) {
+	m.inFlight = false
+	if m.cancel != nil {
+		m.cancel()
+		m.cancel = nil
+	}
+	if v.index < 0 || v.index >= len(m.items) {
+		return
+	}
+	it := &m.items[v.index]
+	if it.version != v.version {
+		return
+	}
+	if v.decoded.Pixels == nil {
+		m.SetImage(v.index, nil, v.err)
+	} else {
+		m.SetImage(v.index, v.decoded.Pixels, v.err)
+	}
+	it.animated = v.decoded.Animated
+	// Stop filling this page when admitting a new image displaced one.
+	if m.grid {
+		start, end := m.visibleRange()
+		for j := start; j < end; j++ {
+			if j != v.index && m.items[j].loaded && m.items[j].err == nil && m.pixels(j) == nil {
+				m.gridFull = true
+				break
 			}
 		}
 	}
-	if m.quit && m.cancel != nil {
-		m.cancel()
-	}
-	return m.load()
 }
 func safeName(p string) string {
 	return strings.Map(func(r rune) rune {

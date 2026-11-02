@@ -19,7 +19,7 @@ func (m *Viewer) View() string {
 		return ""
 	}
 	if m.help {
-		return ansi.Truncate("q quit · Enter grid/image · n/p navigate · arrows pan/select\n+/- zoom · w/W/e/E fit · f actual · </> rotate · ?/| flip\nm mark · M invert · Ctrl+u clear · N/P marked · r reload · Esc close", m.width, "")
+		return ansi.Truncate("q quit · Enter grid/image · n/p navigate · arrows pan/select\n+/- zoom · w/W/e/E fit · f actual · </> rotate · ?/| flip\nm mark · M invert · Ctrl+u clear · N/P marked · r reload · Esc close\nCtrl+a play/pause · Ctrl+n/Ctrl+p step frame · thumbs stay still", m.width, "")
 	}
 	lines := make([]string, max(0, m.height-1))
 	renderer := imageout.NewHalfBlock(color.NRGBA{R: 32, G: 32, B: 32, A: 255})
@@ -84,7 +84,10 @@ func (m *Viewer) View() string {
 			state = " · no image"
 		}
 		if it.animated && it.err == nil {
-			state = " · animated (first frame only)"
+			state = m.animationStatus(&m.items[m.index])
+			if m.grid {
+				state = " · animated"
+			}
 		}
 		size := ""
 		if pix != nil {

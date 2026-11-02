@@ -98,6 +98,10 @@ type Model struct {
 
 	procViewer    procmon.Viewer
 	procMonReturn screen
+	procVisible   bool // last visibility pushed to procViewer
+	paneShown     bool // nested: the parent's active tag shows this pane
+	paneFocused   bool // nested: the parent pane owns the keyboard
+	windowFocused bool // root: the terminal window has focus
 
 	mux     muxState
 	extInfo sysinfo.ExtendedInfo
@@ -224,6 +228,9 @@ func New(dir string) *Model {
 		startInShell:     cfg.StartInShell,
 		disableMinishell: cfg.DisableMinishell,
 		historySearch:    config.BoolDefault(cfg.HistorySearch, true),
+		paneShown:        true,
+		paneFocused:      true,
+		windowFocused:    true,
 	}
 	m.applyMuxConfig(muxCfg)
 	m.shell.loadFromDisk()
@@ -414,32 +421,28 @@ func buildRootItems(dir string, entries []config.Entry) []list.Item {
 						title: "Task Manager",
 						desc:  "Unified monitor with htop, btop, and overview tabs",
 						action: func(m *Model) tea.Cmd {
-							m.enterProcMon(procmon.NewTM())
-							return m.procViewer.Init()
+							return tea.Batch(m.enterProcMon(procmon.NewTM()), m.procViewer.Init())
 						},
 					},
 					menuItem{
 						title: "htop",
 						desc:  "Interactive process viewer with kill, search, filter",
 						action: func(m *Model) tea.Cmd {
-							m.enterProcMon(procmon.NewHtop())
-							return m.procViewer.Init()
+							return tea.Batch(m.enterProcMon(procmon.NewHtop()), m.procViewer.Init())
 						},
 					},
 					menuItem{
 						title: "btop",
 						desc:  "Resource monitor with CPU, memory, disk, network panels",
 						action: func(m *Model) tea.Cmd {
-							m.enterProcMon(procmon.NewBtop())
-							return m.procViewer.Init()
+							return tea.Batch(m.enterProcMon(procmon.NewBtop()), m.procViewer.Init())
 						},
 					},
 					menuItem{
 						title: "top",
 						desc:  "Classic process overview",
 						action: func(m *Model) tea.Cmd {
-							m.enterProcMon(procmon.NewTop())
-							return m.procViewer.Init()
+							return tea.Batch(m.enterProcMon(procmon.NewTop()), m.procViewer.Init())
 						},
 					},
 				}
@@ -456,16 +459,14 @@ func buildRootItems(dir string, entries []config.Entry) []list.Item {
 						title: "Battleship",
 						desc:  "Sink the computer's fleet on a 10×10 grid",
 						action: func(m *Model) tea.Cmd {
-							m.enterProcMon(battleship.New(battleship.Options{}))
-							return m.procViewer.Init()
+							return tea.Batch(m.enterProcMon(battleship.New(battleship.Options{})), m.procViewer.Init())
 						},
 					},
 					menuItem{
 						title: "Mines",
 						desc:  "Minesweeper, beginner 9×9",
 						action: func(m *Model) tea.Cmd {
-							m.enterProcMon(mines.New(mines.Levels[0]))
-							return m.procViewer.Init()
+							return tea.Batch(m.enterProcMon(mines.New(mines.Levels[0])), m.procViewer.Init())
 						},
 					},
 					menuItem{
@@ -477,8 +478,7 @@ func buildRootItems(dir string, entries []config.Entry) []list.Item {
 								m.status = err.Error()
 								return nil
 							}
-							m.enterProcMon(game)
-							return m.procViewer.Init()
+							return tea.Batch(m.enterProcMon(game), m.procViewer.Init())
 						},
 					},
 				}
@@ -734,7 +734,23 @@ func (m *Model) updateMuxRoot(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// Update runs one message and then hands in-process screens their current
+// visibility, so a hidden or unfocused owner never keeps a playback clock.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg.(type) {
+	case tea.FocusMsg:
+		m.windowFocused = true
+	case tea.BlurMsg:
+		m.windowFocused = false
+	}
+	model, cmd := m.update(msg)
+	if next, ok := model.(*Model); ok {
+		cmd = tea.Batch(cmd, next.syncViewerVisibility(), next.syncPaneVisibility())
+	}
+	return model, cmd
+}
+
+func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !m.nestedMode {
 		focus := m.mux.activeIdx
 		model, cmd := m.updateMuxRoot(msg)
@@ -1268,45 +1284,45 @@ func (m *Model) handleBuiltinCmd(input string) (bool, tea.Cmd) {
 
 	switch fields[0] {
 	case "top":
-		m.enterProcMon(procmon.NewTop())
+		enter := m.enterProcMon(procmon.NewTop())
 		m.cmdInput.SetValue("")
-		return true, m.procViewer.Init()
+		return true, tea.Batch(enter, m.procViewer.Init())
 	case "htop":
-		m.enterProcMon(procmon.NewHtop())
+		enter := m.enterProcMon(procmon.NewHtop())
 		m.cmdInput.SetValue("")
-		return true, m.procViewer.Init()
+		return true, tea.Batch(enter, m.procViewer.Init())
 	case "btop", "bytop", "bashtop":
-		m.enterProcMon(procmon.NewBtop())
+		enter := m.enterProcMon(procmon.NewBtop())
 		m.cmdInput.SetValue("")
-		return true, m.procViewer.Init()
+		return true, tea.Batch(enter, m.procViewer.Init())
 	case "tm":
-		m.enterProcMon(procmon.NewTM())
+		enter := m.enterProcMon(procmon.NewTM())
 		m.cmdInput.SetValue("")
-		return true, m.procViewer.Init()
+		return true, tea.Batch(enter, m.procViewer.Init())
 	case "mines":
 		level, err := builtins.MinesLevel(fields[1:])
 		if err != nil {
 			return false, nil
 		}
-		m.enterProcMon(mines.New(level))
+		enter := m.enterProcMon(mines.New(level))
 		m.cmdInput.SetValue("")
-		return true, m.procViewer.Init()
+		return true, tea.Batch(enter, m.procViewer.Init())
 	case "chess":
 		game, err := builtins.ChessGame(fields[1:])
 		if err != nil {
 			return false, nil
 		}
-		m.enterProcMon(game)
+		enter := m.enterProcMon(game)
 		m.cmdInput.SetValue("")
-		return true, m.procViewer.Init()
+		return true, tea.Batch(enter, m.procViewer.Init())
 	case "battleship":
 		game, err := builtins.BattleshipGame(fields[1:])
 		if err != nil {
 			return false, nil
 		}
-		m.enterProcMon(game)
+		enter := m.enterProcMon(game)
 		m.cmdInput.SetValue("")
-		return true, m.procViewer.Init()
+		return true, tea.Batch(enter, m.procViewer.Init())
 	}
 
 	return false, nil
