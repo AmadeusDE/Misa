@@ -3,8 +3,9 @@
 Terminal-side support for the Kitty graphics protocol: the emulator parses the
 APC commands a program writes to its PTY, keeps a per-screen store of images and
 placements, and exposes the visible ones through `Snapshot`. Drawing them is the
-frontend's job (PR6); this package only stores geometry
-and immutable rasters.
+frontend's job: `internal/gui/images.go` composites them for the Wayland and
+Android windows, and mux pane terminals stay disabled. This package only stores
+geometry and immutable rasters.
 
 Everything here is off until a frontend says it can draw images.
 
