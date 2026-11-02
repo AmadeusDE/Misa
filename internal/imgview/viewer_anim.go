@@ -8,7 +8,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-
 	"github.com/AmadeusDE/Misa/internal/imageframe"
 	"github.com/AmadeusDE/Misa/internal/imgview/animdecode"
 )
@@ -39,6 +38,8 @@ type PlaybackPolicy struct {
 	Autoplay bool
 	Loops    LoopMode
 	FPS      int
+	// MinInterval bounds the presentation rate independently of FPS.
+	MinInterval time.Duration
 }
 
 // animationPlayback is the viewer's seam to playback.go's controller. The
@@ -80,6 +81,7 @@ type animation struct {
 	work          context.Context // outstanding decode/index commands
 	stopWork      context.CancelFunc
 	stop          chan struct{}
+	retime        chan struct{}
 	gen           uint64
 	armed         bool
 	index         int // committed frame, -1 until the first decode lands
@@ -341,6 +343,10 @@ func (m *Viewer) tick(v viewerTick) {
 		return
 	}
 	a.armed = false
+	// A changed transport budget may extend a timer that was already armed.
+	if p, ok := a.ctrl.(interface{ PresentationPending() bool }); ok && p.PresentationPending() {
+		return
+	}
 	if !m.animationVisible() || !a.ctrl.Playing() {
 		return
 	}
@@ -373,7 +379,10 @@ func (m *Viewer) waitCmd(a *animation) tea.Cmd {
 	if delay < time.Millisecond {
 		delay = time.Millisecond
 	}
-	stop, gen := a.stop, a.gen
+	if a.retime == nil {
+		a.retime = make(chan struct{})
+	}
+	stop, retime, gen := a.stop, a.retime, a.gen
 	// The boundary starts when it is armed, not when the runtime schedules the
 	// command, so the remaining delay stays accurate under load.
 	clock := m.clock
@@ -384,6 +393,9 @@ func (m *Viewer) waitCmd(a *animation) tea.Cmd {
 	return func() tea.Msg {
 		select {
 		case <-timer.C():
+			return viewerTick{anim: a, gen: gen}
+		case <-retime:
+			timer.Stop()
 			return viewerTick{anim: a, gen: gen}
 		case <-stop:
 			timer.Stop()

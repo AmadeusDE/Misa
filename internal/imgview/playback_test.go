@@ -502,3 +502,31 @@ func TestPlaybackWithGIFSource(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPlaybackTransportIntervalChanges(t *testing.T) {
+	p, clock := newTestPlayback(t, 100, 0, 10*time.Millisecond, PlaybackPolicy{Autoplay: true, MinInterval: 250 * time.Millisecond})
+	if d := p.NextDelay(); d != 250*time.Millisecond {
+		t.Fatalf("delay %v", d)
+	}
+	clock.Advance(50 * time.Millisecond)
+	p.SetMinInterval(500 * time.Millisecond)
+	if d := p.NextDelay(); d != 450*time.Millisecond || !p.PresentationPending() {
+		t.Fatalf("increased delay %v", d)
+	}
+	clock.Advance(450 * time.Millisecond)
+	if p.PresentationPending() {
+		t.Fatal("deadline still pending")
+	}
+	p.Advance()
+	if p.Frame() != 50 {
+		t.Fatalf("did not skip to timeline frame: %d", p.Frame())
+	}
+	if d := p.NextDelay(); d != 500*time.Millisecond {
+		t.Fatalf("new delay %v", d)
+	}
+	clock.Advance(100 * time.Millisecond)
+	p.SetMinInterval(200 * time.Millisecond)
+	if d := p.NextDelay(); d != 100*time.Millisecond {
+		t.Fatalf("decreased delay %v", d)
+	}
+}

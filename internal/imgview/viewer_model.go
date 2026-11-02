@@ -3,7 +3,6 @@ package imgview
 import (
 	"context"
 	"fmt"
-
 	"image"
 	"path/filepath"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	"unicode"
 
 	tea "charm.land/bubbletea/v2"
-
 	"github.com/AmadeusDE/Misa/internal/config"
 	"github.com/AmadeusDE/Misa/internal/imageframe"
 	"github.com/AmadeusDE/Misa/internal/imgview/animdecode"
@@ -55,6 +53,8 @@ type Viewer struct {
 	note                 string
 	notice               string
 	rendererWarning      string
+	renderer             string
+	config               config.ImageViewerConfig
 	policy               PlaybackPolicy
 	clock                imageframe.Clock
 	newPlayback          playbackFactory
@@ -92,7 +92,7 @@ func NewConfigured(paths []string, thumbnail bool, renderer string, cfg config.I
 	// two sample rows. Map the nominal 128px default to the historical 16-cell
 	// grid width.
 	thumb := max(8, min(128, cfg.ThumbnailSize/8))
-	m := &Viewer{grid: thumbnail || cfg.InitialMode == "thumbnails", fit: fit, initialFit: fit, thumb: thumb, cellPixels: defaultCellPixels,
+	m := &Viewer{renderer: renderer, config: cfg, grid: thumbnail || cfg.InitialMode == "thumbnails", fit: fit, initialFit: fit, thumb: thumb, cellPixels: defaultCellPixels,
 		cache: NewCache(int64(cfg.CacheMiB) << 20), limits: Limits{MaxEncodedBytes: int64(cfg.MaxFileMiB) << 20, MaxPixels: int64(cfg.MaxPixels), Animation: animdecode.Limits{
 			MaxWorkingBytes:  int64(cfg.AnimationCacheMiB) << 20,
 			MaxMetadataBytes: int64(cfg.AnimationMetadataMiB) << 20,
@@ -126,6 +126,10 @@ func (m *Viewer) pixels(i int) *image.NRGBA {
 	}
 	return d.Pixels
 }
+
+// Renderer returns the requested rendering mode.
+func (m *Viewer) Renderer() string { return m.renderer }
+
 func (m *Viewer) Index() int      { return m.index }
 func (m *Viewer) Thumbnail() bool { return m.grid }
 func (m *Viewer) IsQuit() bool    { return m.quit }

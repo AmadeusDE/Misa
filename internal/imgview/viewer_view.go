@@ -8,13 +8,17 @@ import (
 	"unicode"
 
 	"charm.land/lipgloss/v2"
+	"github.com/AmadeusDE/Misa/internal/imageframe"
 	"github.com/AmadeusDE/Misa/internal/imageout"
 	"github.com/charmbracelet/x/ansi"
 )
 
 // View renders a portable half-block presentation; no graphics escapes or
 // terminal writes occur here, so it is safe inside an ordinary Misa pane.
-func (m *Viewer) View() string {
+func (m *Viewer) View() string { return m.view(false, false) }
+
+// view builds chrome with an optional Kitty image layer supplied by the host.
+func (m *Viewer) view(kitty, standalone bool) string {
 	if m.width <= 0 || m.height <= 0 {
 		return ""
 	}
@@ -23,7 +27,11 @@ func (m *Viewer) View() string {
 	}
 	lines := make([]string, max(0, m.height-1))
 	renderer := imageout.NewHalfBlock(color.NRGBA{R: 32, G: 32, B: 32, A: 255})
-	frame, err := renderer.Prepare(context.Background(), m.Scene(1, 1))
+	var frame imageframe.Frame
+	var err error
+	if !kitty {
+		frame, err = renderer.Prepare(context.Background(), m.Scene(1, 1))
+	}
 	if err == nil && frame.Cells != nil {
 		layer := frame.Cells
 		w := layer.Bounds.Dx()
@@ -94,7 +102,11 @@ func (m *Viewer) View() string {
 			b := pix.Bounds()
 			size = fmt.Sprintf(" · %dx%d · %.0f%%", b.Dx(), b.Dy(), m.scale()*100)
 		}
-		status = fmt.Sprintf("%d/%d %s%s%s%s · %d marked · halfblock", m.index+1, len(m.items), safeName(it.path), mark, state, size, m.MarkedCount())
+		renderName := "halfblock"
+		if kitty {
+			renderName = "kitty"
+		}
+		status = fmt.Sprintf("%d/%d %s%s%s%s · %d marked · %s", m.index+1, len(m.items), safeName(it.path), mark, state, size, m.MarkedCount(), renderName)
 		if m.note != "" {
 			status += " · " + m.note
 		}
@@ -102,7 +114,7 @@ func (m *Viewer) View() string {
 	if m.notice != "" {
 		status = safeText(m.notice) + " · " + status
 	}
-	if m.rendererWarning != "" {
+	if !standalone && m.rendererWarning != "" {
 		status = m.rendererWarning + " · " + status
 	}
 	lines = append(lines, ansi.Truncate(status, m.width, ""))
