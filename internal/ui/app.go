@@ -1451,6 +1451,7 @@ func (m *Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeAllMotion
+	v.ReportFocus = true
 	return v
 }
 

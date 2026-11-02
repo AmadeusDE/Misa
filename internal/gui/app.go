@@ -143,6 +143,9 @@ func (a *app) Handle(ev Event) {
 		a.closed = true
 	case EventFocus:
 		a.focused = ev.Focused
+		if a.term != nil {
+			a.term.SetFocused(ev.Focused)
+		}
 		a.requestDraw()
 	case EventKey:
 		a.onKey(ev)
@@ -154,6 +157,8 @@ func (a *app) Handle(ev Event) {
 		a.onScroll(ev)
 	case EventFont:
 		a.onFont(ev)
+	case EventInvalidate:
+		a.invalidate()
 	}
 }
 
@@ -346,6 +351,7 @@ func (a *app) startTerminal(rows, cols int) {
 	// may speak the Kitty subset and get pixels instead of silence. Mux pane
 	// terminals inside the child stay disabled: a pane has no compositor yet.
 	t.SetGraphicsEnabled(true)
+	t.SetFocused(a.focused)
 	t.SetOSCHook(a.osc.push)
 	// Pixel dimensions come from the renderer's font metrics, the only place
 	// that knows how big a cell really is.

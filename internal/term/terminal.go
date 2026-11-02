@@ -101,6 +101,7 @@ type Terminal struct {
 	bracketedPaste bool
 	cursorHidden   bool
 	mouse          MouseMode
+	focus          focusState
 
 	processMu   sync.Mutex // serializes VT processing so graphics jobs keep their order
 	gfx         graphicsStore

@@ -361,9 +361,74 @@ animation is application-scheduled frame replacement, and a placement that
 scrolled out is not re-shown from scrollback.
 
 The viewer itself still emits only half-blocks (`renderer: kitty` falls back);
-pane terminals are not forwarded into this layer; Android lifecycle work
-(backgrounding, surface loss pausing a child's playback, extra-key controls,
-handing a file to a system viewer) is still missing.
+pane terminals are not forwarded into this layer. Android lifecycle and
+playback controls are described below; system-viewer integration remains
+separate work.
+
+### Android rendering and lifecycle
+
+The APK runs each tab through `gui.RunSession` and the shared compositor, not a
+separate image widget. It draws premultiplied RGBA into `RGBA_8888` native-window
+buffers; the existing blit swaps red/blue only for a BGRA source. Density,
+font-size and inset changes use the same physical cell metrics as terminal text.
+This validates rendering of supported graphics sent by a child; it does **not**
+make `imgview` emit Kitty graphics or enable graphics forwarding from mux panes.
+The viewer itself still uses animated half-blocks.
+
+The Activity sends foreground/background (`onStart`/`onStop`) and actual window
+focus separately through JNI to the session manager. A child is focused only
+when its tab is current, the Activity is visible, a surface exists and the
+window has keyboard focus. A hidden tab, absent surface, background Activity or
+screen-off transition sends focus-out. Foregrounding or creating a surface does
+not invent keyboard focus for a hidden session. Tab-list reconciliation reads a
+snapshot of session ids without switching through the hidden tabs. If the input
+queue fills, lifecycle events retain the latest focus state, one invalidation and
+close rather than letting ordinary input evict them.
+
+The GUI forwards focus through terminal mode 1004: a child that enables
+`DECSET 1004` gets `CSI I` / `CSI O`. Reports are de-duplicated, suppressed while
+the mode is disabled, and the current host state is reported once when the child
+enables it, including when it starts hidden. The same path forwards Wayland
+window focus. Both Misa's UI and standalone `imgview` request these reports, so
+blur suspends playback and new decode work instead of merely stopping GUI
+presents. Focus resumes the saved frame, remaining delay and loop count without
+undoing a user pause. Already-running codec calls cannot be forcibly interrupted;
+cancellation prevents queued work and stale results from restarting playback.
+This is deliberately conservative: a visible but unfocused session pauses too.
+
+Surface loss preserves the PTY and the terminal's bounded protocol image store.
+A recreated surface reconstructs the current image from that store without
+requiring the child to transmit it again. Low-memory callbacks invalidate
+reconstructible GUI state for every session: framebuffers, frame histories,
+retained snapshots and compositor scratch copies. They never evict the only
+protocol image bytes. A hidden session stays draw-pending without rendering
+offscreen; when revealed it rebuilds once, and an unchanged frame needs no
+repaint timer.
+
+The scrollable extra-keys row has `⏯` (Ctrl+a, playback toggle), `◀F` (Ctrl+p,
+previous frame) and `F▶` (Ctrl+n, next frame). They send the same keyboard chords
+as a hardware keyboard and clear, rather than inherit, latched Ctrl/Alt state.
+They are global keyboard shortcuts, not viewer-only actions; outside the viewer
+the current application receives those chords. Numeric prefixes still work for
+frame stepping. Pinch remains global terminal font scaling, not image zoom.
+
+Android defaults are 20 fps for future pixel presentation, 8 fps for half-block
+playback and previews, and one decode worker (the current viewer also serializes
+its frame requests). Preview/pixel settings remain reserved until those output
+paths land. No wake locks or background animation jobs are added; the existing
+session service still keeps terminal sessions alive. The Activity's session-label
+poll stops on `onStop` and refreshes immediately on `onStart`. An external terminal
+that does not report focus cannot provide automatic background pausing. The
+ACTION_VIEW broker, content provider, sharing and manifest changes belong to the
+separate Android external-open PR, not this rendering/lifecycle work.
+
+Pure-Go terminal/GUI/manager tests run on Linux and Android. Linux integration
+tests additionally run a PTY child through the Android backend to check RGBA
+channel order/alpha, density changes, tab switches, surface recreation and
+low-memory reconstruction; tests that execute a PTY child skip on Android.
+Device rotation/background/screen-off checks, idle-wakeup/RSS measurements, APK
+build/lint and both-ABI native builds still require an Android SDK/NDK and device
+or emulator; source-contract tests alone do not replace that validation.
 
 ### Terminal graphics limits
 
@@ -420,8 +485,9 @@ implemented yet and should not be assumed from this document:
 * External/default viewer opening: the `o` key only reports that it is
   unavailable, and `open_mode` and `external_command` are not wired to a
   launcher.
-* Android-specific lifecycle visibility, playback extra-key controls and
-  handing the original file to a system viewer through a content URI.
+* Android external-open integration: handing the original file to a system
+  viewer through an authenticated broker and read-only content URI (separate
+  from the implemented rendering/lifecycle and extra-key controls).
 * Settings-screen controls for image-viewer options; only `imageviewer.yaml`
   configures them today.
 * SVG support, which remains an optional follow-up. Sixel, animated

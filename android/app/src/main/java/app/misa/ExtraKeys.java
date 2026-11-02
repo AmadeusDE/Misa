@@ -12,6 +12,7 @@ import android.widget.LinearLayout;
 // Esc, Ctrl, Alt, Tab, arrows and a few shell characters, above the IME.
 // Ctrl and Alt latch until the next key or IME commit. MUX opens a row of
 // one-tap multiplexer actions (ids are MuxChords in internal/gui/android).
+// Three further buttons are the image viewer's animation chords.
 // The IME key shows the keyboard; a long press switches raw and text modes.
 final class ExtraKeys extends LinearLayout implements Modifiers {
     interface Listener {
@@ -56,6 +57,17 @@ final class ExtraKeys extends LinearLayout implements Modifiers {
         {"t8", "tag8"},
         {"t9", "tag9"},
         {"t0", "tag0"},
+    };
+
+    // Image viewer animation keys (internal/imgview viewer_keys.go): ctrl+a
+    // toggles playback, ctrl+p and ctrl+n step one frame. label, KeyEvent
+    // code, meta. These are dedicated chords: the latched Ctrl/Alt does not
+    // apply and the latch is dropped.
+    // internal/gui/android/playback_test.go reads this table.
+    private static final Object[][] PLAYBACK = {
+        {"⏯", KeyEvent.KEYCODE_A, KeyEvent.META_CTRL_ON},
+        {"◀F", KeyEvent.KEYCODE_P, KeyEvent.META_CTRL_ON},
+        {"F▶", KeyEvent.KEYCODE_N, KeyEvent.META_CTRL_ON},
     };
 
     private final Listener listener;
@@ -114,6 +126,9 @@ final class ExtraKeys extends LinearLayout implements Modifiers {
         row.addView(sessions);
         mux = key("MUX", this::toggleMux);
         row.addView(mux);
+        for (Object[] item : PLAYBACK) {
+            row.addView(key((String) item[0], () -> chord((Integer) item[1], (Integer) item[2])));
+        }
 
         HorizontalScrollView main = new HorizontalScrollView(context);
         main.setHorizontalScrollBarEnabled(false);
@@ -177,6 +192,11 @@ final class ExtraKeys extends LinearLayout implements Modifiers {
     private void sendMux(String action) {
         clearLatch();
         listener.mux(action);
+    }
+
+    private void chord(int code, int meta) {
+        listener.key(code, meta);
+        clearLatch();
     }
 
     private void paint() {

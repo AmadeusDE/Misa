@@ -214,7 +214,8 @@ internal/
                                  (RGB/RGBA only; no files, compression or native animation)
   term/                          VT emulator + PTY: reader goroutine, DEC 2026 sync buffering, session-wide kill on Close.
                                  terminal.go (sessions, StartArgv/StartFunc), parser.go, screen.go, sgr.go, charset.go,
-                                 reports.go, render.go, mouse.go, input.go (async PTY writes), ptyfd.go (pollable master),
+                                 reports.go, focus.go (mode 1004 host focus/visibility, late-subscriber replay),
+                                 render.go, mouse.go, input.go (async PTY writes), ptyfd.go (pollable master),
                                  jobs.go (wait4 with WUNTRACED: Stopped/Continue)
                                  snapshot.go (Snapshot: cell copy for frontends, immutable graphics placements and generation;
                                  off until a consumer enables them: the GUI does, mux panes do not), graphics*.go (bounded
@@ -248,6 +249,7 @@ internal/
     render.go canvas.go          Cells → premultiplied pixels, row damage against what each buffer last
                                  showed. Canvas order follows PixelFormat. Only the default background
                                  takes `opacity` (default 0.55; ARGB8888 buffers unless it is 1)
+    invalidate.go                Reconstructible GUI cache eviction and full redraw from the live terminal store
     images.go                    Kitty placements: cell metrics and clip, nearest neighbour scaling, alpha
                                  over the canvas, per-buffer placement damage. The GUI terminal enables
                                  graphics for its child; mux panes stay disabled
@@ -261,7 +263,10 @@ internal/
                                  `ANativeWindow_setBuffersGeometry(..., WINDOW_FORMAT_RGBA_8888)`,
                                  lock with the damage rect, copy rows at `buffer.stride`,
                                  unlockAndPost. Density is the core's buffer scale. Insets
-                                 shrink the grid. Sessions survive surface loss
+                                 shrink the grid. Sessions survive surface loss. visibility.go gates presentation
+                                 and child focus on Activity/window/surface/tab state; sessions.go lists tabs
+                                 without activating them. eventqueue.go preserves lifecycle events on overflow.
+                                 Low memory invalidates GUI caches, never protocol images
   cmd/misagui/                   `libmisagui.so` (`-buildmode=c-shared`, `android && cgo`).
                                  `JNI_OnLoad` in `jni_onload.c` calls `RegisterNatives` on
                                  `app/misa/Native` (`MISA_JNI_CLASS` overrides it). A4 loads
@@ -271,7 +276,7 @@ internal/
   android/                       APK shell (`app.misa`), pure Java, no AndroidX. `MisaActivity`
                                  (SurfaceView, InputConnection, extra-keys row with a latched
                                  Ctrl/Alt that applies to IME text, a MUX row of one-tap
-                                 multiplexer buttons, insets, pinch),
+                                 multiplexer buttons, image pause/step chords, lifecycle/focus callbacks, insets, pinch),
                                  `SessionService` (foreground `specialUse` notification, Stop),
                                  `Bootstrap` (D10 env, `filesDir/bin` symlinks to `libmisa.so`,
                                  first-run config). `Native` loads `libmisagui` from its static

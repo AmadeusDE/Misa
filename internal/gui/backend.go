@@ -39,6 +39,13 @@ const (
 	// EventFont changes the point size. FontSize is absolute; when it is
 	// zero, Scale is a factor applied to the current size (a pinch).
 	EventFont
+	// EventInvalidate discards every cache a still-running terminal can
+	// rebuild: the compositor's scratch, the shown frame and the per-buffer
+	// frame histories, the retained snapshot and the backend's buffers. The
+	// terminal's own graphics store is the source and stays. The next frame
+	// is whole; while no surface can present it stays pending, so repeated
+	// events coalesce into the one redraw reattachment makes.
+	EventInvalidate
 )
 
 // PointerAction is a pointer event's phase. Coordinates are logical pixels,

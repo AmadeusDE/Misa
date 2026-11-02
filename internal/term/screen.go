@@ -364,6 +364,7 @@ func (t *Terminal) reset() {
 	t.appCursorKeys = false
 	t.bracketedPaste = false
 	t.cursorHidden = false
+	t.focus.reset()
 	t.mouse = MouseMode{}
 	t.dropGraphics()
 	t.clearRange(0, 0, t.Rows-1, t.Cols-1)

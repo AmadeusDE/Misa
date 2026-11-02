@@ -97,6 +97,8 @@ func TestSessionsSurviveSurfaceLoss(t *testing.T) {
 		t.Fatalf("argv %q dir %q", g.argv, g.dir)
 	}
 
+	m.OnVisibility(true)
+	m.OnFocus(true)
 	surf := newMemSurface(1080, 2400)
 	m.attach(surf)
 	m.OnSurfaceChanged(1080, 2400, 3, 0, 80, 0, 120)
@@ -151,10 +153,9 @@ func TestSessionsSurviveSurfaceLoss(t *testing.T) {
 		t.Fatalf("pointer %+v", down)
 	}
 
-	before := be.bufferID()
 	m.OnLowMemory()
-	if be.bufferID() == before {
-		t.Fatal("low memory kept the framebuffer id")
+	if !hasKind(be.eventsLogged(), gui.EventInvalidate) {
+		t.Fatal("low memory did not request cache eviction")
 	}
 
 	m.CloseSession(id)

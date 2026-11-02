@@ -352,6 +352,8 @@ func (t *Terminal) privateMode(set bool) {
 			}
 		case 2004:
 			t.bracketedPaste = set
+		case 1004:
+			t.setFocusReporting(set)
 		case 9, 1000, 1002, 1003, 1006:
 			t.setMouseMode(p, set)
 		}
