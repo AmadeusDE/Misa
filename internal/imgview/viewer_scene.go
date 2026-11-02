@@ -1,9 +1,10 @@
 package imgview
 
 import (
-	"github.com/AmadeusDE/Misa/internal/imageframe"
 	"image"
 	"math"
+
+	"github.com/AmadeusDE/Misa/internal/imageframe"
 )
 
 func (m *Viewer) columns() int { return max(1, m.width/max(1, m.thumb)) }
@@ -111,6 +112,17 @@ func transformed(it *viewerItem, src *image.NRGBA) *image.NRGBA {
 	return dst
 }
 
+// imageDestination is shared by both scene and standalone rendering.
+func imageDestination(size image.Point, box image.Rectangle, z float64, pan image.Point) image.Rectangle {
+	if z <= 0 {
+		z = math.Min(float64(box.Dx())/float64(size.X), float64(box.Dy())/float64(size.Y))
+	}
+	dw, dh := max(1, int(float64(size.X)*z)), max(1, int(float64(size.Y)*z))
+	x := box.Min.X + (box.Dx()-dw)/2 - pan.X
+	y := box.Min.Y + (box.Dy()-dh)/2 - pan.Y
+	return image.Rect(x, y, x+dw, y+dh)
+}
+
 // Scene returns viewport-local placements in physical pixels; the bottom row is
 // reserved for status. CellPixels carries the real cell size, so a half-block
 // sample keeps the image's shape instead of assuming square samples.
@@ -127,15 +139,9 @@ func (m *Viewer) Scene(owner, generation uint64) imageframe.Scene {
 		if pix == nil {
 			return
 		}
-		size := pix.Bounds().Size()
-		if z <= 0 {
-			z = math.Min(float64(box.Dx())/float64(size.X), float64(box.Dy())/float64(size.Y))
-		}
-		dw, dh := max(1, int(float64(size.X)*z)), max(1, int(float64(size.Y)*z))
-		x := box.Min.X + (box.Dx()-dw)/2 - pan.X
-		y := box.Min.Y + (box.Dy()-dh)/2 - pan.Y
+		dest := imageDestination(pix.Bounds().Size(), box, z, pan)
 		r := &imageframe.Raster{ID: uint64(i + 1), Generation: it.version + it.appearance, Pixels: pix}
-		s.Placements = append(s.Placements, imageframe.Placement{ID: uint64(i + 1), Raster: r, Source: pix.Bounds(), Dest: image.Rect(x, y, x+dw, y+dh), Clip: box})
+		s.Placements = append(s.Placements, imageframe.Placement{ID: uint64(i + 1), Raster: r, Source: pix.Bounds(), Dest: dest, Clip: box})
 	}
 	if !m.grid {
 		add(m.index, image.Rectangle{Max: view}, m.scale(), m.pan)

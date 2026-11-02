@@ -64,14 +64,15 @@ func BenchmarkDrawOneRowChanged(b *testing.B) {
 }
 
 func BenchmarkSnapshotAndDiff(b *testing.B) {
+	r := testRenderer(b)
 	tm := term.New(benchRows, benchCols)
 	tm.ProcessOutput([]byte(strings.Repeat("\x1b[31mhello\x1b[m world ", 400)))
 	var s term.Snapshot
 	var prev frame
 	tm.Snapshot(&s)
-	prev.record(&s, cursorState{})
+	prev.record(&s, cursorState{}, nil, r.metrics())
 	for b.Loop() {
 		tm.Snapshot(&s)
-		changedRows(&s, cursorState{}, &prev)
+		changedRows(&s, cursorState{}, &prev, r.metrics())
 	}
 }

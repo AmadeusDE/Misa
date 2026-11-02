@@ -66,6 +66,12 @@ func misaOnPinch(scale C.float) { android.Default.OnPinch(float64(scale)) }
 //export misaOnLowMemory
 func misaOnLowMemory() { android.Default.OnLowMemory() }
 
+//export misaOnVisibility
+func misaOnVisibility(visible C.int) { android.Default.OnVisibility(visible != 0) }
+
+//export misaOnFocus
+func misaOnFocus(hasFocus C.int) { android.Default.OnFocus(hasFocus != 0) }
+
 //export misaNewSession
 func misaNewSession() C.int { return C.int(android.Default.NewSession()) }
 
@@ -80,6 +86,33 @@ func misaActiveSession() C.int { return C.int(android.Default.ActiveSession()) }
 
 //export misaSessionCount
 func misaSessionCount() C.int { return C.int(android.Default.SessionCount()) }
+
+// misaSessionIDs copies one snapshot of the session ids into a malloc'd
+// buffer, writes its length to count and returns it. The caller frees it.
+// A nil buffer with count 0 means no sessions or no memory.
+//
+//export misaSessionIDs
+func misaSessionIDs(count *C.int) *C.int {
+	if count != nil {
+		*count = 0
+	}
+	ids := android.Default.SessionIDs()
+	if len(ids) == 0 {
+		return nil
+	}
+	buf := C.malloc(C.size_t(len(ids)) * C.size_t(unsafe.Sizeof(C.int(0))))
+	if buf == nil {
+		return nil
+	}
+	out := unsafe.Slice((*C.int)(buf), len(ids))
+	for i, id := range ids {
+		out[i] = C.int(id)
+	}
+	if count != nil {
+		*count = C.int(len(ids))
+	}
+	return (*C.int)(buf)
+}
 
 func cStrings(vars **C.char, n C.int) []string {
 	if vars == nil || n <= 0 {

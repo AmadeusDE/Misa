@@ -8,7 +8,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-
 	"github.com/AmadeusDE/Misa/internal/imageframe"
 	"github.com/AmadeusDE/Misa/internal/imgview/animdecode"
 )
@@ -39,6 +38,8 @@ type PlaybackPolicy struct {
 	Autoplay bool
 	Loops    LoopMode
 	FPS      int
+	// MinInterval bounds the presentation rate independently of FPS.
+	MinInterval time.Duration
 }
 
 // animationPlayback is the viewer's seam to playback.go's controller. The
@@ -75,9 +76,12 @@ type animation struct {
 	version       uint64
 	src           *animdecode.Source
 	ctrl          animationPlayback
-	ctx           context.Context
+	ctx           context.Context // sequence lifetime: cancelled when the sequence stops
 	cancel        context.CancelFunc
+	work          context.Context // outstanding decode/index commands
+	stopWork      context.CancelFunc
 	stop          chan struct{}
+	retime        chan struct{}
 	gen           uint64
 	armed         bool
 	index         int // committed frame, -1 until the first decode lands
@@ -88,8 +92,24 @@ type animation struct {
 	frame         *image.NRGBA
 }
 
-// invalidate drops outstanding ticks and decode results. It never closes the
-// source: an in-flight codec call cannot be interrupted and must finish first.
+// newWork gives the next decode or index command its own child of the sequence
+// context. The sequence stays live, so a hidden viewer can resume with the same
+// source, controller, frame and loop counter.
+func (a *animation) newWork() {
+	if a.stopWork != nil {
+		a.stopWork()
+	}
+	parent := a.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	a.work, a.stopWork = context.WithCancel(parent)
+}
+
+// invalidate drops outstanding ticks, decode and index commands. A codec call
+// cannot be interrupted, so cancelling only stops the bounded reads and frame
+// loop at their next checkpoint and the result is dropped by its generation; the
+// source stays open because it is still the live sequence.
 func (a *animation) invalidate() {
 	if a.stop != nil {
 		close(a.stop)
@@ -97,6 +117,7 @@ func (a *animation) invalidate() {
 	a.stop = make(chan struct{})
 	a.gen++
 	a.armed = false
+	a.newWork()
 }
 
 func (a *animation) closeSource() {
@@ -136,7 +157,8 @@ type viewerTick struct {
 }
 
 // SetVisible reports whether the host currently shows the viewer. Hidden owners
-// stop timers and frame decoding; revealing resumes with the saved delay.
+// stop timers, frame decoding and poster/thumbnail decoding; revealing resumes
+// with the saved delay.
 //
 // A host reports true only for a screen that is on screen and owns the keyboard,
 // so it also settles focus: terminal focus messages are routed to one pane at a
@@ -145,21 +167,32 @@ type viewerTick struct {
 // leaves focus alone; the standalone program has no host and relies on focus
 // messages alone.
 //
-// The returned command is what restarts the clock: hiding cancelled the pending
-// boundary, so a host that only records the call would leave playback frozen
-// until some unrelated message reached the viewer. The host must return it from
-// its own Update.
+// The returned command is what restarts the work hiding cancelled: the pending
+// boundary, the animation source and the poster or thumbnail decode. A host that
+// only recorded the call would leave playback frozen and the image missing until
+// some unrelated message reached the viewer, so the host must return it from its
+// own Update.
 func (m *Viewer) SetVisible(visible bool) tea.Cmd {
 	m.visible = visible
 	if visible {
 		m.focused = true
 	}
-	m.syncAnimation()
-	return tea.Batch(m.ensureAnimation(), m.animCmd())
+	m.syncVisibility()
+	return tea.Batch(m.load(), m.ensureAnimation(), m.animCmd())
 }
 
+// screenVisible reports whether the screen may spend decode or playback work:
+// on screen, keyboard-focused, not covered by help and not closing. A host
+// reports visibility through SetVisible and focus through the focus messages, so
+// both routes end here.
+func (m *Viewer) screenVisible() bool {
+	return m.visible && m.focused && !m.help && !m.quit
+}
+
+// animationVisible narrows screen visibility to the single-image view: the
+// thumbnail grid always shows still posters.
 func (m *Viewer) animationVisible() bool {
-	return m.visible && m.focused && !m.grid && !m.help && !m.quit
+	return m.screenVisible() && !m.grid
 }
 
 // syncAnimation propagates viewer visibility to the controller. Grid, help and
@@ -207,15 +240,15 @@ func (m *Viewer) openAnimation(index int) tea.Cmd {
 	a := &animation{item: index, version: it.version, ctx: ctx, cancel: cancel, visible: m.animationVisible(), index: -1}
 	a.invalidate()
 	m.anim = a
-	path, limits, gen := it.path, m.limits, a.gen
+	path, limits, gen, work := it.path, m.limits, a.gen, a.work
 	return func() tea.Msg {
-		src, err := OpenAnimation(ctx, path, limits)
+		src, err := OpenAnimation(work, path, limits)
 		return viewerAnimation{anim: a, gen: gen, src: src, err: err}
 	}
 }
 
 func (m *Viewer) ensureAnimation() tea.Cmd {
-	if m.anim != nil || len(m.items) == 0 || m.grid || m.help || m.quit || !m.visible || !m.focused {
+	if m.anim != nil || len(m.items) == 0 || !m.animationVisible() {
 		return nil
 	}
 	it := &m.items[m.index]
@@ -259,7 +292,7 @@ func (m *Viewer) animationOpened(v viewerAnimation) {
 }
 
 func (m *Viewer) frameCmd(a *animation, frame int) tea.Cmd {
-	src, ctx, gen, limits := a.src, a.ctx, a.gen, m.limits
+	src, ctx, gen, limits := a.src, a.work, a.gen, m.limits
 	a.frameInFlight, a.frameGen = true, gen
 	return func() tea.Msg {
 		release, err := reserveAnimationWork(limits)
@@ -310,6 +343,10 @@ func (m *Viewer) tick(v viewerTick) {
 		return
 	}
 	a.armed = false
+	// A changed transport budget may extend a timer that was already armed.
+	if p, ok := a.ctrl.(interface{ PresentationPending() bool }); ok && p.PresentationPending() {
+		return
+	}
 	if !m.animationVisible() || !a.ctrl.Playing() {
 		return
 	}
@@ -342,7 +379,10 @@ func (m *Viewer) waitCmd(a *animation) tea.Cmd {
 	if delay < time.Millisecond {
 		delay = time.Millisecond
 	}
-	stop, gen := a.stop, a.gen
+	if a.retime == nil {
+		a.retime = make(chan struct{})
+	}
+	stop, retime, gen := a.stop, a.retime, a.gen
 	// The boundary starts when it is armed, not when the runtime schedules the
 	// command, so the remaining delay stays accurate under load.
 	clock := m.clock
@@ -353,6 +393,9 @@ func (m *Viewer) waitCmd(a *animation) tea.Cmd {
 	return func() tea.Msg {
 		select {
 		case <-timer.C():
+			return viewerTick{anim: a, gen: gen}
+		case <-retime:
+			timer.Stop()
 			return viewerTick{anim: a, gen: gen}
 		case <-stop:
 			timer.Stop()

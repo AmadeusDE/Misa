@@ -17,13 +17,15 @@ type Runner func(be gui.Backend, dir string, argv []string) (int, error)
 
 // Manager owns the terminal sessions and the one Surface they share.
 // Input reaches the active session. Destroying the surface releases the
-// window and leaves every child running; the next surface gets a full redraw.
+// window and preserves every session; the next visible surface gets a full redraw.
 type Manager struct {
 	mu       sync.Mutex
 	runner   Runner
 	sessions map[int]*session
 	order    []int
 	active   int
+	visible  bool
+	focused  bool
 	nextID   int
 	exe      string
 	dir      string
@@ -34,10 +36,13 @@ type Manager struct {
 }
 
 type session struct {
-	id   int
-	be   *Backend
-	code int
-	err  error
+	id         int
+	be         *Backend
+	code       int
+	err        error
+	shown      bool
+	focusKnown bool
+	focused    bool
 }
 
 // Default is the process-wide manager JNI calls.
@@ -149,25 +154,6 @@ func (m *Manager) OnSurfaceChanged(w, h int, density float64, left, top, right, 
 	}
 }
 
-// OnSurfaceDestroyed releases the window. Sessions keep running.
-func (m *Manager) OnSurfaceDestroyed() {
-	m.mu.Lock()
-	surf := m.surf
-	m.surf = nil
-	backs := make([]*Backend, 0, len(m.sessions))
-	for _, s := range m.sessions {
-		backs = append(backs, s.be)
-	}
-	m.mu.Unlock()
-	for _, b := range backs {
-		b.setPresenting(false)
-		b.setSurface(nil)
-	}
-	if surf != nil {
-		surf.Release()
-	}
-}
-
 // OnText delivers an IME commit to the active session. meta is the latched
 // Ctrl/Alt state from the extra-keys bar; zero sends the text unchanged.
 func (m *Manager) OnText(s string, meta int) {
@@ -229,24 +215,6 @@ func (m *Manager) OnPinch(scale float64) {
 	m.emitActive(gui.Event{Kind: gui.EventFont, Scale: scale})
 }
 
-// OnLowMemory drops spare framebuffers and asks the active session to
-// repaint, so the next frame is whole.
-func (m *Manager) OnLowMemory() {
-	m.mu.Lock()
-	var active *Backend
-	for _, s := range m.sessions {
-		s.be.DropBuffers()
-		if s.id == m.active {
-			active = s.be
-		}
-	}
-	g := m.geom
-	m.mu.Unlock()
-	if active != nil {
-		active.pushGeom(g)
-	}
-}
-
 // NewSession starts another child on exe and makes it active. The id is
 // never reused. Zero means OnCreate has not stored an executable.
 func (m *Manager) NewSession() int {
@@ -261,22 +229,17 @@ func (m *Manager) NewSession() int {
 	s := &session{id: id, be: be}
 	m.sessions[id] = s
 	m.order = append(m.order, id)
-	if old := m.sessions[m.active]; old != nil {
-		old.be.setPresenting(false)
-		old.be.setSurface(nil)
-	}
 	m.active = id
-	surf := m.surf
-	g := m.geom
+	m.syncPresentationLocked(false)
+	if !s.shown {
+		be.pushGeom(m.geom)
+	}
 	dir, exe := m.dir, m.exe
 	if dir == "" {
 		dir = "."
 	}
 	run := m.runner
 	m.mu.Unlock()
-	be.setSurface(surf)
-	be.setPresenting(surf != nil)
-	be.pushGeom(g)
 	go func() {
 		code, err := run(be, dir, []string{exe})
 		m.finish(s, code, err)
@@ -288,52 +251,34 @@ func (m *Manager) NewSession() int {
 // active. An unknown id is ignored.
 func (m *Manager) CloseSession(id int) {
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	s := m.sessions[id]
 	if s == nil {
-		m.mu.Unlock()
 		return
 	}
+	m.hideLocked(s)
 	delete(m.sessions, id)
 	m.order = removeID(m.order, id)
-	var next *session
 	if m.active == id {
 		m.active = 0
 		if n := len(m.order); n > 0 {
-			next = m.sessions[m.order[n-1]]
-			m.active = next.id
+			m.active = m.order[n-1]
 		}
 	}
-	surf := m.surf
-	g := m.geom
-	m.mu.Unlock()
 	s.be.emit(gui.Event{Kind: gui.EventClose})
-	if next != nil {
-		next.be.setSurface(surf)
-		next.be.setPresenting(surf != nil)
-		next.be.pushGeom(g)
-	}
+	m.syncPresentationLocked(false)
 }
 
 // SwitchSession shows id. The terminal is resized to the current surface
 // so a rotation that happened while it was hidden is applied.
 func (m *Manager) SwitchSession(id int) {
 	m.mu.Lock()
-	s := m.sessions[id]
-	if s == nil || m.active == id {
-		m.mu.Unlock()
+	defer m.mu.Unlock()
+	if m.sessions[id] == nil || m.active == id {
 		return
 	}
-	if old := m.sessions[m.active]; old != nil {
-		old.be.setPresenting(false)
-		old.be.setSurface(nil)
-	}
 	m.active = id
-	surf := m.surf
-	g := m.geom
-	m.mu.Unlock()
-	s.be.setSurface(surf)
-	s.be.setPresenting(surf != nil)
-	s.be.pushGeom(g)
+	m.syncPresentationLocked(false)
 }
 
 // ActiveSession is the visible session, or 0 when there is none.
@@ -350,58 +295,22 @@ func (m *Manager) SessionCount() int {
 	return len(m.sessions)
 }
 
-func (m *Manager) attach(surf Surface) {
-	m.mu.Lock()
-	old := m.surf
-	m.surf = surf
-	var active *Backend
-	for _, s := range m.sessions {
-		if s.id == m.active {
-			active = s.be
-			continue
-		}
-		s.be.setPresenting(false)
-		s.be.setSurface(nil)
-	}
-	g := m.geom
-	m.mu.Unlock()
-	if old != nil && old != surf {
-		old.Release()
-	}
-	if active != nil {
-		active.setSurface(surf)
-		active.setPresenting(true)
-		active.pushGeom(g)
-	}
-}
-
 func (m *Manager) finish(s *session, code int, err error) {
 	m.mu.Lock()
 	s.code, s.err = code, err
-	if m.sessions[s.id] != s {
-		m.mu.Unlock()
-		s.be.Close()
-		return
-	}
-	delete(m.sessions, s.id)
-	m.order = removeID(m.order, s.id)
-	var next *Backend
-	g := m.geom
-	surf := m.surf
-	if m.active == s.id {
-		m.active = 0
-		if n := len(m.order); n > 0 {
-			nxt := m.sessions[m.order[n-1]]
-			m.active = nxt.id
-			next = nxt.be
+	if m.sessions[s.id] == s {
+		m.hideLocked(s)
+		delete(m.sessions, s.id)
+		m.order = removeID(m.order, s.id)
+		if m.active == s.id {
+			m.active = 0
+			if n := len(m.order); n > 0 {
+				m.active = m.order[n-1]
+			}
 		}
+		m.syncPresentationLocked(false)
 	}
 	m.mu.Unlock()
-	if next != nil {
-		next.setSurface(surf)
-		next.setPresenting(surf != nil)
-		next.pushGeom(g)
-	}
 	s.be.Close()
 }
 

@@ -3,7 +3,6 @@ package imgview
 import (
 	"context"
 	"fmt"
-
 	"image"
 	"path/filepath"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	"unicode"
 
 	tea "charm.land/bubbletea/v2"
-
 	"github.com/AmadeusDE/Misa/internal/config"
 	"github.com/AmadeusDE/Misa/internal/imageframe"
 	"github.com/AmadeusDE/Misa/internal/imgview/animdecode"
@@ -39,6 +37,7 @@ type Viewer struct {
 	limits               Limits
 	initialFit           fitMode
 	inFlight             bool
+	loadGen              uint64
 	cancel               context.CancelFunc
 	drag                 bool
 	dragAt               image.Point
@@ -54,6 +53,8 @@ type Viewer struct {
 	note                 string
 	notice               string
 	rendererWarning      string
+	renderer             string
+	config               config.ImageViewerConfig
 	policy               PlaybackPolicy
 	clock                imageframe.Clock
 	newPlayback          playbackFactory
@@ -91,7 +92,7 @@ func NewConfigured(paths []string, thumbnail bool, renderer string, cfg config.I
 	// two sample rows. Map the nominal 128px default to the historical 16-cell
 	// grid width.
 	thumb := max(8, min(128, cfg.ThumbnailSize/8))
-	m := &Viewer{grid: thumbnail || cfg.InitialMode == "thumbnails", fit: fit, initialFit: fit, thumb: thumb, cellPixels: defaultCellPixels,
+	m := &Viewer{renderer: renderer, config: cfg, grid: thumbnail || cfg.InitialMode == "thumbnails", fit: fit, initialFit: fit, thumb: thumb, cellPixels: defaultCellPixels,
 		cache: NewCache(int64(cfg.CacheMiB) << 20), limits: Limits{MaxEncodedBytes: int64(cfg.MaxFileMiB) << 20, MaxPixels: int64(cfg.MaxPixels), Animation: animdecode.Limits{
 			MaxWorkingBytes:  int64(cfg.AnimationCacheMiB) << 20,
 			MaxMetadataBytes: int64(cfg.AnimationMetadataMiB) << 20,
@@ -125,6 +126,10 @@ func (m *Viewer) pixels(i int) *image.NRGBA {
 	}
 	return d.Pixels
 }
+
+// Renderer returns the requested rendering mode.
+func (m *Viewer) Renderer() string { return m.renderer }
+
 func (m *Viewer) Index() int      { return m.index }
 func (m *Viewer) Thumbnail() bool { return m.grid }
 func (m *Viewer) IsQuit() bool    { return m.quit }
@@ -202,12 +207,40 @@ func (m *Viewer) SetImage(i int, img image.Image, err error) {
 type viewerLoaded struct {
 	index   int
 	version uint64
+	gen     uint64
 	decoded Decoded
 	err     error
 }
 
+// cancelLoad drops the outstanding decode request. A codec call cannot be
+// interrupted, so the request keeps its generation instead of being abandoned:
+// the result still arrives and is discarded by loaded. Nothing new starts while
+// the screen stays hidden, and the reveal asks for the item again.
+//
+// m.cancel marks a request that is still outstanding, so hiding twice bumps the
+// generation once and no further work is invalidated by later hidden passes.
+func (m *Viewer) cancelLoad() {
+	if m.cancel == nil {
+		return
+	}
+	m.loadGen++
+	m.cancel()
+	m.cancel = nil
+}
+
+// syncVisibility applies the current visibility to all background work: a
+// screen that is hidden, unfocused or covered cancels its outstanding decode and
+// freezes the playback clock. It runs on every message, so a transition that
+// arrived as a focus message and one the host pushed look the same here.
+func (m *Viewer) syncVisibility() {
+	if !m.screenVisible() {
+		m.cancelLoad()
+	}
+	m.syncAnimation()
+}
+
 func (m *Viewer) load() tea.Cmd {
-	if len(m.items) == 0 || m.quit {
+	if len(m.items) == 0 || !m.screenVisible() {
 		return nil
 	}
 	if m.inFlight {
@@ -229,6 +262,7 @@ func (m *Viewer) load() tea.Cmd {
 			m.inFlight = true
 			ctx, cancel := context.WithCancel(context.Background())
 			m.cancel = cancel
+			gen := m.loadGen
 			path, version, limits := it.path, it.version, m.limits
 			return func() tea.Msg {
 				l := NewLoader(1, 1)
@@ -236,9 +270,9 @@ func (m *Viewer) load() tea.Cmd {
 				l.Submit(Request{Context: ctx, Path: path, Limits: limits, Generation: version, Visible: true})
 				select {
 				case r := <-l.Results():
-					return viewerLoaded{i, version, r.Image, r.Err}
+					return viewerLoaded{index: i, version: version, gen: gen, decoded: r.Image, err: r.Err}
 				case <-ctx.Done():
-					return viewerLoaded{i, version, Decoded{}, ctx.Err()}
+					return viewerLoaded{index: i, version: version, gen: gen, err: ctx.Err()}
 				}
 			}
 		}
@@ -278,14 +312,19 @@ func (m *Viewer) Update(msg tea.Msg) tea.Cmd {
 	}
 	if m.quit {
 		m.stopAnimation()
-		if m.cancel != nil {
-			m.cancel()
-		}
+		m.cancelLoad()
 	}
-	m.syncAnimation()
+	m.syncVisibility()
 	return tea.Batch(m.load(), m.ensureAnimation(), m.animCmd())
 }
 
+// loaded publishes a decode result. A result whose generation is stale ran for a
+// screen that was hidden, unfocused or covered, so it may not publish a
+// cancellation as an item error and may not leave the item marked loading: the
+// reveal requests it again. A decode that did finish before it could be
+// cancelled is still admitted, because that work is already paid for, admitting
+// it starts nothing new, and it makes the reveal instant. Publication of stale
+// pixels from an older item version is refused separately, by version.
 func (m *Viewer) loaded(v viewerLoaded) {
 	m.inFlight = false
 	if m.cancel != nil {
@@ -298,6 +337,17 @@ func (m *Viewer) loaded(v viewerLoaded) {
 	it := &m.items[v.index]
 	if it.version != v.version {
 		return
+	}
+	if v.gen != m.loadGen {
+		// The screen was hidden, unfocused or covered while this request ran, so
+		// it was cancelled. A cancellation or a missing result is dropped and the
+		// item stays unloaded for the reveal to request again; a finished image is
+		// still admitted, because that work is already paid for and admitting it
+		// keeps the reveal instant.
+		if v.err != nil || v.decoded.Pixels == nil {
+			it.loading = false
+			return
+		}
 	}
 	if v.decoded.Pixels == nil {
 		m.SetImage(v.index, nil, v.err)

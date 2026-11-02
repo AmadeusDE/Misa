@@ -76,7 +76,7 @@ func runImgview(ctx *Context) int {
 	flags, err := imgviewSpec.ParseArgs(ctx.Args)
 	if err == nil && HandleHelpVersion(ctx, flags, imgviewSpec) {
 		if flags.HelpRequested {
-			fmt.Fprintln(ctx.Stdout, "\nOpen FILEs, or the images inside DIRs, in order. -r/--recursive also descends\ninto subdirectories; hidden entries are skipped. --renderer accepts auto,\nhalfblock, or kitty (falls back to halfblock).")
+			fmt.Fprintln(ctx.Stdout, "\nOpen FILEs, or the images inside DIRs, in order. -r/--recursive also descends\ninto subdirectories; hidden entries are skipped. --renderer accepts auto,\nhalfblock, or kitty (forced pixels); auto probes the terminal.")
 		}
 		return 0
 	}

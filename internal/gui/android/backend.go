@@ -197,14 +197,7 @@ func (b *Backend) emit(ev gui.Event) {
 	if ev.Kind == gui.EventPointer || ev.Kind == gui.EventScroll {
 		return
 	}
-	select {
-	case <-b.events:
-	default:
-	}
-	select {
-	case b.events <- ev:
-	default:
-	}
+	b.overflow(ev)
 }
 
 func (b *Backend) note(ev gui.Event) {
