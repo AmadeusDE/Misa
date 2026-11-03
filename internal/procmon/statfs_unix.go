@@ -1,4 +1,4 @@
-//go:build !openbsd && !freebsd && !netbsd && !darwin && !dragonfly
+//go:build unix && !openbsd && !freebsd && !netbsd && !darwin && !dragonfly
 
 package procmon
 

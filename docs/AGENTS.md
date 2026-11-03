@@ -39,6 +39,10 @@ ANDROID_NDK_HOME=... ANDROID_HOME=... just apk-release
 # CGO_ENABLED=0 go vet ./... is arm64 only. android/amd64 cannot load test
 # binaries without the external linker, so that arch typechecks libraries
 # with go build. The arm64 vet covers the pure-Go android files.
+# Windows (in progress, #108). Package loading only until F04: the reduced build does not
+# compile yet. platformset_test.go pins the Windows package set and runs in `go test ./...`.
+GOOS=windows GOARCH=amd64 go list -tags 'nough noweb' -deps . >/dev/null
+GOOS=windows GOARCH=arm64 go list -tags 'nough noweb' -deps . >/dev/null
 ```
 
 Single binary, no external build tools needed except the Android NDK for `GOOS=android`
