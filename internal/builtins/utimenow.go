@@ -4,4 +4,7 @@ package builtins
 
 import "golang.org/x/sys/unix"
 
-const utimeNow = unix.UTIME_NOW
+const (
+	utimeNow  = unix.UTIME_NOW
+	utimeOmit = unix.UTIME_OMIT
+)
